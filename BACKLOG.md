@@ -8,9 +8,33 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
 
 ## DPI-1: Propagate RDP client DPI to Xorg/xorgxrdp sessions
 
-- **Status:** TODO
+- **Status:** IN PROGRESS (implementation + headless tests DONE; interactive
+  E2 verification on localhost:3389 pending — see dev_config.md Part E2/F)
 - **Source:** `PRD.md`
 - **Owner:** (unassigned)
+
+### Progress log
+
+- **Done:** end-to-end plumbing implemented exactly per the Fix scope below.
+  - Pure helper `xrdp_client_info_calculate_dpi()` + range predicate
+    `xrdp_client_info_dpi_valid_for_session()` (bounds 50..400) added to
+    `common/xrdp_client_info.{c,h}` (new `.c`, wired into `common/Makefile.am`).
+  - Login screen keeps the **raw** DPI (no font-scaling regression); bounds
+    apply only on the session path.
+  - DPI field appended at END of SCP `"yqqysss"`→`"yqqysssq"` and EICP
+    `"iyqqysss"`→`"iyqqysssq"`; re-validated on every receive (defense in depth).
+  - `LIBIPM_VERSION` 2→3; test canary `tests/libipm/test_libipm.h` updated to 3.
+  - sesexec emits `-dpi <n>` as two integer-only argv tokens, only when valid
+    AND no admin `-dpi` already present (exact-token compare); admin wins.
+  - Unit tests added: `tests/common/test_xrdp_client_info.c` (15 cases, PRD
+    §10.1). `make check` green: libcommon 172, libipm 35, libxrdp 13, memtest 1,
+    XRDP daemon 26. astyle (pinned 3.4.14) clean; no new cppcheck findings.
+  - BEFORE baseline: stock-commit `.deb` (`0.10.80+git34a48901382e`) installed
+    for regression testing; AFTER build verified to compile + pass tests.
+- **Pending:** interactive E2 matrix (mstsc/xfreerdp3 on localhost:3389):
+  HiDPI `-dpi` applied, 96-DPI stays ~96, invalid⇒no `-dpi`, admin-override,
+  Xvnc unchanged. libipm SCP/EICP create-session send/recv tests still TODO
+  (helper + argv logic are covered; wire round-trip for the new field is not).
 
 ### Context
 
