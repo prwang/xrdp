@@ -26,56 +26,107 @@ matches.
 
 - No hard-coded DPI — compute from client monitor metadata.
 - No changes to `startwm.sh`, `~/.xsession`, `~/.xinitrc`, or DE-specific config.
-- Backward compatible: absent/invalid DPI ⇒ exactly current behavior (96 DPI).
-- Respect admin-configured `-dpi` in `sesman.ini [Xorg]`; never emit a duplicate `-dpi`.
+- Behavior-compatible: absent/invalid DPI ⇒ exactly current behavior (96 DPI).
+  NOTE: this is *behavioral* compatibility, not wire compatibility. libipm has no
+  optional-field mechanism — every field is type-tagged and parsed positionally,
+  so adding the DPI field to the SCP/EICP messages is a breaking wire change.
+  xrdp + sesman + sesexec + sesrun ship together and must upgrade in lockstep; a
+  mixed-version peer fails the parse cleanly (fail-closed: failed session create,
+  never a misparse/crash — verified `libipm/libipm_recv.c:584-590`). Append the
+  new field at the END of the format strings and bump `LIBIPM_VERSION` so a
+  mismatch is rejected with a clear error.
+- Respect admin-configured `-dpi` in `sesman.ini [Xorg]`; never emit a duplicate
+  `-dpi`. Detect via an exact-string token compare over `g_cfg->xorg_params`;
+  never parse the client value into that decision.
 - Xorg/xorgxrdp only (not Xvnc / X11rdp).
-- Validate bounds: `50 <= dpi <= 400`; reject zero/negative/extreme; no overflow.
+- Validate bounds: `50 <= dpi <= 400`; reject zero/negative/extreme. Guard the
+  arithmetic against integer overflow (`unsigned int` math at
+  `xrdp_login_wnd.c:739`) and against `height_pixels = bottom - top + 1`
+  unsigned underflow when `bottom < top`; reject `height_mm == 0`.
 
 ### Fix scope — changed source files (end-to-end data flow)
 
 **Front-end: compute the DPI and send it**
 - `xrdp/xrdp_login_wnd.c` — extract the inline DPI calculation currently inside
-  `xrdp_login_wnd_get_monitor_dpi()` into a small, reusable, unit-testable helper
-  (input: monitor pixel height + physical height in mm; output: validated DPI).
+  `xrdp_login_wnd_get_monitor_dpi()` (formula at `:739`) into a small, reusable,
+  unit-testable helper. NOTE: the current function returns the **raw** DPI with
+  NO `50..400` bound and no overflow guard (it only feeds font scaling today); the
+  extracted helper must become the single source of truth for bounds + overflow
+  and return an "invalid" sentinel (the existing `0` return maps cleanly to
+  "absent/invalid ⇒ don't inject").
 - `common/xrdp_client_info.{h,c}` *(or a small dedicated common util)* — host the
-  pure `height_px,height_mm -> dpi` helper with bounds validation so it is
-  testable independently of `struct xrdp_wm`. *(decide exact location; if a new
-  common source file is added, update `common/Makefile.am`.)*
-- `xrdp/xrdp.h` — update declaration(s) if the helper signature changes.
+  pure `height_px,height_mm -> validated dpi` helper so it is testable
+  independently of `struct xrdp_wm` (the surrounding monitor-selection logic stays
+  in `xrdp_login_wnd.c`). *(decide exact location; if a new common source file is
+  added, update `common/Makefile.am`.)*
+- `xrdp/xrdp.h` — update declaration(s) ONLY if the existing helper signature
+  changes (not needed if the pure helper lives in a common header).
 - `xrdp/xrdp_mm.c` — `xrdp_mm_create_session()`: obtain the client DPI (via the
-  helper using `self->wm`) and pass it to `scp_send_create_session_request()`.
+  helper using `self->wm`, which it already references) and pass it to
+  `scp_send_create_session_request()`.
 
 **SCP protocol (xrdp ⇄ sesman)**
 - `libipm/scp.h` — add the DPI parameter to `scp_send_create_session_request()`
   and `scp_get_create_session_request()`.
-- `libipm/scp.c` — extend the serialization format string (currently `"yqqysss"`)
-  to carry the DPI field; re-validate bounds on receive.
+- `libipm/scp.c` — extend the serialization format string (currently `"yqqysss"`,
+  send `:428` / get `:458`) with the DPI field appended at the END; re-validate
+  `50..400` on receive (sesman must not trust xrdp's value — defense in depth).
+- `sesman/tools/sesrun.c` — **second caller** of `scp_send_create_session_request`
+  (`:507`). MUST update the call (pass a "no DPI" sentinel). **Compile blocker if
+  omitted.**
+- `libipm/libipm_private.h` — bump `LIBIPM_VERSION` (`:37`) since the wire format
+  changes; this is the graceful mismatch-rejection mechanism.
 
 **sesman: forward the DPI**
-- `sesman/scp_process.c` — `process_create_session_request()`: receive the DPI,
-  log it (e.g. *"Received client DPI for Xorg session: N"*), and forward it via
-  `eicp_send_create_session_request()`.
+- `sesman/scp_process.c` — `process_create_session_request()` (`:432`): receive
+  the DPI (`:453`), log it (e.g. *"Received client DPI for Xorg session: N"*,
+  fixed `%d` format), and forward it via `eicp_send_create_session_request()`
+  (`:535`).
 
 **EICP protocol (sesman ⇄ sesexec)**
 - `libipm/eicp.h` — add the DPI parameter to the create-session request send/get.
-- `libipm/eicp.c` — extend the serialization format string (currently `"iyqqysss"`).
+- `libipm/eicp.c` — extend the serialization format string (currently
+  `"iyqqysss"`, send `:288` / get `:321`) with the DPI field appended at the END;
+  re-validate `50..400` on receive.
 
 **sesexec: apply the DPI to the Xorg argv**
 - `sesman/sesexec/session.h` — add a DPI field (e.g. `int dpi;`, with validity
   semantics) to `struct session_parameters`.
 - `sesman/sesexec/eicp_server.c` — `handle_create_session_request()`: parse the
   DPI into `sp`.
-- `sesman/sesexec/session.c` — `prepare_xorg_xserver_params()`: append `-dpi
-  <value>` only when the DPI is valid AND the configured `[Xorg]` params do not
-  already contain `-dpi`; log the decision. Do **not** modify
-  `prepare_xvnc_xserver_params()`.
+- `sesman/sesexec/session.c` — `prepare_xorg_xserver_params()` (`:353`): append
+  `-dpi <value>` only when the DPI is valid AND the configured `[Xorg]` params do
+  not already contain `-dpi`; log the decision. Format with
+  `g_snprintf(buf, sizeof(buf), "%d", dpi)` + `list_add_strdup` (mirror the
+  existing width/height handling) — integer-only, never a combined `"-dpi N"`
+  token, never via any shell. Defensively re-check `50..400` here before emitting.
+  Do **not** modify `prepare_xvnc_xserver_params()`.
+
+**No change needed (stated to preempt the question)**
+- Session reuse/reconnect matching `session_list_get_bydata()`
+  (`sesman/scp_process.c:474`, `sesman/session_list.c:186`) intentionally does
+  NOT include DPI in its match key, and should not — on reconnect the Xorg server
+  is already running with `-dpi` baked in at launch. DPI matters only at *create*
+  time, so `session_list.h` / `struct session_item` need no DPI field.
+
+### Security must-do (from security review)
+
+- The X server is launched via `g_execvp_list()` (argv, no shell —
+  `session.c:757`); keep DPI integer-only so argument injection is impossible.
+- `env_set_user()` (the `setuid`/`setgid` drop) is the FIRST call in
+  `start_x_server` (`session.c:681-683`), before `prepare_xorg_xserver_params`
+  (`:720`). Do not reorder — DPI must be consumed post-drop, as the user.
+- Plumb DPI as pure data only; do NOT gate or branch any login/authorization
+  logic on it (no changes to auth/PAM/ownership/identity).
+- Log DPI only as a `%d` value with a fixed format string; never as a format arg.
 
 **Tests**
 - `tests/xrdp/` (or `tests/common/`) — unit tests for the DPI calc helper.
   Cases (PRD §10.1): `2160/392 -> 139/140`, `1440/392 -> 93`, `1080/286 -> 96`,
   `2160/0 -> invalid`, `0/392 -> invalid`, `2160/-1 -> invalid`, `dpi<50` /
   `dpi>400 -> invalid`.
-- `tests/libipm/` — extend send/recv tests for the new SCP/EICP DPI field.
+- `tests/libipm/` — **write** create-session send/recv tests (none exist today)
+  covering the new SCP/EICP DPI field.
 - If feasible, an argv-construction test asserting `-dpi` injection and the
   admin-override skip.
 
