@@ -64,3 +64,7 @@ xrdp_configure_options.h
 xrdpapi/xrdp-xrdpapi-simple
 .vscode/*
 xrdp_accel_assist/xrdp-accel-assist
+xrdpapi/xrdp-xrdpapi-connectmon
+# developer .deb output (scripts/build_dev_deb.sh)
+/dist/
+*.deb
