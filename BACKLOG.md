@@ -27,14 +27,17 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
   - sesexec emits `-dpi <n>` as two integer-only argv tokens, only when valid
     AND no admin `-dpi` already present (exact-token compare); admin wins.
   - Unit tests added: `tests/common/test_xrdp_client_info.c` (15 cases, PRD
-    §10.1). `make check` green: libcommon 172, libipm 35, libxrdp 13, memtest 1,
-    XRDP daemon 26. astyle (pinned 3.4.14) clean; no new cppcheck findings.
+    §10.1) for the pure helper, plus 4 SCP/EICP create-session **semantic
+    round-trip** tests in `tests/libipm/test_libipm_recv_calls.c` (send→recv
+    over the loopback link, asserting the DPI value survives and that
+    out-of-range/absent values are rejected to 0; non-DPI fields verified
+    intact). `make check` green: libcommon 172, libipm 39, libxrdp 13,
+    memtest 1, XRDP daemon 26. astyle (pinned 3.4.14) clean; no new cppcheck.
   - BEFORE baseline: stock-commit `.deb` (`0.10.80+git34a48901382e`) installed
     for regression testing; AFTER build verified to compile + pass tests.
 - **Pending:** interactive E2 matrix (mstsc/xfreerdp3 on localhost:3389):
   HiDPI `-dpi` applied, 96-DPI stays ~96, invalid⇒no `-dpi`, admin-override,
-  Xvnc unchanged. libipm SCP/EICP create-session send/recv tests still TODO
-  (helper + argv logic are covered; wire round-trip for the new field is not).
+  Xvnc unchanged.
 
 ### Context
 

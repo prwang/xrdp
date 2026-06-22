@@ -313,7 +313,7 @@ xrdp_mm_create_session(struct xrdp_mm *self)
     int rv = 0;
     int xserverbpp;
     enum scp_session_type type;
-    unsigned int dpi = 0;
+    unsigned short dpi = 0;
 
     /* Map the session code to an SCP session type */
     switch (self->code)
