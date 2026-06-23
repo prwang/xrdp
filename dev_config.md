@@ -315,7 +315,7 @@ interactive**, run by you from a real RDP client to `localhost:3389`.
 2. **Service smoke** — after deploy:
    ```bash
    systemctl is-active xrdp xrdp-sesman
-   sudo ss -ltnp | grep -E ':(3389|3350)\b'      # must be 127.0.0.1 only
+   sudo ss -ltnp | grep ':3389'                  # RDP: 127.0.0.1 only (sesman is a unix socket, no TCP 3350)
    sudo journalctl -u xrdp -u xrdp-sesman -n 60 --no-pager   # no fatal parse errors
    ```
 3. **Optional headless end-to-end (plumbing + fallback)** — drive an RDP login
