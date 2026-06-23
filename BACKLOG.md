@@ -49,9 +49,21 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
     non-console users, and a **version-matched xorgxrdp** is required — distro
     0.10.2 is incompatible with the dev branch's display-socket naming
     (upstream `c4727ad8`). A matched `xorgxrdp-dev 0.10.80` was built + installed.
-- **Pending:** AFTER interactive matrix (DPI-1 `.deb` installed): HiDPI ⇒
-  `-dpi 139` (or 140) and `xdpyinfo` `139x139`; 96-DPI stays ~96; invalid ⇒ no
-  `-dpi`; admin `-dpi` in `sesman.ini` still wins.
+  - **AFTER interactive HiDPI verified (2026-06-23):** with the DPI-1 deb, the
+    Xorg session launches `-dpi 139`, `xdpyinfo` reports `139x139`, sesman logs
+    `Received client DPI for Xorg session: 139`. **Font scaling finding:** `-dpi`
+    sets only the X *core* DPI; GTK/Qt scale from `Xft.dpi`/XSETTINGS `/Xft/DPI`,
+    so fonts scale **only when the desktop is in auto-DPI mode** (XFCE
+    `Xft/DPI = -1`). The XFCE default pins `/Xft/DPI = 96`, which overrides
+    `-dpi` — verified by flipping it to `-1` (fonts then scaled).
+  - **Scope acknowledged (per PRD Non-Goals 3 & 5):** DPI-1 propagates the core
+    DPI only; setting the toolkit `Xft.dpi`/XSETTINGS is per-user, DE-specific
+    config and is out of scope (would mean "fix every WM"). Added a sesman
+    one-line log reminder (`sesman/sesexec/session.c`) advising auto-DPI when a
+    client DPI is applied; documented in PRD §4/§11, FAQ Q14, PR.md.
+- **Pending:** finish AFTER interactive matrix (HiDPI scaling DONE): 96-DPI
+  client stays ~96; invalid metadata ⇒ no `-dpi`, session starts; admin `-dpi`
+  in `sesman.ini [Xorg]` still wins (exactly one `-dpi`).
 
 ### Context
 

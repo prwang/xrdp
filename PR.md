@@ -71,6 +71,18 @@ factor* instead (e.g. 96×1.5) is a reasonable alternative policy; it's
 intentionally out of scope here and could be added later behind a config knob
 without changing this plumbing. See FAQ for the trade-off.
 
+## Scope / limitation: core DPI vs toolkit DPI
+
+This sets the X server **core** DPI (via `-dpi`). GTK/Qt take their font scale
+from `Xft.dpi` / XSETTINGS `/Xft/DPI`, not the core DPI, so the visible effect
+appears only when the desktop runs in **auto-DPI mode** (honors the core DPI,
+e.g. XFCE `Xft/DPI = -1`). A desktop that pins a fixed toolkit DPI (e.g. XFCE's
+default `96`) will override `-dpi`. Setting `Xft.dpi`/XSETTINGS is per-user,
+desktop-specific session config and is intentionally **out of scope** (PRD
+Non-Goals 3 & 5). sesman logs a one-line reminder when it applies a client DPI
+so an admin whose fonts don't scale knows to switch the desktop to auto-DPI.
+See FAQ Q14.
+
 ## Testing
 
 - **Unit tests, pure helper** (`tests/common/test_xrdp_client_info.c`, 15 cases):

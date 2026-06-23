@@ -69,6 +69,17 @@ This patch must not:
 7. Change authentication, PAM, or session authorization behavior.
 8. Attempt to solve per-monitor mixed-DPI scaling fully in this patch.
 
+> **Acknowledged consequence of items 3 & 5.** This patch sets only the X server
+> *core* DPI (via `-dpi`) and deliberately does not touch desktop config. GUI
+> toolkits (GTK/Qt) take their font/UI scale from `Xft.dpi` / XSETTINGS
+> `/Xft/DPI`, **not** the core DPI, so visible scaling happens only when the
+> desktop honors the core DPI — i.e. runs in **auto-DPI mode** (e.g. XFCE
+> `Xft/DPI = -1`). A desktop that pins a fixed toolkit DPI (e.g. XFCE's default
+> `Xft/DPI = 96`) overrides `-dpi` and fonts will not scale. Making every DE
+> honor the core DPI is out of scope; sesman instead logs a one-line reminder
+> (see §11) whenever it applies a client DPI, so the admin knows to switch the
+> desktop to auto-DPI if scaling does not appear.
+
 ## 5. Background
 
 Currently, the `xrdp` front-end process already receives enough monitor metadata to log:
@@ -594,6 +605,16 @@ Suggested sesman logs:
 ```text
 [INFO ] Received client DPI for Xorg session: 139
 [INFO ] Starting X server on display 11: /usr/lib/xorg/Xorg :11 ... -dpi 139 ...
+```
+
+When the client DPI is applied, sesman also logs a reminder that the desktop
+must be in auto-DPI mode for it to take visible effect (see Non-Goals):
+
+```text
+[INFO ] ... starting Xorg with client DPI 139. This sets the X server core DPI
+        only; GUI toolkits (GTK/Qt) follow it only when the desktop's font DPI is
+        automatic. If fonts do not scale, set the desktop to auto DPI (e.g. XFCE
+        Xft/DPI = -1).
 ```
 
 If skipped:

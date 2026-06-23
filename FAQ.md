@@ -141,3 +141,23 @@ each hop has a send side, a receive side, and a header. That's inherent to the
 SCP/EICP design; each file's change is small (a parameter + a format-string
 field + a validation). The actual logic lives in one place
 (`common/xrdp_client_info.c`).
+
+### Q14. Does `-dpi` actually scale the desktop fonts? Why not set `Xft.dpi`?
+
+`-dpi` sets the X server **core** DPI (what `xdpyinfo` reports). GTK/Qt toolkits
+take their font/UI scale from `Xft.dpi` / XSETTINGS `/Xft/DPI`, **not** the core
+DPI — so visible scaling happens only when the desktop runs in **auto-DPI mode**
+(it honors the core DPI, e.g. XFCE `Xft/DPI = -1`). A desktop that pins a fixed
+toolkit DPI (e.g. XFCE's default `Xft/DPI = 96`) overrides `-dpi`, and fonts stay
+at 96 even though `xdpyinfo` shows the new value.
+
+We deliberately do **not** set `Xft.dpi`/XSETTINGS, because that is per-user,
+desktop-specific session config — explicitly out of scope (PRD Non-Goals 3 & 5:
+no `.xsession`/XFCE/GNOME config changes, no DE dependency). Trying to set it
+correctly for every DE (XFCE, GNOME, KDE, bare WMs, each with its own settings
+daemon that may re-override) is the "fix every WM" rabbit hole this PR avoids.
+
+So the scope is: **propagate the DPI to the X server; let the desktop honor it.**
+sesman logs a one-line reminder when it applies a client DPI, so an admin whose
+fonts don't scale knows to switch the desktop to auto-DPI. Setting the toolkit
+DPI could be a separate, opt-in follow-up.

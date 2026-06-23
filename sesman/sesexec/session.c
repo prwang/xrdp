@@ -463,7 +463,10 @@ prepare_xorg_xserver_params(const struct session_data *sd,
                 list_add_strdup(params, dpi_str);
                 LOG(LOG_LEVEL_INFO,
                     "[session start] (display :%d): starting Xorg with "
-                    "client DPI %d",
+                    "client DPI %d. This sets the X server core DPI only; "
+                    "GUI toolkits (GTK/Qt) follow it only when the desktop's "
+                    "font DPI is automatic. If fonts do not scale, set the "
+                    "desktop to auto DPI (e.g. XFCE Xft/DPI = -1).",
                     sd->params.x11_display, sd->params.dpi);
             }
         }
