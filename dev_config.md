@@ -49,17 +49,25 @@ mstsc /v:127.0.0.1:3389      # user: tester  /  password: (blank)  /  session: X
 
 ---
 
-## 3. Observe (run inside each session, e.g. in qterminal)
+## 3. Observe
+
+**In the session** — as `tester`, e.g. in qterminal:
 
 ```bash
-pgrep -a Xorg | tr ' ' '\n' | grep -A1 -x -- -dpi    # the -dpi argv, if any
 xdpyinfo | grep resolution                            # the live DPI
-sudo grep -E 'Login screen monitor height|client DPI|Starting X server' \
+pgrep -a Xorg | tr ' ' '\n' | grep -A1 -x -- -dpi     # the -dpi argv, if any
+```
+
+**On the server** — as the operator (root). `tester` has no sudo, so this is
+**not** run in the session; read the logs directly on the host:
+
+```bash
+grep -E 'Login screen monitor height|client DPI|Starting X server' \
     /var/log/xrdp.log /var/log/xrdp-sesman.log | tail
 ```
 
-**Today (BEFORE):** the first command prints nothing (no `-dpi`) and `xdpyinfo`
-shows ~`96x96` — that is the expected current PASS (DPI-1 not implemented yet).
+**Today (BEFORE):** `xdpyinfo` shows ~`96x96` and the `-dpi` grep prints nothing
+— that is the expected current PASS (DPI-1 not implemented yet).
 
 ---
 
