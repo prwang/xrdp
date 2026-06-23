@@ -2,11 +2,10 @@
 > Debian 13 (trixie): it installs the distribution `xrdp` + `xorgxrdp` + XFCE and
 > brings up a working RDP-to-XFCE session on `127.0.0.1:3389` for `user1`. It is
 > the **regression control** and the **BEFORE state** (96 DPI) for the DPI-1
-> feature. To build this source tree, package a self-built `.deb`, deploy it over
-> this baseline, and run the feature test plan / accept-reject matrix, see
-> **`dev_config.md`** (which assumes this baseline is already in place — in
-> particular `xorgxrdp`, which is a separate Xorg module and is **not** built from
-> this tree).
+> feature, see **`build_config.md`** (build, package, deploy, headless checks)
+> and **`dev_config.md`** (the interactive RDP test). Both assume this baseline is
+> already in place — in particular `xorgxrdp`, a separate Xorg module **not** built
+> from this tree (and which must be version-matched — see `build_config.md` Part X).
 >
 > Package names and config below are Debian 13; the linked manpages are the Ubuntu
 > renderings of the same `xrdp.ini(5)` / `sesman.ini(5)` / `pam_succeed_if(8)`.
@@ -436,7 +435,7 @@ sudo -u user1 cat /home/user1/.cache/xrdp-startwm-xfce.log
 # Gate 9 — Capture the baseline (BEFORE) DPI evidence
 
 Once a session is up, record the stock behaviour. This is the **regression
-control** that `dev_config.md` Part F (accept/reject matrix) compares against.
+control** that `dev_config.md` §4 (interactive scenarios) compares against.
 Run inside the RDP session:
 
 ```bash
@@ -457,8 +456,8 @@ xrdp.log may still report a client DPI on the login screen (~139), but it is
   NOT propagated to the session
 ```
 
-Save this output; after deploying the dev build (`dev_config.md`), the HiDPI
-case (matrix row F4) must change to `-dpi 139/140` and `139x139`, while the
+Save this output; after deploying the dev build (`build_config.md`), the HiDPI
+scenario (`dev_config.md` §4) must change to `-dpi 139/140` and `139x139`, while the
 normal-DPI case (F5) must stay ~`96x96`.
 
 ---

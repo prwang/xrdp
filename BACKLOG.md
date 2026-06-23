@@ -9,7 +9,8 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
 ## DPI-1: Propagate RDP client DPI to Xorg/xorgxrdp sessions
 
 - **Status:** IN PROGRESS (implementation + headless tests DONE; interactive
-  E2 verification on localhost:3389 pending — see dev_config.md Part E2/F)
+  E2 verification on localhost:3389 pending — see dev_config.md (interactive
+  scenarios); headless checks + build/deploy in build_config.md)
 - **Source:** `PRD.md`
 - **Owner:** (unassigned)
 

@@ -48,7 +48,8 @@ own traceability and review history; they are never imported into the PR branch.
 BACKLOG.md            – transparent task backlog (ours)
 CLAUDE.md             – agent/contributor rules (ours)
 PRD.md                – requirements doc (ours)
-dev_config.md         – build/deploy/test runbook (ours)
+dev_config.md         – interactive DPI-1 test runbook (ours)
+build_config.md       – build/package/deploy + headless checks (ours)
 normal_config.md      – stock-baseline runbook (ours)
 CLEANUP_PLAN.md       – this file
 PR.md                 – the text we paste into the GitHub PR
@@ -94,7 +95,7 @@ git checkout "$DEV" -- \
 
 # 3. Sanity: the diff must contain NONE of the dev-only files in section 2.
 git status --short
-git diff --cached --stat | grep -E 'BACKLOG|CLAUDE|PRD|dev_config|normal_config|CLEANUP|PR\.md|FAQ|build_dev_deb|\.deb' \
+git diff --cached --stat | grep -E 'BACKLOG|CLAUDE|PRD|dev_config|build_config|normal_config|CLEANUP|PR\.md|FAQ|build_dev_deb|\.deb' \
   && echo "!! LEAK - remove before committing" || echo "clean scope"
 
 # 4. Build + test from clean in the pristine tree.
