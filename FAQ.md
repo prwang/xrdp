@@ -1,14 +1,15 @@
 # FAQ.md — anticipated maintainer questions for the DPI PR
 
-Prep for review of the #3473 fix. Each entry is a likely objection and a
-straight answer. Keep answers in the PR thread short; this is the long form.
+Anticipated maintainer questions for the #3473 DPI fix, with detailed answers.
+Each entry is a likely objection and a straight answer.
 
 ---
 
 ### Q1. Why physical DPI from the monitor size, not the RDP desktop *scale factor*?
 
 This is the most likely pushback (the #3473 reporter expected `96 × 1.5 = 144`
-for 150% scaling, but the physical-size calc gave ~163 for their panel).
+for 150% scaling, but the physical-size calc gives a higher value on a denser
+panel, because it reflects true pixel density rather than the scale preference).
 
 **Answer.** Two different things:
 - **Physical DPI** = the panel's true pixel density (from TS_MONITOR_ATTRIBUTES
@@ -56,7 +57,7 @@ Defense in depth, and each layer has a different trust boundary:
   a process argument; treat it as untrusted at the point of use).
 
 All client-derived data is untrusted per the project's security rules; the cost
-is three integer comparisons. The value reaching Xorg is provably in 50–400.
+is three integer comparisons. The value reaching Xorg is always in 50–400.
 
 ### Q4. Why the 50–400 bounds? Aren't they arbitrary?
 
@@ -158,6 +159,4 @@ correctly for every DE (XFCE, GNOME, KDE, bare WMs, each with its own settings
 daemon that may re-override) is the "fix every WM" rabbit hole this PR avoids.
 
 So the scope is: **propagate the DPI to the X server; let the desktop honor it.**
-sesman logs a one-line reminder when it applies a client DPI, so an admin whose
-fonts don't scale knows to switch the desktop to auto-DPI. Setting the toolkit
-DPI could be a separate, opt-in follow-up.
+Setting the toolkit DPI could be a separate, opt-in follow-up.

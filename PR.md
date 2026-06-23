@@ -11,8 +11,6 @@ the **Xorg/xorgxrdp desktop** that follows always starts at the default 96 DPI.
 
 The result is the inconsistency reported in #3473: on a HiDPI client the login
 screen is scaled correctly, then the desktop appears with everything too small.
-The DPI the client supplies is available at connect time but is dropped on the
-floor before the X server is launched.
 
 ## What this changes
 
@@ -20,7 +18,7 @@ Propagate the already-computed client DPI from the xrdp front-end through
 sesman and sesexec, and launch Xorg with `-dpi <client_dpi>` so the desktop
 matches the login screen.
 
-Data flow (all new code is pure data plumbing — no auth/PAM/identity changes):
+Data flow (no auth/PAM/identity changes):
 
 ```
 xrdp_mm (compute+validate) → SCP → sesman → EICP → sesexec → Xorg argv "-dpi N"
@@ -53,13 +51,25 @@ xrdp_mm (compute+validate) → SCP → sesman → EICP → sesexec → Xorg argv
   `-dpi 0`, `-dpi 1`, or `-dpi 10000` can ever be emitted.
 - **Admin override wins:** an existing `-dpi` in `[Xorg]` params is detected and
   the client value is skipped, so there is never a duplicate `-dpi`.
-- **Wire-format change (please note):** the SCP and EICP create-session messages
+- **Wire-format change:** the SCP and EICP create-session messages
   gain a trailing field, so `LIBIPM_VERSION` is bumped **2 → 3**. libipm has no
   optional-field mechanism, so this is a breaking change by construction. xrdp,
   xrdp-sesman, xrdp-sesexec and sesrun ship and must be upgraded together; a
   mixed-version peer is rejected cleanly by the existing version check
   (fail-closed: failed session create, never a misparse or crash). The new field
   is appended at the end of the format strings to keep the change minimal.
+
+## Scope / limitation: core DPI vs toolkit DPI
+
+This sets the X server **core** DPI (via `-dpi`); desktops running in
+**auto-DPI mode** (those that honor the core DPI, e.g. XFCE `Xft/DPI = -1`) pick
+it up automatically. GTK/Qt take their font scale from `Xft.dpi` / XSETTINGS
+`/Xft/DPI`, not the core DPI, so a desktop that pins a fixed toolkit DPI (e.g.
+XFCE's default `96`) overrides `-dpi` and fonts stay at 96. Setting
+`Xft.dpi`/XSETTINGS is per-user, desktop-specific session config and is
+intentionally **out of scope** here. sesman logs a one-line reminder when it
+applies a client DPI, so an admin whose fonts don't scale knows to switch the
+desktop to auto-DPI.
 
 ## Design note: physical DPI
 
@@ -69,25 +79,13 @@ the login screen. This deliberately makes the desktop consistent with the login
 screen, which is the concrete defect in #3473. Using the RDP desktop *scale
 factor* instead (e.g. 96×1.5) is a reasonable alternative policy; it's
 intentionally out of scope here and could be added later behind a config knob
-without changing this plumbing. See FAQ for the trade-off.
-
-## Scope / limitation: core DPI vs toolkit DPI
-
-This sets the X server **core** DPI (via `-dpi`). GTK/Qt take their font scale
-from `Xft.dpi` / XSETTINGS `/Xft/DPI`, not the core DPI, so the visible effect
-appears only when the desktop runs in **auto-DPI mode** (honors the core DPI,
-e.g. XFCE `Xft/DPI = -1`). A desktop that pins a fixed toolkit DPI (e.g. XFCE's
-default `96`) will override `-dpi`. Setting `Xft.dpi`/XSETTINGS is per-user,
-desktop-specific session config and is intentionally **out of scope** (PRD
-Non-Goals 3 & 5). sesman logs a one-line reminder when it applies a client DPI
-so an admin whose fonts don't scale knows to switch the desktop to auto-DPI.
-See FAQ Q14.
+without changing this plumbing.
 
 ## Testing
 
 - **Unit tests, pure helper** (`tests/common/test_xrdp_client_info.c`, 15 cases):
   the DPI formula incl. the truncation cases, zero/overflow/underflow → invalid,
-  and the 50–400 range boundaries (PRD-style cases, e.g. 2160px/392mm → 139).
+  and the 50–400 range boundaries (e.g. 2160px/392mm → 139).
 - **Semantic round-trip tests** (`tests/libipm/test_libipm_recv_calls.c`, 4
   cases): the SCP and EICP create-session messages are sent and received over
   the loopback link; a valid DPI survives intact (with the other fields
