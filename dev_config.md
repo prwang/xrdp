@@ -368,18 +368,26 @@ AFTER = once DPI-1 is implemented.) DPI value may be the rounded nearby integer
 |---|---|---|---|---|---|
 | F1 | DPI calc unit tests | headless `make check` | helper returns 139/93/96; invalid for 0/neg/out-of-range | all cases pass | any case wrong or missing |
 | F2 | libipm round-trip | headless `make check` | DPI field serializes/parses on SCP+EICP | round-trip equal; bad value rejected | mismatch, parse error, or crash |
-| F3 | Service health | headless | xrdp+sesman active; 3389/3350 on 127.0.0.1 only | both active, loopback-only | down, or bound to non-loopback |
+| F3 | Service health | headless | xrdp on `127.0.0.1:3389`; sesman on its **unix socket** (`/run/xrdp/sesman.socket`) — this build has **no TCP 3350** | both active, RDP loopback-only, sesman not on any TCP port | down, or 3389 bound to a non-loopback address |
 | F4 | HiDPI client | E2 mstsc 3840×2160 | `Xorg … -dpi 139/140`; `xdpyinfo` 139/140 | `-dpi` present **and** xdpyinfo matches | xdpyinfo 96, or no `-dpi`, or wrong value |
 | F5 | Normal 96-DPI client | E2 mstsc / xfreerdp3 | **no enlargement**; ~96×96 | xdpyinfo ≈ 96 | session > 96 (regression) |
 | F6 | Invalid / missing phys size | E1 xfreerdp3 windowed | no client `-dpi`; session starts | session up, no `-dpi 0/1/10000` | bad `-dpi`, or session fails to start |
 | F7 | Admin `-dpi` in sesman.ini | E2 mstsc HiDPI | exactly one `-dpi`, **admin value wins** | single `-dpi 144` | duplicate `-dpi`, or admin value overridden |
-| F8 | Non-Xorg backend (Xvnc) | E2, `autorun=` Xvnc | argv unchanged vs baseline | no DPI logic applied | `-dpi` injected into Xvnc |
-| F9 | Privilege boundary | code review + E1 | DPI consumed after `env_set_user` drop; no auth/PAM change | unchanged auth path; Xorg runs as user | any auth/ownership/ordering change |
+| F8 | Privilege boundary | code review + E1 | DPI consumed after `env_set_user` drop; no auth/PAM change | unchanged auth path; Xorg runs as user | any auth/ownership/ordering change |
 
 **BEFORE state (current branch) acceptance:** F1/F2 are N/A (tests not written
-yet); F3/F5/F6/F8/F9 must already hold; F4 will show 96 DPI / no `-dpi` (the
+yet); F3/F5/F6/F8 must already hold; F4 will show 96 DPI / no `-dpi` (the
 documented regression this feature fixes); F7 (admin static `-dpi`) already works
 via stock config.
+
+> **Why no Xvnc row:** an earlier matrix had an "Xvnc backend unchanged" row. It
+> was dropped — DPI-1 only edits `prepare_xorg_xserver_params()` /
+> `xorg_params_contain_dpi()` (the Xvnc param builder is untouched, verifiable
+> from the `480c596e` diff), so Xvnc is unaffected by construction. A live Xvnc
+> check also isn't runnable here (no `Xvnc` binary; needs `tigervnc-standalone-
+> server`), and stock `sesman.ini [Xvnc]` already ships a static `-dpi 96`, which
+> a live check would misread as a DPI-1 leak. The "no Xorg-only-isolation
+> regression" guarantee is covered by code review, not a backend connect.
 
 ---
 
