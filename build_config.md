@@ -80,9 +80,10 @@ make check ; echo "exit=$?"
 libcommon 157   libipm 35   libxrdp 13   memtest 1   "XRDP daemon" 26
 ```
 
-After DPI-1, the new tests must appear and pass:
-- DPI calc helper (PRD §10.1): `2160/392 → 139`, `1440/392 → 93`, `1080/286 → 96`;
-  invalid for `2160/0`, `0/392`, `2160/-1`, `dpi<50`, `dpi>400`.
+After DPI-1, totals rise to `libcommon 172  libipm 39  libxrdp 13  memtest 1
+"XRDP daemon" 26` and the new tests must appear and pass:
+- DPI calc helper (PRD §10.1): `2160/392 → 139 (or 140)`, `1440/392 → 93`,
+  `1080/286 → 96`; invalid for `2160/0`, `0/392`, `2160/-1`, `dpi<50`, `dpi>400`.
 - libipm SCP/EICP create-session round-trip incl. the new DPI field.
 
 ### B.2 Static/style gate (matches CI)
@@ -216,7 +217,7 @@ These DPI-1 acceptance criteria are validated headless / by code review — they
 
 | # | Check | Where | ACCEPT if |
 |---|---|---|---|
-| H1 | DPI calc unit tests | `make check` | helper returns 139/93/96; invalid for 0/neg/out-of-range |
+| H1 | DPI calc unit tests | `make check` | helper returns 139 (or 140)/93/96; invalid for 0/neg/out-of-range |
 | H2 | libipm round-trip | `make check` | DPI field serializes/parses on SCP+EICP; bad value rejected |
 | H3 | Service health | `ss`, `journalctl` | xrdp on `127.0.0.1:3389`; sesman on its unix socket (no TCP 3350) |
 | H4 | Privilege boundary | code review | DPI consumed after `env_set_user` drop; no auth/PAM/ownership change |

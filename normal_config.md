@@ -458,7 +458,7 @@ xrdp.log may still report a client DPI on the login screen (~139), but it is
 
 Save this output; after deploying the dev build (`build_config.md`), the HiDPI
 scenario (`dev_config.md` §4) must change to `-dpi 139/140` and `139x139`, while the
-normal-DPI case (F5) must stay ~`96x96`.
+**Normal** scenario must stay ~`96x96`.
 
 ---
 

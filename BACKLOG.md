@@ -8,9 +8,10 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
 
 ## DPI-1: Propagate RDP client DPI to Xorg/xorgxrdp sessions
 
-- **Status:** IN PROGRESS (implementation + headless tests DONE; interactive
-  E2 verification on localhost:3389 pending — see dev_config.md (interactive
-  scenarios); headless checks + build/deploy in build_config.md)
+- **Status:** IN PROGRESS (implementation + headless tests + **BEFORE**
+  interactive baseline DONE; **AFTER** interactive verification on localhost:3389
+  in progress — see dev_config.md (scenarios); headless checks + build/deploy in
+  build_config.md)
 - **Source:** `PRD.md`
 - **Owner:** (unassigned)
 
@@ -34,11 +35,23 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
     out-of-range/absent values are rejected to 0; non-DPI fields verified
     intact). `make check` green: libcommon 172, libipm 39, libxrdp 13,
     memtest 1, XRDP daemon 26. astyle (pinned 3.4.14) clean; no new cppcheck.
-  - BEFORE baseline: stock-commit `.deb` (`0.10.80+git34a48901382e`) installed
-    for regression testing; AFTER build verified to compile + pass tests.
-- **Pending:** interactive E2 matrix (mstsc/xfreerdp3 on localhost:3389):
-  HiDPI `-dpi` applied, 96-DPI stays ~96, invalid⇒no `-dpi`, admin-override,
-  Xvnc unchanged.
+  - BEFORE baseline: stock-commit `.deb` (`0.10.80+git34a48901382e`, pre-DPI)
+    was installed for the BEFORE regression run. After BEFORE was captured, the
+    DPI-1 (AFTER) `.deb` was built from the feature branch HEAD and installed for
+    AFTER testing.
+  - **BEFORE interactive verification DONE (2026-06-23, localhost:3389, mstsc
+    HiDPI):** confirmed the #3473 regression on the pre-DPI deb — the login
+    screen computes 139 DPI (2160 px / 392 mm) but the Xorg session launches with
+    **no `-dpi`** and `xdpyinfo` reports `96x96`. Normal / invalid-metadata paths
+    start cleanly. This is the regression control for the AFTER comparison.
+  - Environment prereqs surfaced during interactive bring-up (NOT DPI-related;
+    see build_config.md Part X / dev_config.md §1): the Xorg wrapper must allow
+    non-console users, and a **version-matched xorgxrdp** is required — distro
+    0.10.2 is incompatible with the dev branch's display-socket naming
+    (upstream `c4727ad8`). A matched `xorgxrdp-dev 0.10.80` was built + installed.
+- **Pending:** AFTER interactive matrix (DPI-1 `.deb` installed): HiDPI ⇒
+  `-dpi 139` (or 140) and `xdpyinfo` `139x139`; 96-DPI stays ~96; invalid ⇒ no
+  `-dpi`; admin `-dpi` in `sesman.ini` still wins.
 
 ### Context
 

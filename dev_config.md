@@ -6,9 +6,11 @@ physical size (the DPI-1 feature). Everything non-interactive — build, package
 deploy, `make check`, the xorgxrdp rebuild, code-review checks — is in
 **`build_config.md`**; do that (and `normal_config.md`) first.
 
-> **Status:** DPI-1 is **not implemented yet** (see `BACKLOG.md`). Today every
-> scenario shows the **BEFORE** state (no `-dpi`, ~96 DPI). After implementation,
-> HiDPI must show `-dpi 139 or 140`; the other rows must stay unchanged.
+> **Status (2026-06-23):** DPI-1 is implemented and headless-tested. **BEFORE
+> baseline captured & PASS** — a HiDPI client (392 mm / 2160 px → login computes
+> 139 DPI) gave session `96x96` with no `-dpi`: the #3473 regression. The DPI-1
+> (AFTER) build is now installed, so run the scenarios and expect the **ACCEPT
+> (AFTER)** column — HiDPI must now show `-dpi 139 or 140`; the rest stay put.
 
 ---
 
@@ -66,8 +68,9 @@ grep -E 'Login screen monitor height|client DPI|Starting X server' \
     /var/log/xrdp.log /var/log/xrdp-sesman.log | tail
 ```
 
-**Today (BEFORE):** `xdpyinfo` shows ~`96x96` and the `-dpi` grep prints nothing
-— that is the expected current PASS (DPI-1 not implemented yet).
+**Reading it:** the captured BEFORE baseline was `96x96` / no `-dpi`. With the
+DPI-1 build installed, a HiDPI client should now show `-dpi <n>` and a matching
+`xdpyinfo` (≈139 for a 392 mm / 2160 px panel).
 
 ---
 
@@ -82,8 +85,10 @@ DPI value may be the rounded nearby integer (139 or 140) per PRD §6.1.
 | **Admin override** | add `param=-dpi` / `param=144` to `[Xorg]` in `/etc/xrdp/sesman.ini`, restart sesman, reconnect HiDPI | exactly one `-dpi`, **144** (admin wins) | duplicate `-dpi`, or admin value overridden |
 | **Invalid metadata** | client with no/zero physical size (e.g. `xfreerdp3` windowed) | session starts; no `-dpi` (never `-dpi 0/1/10000`) | bad `-dpi`, or session fails to start |
 
-**BEFORE (today):** HiDPI shows 96 / no `-dpi` (the regression DPI-1 fixes);
-Normal and Invalid already pass; Admin-override already works via stock config.
+**BEFORE baseline (captured — regression control):** HiDPI showed 96 / no `-dpi`
+(the #3473 regression); Normal and Invalid passed; Admin-override worked via
+stock config. With the DPI-1 build installed, the **HiDPI** row must now flip to
+the ACCEPT column; the others must stay unchanged.
 
 > After the **Admin override** scenario, remove the `param=-dpi`/`param=144`
 > lines from `[Xorg]` and restart sesman before re-running HiDPI, or the admin
