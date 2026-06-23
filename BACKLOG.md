@@ -8,10 +8,10 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
 
 ## DPI-1: Propagate RDP client DPI to Xorg/xorgxrdp sessions
 
-- **Status:** IN PROGRESS (implementation + headless tests + **BEFORE**
-  interactive baseline DONE; **AFTER** interactive verification on localhost:3389
-  in progress — see dev_config.md (scenarios); headless checks + build/deploy in
-  build_config.md)
+- **Status:** IN PROGRESS (implementation + headless tests + interactive
+  **BEFORE/AFTER** verification DONE; remaining step is opening the upstream PR
+  per `CLEANUP_PLAN.md` — see dev_config.md (scenarios); headless checks +
+  build/deploy in build_config.md)
 - **Source:** `PRD.md`
 - **Owner:** (unassigned)
 
@@ -61,9 +61,21 @@ See `CLAUDE.md` for coding, scope, security, and cooperation rules.
     config and is out of scope (would mean "fix every WM"). Added a sesman
     one-line log reminder (`sesman/sesexec/session.c`) advising auto-DPI when a
     client DPI is applied; documented in PRD §4/§11, FAQ Q14, PR.md.
-- **Pending:** finish AFTER interactive matrix (HiDPI scaling DONE): 96-DPI
-  client stays ~96; invalid metadata ⇒ no `-dpi`, session starts; admin `-dpi`
-  in `sesman.ini [Xorg]` still wins (exactly one `-dpi`).
+  - **AFTER interactive matrix COMPLETE (2026-06-23, localhost:3389):**
+    - HiDPI: client 139 ⇒ Xorg `-dpi 139`, `xdpyinfo` 139x139, fonts scale
+      (auto-DPI desktop). ✅
+    - Normal/low: client 93 (1440px/392mm) ⇒ Xorg `-dpi 93`, `xdpyinfo` 93x93,
+      no enlargement. ✅
+    - Admin override: `[Xorg] -dpi 144` ⇒ sesman logs *"-dpi is set … ignoring
+      client DPI 93"*, Xorg gets exactly one `-dpi 144` (admin wins). ✅
+      (sesman.ini reverted afterwards.)
+    - Invalid/missing physical size: **proven statically** (no client available)
+      — `calculate_dpi(px,0)=0` and the `dpi_valid_for_session()` gate make a
+      `-dpi 0/1/10000` structurally impossible; covered by unit tests
+      (`test_calc_dpi__zero_*`, `test_valid__zero/below_min/above_max`) and the
+      libipm out-of-range round-trip tests. Session starts with no `-dpi`. ✅
+- **Pending:** open the upstream PR (execute `CLEANUP_PLAN.md`: pristine worktree,
+  21 functional files only, rebase on `upstream/devel`).
 
 ### Context
 
