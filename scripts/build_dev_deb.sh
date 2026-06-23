@@ -54,6 +54,13 @@ make -C "${BUILDDIR}" install "DESTDIR=${STAGE}" >/dev/null
 echo "==> staged $(find "${STAGE}" -type f | wc -l) files to ${STAGE}"
 
 # --- DEBIAN/control + metadata ------------------------------------------------
+# xorgxrdp coupling: dev-branch xrdp (>= the Feb-2026 "display string" change,
+# commit c4727ad8) names the Xorg display socket xrdp_display_X11-<n> and relies
+# on xorgxrdp honouring the XRDP_X11RDP_SOCKET env var. The distro xorgxrdp
+# 0.10.2 predates this and creates xrdp_display_<n>, so sessions fail at runtime
+# with "Can't connect to display server ... No such file or directory".
+# Breaks: makes that mismatch fail LOUDLY at install/configure time instead of
+# silently at login. A matching xorgxrdp (>= 0.10.80) must be installed.
 mkdir -p "${STAGE}/DEBIAN"
 
 # conffiles: everything we install under /etc, so dpkg preserves admin edits.
@@ -71,10 +78,11 @@ Architecture: ${ARCH}
 Maintainer: xrdp dev build <xrdp-devel@googlegroups.com>
 Installed-Size: ${INSTALLED_KB}
 Depends: libc6, libssl3 | libssl1.1, libpam0g, libx11-6, libxfixes3, libxrandr2
-Recommends: xorgxrdp, xserver-xorg-core
+Recommends: xorgxrdp (>= 1:0.10.80~), xserver-xorg-core
 Conflicts: xrdp
 Replaces: xrdp
 Provides: xrdp
+Breaks: xorgxrdp (<< 1:0.10.80~)
 Section: net
 Priority: optional
 Description: xrdp RDP server (developer build from git ${GIT_HASH})

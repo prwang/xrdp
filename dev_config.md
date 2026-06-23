@@ -8,8 +8,10 @@ feature** (client monitor DPI propagated to the Xorg session via `-dpi`).
 > Relationship to `normal_config.md`: that doc sets up the **stock-package
 > baseline** (the BEFORE state, 96 DPI) on `localhost:3389`. This doc replaces the
 > stock `xrdp` binaries with a locally built `.deb` and verifies the AFTER state.
-> Keep `xorgxrdp` from apt — it is a separate Xorg driver module, **not** in this
-> tree.
+> `xorgxrdp` is a separate Xorg driver module, **not** in this tree — but the
+> stock apt `xorgxrdp` (0.10.2) is **incompatible** with this dev branch and must
+> be rebuilt/version-matched. See **Part 0.5** (read it before any interactive
+> session — it is a hard blocker, unrelated to DPI).
 
 ## 0. Verified environment
 
@@ -29,6 +31,95 @@ Everything below was actually executed in this sandbox and is known to work:
 > **Feature status:** DPI-1 is **not implemented yet** (see `BACKLOG.md`). On the
 > current branch the test plan therefore reproduces the BEFORE state (no `-dpi`,
 > 96 DPI). After implementing DPI-1, the same plan must show the AFTER state.
+
+---
+
+## Part 0.5 — CRITICAL environment prerequisites (learned during live GUI test)
+
+Two environment issues block **every** interactive Xorg session on this dev
+branch, independently of DPI. Both were hit during real RDP testing and cost
+significant debugging; fix both before expecting a desktop.
+
+### 0.5.1 Xorg wrapper must allow non-console users
+
+**Symptom:** login authenticates, then *"Can't create session for user … —
+X server could not be started"*; `xrdp-sesman.log` shows `waitforx: Unable to
+open display :N` and no Xorg log is written.
+
+**Cause:** Debian's `xserver-xorg-legacy` ships `/etc/X11/Xwrapper.config` with
+`allowed_users=console`; xrdp sessions are not on a console, so the setuid
+`Xorg.wrap` refuses to launch Xorg (*"Only console users are allowed to run the
+X server"*).
+
+**Fix** (environment, not a code change):
+```ini
+# /etc/X11/Xwrapper.config
+allowed_users=anybody
+needs_root_rights=no
+```
+`needs_root_rights=no` is required: when Xorg keeps root it rejects the
+`-logfile`/`-config` args xrdp passes (*"Invalid argument -logfile with elevated
+privileges"*). xorgxrdp's driver is fully virtual, so rootless Xorg is correct.
+Takes effect on the next connection (no daemon restart needed).
+
+### 0.5.2 xorgxrdp must be version-matched to the dev branch (BREAKING CHANGE)
+
+*Supersedes the old "just keep apt's xorgxrdp" guidance.*
+
+**Symptom:** Xorg starts ("Display X11-N is working"), the desktop briefly
+initialises, then the session dies with
+`Can't connect to display server X11-N [No such file or directory]`
+(`sesman/sesexec/session.c:1523`).
+
+**Cause — an upstream xrdp↔xorgxrdp socket-naming skew, NOT a DPI change:**
+- xrdp commit **`c4727ad8`** (matt335672, Feb 2026, *"Replace X11 display number
+  with a display string"*) renamed the Xorg display socket from
+  `xrdp_display_<n>` to `xrdp_display_<displayname>` (e.g. `xrdp_display_X11-10`).
+  It is in the branch base (`21d38d0c`), so it affects the **unmodified** dev
+  branch too — not our work.
+- sesexec exports the socket dir via `XRDP_SOCKET_PATH` and the basename via
+  `XRDP_X11RDP_SOCKET` (`env.c:108`, `:424`), then connects to
+  `<XRDP_SOCKET_PATH>/xrdp_display_<displayname>` (`session.c:1502`).
+- Distro **xorgxrdp 0.10.2** predates this: it reads `XRDP_SOCKET_PATH` (so the
+  *directory* matches, `/var/run/xrdp/<uid>`) but **ignores `XRDP_X11RDP_SOCKET`**
+  and names the file `xrdp_display_<number>`. So `…/xrdp_display_X11-10` (xrdp
+  wants) ≠ `…/xrdp_display_10` (xorgxrdp made) → ENOENT.
+- A matched xorgxrdp (HEAD; `set_sock_name()` in `module/rdpClientCon.c` honours
+  `XRDP_X11RDP_SOCKET`) creates `xrdp_display_X11-10` and the session connects.
+
+Verified by runtime + `git blame`; no DPI commit (`480c596e`, `40455218`)
+touches the socket-naming or connect code. The `[Globals] port=tcp://127.0.0.1`
+listener and the unix-socket sesman (the harmless *"Ignoring obsolete SCP port
+3350"* log) are part of the same 0.10.x modernization and are **not** the cause.
+
+**Fix — build & install a version-matched xorgxrdp (separate repo, NOT this tree):**
+```bash
+sudo apt-get install -y xserver-xorg-dev          # Xorg SDK (provides xorg-server.pc)
+git clone https://github.com/neutrinolabs/xorgxrdp.git /workUpdateXorgXrdp
+cd /workUpdateXorgXrdp
+./bootstrap && ./configure --prefix=/usr && make -j"$(nproc)"
+# package as a .deb that Provides/Conflicts/Replaces xorgxrdp, git-tagged:
+make install DESTDIR=/tmp/xxstage
+#   DEBIAN/control: Package: xorgxrdp-dev / Version: 1:0.10.80+git<hash>
+#                   Provides: xorgxrdp / Conflicts: xorgxrdp / Replaces: xorgxrdp
+dpkg-deb --root-owner-group --build /tmp/xxstage \
+    /work/dist/xorgxrdp-dev_0.10.80+git<hash>_amd64.deb
+sudo apt-get install -y /work/dist/xorgxrdp-dev_*.deb
+```
+**Verify** the socket name flips (with an Xorg launched as the session user and
+`XRDP_SOCKET_PATH=/var/run/xrdp/<uid>`, `XRDP_X11RDP_SOCKET=xrdp_display_X11-<n>`):
+```bash
+ls /var/run/xrdp/<uid>/xrdp_display_X11-*   # present  => matched, session works
+ls /var/run/xrdp/<uid>/xrdp_display_[0-9]*  # present  => still the old 0.10.2 driver
+```
+
+### 0.5.3 The dev xrdp .deb now guards against 0.5.2
+
+`scripts/build_dev_deb.sh` declares `Breaks: xorgxrdp (<< 1:0.10.80~)` plus a
+versioned `Recommends:`. A future install of the dev xrdp `.deb` over an outdated
+xorgxrdp now **fails loudly at install time** with a clear conflict, instead of
+breaking silently at login. (The currently-installed dev `.deb` predates the
+guard; it stays as-is — rebuild to apply the guard.)
 
 ---
 
