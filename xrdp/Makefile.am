@@ -79,6 +79,16 @@ xrdp_SOURCES = \
   xrdp_types.h \
   xrdp_egfx.c \
   xrdp_egfx.h \
+  xrdp_avc444_convert.c \
+  xrdp_avc444_convert.h \
+  xrdp_avc444_caps.c \
+  xrdp_avc444_caps.h \
+  xrdp_h264_annexb.c \
+  xrdp_h264_annexb.h \
+  xrdp_nut.c \
+  xrdp_nut.h \
+  xrdp_encoder_ffmpeg.c \
+  xrdp_encoder_ffmpeg.h \
   xrdp_wm.c \
   xrdp_main_utils.c \
   xrdp_tconfig.c \
