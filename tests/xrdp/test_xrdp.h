@@ -8,5 +8,10 @@ Suite *make_suite_test_keymap_load(void);
 Suite *make_suite_egfx_base_functions(void);
 Suite *make_suite_region(void);
 Suite *make_suite_tconfig_load_gfx(void);
+Suite *make_suite_avc444_convert(void);
+Suite *make_suite_avc444_caps(void);
+Suite *make_suite_avc444_h264(void);
+Suite *make_suite_avc444_nut(void);
+Suite *make_suite_avc444_ffmpeg(void);
 
 #endif /* TEST_XRDP_H */
