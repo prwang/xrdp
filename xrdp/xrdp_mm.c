@@ -32,6 +32,8 @@
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
+#include "xrdp_avc444_caps.h"
+#include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_sockets.h"
 #include "xrdp_egfx.h"
 #include "libxrdp.h"
@@ -1254,11 +1256,64 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     int best_index = -1;
     struct xrdp_tconfig_gfx_codec_order *co = &self->wm->gfx_config->codec;
     char cobuff[64];
+    int avc444_ffmpeg_ok = 0;
+
+    /* external stock-ffmpeg AVC444 backend eligibility (FR-CAP / FR-PROBE):
+     * the MVP ffmpeg backend supplies AVC444 v1 only, on a single monitor,
+     * and only after a successful behavioral probe at the session geometry */
+    if (self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG &&
+            best_h264_index >= 0 &&
+            self->wm->client_info->display_sizes.monitorCount <= 1)
+    {
+        enum xrdp_gfx_avc_mode m;
+        m = xrdp_avc444_classify_caps(ver_flags[best_h264_index].version,
+                                      ver_flags[best_h264_index].flags);
+        if (m == XRDP_GFX_AVC444)
+        {
+            struct xrdp_ffmpeg_avc444_config cfg;
+            int cw = (screen->width + 15) & ~15;
+            int ch = (screen->height + 15) & ~15;
+            xrdp_ffmpeg_avc444_config_default(&cfg);
+            g_strncpy(cfg.path, self->wm->gfx_config->avc444_ffmpeg_path,
+                      sizeof(cfg.path) - 1);
+            cfg.quality_crf = self->wm->gfx_config->avc444_ffmpeg_crf;
+            cfg.gop_pictures = self->wm->gfx_config->avc444_ffmpeg_gop;
+            LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
+                "AVC444 %s at %dx%d", cfg.path, cw, ch);
+            if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
+            {
+                avc444_ffmpeg_ok = 1;
+                LOG(LOG_LEVEL_INFO, "  ffmpeg AVC444 probe OK");
+            }
+            else
+            {
+                LOG(LOG_LEVEL_WARNING, "  ffmpeg AVC444 probe FAILED; "
+                    "removing external AVC444 candidate");
+            }
+        }
+    }
 
     LOG(LOG_LEVEL_INFO, "Codec search order is %s",
         tconfig_codec_order_to_str(co, cobuff, sizeof(cobuff)));
     for (index = 0 ; index < co->codec_count ; ++index)
     {
+        /* external stock-ffmpeg AVC444 backend (compiles without a linked
+         * H.264 library); administrator policy, no silent fallback */
+        if (co->codecs[index] == XTC_H264 &&
+                self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG)
+        {
+            if (avc444_ffmpeg_ok && best_h264_index >= 0)
+            {
+                LOG(LOG_LEVEL_INFO, "Matched H264/AVC444 (ffmpeg) mode");
+                best_index = best_h264_index;
+                self->egfx_flags = XRDP_EGFX_H264;
+                self->avc444_ffmpeg = 1;
+                break;
+            }
+            /* ffmpeg backend chosen but not eligible: skip H.264, fall
+             * through to the next configured codec (FR-CAP-3) */
+            continue;
+        }
 #if defined(XRDP_H264)
         if (co->codecs[index] == XTC_H264 && best_h264_index >= 0)
         {

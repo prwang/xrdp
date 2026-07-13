@@ -393,8 +393,43 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                 valid_encoder_found = 1;
                 config->h264_encoder = XTC_H264_OPENH264;
             }
+            if (g_strcasecmp(h264_encoder.u.s, "ffmpeg") == 0)
+            {
+                TCLOG(LOG_LEVEL_DEBUG, "[codec] h264_encoder = ffmpeg");
+                valid_encoder_found = 1;
+                config->h264_encoder = XTC_H264_FFMPEG;
+            }
 
             free(h264_encoder.u.s);
+        }
+    }
+
+    /* external stock-ffmpeg AVC444 backend defaults + [avc444_ffmpeg] table */
+    g_strncpy(config->avc444_ffmpeg_path, "/usr/bin/ffmpeg",
+              sizeof(config->avc444_ffmpeg_path) - 1);
+    config->avc444_ffmpeg_crf = 18;
+    config->avc444_ffmpeg_gop = 240;
+    {
+        toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
+        if (avc != NULL)
+        {
+            toml_datum_t path = toml_string_in(avc, "path");
+            toml_datum_t crf = toml_int_in(avc, "quality_crf");
+            toml_datum_t gop = toml_int_in(avc, "gop_pictures");
+            if (path.ok)
+            {
+                g_strncpy(config->avc444_ffmpeg_path, path.u.s,
+                          sizeof(config->avc444_ffmpeg_path) - 1);
+                free(path.u.s);
+            }
+            if (crf.ok)
+            {
+                config->avc444_ffmpeg_crf = (int)crf.u.i;
+            }
+            if (gop.ok)
+            {
+                config->avc444_ffmpeg_gop = (int)gop.u.i;
+            }
         }
     }
 

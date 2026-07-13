@@ -436,6 +436,7 @@ struct xrdp_mm
     struct xrdp_egfx *egfx;
     int egfx_up;
     enum xrdp_egfx_flags egfx_flags;
+    int avc444_ffmpeg; /* external stock-ffmpeg AVC444 backend selected */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.

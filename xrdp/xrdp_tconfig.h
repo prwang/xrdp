@@ -62,7 +62,8 @@ enum xrdp_tconfig_codecs
 enum xrdp_tconfig_h264_encoders
 {
     XTC_H264_X264,
-    XTC_H264_OPENH264
+    XTC_H264_OPENH264,
+    XTC_H264_FFMPEG      /* external stock-ffmpeg AVC444 backend */
 };
 
 struct xrdp_tconfig_gfx_codec_order
@@ -79,6 +80,10 @@ struct xrdp_tconfig_gfx
     struct xrdp_tconfig_gfx_x264_param x264_param[NUM_CONNECTION_TYPES];
     struct xrdp_tconfig_gfx_openh264_param
         openh264_param[NUM_CONNECTION_TYPES];
+    /* external stock-ffmpeg AVC444 backend (h264_encoder = "ffmpeg") */
+    char avc444_ffmpeg_path[256];
+    int avc444_ffmpeg_crf;
+    int avc444_ffmpeg_gop;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =
