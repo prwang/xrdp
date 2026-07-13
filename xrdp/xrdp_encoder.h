@@ -45,6 +45,14 @@ struct xrdp_encoder
     void *codec_handle_h264;
     void *codec_handle_prfx_gfx[16];
     void *codec_handle_h264_gfx[16];
+    /* external stock-ffmpeg AVC444 backend (opaque handles) */
+    int avc444_ffmpeg;
+    char avc444_path[256];
+    int avc444_crf;
+    int avc444_gop;
+    unsigned long long avc444_seq;
+    void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
+    void *avc444_conv[16];           /* struct xrdp_avc444_conv *    */
     int frame_id_client; /* last frame id received from client */
     int frame_id_server; /* last frame id received from Xorg */
     int frame_id_server_sent;

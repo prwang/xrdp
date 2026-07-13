@@ -87,7 +87,8 @@ enum xrdp_capture_code
     CC_SUF_RFX      = 2,
     CC_SUF_A2       = 3,
     CC_GFX_PRO      = 4,
-    CC_GFX_A2       = 5
+    CC_GFX_A2       = 5,
+    CC_GFX_AVC444   = 6      /* GFX AVC444: full-chroma XRGB8888 capture */
 };
 
 /**
