@@ -1,0 +1,2118 @@
+# Product Requirements Document v2: External Stock-FFmpeg AVC444 Backend for xrdp
+
+**Status:** Resolved MVP design after specification, codebase, and executable-behavior review  
+**Target repositories:** `neutrinolabs/xrdp` and `neutrinolabs/xorgxrdp`  
+**Reviewed branch/baseline:** `dev/ipc_avc444`, working tree at commit `4d61d13b` (forked from `devel`). All Section 6 seam line numbers are against this baseline; §19 requires re-pinning immutable commit IDs immediately before implementation.  
+**Code-review date:** 2026-07-13  
+**MVP deployment target:** Linux and supported Unix-like xrdp/xorgxrdp servers  
+**MVP display topology:** One monitor / one RDPGFX surface  
+**Primary interoperability target:** Microsoft Windows `mstsc.exe`  
+**Working name:** `ffmpeg-process` AVC444 backend
+
+---
+
+## 1. Executive summary
+
+This document specifies an xrdp Graphics Pipeline AVC444 backend that uses a **user-selected, unmodified stock `ffmpeg` executable** rather than linking xrdp against FFmpeg development libraries or an encoder SDK.
+
+The MVP adds exactly one encoder process to an existing xrdp/xorgxrdp session: one persistent child `ffmpeg` process containing one H.264 encoder stream. The relevant encoder boundary is therefore a two-process boundary—`xrdp` and its FFmpeg child—but the complete session still includes the existing Xorg/xorgxrdp and xrdp service processes.
+
+Microsoft RDP AVC444 is not a conventional H.264 4:4:4 stream. xrdp constructs two synthetic YUV420 pictures for every logical desktop update:
+
+- a main YUV420 view; and
+- a Chroma420 auxiliary view.
+
+The two pictures are written in that order to the **same** FFmpeg child. MS-RDPEGFX requires them to be encoded by the same H.264 encoder and decoded by a single H.264 decoder as one continuous stream.
+
+The xrdp side:
+
+- evaluates the client capability sets and the configured codec order;
+- runs a bounded probe of the exact FFmpeg command **before** selecting AVC444 in `RDPGFX_CAPS_CONFIRM_PDU`;
+- selects AVC444 v1 only for eligible RDP 10.x capability sets;
+- receives a persistent XRGB8888 full-chroma surface from xorgxrdp;
+- reconstructs the complete main and auxiliary NV12 views for every submitted MVP update using the MS-RDPEGFX full-range BT.709 equations;
+- pads coded dimensions to multiples of 16 while preserving arbitrary visible RDP dimensions through the AVC region mask;
+- writes complete main and auxiliary raw frames to the FFmpeg child over a nonblocking pipe;
+- reads a **standard NUT stream with normal syncpoints** from stdout;
+- demuxes NUT packets without decoding H.264;
+- validates Annex-B H.264, packet order, and reset parameter sets;
+- packages both packets as `RFX_AVC444_BITMAP_STREAM` with `LC=0`; and
+- sends the result with RDPGFX codec ID `0x000E` to `mstsc.exe`.
+
+The FFmpeg child:
+
+- reads alternating main/auxiliary NV12 frames;
+- encodes every picture through one persistent `libx264` encoder context for the MVP;
+- uses zero-latency/no-reordering settings and repeated parameter-set headers;
+- muxes one encoded packet per picture to standard `-f nut`; and
+- writes the NUT stream to stdout.
+
+Every visible resize or coded-dimension change destroys and reaps the child, discards the old parser/stream generation, recreates the converter buffers, and starts a new child. The first update after restart is a full-surface `LC=0` pair whose first packet contains SPS, PPS, and IDR NAL units.
+
+The design accepts the copy and throughput cost of serializing complete subframes. Encoder throughput is not an xrdp correctness guarantee. xrdp is responsible for bounded queueing, deterministic failure, and protocol-correct output—not for making an underpowered encoder sustain the requested rate.
+
+### 1.1 Resolved MVP decisions
+
+| Area | MVP decision |
+|---|---|
+| Capability floor | AVC444 v1 on eligible RDP 10.0 and 10.2–10.7 sets; Windows Server 2016-era MSTSC is the minimum target |
+| Codec order | Preserve existing `order` semantics; an earlier `RFX` entry still wins. Extend `h264_encoder` with `ffmpeg`; that backend supplies AVC444 v1 only in MVP and does not silently switch to a linked encoder |
+| Capture | XRGB8888 |
+| Color | Exact MS-RDPEGFX full-range BT.709 conversion |
+| Dimensions | Arbitrary visible dimensions; coded width and height padded to 16 |
+| FFmpeg MVP | Stock executable with `libx264` |
+| Process model | xrdp plus one persistent FFmpeg child |
+| NUT | Standard NUT with normal syncpoints and `-write_index 0`; no experimental PIPE mode |
+| H.264 headers | `h264_mp4toannexb` plus `libx264` `repeat-headers=1`; startup NAL validation is authoritative |
+| Reset | Kill/reap and recreate child on every resize or discontinuity |
+| Timeout | Bounded startup and pair deadlines; no runtime force-IDR RPC in MVP |
+| Output sizing | Dynamically growing best-effort buffers under a separate hard safety ceiling; legacy GFX compressed limit is not reused |
+| Topology | Single monitor only |
+| Server platforms | Linux and supported Unix-like xrdp/xorgxrdp servers; no non-target platform-specific material in this MVP |
+
+---
+
+## 2. Problem statement
+
+Current xrdp H.264 support is build-time coupled to in-process software encoder libraries. In the current `devel` code:
+
+- `set_h264_encoder_methods()` selects x264 or OpenH264 function pointers at compile time;
+- `xrdp_encoder_create()` selects `CC_GFX_A2` and `XRDP_nv12_709fr` for GFX H.264;
+- `gfx_wiretosurface1()` emits one AVC420 metablock and invokes one H.264 encode operation; and
+- `xrdp_encoder_x264_encode()` copies compression rectangles into an encoder-private persistent NV12 frame and calls x264 in process.
+
+This arrangement creates four relevant limitations:
+
+1. Every linked encoder creates build, packaging, ABI, and maintenance branches.
+2. A distribution-provided FFmpeg executable may already contain the preferred local software or hardware encoder, but xrdp cannot use it without another linked backend.
+3. Current GFX H.264 is AVC420 and loses chroma resolution needed for sharp colored desktop edges.
+4. The existing synchronous one-frame/one-buffer API does not represent the two-picture AVC444 transaction or a packetized child-process output stream.
+
+The proposed MVP deliberately narrows the first implementation to a stock FFmpeg executable with `libx264`, one logical monitor, AVC444 v1, standard NUT, complete-view reconstruction, and process restart on every resize. This creates one portable executable integration path before Linux hardware-specific profiles are attempted in later changes.
+
+## 3. Goals
+
+### G-1: Windows MSTSC AVC444 interoperability
+
+Implement Microsoft-compatible RDPGFX AVC444, initially using `RFX_AVC444_BITMAP_STREAM` with `LC=0`, and validate it with supported Windows `mstsc.exe` clients.
+
+### G-2: Stock executable integration
+
+Use a user-installed `ffmpeg` executable with no compile-time dependency on FFmpeg headers or libraries.
+
+### G-3: One generic build path
+
+Avoid separate xrdp compile-time implementations for libx264, QSV, VAAPI, NVENC, and other encoder APIs. The MVP adds `ffmpeg` as a runtime `h264_encoder` choice and validates stock-FFmpeg `libx264`; later Linux hardware profiles remain runtime behavior, not new xrdp SDK linkages.
+
+### G-4: Correct H.264 stream semantics
+
+Encode main and auxiliary AVC444 views through the same persistent FFmpeg output stream and preserve exact coded-picture order.
+
+### G-5: Bounded latency
+
+Prevent encoder or pipe backpressure from building an unbounded stale-frame queue. Drop or coalesce only work that has not been submitted to the H.264 stream.
+
+### G-6: Deterministic reset
+
+Terminate and recreate the FFmpeg child on every resize, coded-dimension change, process failure, parser failure, or stream discontinuity. Resume with a full `LC=0` reset pair.
+
+### G-7: Codebase-aligned integration
+
+Reuse xrdp's existing encoder worker thread, GFX command processing, one existing H.264 handle slot for the MVP surface, processed FIFO, and RDPGFX output path where practical.
+
+---
+
+## 4. Non-goals
+
+### NG-1: Guaranteed real-time encoding
+
+The project does not guarantee that an arbitrary FFmpeg binary, encoder, driver, or hardware device can sustain a requested picture rate. For AVC444, 60 desktop updates per second means 120 encoded H.264 pictures per second.
+
+### NG-2: Linking against libavcodec
+
+The initial backend does not include or dynamically load `libavcodec`, `libavformat`, or `libavutil`.
+
+### NG-3: A custom long-running encoder daemon
+
+The initial design directly spawns and owns a stock FFmpeg child. It does not define a separately installed service, Unix-domain RPC daemon, or shared-memory encoder protocol.
+
+### NG-4: Dynamic resolution changes
+
+The child is not reconfigured in place. It is killed and restarted for every coded-size change.
+
+### NG-5: AVC444v2 in the first milestone
+
+The first milestone targets AVC444 codec ID `0x000E`. AVC444v2 codec ID `0x000F` is a later feature because its Chroma420 construction algorithm differs even though the outer wire structure is similar.
+
+### NG-6: Deferred chroma in the first milestone
+
+The first milestone always uses `LC=0`: main and auxiliary views are sent together. `LC=1`/`LC=2` scheduling is deferred.
+
+### NG-7: Zero-copy process transport
+
+Complete reconstructed subframes are serialized to FFmpeg. The extra process-boundary copies are an accepted portability tradeoff.
+
+### NG-8: H.264 decoding in xrdp
+
+xrdp demuxes NUT and inspects/normalizes H.264 NAL units. It does not decode the H.264 pictures. The RDP client is the decoder.
+
+---
+
+## 5. Terminology
+
+| Term | Meaning |
+|---|---|
+| Desktop update | One logical xrdp display update submitted to AVC444. |
+| Main view | The normal YUV420 view defined by MS-RDPEGFX AVC444. |
+| Auxiliary view | The Chroma420 view used with the main view to reconstruct YUV444. |
+| Pair | Main picture followed immediately by its auxiliary picture. |
+| Coded picture | One H.264 picture generated from one raw NV12 input frame. |
+| Child | One persistent stock FFmpeg process for the single MVP RDPGFX surface. |
+| NUT demuxer | In-tree parser that extracts encoded packet boundaries, timestamps, flags, and codec data from FFmpeg's NUT stdout. It is not an H.264 decoder. |
+| Submitted | Any byte of a raw picture has been committed to the child input pipe. |
+| Unsubmitted | A pending update whose main picture has not begun writing to the child. |
+| Reset pair | A full-surface `LC=0` pair sent after child creation or stream reset. |
+| Actual dimensions | Width and height of the RDP surface. |
+| Coded dimensions | NV12 dimensions given to FFmpeg, including any required padding. |
+
+---
+
+## 6. Codebase review and current-state evidence
+
+This section records the integration assumptions reviewed against the `devel` branch on 2026-07-13. Line numbers are approximate and should be refreshed immediately before implementation.
+
+### 6.1 Current xrdp encoder worker
+
+In `xrdp/xrdp_encoder.c`:
+
+- `xrdp_encoder_create()` creates `fifo_to_proc`, `fifo_processed`, a mutex, `xrdp_encoder_event_to_proc`, `xrdp_encoder_event_processed`, termination wait objects, and the `proc_enc_msg` worker thread.
+- `xrdp_encoder_delete()` signals termination and waits up to five seconds before deleting codec handles and synchronization objects.
+- `gfx_send_done()` creates `XRDP_ENC_DATA_DONE`, appends it to `fifo_processed`, and signals `xrdp_encoder_event_processed`.
+- The GFX H.264 work is therefore already off the main xrdp thread. The external child is an additional process boundary inside the existing encoder worker path, not the first asynchronous boundary.
+
+**Design consequence:** The first implementation should keep one synchronous `encode_pair()` transaction inside the existing encoder worker. Its implementation must use nonblocking pipes and `poll()` so it can write raw input while concurrently draining NUT output and stderr.
+
+### 6.2 Current GFX H.264 path
+
+In `xrdp/xrdp_encoder.c`:
+
+- `xrdp_encoder_create()` currently selects `CC_GFX_A2`, `XRDP_nv12_709fr`, and GFX mode when H.264 is selected.
+- `process_enc_h264()` for the older surface-command route is a dummy; the implemented H.264 route is in the GFX path.
+- `gfx_wiretosurface1()` parses the GFX command, selects a monitor index, writes `RFX_AVC420_METABLOCK`, checks the NV12 byte count, lazily creates a per-surface H.264 handle, calls the H.264 encode function, and then calls the generic RDPGFX serializer `xrdp_egfx_wire_to_surface1()` (`xrdp/xrdp_egfx.c:496`, declared `xrdp/xrdp_egfx.h:206`).
+- `codec_handle_h264_gfx[16]` provides the current per-surface handle seam.
+
+**Design consequence:** Add a separate AVC444 serializer path adjacent to `gfx_wiretosurface1()`. The MVP uses exactly one external handle for the single supported surface; the existing monitor-slot array is an integration seam, not an MVP multi-monitor promise.
+
+### 6.3 Current x264 reconstruction behavior
+
+In `xrdp/xrdp_encoder_x264.c`:
+
+- the encoder owns persistent `yuvdata`;
+- changed Y and UV rows are copied into it for each compression rectangle;
+- the x264 input color space is `X264_CSP_NV12`;
+- `i_width` and `i_height` are rounded up with `(dimension + 15) & ~15`; and
+- the persistent reconstructed frame is submitted as one complete picture.
+
+The external implementation must allocate its NV12 planes from the **coded** aligned dimensions. It must not assume an allocation based only on visible dimensions is large enough.
+
+**Design consequence:** Dirty rectangles are metadata/state inputs, not independently encoded H.264 tiles. The AVC444 MVP maintains complete main and auxiliary NV12 buffers, reconstructs both from the full XRGB surface for each submitted update, and sends complete pictures to FFmpeg.
+
+### 6.4 Current xorgxrdp shared memory
+
+In `xorgxrdp/module/rdpClientCon.c`:
+
+- shared capture memory is allocated with a mapped pointer and fd;
+- `CC_GFX_A2` currently allocates approximately two bytes per pixel and selects the H.264 capture path;
+- resize reallocates capture memory when dimensions change.
+
+The current GFX H.264 capture format is specifically **`XRDP_nv12_709fr`** — BT.709 *full-range* NV12, not generic BT.601 NV12. `xrdp_encoder_create()` sets `capture_format = XRDP_nv12_709fr` (`xrdp/xrdp_encoder.c:234-235`); the only implemented GFX converter is `rdpCaptureGfxA2` → `rdpCopyBox_a8r8g8b8_to_nv12_709fr` (`xorgxrdp/module/rdpCapture.c:1454`, whose luma `Y=(54R+183G+18B)>>8` over `[0,255]` confirms BT.709 full-range); the constant is defined at `common/xrdp_constants.h:349`. Plain `XRDP_nv12` (BT.601-style) is used only by the non-GFX `CC_SUF_A2` path (`xrdp/xrdp_encoder.c:244`). The AVC444 main/auxiliary views must therefore use matching **BT.709 full-range** colorimetry (§8.3), consistent with the existing GFX path.
+
+**Design consequence:** AVC444 requires a new full-chroma capture mode. The current `XRDP_nv12_709fr` source cannot be reused because 4:2:0 conversion has already discarded the chroma samples needed to build the auxiliary view. Three full-chroma format constants **already exist but are unimplemented** — `XRDP_yuv444_709fr` (`common/xrdp_constants.h:352`, code 67), `XRDP_yuv444_v1_stream_709fr` (`:356`, code 68; MS-RDPEGFX AVC444 v1) and `XRDP_yuv444_v2_stream_709fr` (`:360`, code 69) — with no `yuv444` converter anywhere in `/work` or `xorgxrdp/module/`. The new capture mode (FR-CAPTURE-2) should **reuse or supersede these existing constants rather than duplicate the format numbering**; note the capture is XRGB-source (FR-CAPTURE-1), and these constants name the intended *view* colorimetry.
+
+### 6.5 Microsoft AVC444 requirement
+
+MS-RDPEGFX defines an AVC444 bitmap stream as two AVC420-form structures. For `LC=0`, the first carries the main YUV420 picture and the second carries the Chroma420 picture. The two H.264 bitstreams must come from the same H.264 encoder and be decoded by a single decoder as one stream.
+
+**Design consequence:** “Two-process” means xrdp plus one FFmpeg child per logical H.264 stream. It never means one FFmpeg process for main and another for auxiliary.
+
+### 6.6 Current compile-time guards that must change
+
+The current source does not merely select x264/OpenH264 at runtime:
+
+- the implemented body of `gfx_wiretosurface1()` (`xrdp/xrdp_encoder.c:794`) is wrapped by `#if defined(XRDP_X264) || defined(XRDP_OPENH264)`;
+- GFX H.264 selection in `xrdp_encoder_create()` (`xrdp/xrdp_encoder.c:228`) is under the same compile-time condition;
+- per-surface H.264 handle deletion (`xrdp/xrdp_encoder.c:414`) is similarly guarded;
+- `init_libh264_loaded()` (`xrdp/xrdp_mm.c:57-73`) derives H.264 availability from compiled-in library support, but keys on a **different** macro set: `#if defined(XRDP_OPENH264)` (runtime probe) / `#elif defined(XRDP_H264)` (set loaded) / `#else` (unavailable). `XRDP_H264` is a *derived umbrella macro* defined in `xrdp/xrdp.h:41-43` as `#if defined(XRDP_X264) || defined(XRDP_OPENH264) || defined(XRDP_NVENC)`. `XRDP_X264` does not appear in this function, so an x264-only build reaches the `XRDP_H264` branch via the umbrella.
+
+**The capability-split work must therefore account for three macros — `XRDP_X264`, `XRDP_OPENH264`, and the `XRDP_H264` umbrella — not the two named in earlier drafts.**
+
+**Design consequence:** The external process backend must be compilable and selectable when neither x264 nor OpenH264 is linked. AVC capability availability must be split into at least:
+
+- compiled-in in-process software H.264 availability; and
+- configured/probed external FFmpeg AVC444 availability.
+
+The GFX parser, AVC420 metablock helper, generic H.264/RDP serializers, and external child lifecycle must not remain accidentally excluded by x264/OpenH264-only preprocessor guards.
+
+### 6.7 Integration seam matrix
+
+| Repository/file | Current seam | Required change | Synchronization significance |
+|---|---|---|---|
+| `xrdp/xrdp_mm.c` | `init_libh264_loaded()` | Separate linked-library availability from externally probed AVC444 availability | The capability decision must be made before creating the GFX encoder |
+| `xrdp/xrdp_mm.c` | `xrdp_mm_egfx_caps_advertise()` | Select and retain explicit AVC420/AVC444 mode and codec ID | Establishes the session-wide wire contract |
+| `xrdp/xrdp_encoder.c` | `xrdp_encoder_create()` | Select full-chroma capture and external pair backend | Must complete before xorgxrdp begins the selected capture mode |
+| `xrdp/xrdp_encoder.c` | `proc_enc_msg()` / `process_enc_egfx()` | Keep existing worker ownership; invoke pair backend from GFX command processing | Provides the single xrdp-side serialization point for each work item |
+| `xrdp/xrdp_encoder.c` | `gfx_wiretosurface1()` | Split AVC420 and AVC444 serializers; parse common command fields once | Pair commit and output completion occur inside this worker path |
+| `xrdp/xrdp_encoder.c` | `gfx_send_done()` | Reuse unchanged where possible | Existing handoff from encoder worker to xrdp main thread |
+| `xrdp/xrdp_encoder.h` | existing H.264 handles and function pointers | Add one pair-oriented external handle/API and child generation state for the MVP surface | One owner for child PID, fds, parser, tags, and reconstructed views |
+| `xorgxrdp/module/rdpClientCon.c` | capture mode allocation and resize | Add full-chroma AVC444 mode and selected-codec command metadata | Source pixels must be stable before the existing encoder work item is queued |
+| `xrdp/gfx.toml` and typed config | software H.264 configuration | Add executable/profile/probe/process limits | Configuration is resolved before child creation; no shell parsing |
+| xrdp build files | x264/OpenH264 source guards | Compile external backend and common AVC serializers without FFmpeg libraries | Enables the promised single build path |
+
+---
+
+## 7. Proposed architecture
+
+```text
+Windows mstsc
+    │
+    │ RDPGFX capabilities
+    ▼
+xrdp main thread
+    │  selects AVC444 and creates GFX encoder
+    ▼
+xorgxrdp full-chroma shared capture surface
+    │  dirty/compression rectangle metadata
+    ▼
+xrdp encoder worker: process_enc_egfx()
+    │
+    ├─ gfx_wiretosurface1_avc444()
+    │      │
+    │      ├─ reconstruct complete main NV12 view
+    │      ├─ reconstruct complete auxiliary NV12 view
+    │      └─ external_ffmpeg_encode_pair()
+    │              │
+    │              │ raw NV12 main then auxiliary
+    │              ▼
+    │         child fd 3 / anonymous pipe
+    │              ▼
+    │         stock ffmpeg process
+    │         one H.264 encoder stream
+    │              │
+    │              │ NUT on stdout
+    │              ▼
+    │         xrdp NUT demuxer
+    │              │
+    │              ├─ encoded main packet
+    │              └─ encoded auxiliary packet
+    │
+    ├─ Annex-B validation/normalization
+    ├─ RFX_AVC444_BITMAP_STREAM serializer, LC=0
+    ├─ xrdp_egfx_wire_to_surface1()
+    └─ gfx_send_done()
+           │
+           ▼
+xrdp main thread sends RDPGFX data
+           │
+           ▼
+mstsc uses one H.264 decoder and combines both views
+```
+
+### 7.1 Process cardinality
+
+The MVP supports one logical monitor and one RDPGFX surface. In current xrdp state, the legacy single-display topology may be represented by `monitorCount == 0`, while an explicit one-monitor layout uses `monitorCount == 1`; both are MVP-eligible. Any value greater than one is multi-monitor and ineligible:
+
+```text
+one xrdp process + one persistent FFmpeg child + one FFmpeg H.264 stream
+```
+
+The child receives this immutable picture order:
+
+```text
+update 0 main
+update 0 auxiliary
+update 1 main
+update 1 auxiliary
+...
+```
+
+A second monitor is not assigned another child in the MVP. If the initial topology has more than one monitor, the external AVC444 candidate is unavailable and normal pre-confirm codec-order fallback applies. If topology changes to multiple monitors after capability confirmation, xrdp terminates the child and fails/restarts the GFX connection path; MVP does not perform an in-stream codec switch or remap encoder contexts.
+
+The data model should avoid gratuitously preventing a later per-surface extension, but no multi-stream or multi-child behavior is part of MVP acceptance.
+
+---
+
+## 8. Functional requirements
+
+## 8.1 Capability negotiation
+
+### FR-CAP-0: Backend availability
+
+External AVC444 availability must not depend on `XRDP_X264`, `XRDP_OPENH264`, or a linked H.264 library. The GFX AVC serializers and external process backend must compile when neither in-process library is linked.
+
+The external AVC444 candidate is available only when all of these conditions hold:
+
+1. the feature is enabled;
+2. the session topology is a single logical display (`monitorCount <= 1` in the current representation);
+3. the configured FFmpeg executable and profile pass the bounded behavioral probe; and
+4. the client advertises an eligible AVC444 v1 capability set.
+
+### FR-CAP-1: Explicit selected mode
+
+xrdp must retain the selected wire mode rather than reducing all H.264 to `XRDP_EGFX_H264`:
+
+```c
+enum xrdp_gfx_avc_mode
+{
+    XRDP_GFX_AVC_NONE = 0,
+    XRDP_GFX_AVC420,
+    XRDP_GFX_AVC444,
+    XRDP_GFX_AVC444V2
+};
+```
+
+Store the selected mode, capability version, flags, and codec ID through `xrdp_encoder_create()` and GFX serialization.
+
+### FR-CAP-2: Exact MVP capability table
+
+| Advertised capability set | H.264 interpretation for this MVP |
+|---|---|
+| `RDPGFX_CAPVERSION_8` | No AVC candidate |
+| `RDPGFX_CAPVERSION_81` with `AVC420_ENABLED` | AVC420 candidate only |
+| `RDPGFX_CAPVERSION_81` without `AVC420_ENABLED` | No AVC candidate |
+| `RDPGFX_CAPVERSION_10` with `AVC_DISABLED` clear | AVC444 v1 candidate |
+| `RDPGFX_CAPVERSION_101` (`0x000A0100`) | Reserved-only capsData — no AVC flag field (MS-RDPEGFX 2.2.1.10); **not eligible** for the v1-only MVP (treated as AVC444v2 territory) |
+| `RDPGFX_CAPVERSION_102`–`107` with `AVC_DISABLED` clear | AVC444 v1 candidate |
+| Any v10.x set with `AVC_DISABLED` set | No AVC candidate |
+
+`AVC_THINCLIENT`, where present, is a preference indication, not a prerequisite for AVC444 selection.
+
+When several eligible sets of the same mode are advertised, choose the highest supported version. Do not identify the client by Windows version; capability contents are authoritative. Windows Server 2016-generation MSTSC is the minimum acceptance target because AVC444 appeared in that generation, but it is selected only when the client actually advertises an eligible v10.0 or v10.2–v10.7 set. A client that advertises only v10.1 is not accepted by the v1-only MVP.
+
+### FR-CAP-3: Codec-order and encoder-backend interaction
+
+Preserve the existing `gfx.toml` `order` semantics and extend the existing `h264_encoder` selector:
+
+- Iterate `order` entries exactly as today.
+- If `RFX` appears earlier and has an eligible Progressive capability set, RFX wins.
+- When `H.264` is reached, consult the configured H.264 backend:
+  - `h264_encoder = "ffmpeg"`: the MVP supplies only a successfully probed AVC444 v1 candidate. A v8.1 AVC420-only client therefore causes this `H.264` entry to be skipped and the next configured codec to be considered.
+  - `h264_encoder = "x264"` or `"OpenH264"`: retain the existing linked-backend AVC420 behavior when compiled and available.
+- Never silently change from `ffmpeg` to a linked backend because the probe failed. Backend selection is administrator policy; codec-order fallback remains separate.
+
+The MVP does not require a new top-level codec-order token. The selected log line must state the backend and wire mode, for example `ffmpeg/AVC444`, `x264/AVC420`, or no H.264, rather than merely “H264”. A future explicit AVC-mode order can be considered after AVC444v2 or external AVC420 exists.
+
+### FR-CAP-4: Probe timing and immutable connection choice
+
+Run the exact FFmpeg behavioral probe before sending `RDPGFX_CAPS_CONFIRM_PDU`. A failed probe removes the external AVC444 candidate before codec-order selection.
+
+No persistent probe cache is required for MVP. The **client-advertised capability does not change** because FFmpeg changes; the server's readiness to select and honor AVC444 can change between xrdp processes because the executable, package, permissions, or profile may have changed. Probe once in the connection process before confirmation and retain that result for the connection.
+
+After confirmation:
+
+- a runtime child failure follows the bounded reset/restart policy;
+- no partially emitted pair may be replaced with another codec; and
+- after the configured failure threshold, fail the GFX/session path cleanly. MVP does not perform a mid-connection switch to RFX or AVC420, even if the confirmed capability set could theoretically describe another codec.
+
+### FR-CAP-5: AVC444 v1 codec ID
+
+The MVP sends `XR_RDPGFX_CODECID_AVC444` / `0x000E`. It must not select capability version 10.1 and then send AVC444 v1. AVC444v2 / `0x000F` is deferred.
+
+### Integration seam
+
+Primary location: `xrdp_mm_egfx_caps_advertise()` in `xrdp/xrdp_mm.c`.
+
+The current code sorts advertised sets, records one `best_h264_index`, and then applies codec order. Replace the single H.264 index with explicit candidates such as `best_avc444_v1_index` and `best_avc420_index`, populated only after external-probe availability is known.
+
+---
+
+## 8.2 Full-chroma capture
+
+### FR-CAPTURE-1: MVP format
+
+Use xorgxrdp's existing **`XRDP_a8r8g8b8` / logical XRGB8888** 32-bit capture representation as the initial full-chroma source. Conversion cost is not an MVP concern; clarity, portability, and reuse of existing 32-bit xorgxrdp handling take precedence.
+
+Read each pixel as the format's native 32-bit logical value and extract `R = (pixel >> 16) & 0xff`, `G = (pixel >> 8) & 0xff`, and `B = pixel & 0xff`; do not hard-code little-endian byte offsets in the converter. Alpha is ignored. Add a format/byte-order unit vector so the capture producer and converter cannot silently disagree.
+
+### FR-CAPTURE-2: Distinct capture mode
+
+Add a distinct capture code, provisionally:
+
+```c
+CC_GFX_AVC444
+```
+
+Do not overload `CC_GFX_A2`, whose allocation and semantics are tied to `XRDP_nv12_709fr` AVC420. For the capture *format* field, prefer reusing or superseding the pre-existing unimplemented `XRDP_yuv444*_709fr` constants (§6.4) rather than minting a new number.
+
+### FR-CAPTURE-3: Required metadata
+
+The capture allocation/work item must provide:
+
+- actual width and height;
+- source stride;
+- mapped XRGB pointer;
+- sufficient full-chroma bytes;
+- dirty/compression rectangles;
+- the single MVP surface identity; and
+- existing frame/capture identifiers used for acknowledgement.
+
+### FR-CAPTURE-4: Resize
+
+Every visible dimension change reallocates/revalidates the capture surface and triggers mandatory FFmpeg child replacement, even when the new dimensions round to the same 16-pixel coded dimensions. This avoids retaining converter or RDP region state across a changed visible geometry.
+
+### FR-CAPTURE-5: Source lifetime
+
+The current encoder work item and capture acknowledgement remain the source-lifetime contract. The converter reads the complete persistent XRGB surface only while processing that work item. After the complete main and auxiliary NV12 buffers have been reconstructed, the source capture memory is no longer needed by the FFmpeg child.
+
+### Integration seams
+
+- `xrdp_encoder_create()` in `xrdp/xrdp_encoder.c`
+- shared capture-code/format declarations
+- `rdpClientConProcessMsgClientInfo()` and resize/allocation logic in `xorgxrdp/module/rdpClientCon.c`
+
+---
+
+## 8.3 AVC444 view reconstruction and color
+
+### FR-CONVERT-1: Microsoft two-view mapping
+
+Implement the Microsoft AVC444 v1 mapping from the full-chroma source into:
+
+1. a persistent main NV12/YUV420 view; and
+2. a persistent Chroma420 auxiliary NV12/YUV420 view.
+
+This is the mapping defined by MS-RDPEGFX section 3.3.8.3.2, not a generic pair of chroma-downsampled images.
+
+### FR-CONVERT-2: Exact color conversion
+
+Use the MS-RDPEGFX **full-range BT.709** forward transform. For 8-bit `R`, `G`, and `B`, use the specification's integer form and clamp each result to `[0,255]`:
+
+```text
+Y = ( 54*R + 183*G +  18*B) >> 8
+U = ((-29*R -  99*G + 128*B) >> 8) + 128
+V = ((128*R - 116*G -  12*B) >> 8) + 128
+```
+
+Implementation must make signed arithmetic and rounding/shift behavior explicit and match specification test vectors. In particular, do not replace the signed `>> 8` operation with C integer division that truncates negative chroma numerators toward zero; use an explicit portable arithmetic-floor helper. Alpha is ignored for the video planes.
+
+The FFmpeg command marks the input/output as full-range BT.709:
+
+```text
+-color_range pc
+-colorspace bt709
+-color_primaries bt709
+-color_trc bt709
+```
+
+These metadata options do not replace the required pixel-domain formula. The startup probe records the resulting stream metadata but MSTSC wire acceptance and visual vectors remain authoritative.
+
+### FR-CONVERT-3: Complete-view reconstruction for MVP
+
+For every submitted desktop update, reconstruct **all visible pixels** of both main and auxiliary views from the persistent XRGB surface, then refresh deterministic padding. This intentionally avoids incremental AVC444 mapping errors in the prototype and is consistent with the accepted decision that conversion compute is not an MVP concern.
+
+Dirty/compression rectangles remain useful for:
+
+- deciding whether an update exists;
+- coalescing unsubmitted work;
+- constructing the conservative RDP region metadata; and
+- future optimization measurements.
+
+They do not limit which source pixels are converted in MVP. Empty/no-damage work is not submitted. Incremental luma/chroma reconstruction and independent damage tracking are deferred.
+
+### FR-CONVERT-4: Padding
+
+The converter owns padded main and auxiliary buffers sized to coded dimensions. Right and bottom padding must be deterministic and initialized. Replicate the final valid column and row into padding so prediction/deblocking near visible edges does not reference uninitialized or high-contrast synthetic content.
+
+Because MVP reconstructs the complete views, every submitted update refreshes all right/bottom padding edges.
+
+### FR-CONVERT-5: Buffer mutation and input commit
+
+Once the first byte of a pair is written to the child, neither reconstructed buffer may be changed until both complete raw pictures have been accepted by the input pipe. The MVP performs conversion and transfer synchronously in the existing encoder worker, so one persistent main buffer and one persistent auxiliary buffer are sufficient.
+
+### Suggested interface
+
+```c
+int
+xrdp_avc444_update_views(
+    struct xrdp_avc444_converter *ctx,
+    const uint8_t *xrgb,
+    int xrgb_stride,
+    int actual_width,
+    int actual_height);
+```
+
+---
+
+## 8.4 External FFmpeg process
+
+### FR-PROC-1: Spawn model
+
+Invoke an absolute or administrator-approved FFmpeg executable directly with `posix_spawn()` or `fork()`/`execve()`. Never invoke a shell.
+
+### FR-PROC-2: Single handle contents
+
+The one MVP external handle owns:
+
+- child PID and generation;
+- raw-input write fd;
+- NUT stdout read fd;
+- stderr read fd;
+- actual and coded dimensions;
+- input picture counter;
+- pending output-tag FIFO;
+- NUT parser state;
+- H.264 validation state;
+- persistent main and auxiliary NV12 buffers;
+- active argv/profile identity; and
+- health, timeout, and restart counters.
+
+### FR-PROC-3: Descriptor layout
+
+Prefer a dedicated inherited raw-media descriptor:
+
+```text
+parent raw writer ──> child fd 3
+child stdout ───────> parent NUT demuxer
+child stderr ───────> parent diagnostics
+child stdin ────────> /dev/null
+```
+
+This permits `-nostdin` and keeps FFmpeg interactive stdin separate from media input.
+
+### FR-PROC-4: FD behavior
+
+Parent fds are nonblocking and close-on-exec. Child inheritance is restricted to intended descriptors. The parent drains input progress, stdout, and stderr in one `poll()` loop.
+
+### FR-PROC-5: MVP FFmpeg command
+
+Structural arguments are owned by xrdp. The initial supported profile is stock FFmpeg `libx264`:
+
+```text
+<ffmpeg-path>
+  -hide_banner
+  -nostdin
+  -loglevel <configured-level>
+  -f rawvideo
+  -pixel_format nv12
+  -video_size <coded-width>x<coded-height>
+  -framerate <2 * desktop-update-rate>
+  -color_range pc
+  -colorspace bt709
+  -color_primaries bt709
+  -color_trc bt709
+  -i pipe:3
+  -map 0:v:0
+  -an
+  -sn
+  -dn
+  -fps_mode passthrough
+  -c:v libx264
+  -bf 0
+  -preset ultrafast
+  -tune zerolatency
+  -crf <configured-quality>
+  -g <configured-gop>
+  -x264-params repeat-headers=1
+  -bsf:v h264_mp4toannexb
+  -flush_packets 1
+  -write_index 0
+  -f nut
+  pipe:1
+```
+
+With `-color_range pc`, ffmpeg tags the stream as full-range; on 8-bit YUV this surfaces (in `ffprobe`) as the deprecated `yuvj420p` pixel format rather than `yuv420p`. This is expected, does not affect the NUT/H.264 output, and implementers should not treat `yuvj420p` as an unexpected/rejected format.
+
+The argv builder may use the older equivalent of `-fps_mode passthrough` only when the behavioral probe proves identical no-drop/no-duplicate behavior.
+
+### FR-PROC-6: Standard NUT only
+
+Do not pass `-syncpoints none`, `-f_strict experimental`, or any NUT PIPE/no-syncpoint option in MVP. Standard NUT syncpoints are mandatory. `-write_index 0` disables the trailing/growing index while retaining normal syncpoints.
+
+### FR-PROC-7: Structural invariants
+
+User configuration may adjust quality, GOP, preset, and other explicitly allowlisted libx264 options. The command builder must merge any allowed x264 suboptions into one `-x264-params` value while forcing `repeat-headers=1`. It may not override:
+
+- input format or dimensions;
+- input/output descriptors;
+- stream count or map selection;
+- picture ordering;
+- `-bf 0` / no-reordering behavior;
+- `repeat-headers=1`;
+- Annex-B bitstream filtering;
+- standard NUT output;
+- output destination; or
+- lifecycle/termination behavior.
+
+### FR-PROC-8: Future encoders
+
+QSV, VAAPI, NVENC, and other Linux/Unix FFmpeg encoders are deferred. They must land as later profiles with their own behavioral evidence. They do not change the process/NUT/RDP seams unless an actual backend demonstrates a requirement.
+
+---
+
+## 8.5 Raw input stream protocol
+
+There is no custom wire protocol on the FFmpeg input pipe. The stock FFmpeg rawvideo demuxer reads fixed-size frames.
+
+### FR-IN-1
+
+For coded dimensions `CW × CH`, each NV12 picture is exactly:
+
+```text
+CW * CH + CW * ceil(CH / 2)
+```
+
+when `CW` is even and the UV stride equals `CW`. The implementation should define the exact plane strides and total bytes centrally and reject inconsistent buffers.
+
+### FR-IN-2
+
+A desktop pair is serialized exactly as:
+
+```text
+main picture bytes
+auxiliary picture bytes
+```
+
+No other picture from that H.264 context may be interleaved between them.
+
+### FR-IN-3
+
+The backend must append logical tags to an internal pending-output FIFO before or atomically with submission:
+
+```c
+struct xrdp_ffmpeg_picture_tag
+{
+    uint64_t generation;
+    uint64_t desktop_sequence;
+    uint64_t input_picture_index;
+    enum { AVC444_MAIN, AVC444_AUX } view;
+};
+```
+
+These tags do not cross the pipe. They map ordered NUT output packets back to xrdp transactions.
+
+### FR-IN-4
+
+Once any byte of the main picture has been written, the pair is committed. The auxiliary picture must follow unless the child dies. A committed pair cannot be dropped, replaced, or reordered.
+
+### FR-IN-5
+
+Input picture PTS generated by FFmpeg must remain monotonic and correspond one-for-one to the raw input order. The behavioral probe must verify this.
+
+---
+
+## 8.6 Full-duplex process I/O and exact synchronization
+
+A blocking “write two frames, then read two packets” implementation can deadlock if FFmpeg fills stdout or stderr while the parent blocks on the input pipe. The backend must drive all directions concurrently.
+
+### FR-SYNC-1: Capture ownership point
+
+The GFX work item is eligible for conversion only after xorgxrdp has completed its source pixel writes and queued the existing encoder message.
+
+The initial implementation should preserve the existing xrdp/xorgxrdp acknowledgement lifetime rather than introduce an early capture-buffer release optimization.
+
+### FR-SYNC-2: Pair reconstruction point
+
+Before the first raw byte is submitted:
+
+- both persistent reconstructed views must be complete for the current full XRGB surface;
+- pair metadata and output tags must be allocated;
+- the child generation and dimensions must match the request; and
+- restart/reset processing must be complete.
+
+### FR-SYNC-3: Input commit point
+
+The pair changes from `UNSUBMITTED` to `COMMITTED` when the first byte of its main picture is successfully written to the child input pipe.
+
+Before this point, a pending update may be replaced or coalesced. After this point, neither member may be dropped.
+
+### FR-SYNC-4: Input consumption point
+
+A picture is considered transferred when its exact raw byte count has been accepted by the pipe. This only proves transport to the child process; it does not prove that the encoder has consumed or released the picture. Because the data has been copied into the pipe/FFmpeg process, xrdp may reuse its reconstructed view memory after all bytes for that picture have been written.
+
+For the synchronous pair implementation, both reconstructed buffers may be reused after both complete picture byte ranges have been written.
+
+### FR-SYNC-5: Output association point
+
+A NUT video packet is associated with the oldest pending picture tag only after the NUT demuxer has parsed a complete packet and validated:
+
+- expected video stream;
+- monotonic timestamp/order;
+- valid packet length within configured limits;
+- H.264 codec identity; and
+- no unsupported reorder condition.
+
+### FR-SYNC-6: Pair completion point
+
+A desktop update is `PAIR_COMPLETE` only when:
+
+- one valid encoded packet/access unit has been associated with its main tag;
+- one valid encoded packet/access unit has been associated with its auxiliary tag;
+- both belong to the current child generation;
+- main precedes auxiliary in coded-picture order; and
+- both payloads are normalized to the RDP-required H.264 byte-stream representation.
+
+Only then may xrdp serialize and emit an `LC=0` AVC444 bitmap stream.
+
+### FR-SYNC-7: Existing xrdp completion point
+
+After RDPGFX serialization, the worker uses the existing `gfx_send_done()` / `fifo_processed` / `xrdp_encoder_event_processed` path. The `XRDP_ENC_DATA` work item remains owned until the existing completed-item lifecycle releases it and allows the corresponding xorgxrdp acknowledgement.
+
+### FR-SYNC-8: Poll loop
+
+The synchronous `encode_pair()` call must use `poll()` or an equivalent event loop over:
+
+- writable child input fd;
+- readable child NUT stdout;
+- readable child stderr;
+- child termination detection or periodic `waitpid(..., WNOHANG)`;
+- xrdp encoder termination request; and
+- an operation deadline.
+
+At each iteration it must:
+
+1. write as much pending raw input as possible;
+2. drain all currently available stdout into the NUT parser;
+3. drain stderr into a bounded line buffer/log sink;
+4. process all complete NUT packets;
+5. check child exit;
+6. check cancellation/termination;
+7. enforce configured limits and timeout.
+
+### State model
+
+```text
+IDLE
+  │ reconstructed pair available
+  ▼
+UNSUBMITTED
+  │ first main byte written
+  ▼
+MAIN_WRITING
+  │ complete main bytes written
+  ▼
+AUX_WRITING
+  │ complete auxiliary bytes written
+  ▼
+PAIR_SUBMITTED
+  │ main NUT packet complete
+  ▼
+MAIN_OUTPUT_READY
+  │ auxiliary NUT packet complete
+  ▼
+PAIR_COMPLETE
+  │ RDPGFX serialized and queued
+  ▼
+IDLE
+```
+
+Output may begin before input writing finishes. The implementation must therefore treat input and output progress as orthogonal counters rather than assuming the strictly linear timing shown above.
+
+---
+
+## 8.7 NUT demuxer requirements
+
+The in-tree component is a **NUT demuxer**, not a media decoder. It reconstructs packet boundaries and metadata from child stdout; it never decodes H.264 pixels.
+
+### FR-NUT-1: Supported subset
+
+Implement a bounded streaming parser for the standard NUT subset generated by the MVP command. It must support:
+
+- NUT identifier;
+- main header;
+- exactly one H.264 video stream header;
+- time bases;
+- codec-specific data/extradata;
+- frame-code table;
+- variable-length integer parsing;
+- packet payload length and PTS reconstruction;
+- keyframe flags;
+- repeated headers;
+- **standard syncpoints**;
+- required CRC validation; and
+- arbitrary pipe read fragmentation.
+
+Experimental NUT PIPE/no-syncpoint streams are explicitly unsupported and deferred.
+
+### FR-NUT-2: Rejection and bounds
+
+Reject:
+
+- more than one media stream;
+- non-video streams;
+- codec tags other than H.264;
+- unsupported NUT version/features;
+- malformed frame-code tables or variable-length fields;
+- invalid CRCs;
+- non-monotonic/reordered packet output;
+- excessive metadata/header repetition; and
+- any header or packet exceeding the independent parser safety ceilings.
+
+The existing `XRDP_GFX_MAX_COMPRESSED_BYTES` / `gfx.max_compressed_bytes` value is **not** the AVC444 subframe or pair limit.
+
+### FR-NUT-3: Best-effort output allocation
+
+Grow packet and pair buffers dynamically up to separate implementation-safety caps. MVP defaults:
+
+- maximum NUT header/metadata bytes: 1 MiB;
+- maximum one encoded picture packet: 128 MiB;
+- maximum complete AVC444 pair payload, excluding outer xrdp transport overhead: 256 MiB.
+
+These are denial-of-service/allocation guards, not rate-control or expected compressed-size limits. They are configurable downward by administrators. Exceeding one kills the child and fails the generation; normal output is not truncated.
+
+### FR-NUT-4: API
+
+```c
+enum xrdp_nut_event_type
+{
+    XRDP_NUT_NEED_MORE,
+    XRDP_NUT_STREAM_READY,
+    XRDP_NUT_PACKET,
+    XRDP_NUT_ERROR
+};
+```
+
+A packet event includes stream ID, PTS/DTS if available, keyframe flag, payload pointer/length, and current codec-extradata generation.
+
+### FR-NUT-5: Licensing and clean-room boundary
+
+NUT is a publicly documented container format; FFmpeg's NUT implementation is published under LGPL-2.1-or-later. The MVP executes a separately installed FFmpeg binary and does not link or redistribute it as part of xrdp; downstream packaging policy remains separate. This PRD does not provide legal advice, and maintainers make the final licensing determination.
+
+For the xrdp parser:
+
+- implement from the public NUT format documentation and independently generated files;
+- do not copy FFmpeg parser/muxer functions, tables, control flow, comments, or tests;
+- independently define only the wire constants and algorithms necessary for interoperability;
+- keep a design note identifying every public source consulted; and
+- have a reviewer compare behavior and tests, not source-text similarity.
+
+### FR-NUT-6: Test-vector provenance
+
+Generate committed fixtures with stock FFmpeg commands. For each fixture record:
+
+- exact generator argv;
+- FFmpeg version/configuration output;
+- input generator description;
+- expected packet metadata;
+- SHA-256 digest; and
+- whether corruption/truncation was applied after generation.
+
+Required fixtures include valid standard-syncpoint streams, repeated headers, one-byte fragmentation, truncated headers/packets, invalid CRCs, oversized variable integers, malformed frame codes, and fuzz-derived regressions. No fixture may be copied from FFmpeg's own test suite without explicit license review.
+
+### FR-NUT-7: Untrusted input handling
+
+Treat stdout as untrusted even though the process is local. Fuzz the parser independently and bound all arithmetic, allocation, loop counts, and resynchronization scanning.
+
+All size and offset computations derived from NUT variable-length integers (payload length, header length, and any count×element products) must use **overflow-checked arithmetic** and be validated against the FR-NUT-3 ceilings (`max_nut_header_bytes` / `max_encoded_picture_bytes` / `max_encoded_pair_bytes`) **before** any allocation, seek, or copy. Reject any intermediate value that would overflow `size_t`/`off_t` or exceed a ceiling, and reject zero/negative stream or packet counts (CLAUDE.md rule 3: validate numeric bounds; reject zero/negative/extreme values; avoid integer overflow). Any NUT-metadata-derived string that is logged or surfaced must follow NFR-SEC-8 (constant format string, escaped control characters).
+
+---
+
+## 8.8 H.264 normalization and validation
+
+### FR-H264-1: Annex B
+
+Every H.264 access unit placed in `RFX_AVC420_BITMAP_STREAM` must conform to H.264 Annex B byte-stream format.
+
+### FR-H264-2: MVP normalization strategy
+
+The command always requests:
+
+```text
+-bsf:v h264_mp4toannexb
+-x264-params repeat-headers=1
+```
+
+`h264_mp4toannexb` converts length-prefixed NAL units but is **not sufficient by itself** to guarantee SPS/PPS occur in the first NUT packet. A local review test with Debian FFmpeg 7.1.5 and libx264 produced Annex-B packet data but kept SPS/PPS only in NUT extradata until `repeat-headers=1` was added.
+
+Therefore the MVP:
+
+1. parses and bounds NUT extradata for format validation;
+2. does not synthesize parameter sets from extradata;
+3. requires `repeat-headers=1`; and
+4. rejects the profile unless the first packet itself contains the required parameter sets and IDR.
+
+Extradata-based synthesis is deferred until a real later encoder profile demonstrates the need.
+
+### FR-H264-3: Packet-to-picture mapping
+
+Exactly one NUT video packet must correspond to each submitted raw picture. The probe rejects split, combined, duplicated, dropped, or reordered packetization.
+
+### FR-H264-4: FIFO association
+
+Associate output packets to ordered tags:
+
+```text
+(main N), (auxiliary N), (main N+1), (auxiliary N+1), ...
+```
+
+Delayed output is allowed within deadlines; display-order reordering is not.
+
+### FR-H264-5: Startup/reset validation
+
+For the first main packet of every child generation require:
+
+- NUT keyframe flag set;
+- at least one SPS NAL unit, type 7;
+- at least one PPS NAL unit, type 8;
+- at least one IDR VCL NAL unit, type 5; and
+- valid Annex-B start-code framing and bounded NAL traversal.
+
+For the immediately following auxiliary packet require at least one valid VCL NAL unit, type 1 or 5, and strict second-picture order in the same stream.
+
+Do not require AUD NAL units. This is not a full H.264 parser: split bounded Annex-B start codes and inspect only the one-byte NAL header's `nal_unit_type` field. Do not parse slice syntax, reference-picture semantics, or decode pixels.
+
+### FR-H264-6: Timeout rather than runtime keyframe control
+
+MVP has no fine-grained child control channel and no runtime force-IDR request. A new child is expected to begin with a keyframe. Apply bounded deadlines:
+
+- child spawn and NUT stream-ready default: 2 seconds;
+- first main packet default: 2 seconds after full main input transfer;
+- auxiliary/pair completion default: 2 seconds after full auxiliary transfer.
+
+Timeout or failed NAL checks kill/reap the child and fail the generation. Values are configurable with hard upper bounds.
+
+---
+
+## 8.9 AVC444 wire serialization
+
+### FR-WIRE-0
+
+The selected xrdp GFX AVC mode is the source of truth for the outgoing codec ID. Current `gfx_wiretosurface1()` parses `codec_id` from the incoming GFX command. The AVC444 implementation must either update the xorgxrdp command producer to emit `0x000E` or derive/override the value in xrdp, and in all cases validate that a stale AVC420 command cannot be serialized with AVC444 data.
+
+### FR-WIRE-1
+
+Add a dedicated serializer, provisionally:
+
+```c
+gfx_wiretosurface1_avc444(...)
+```
+
+rather than overloading the existing AVC420 function with deeply conditional behavior.
+
+### FR-WIRE-2
+
+For MVP `LC=0`, construct the `RFX_AVC444_BITMAP_STREAM` (MS-RDPEGFX 2.2.4.5):
+
+```text
+uint32 avc420EncodedBitstreamInfo
+RFX_AVC420_BITMAP_STREAM main
+RFX_AVC420_BITMAP_STREAM auxiliary
+```
+
+where the info word (spec field name `avc420EncodedBitstreamInfo`) splits into:
+
+```text
+cbAvc420EncodedBitstream1 (bits 0..29) = byte length of the first RFX_AVC420_BITMAP_STREAM (main)
+LC                        (bits 30..31) = 0 for the LC=0 both-views case
+```
+
+The `cbAvc420EncodedBitstream1` length must follow the exact MS-RDPEGFX definition, including the first stream's `RFX_AVC420_METABLOCK` metadata and H.264 data as specified.
+
+### FR-WIRE-3
+
+Each substream must contain its own `RFX_AVC420_METABLOCK` and encoded H.264 access unit.
+
+### FR-WIRE-4
+
+For the first implementation, use the same destination rectangle and conservative region set for both substreams.
+
+### FR-WIRE-5
+
+Call the existing generic `xrdp_egfx_wire_to_surface1()` path with AVC444 codec ID and the completed bitmap data.
+
+### FR-WIRE-6
+
+Do not expose a conventional H.264 4:4:4 bitstream as AVC444. RDP AVC444 is specifically the two-view construction.
+
+---
+
+## 8.10 Resize and restart lifecycle
+
+The user-visible requirement is explicit: **kill FFmpeg on every resize**.
+
+### FR-RESIZE-1
+
+Any change to actual dimensions, coded dimensions, pixel format, monitor/surface identity requiring context recreation, or encoder profile must increment the per-handle `generation`.
+
+### FR-RESIZE-2
+
+Before any byte of a new-size picture is written:
+
+1. stop accepting new pairs for the old generation;
+2. discard/coalesce old-generation updates that are still unsubmitted;
+3. terminate the old child;
+4. discard incomplete input and NUT parser state;
+5. clear pending picture tags and encoded half-pairs;
+6. allocate/reinitialize both reconstructed views;
+7. calculate coded dimensions and padding;
+8. spawn the new child with the new dimensions;
+9. parse a valid NUT header;
+10. submit a full-surface main+auxiliary pair;
+11. validate reset output;
+12. send it as `LC=0`.
+
+### FR-RESIZE-3
+
+Termination sequence:
+
+1. close the child raw-input fd;
+2. optionally drain stdout for a short bounded interval only if needed for clean logs;
+3. send `SIGTERM` if the process remains alive;
+4. wait for a configured grace interval;
+5. send `SIGKILL` if required;
+6. call `waitpid()` and close all fds.
+
+The resize path must not wait indefinitely for FFmpeg to flush delayed frames. Old-generation output is discarded.
+
+### FR-RESIZE-4
+
+A dimension mismatch detected inside `encode_pair()` is a mandatory safety-net restart even if a higher-level resize hook is also implemented.
+
+### FR-RESIZE-5
+
+The first pair after restart must use a full-surface dirty region. Partial reconstruction is invalid because the child and client decoder state are new.
+
+### FR-RESIZE-6
+
+Child crash, NUT parse error, timeout, broken pipe, H.264 validation error, or packet-order error follows the same reset sequence. Repeated failures disable the backend for the connection and fail the GFX/session path; MVP does not switch codecs after confirmation.
+
+---
+
+## 8.11 Backpressure and queue policy
+
+### FR-BP-1
+
+The backend must not guarantee throughput. It must guarantee bounded queueing and internally consistent H.264 order.
+
+### FR-BP-2
+
+At most:
+
+- one pair may be committed/in progress for the single FFmpeg child; and
+- one newest unsubmitted desktop update may wait for that context.
+
+If current xrdp scheduling makes even the single waiting item unnecessary, an initial zero-waiting-item implementation is acceptable.
+
+### FR-BP-3
+
+When overloaded, replace older unsubmitted work with a newer update whose damage region is the union needed to reconstruct the newest correct state.
+
+### FR-BP-4
+
+Never drop:
+
+- a main picture after its first byte is written;
+- the auxiliary picture belonging to a committed main;
+- an encoded picture already returned by FFmpeg while preserving later dependent pictures; or
+- a packet from the middle of the active H.264 stream.
+
+### FR-BP-5
+
+The kernel pipe must not become an implicit deep frame queue. Do not enlarge it to hold many complete 4K pairs. Input progress is explicitly tracked, and stale work is eliminated before commit.
+
+### FR-BP-6
+
+If a committed pair does not complete before the operation deadline, terminate the child and reset. Do not continue the stream after an unknown half-pair state.
+
+### FR-BP-7
+
+Metrics must expose:
+
+- raw input bytes;
+- write-blocked time;
+- NUT output latency;
+- pair completion latency;
+- queued/coalesced/dropped-before-submit updates;
+- process restarts;
+- timeout count;
+- parser errors; and
+- encoder-reported stderr warnings.
+
+---
+
+## 8.12 Runtime configuration
+
+Suggested `gfx.toml` meaning:
+
+```toml
+[codec]
+order = ["H.264", "RFX"]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+enabled = true
+path = "/usr/bin/ffmpeg"
+encoder = "libx264"
+desktop_fps = 60
+startup_probe = true
+stream_ready_timeout_ms = 2000
+picture_timeout_ms = 2000
+pair_timeout_ms = 2000
+terminate_grace_ms = 250
+stderr_level = "warning"
+max_nut_header_bytes = 1048576
+max_encoded_picture_bytes = 134217728
+max_encoded_pair_bytes = 268435456
+quality_crf = 18
+gop_pictures = 240
+extra_x264_args = []
+```
+
+### FR-CONFIG-1
+
+Use xrdp's existing typed configuration facilities. The spelling above is illustrative; the meaning and security boundary are normative.
+
+### FR-CONFIG-2
+
+The MVP adds `h264_encoder = "ffmpeg"`; its initial executable encoder is `libx264`. Startup probe failure makes that H.264 backend unavailable and codec order proceeds to the next entry. It does not silently invoke linked x264/OpenH264. The xrdp binary still has no compile-time FFmpeg dependency.
+
+### FR-CONFIG-3
+
+Configuration tokens are argv elements, never shell text. Only allowlisted libx264 options are accepted in the MVP. Structural arguments cannot be overridden.
+
+### FR-CONFIG-4
+
+Log the resolved executable path, encoder, selected capability/mode, coded dimensions, and safely escaped argv at debug level. Do not log unrelated environment data. Any externally-produced bytes (argv echoes, ffmpeg stderr) must be logged per NFR-SEC-8 — constant format string with the data as a `%s` argument, never as the format string itself.
+
+### FR-CONFIG-5
+
+Future Linux/Unix hardware profiles are separate follow-up work. They must not be enabled merely because `ffmpeg -encoders` lists a name; each requires end-to-end probe and MSTSC interoperability evidence.
+
+---
+
+## 8.13 Startup behavioral probe
+
+### FR-PROBE-1: Timing
+
+Run the exact executable/profile probe synchronously before `xrdp_mm_egfx_caps_advertise()` commits an AVC444 capability set in `xrdp_egfx_send_capsconfirm()`. Probe results are held in process/session memory only for MVP.
+
+### FR-PROBE-2: Input and command
+
+Use the same structural command builder as the real child at the **actual session coded dimensions**. Submit at least four distinguishable NV12 pictures in main/auxiliary order. The probe child is always terminated and reaped afterward because its test pictures are not visible to the client and must not become reference pictures for the real stream. A separate 32×32 command remains useful for unit/CI fixtures, but it is not sufficient for the connection capability decision.
+
+### FR-PROBE-3: Required evidence
+
+The probe must verify:
+
+1. child spawn succeeds;
+2. a valid standard-NUT identifier, main header, stream header, and syncpoint/packet sequence are parsed;
+3. one H.264 video stream exists;
+4. exactly one packet is returned per picture;
+5. PTS/order is monotonic and input-order preserving;
+6. no picture is duplicated or dropped;
+7. packet payloads are Annex B;
+8. first packet has NUT key flag plus SPS, PPS, and IDR;
+9. second packet contains VCL data and follows in the same stream;
+10. four packets complete before the configured deadlines; and
+11. the child terminates and is reaped without fd leaks.
+
+### FR-PROBE-4: No persistent cache
+
+Do not implement persistent disk caching or a new cross-process probe service in MVP. A connection process probes once before capability confirmation and reuses that in-memory result. A later xrdp process rechecks the exact command, avoiding stale **server readiness** after FFmpeg replacement, package update, permission change, or configuration edit.
+
+Within one established connection, the client capability and server selection are immutable. Runtime process restart uses the already selected profile and bounded reset path rather than renegotiating GFX capabilities.
+
+### FR-PROBE-5: Failure
+
+Probe failure removes only the configured `ffmpeg` H.264 candidate. It does not fail the xrdp service. Existing codec order then proceeds to the next entry, normally RFX. A separately configured linked H.264 backend remains a different administrator-selected mode rather than an implicit fallback.
+
+---
+
+## 9. Non-functional requirements
+
+## 9.1 Portability
+
+### NFR-PORT-1
+
+Target Linux and supported Unix-like xrdp/xorgxrdp server environments with normal POSIX process and pipe facilities:
+
+- `pipe()`/`pipe2()` or xrdp wrappers;
+- `fcntl()`;
+- `poll()`;
+- `posix_spawn()` or `fork()`/`execve()`;
+- `read()`/`write()`;
+- `waitpid()`;
+- signals; and
+- monotonic clocks.
+
+### NFR-PORT-2
+
+Linux-specific acceleration APIs such as DMA-BUF, VAAPI, QSV device integration, `eventfd`, `epoll`, or systemd APIs are not mandatory for MVP.
+
+### NFR-PORT-3
+
+The MVP requires a stock FFmpeg binary containing `libx264`, rawvideo input, the NUT muxer, and `h264_mp4toannexb`. xrdp itself does not link FFmpeg or x264.
+
+---
+
+## 9.2 Performance
+
+Two full NV12 views require approximately three bytes per desktop pixel per update.
+
+| Resolution | Pair size | 30 updates/s | 60 updates/s |
+|---|---:|---:|---:|
+| 1280×720 | 2.76 MB | 82.9 MB/s | 165.9 MB/s |
+| 1920×1080 | 6.22 MB | 186.6 MB/s | 373.2 MB/s |
+| 2560×1440 | 11.06 MB | 331.8 MB/s | 663.6 MB/s |
+| 3840×2160 | 24.88 MB | 746.5 MB/s | 1.49 GB/s |
+| 5120×2880 | 44.24 MB | 1.33 GB/s | 2.65 GB/s |
+
+A conventional pipe entails userspace-to-kernel and kernel-to-userspace copying, approximately doubling IPC copy traffic. Conversion writes and encoder reads/uploads add further memory traffic.
+
+### NFR-PERF-1
+
+These costs are accepted for the portability-first backend. Failure to sustain a target rate on a selected encoder is not an xrdp correctness failure when bounded-backpressure behavior works.
+
+### NFR-PERF-2
+
+No unnecessary intermediate full-frame YUV444 buffer should be created. Convert the full-chroma capture directly into the two persistent NV12 views.
+
+### NFR-PERF-3
+
+The MVP converter reconstructs both complete views on every submitted update. Dirty-region conversion is a later optimization; pipe transport is full-picture in either case.
+
+### NFR-PERF-4
+
+Avoid per-update process creation, command parsing, heap churn proportional to raw frame size, and unbounded buffer growth.
+
+---
+
+## 9.3 Latency
+
+### NFR-LAT-1
+
+The primary latency metric is age of the displayed desktop state, not preservation of every intermediate update.
+
+### NFR-LAT-2
+
+Do not queue multiple stale unsubmitted pairs. Prefer latest-state coalescing.
+
+### NFR-LAT-3
+
+Output buffering must be minimized through:
+
+- one persistent child;
+- no B-frames;
+- passthrough frame timing;
+- low-delay encoder profile;
+- NUT streaming output;
+- packet flushing;
+- concurrent pipe draining;
+- bounded operation deadlines.
+
+### NFR-LAT-4
+
+No fixed latency promise is made for arbitrary hardware profiles. The probe and metrics must make buffering visible.
+
+---
+
+## 9.4 Security
+
+### NFR-SEC-1
+
+Never invoke a shell.
+
+### NFR-SEC-2
+
+Validate and canonicalize executable paths according to administrator policy. Prefer absolute paths.
+
+### NFR-SEC-3
+
+Close unintended file descriptors in the child and use close-on-exec in the parent.
+
+### NFR-SEC-4
+
+Use a minimal controlled environment. Do not pass session secrets through argv or environment.
+
+### NFR-SEC-5
+
+Treat FFmpeg stdout, stderr, and NUT metadata as untrusted bounded input.
+
+### NFR-SEC-6
+
+Limit:
+
+- header length;
+- metadata count and string length;
+- packet length;
+- stderr buffering;
+- parser recursion/state;
+- per-pair execution time;
+- restart frequency.
+
+### NFR-SEC-7
+
+Do not run the child with more privileges than xrdp already has. Hardware-device permissions are administrator configuration.
+
+### NFR-SEC-8
+
+Untrusted FFmpeg stderr and any NUT-metadata-derived string must be logged **only via a constant format string** with the external data passed as a `%s` argument (e.g. `LOG(LOG_LEVEL_WARNING, "ffmpeg: %s", line)`); externally-produced bytes must **never** be passed as the `LOG()` / `log_message()` format argument. This matches xrdp's real logging API — `LOG(level, ...)` expands to `log_message()`, declared `printflike(2,3)` in `common/log.h`, so the first variadic argument is the printf format string — and satisfies CLAUDE.md rule 3 ("never pass client data as a format string"). Strip or escape control characters (including NUL and newlines) before logging.
+
+---
+
+## 9.5 Reliability and observability
+
+### NFR-REL-1
+
+Every child must be reaped. No zombie processes.
+
+### NFR-REL-2
+
+Session teardown must terminate and reap the single FFmpeg child before encoder object destruction completes.
+
+### NFR-REL-3
+
+Child stderr must be drained continuously and emitted through rate-limited xrdp logging.
+
+### NFR-REL-4
+
+Log state transitions with generation, surface ID, PID, dimensions, encoder/profile, and failure cause.
+
+### NFR-REL-5
+
+Repeated restart loops must be rate-limited. After a configured threshold, disable the backend and terminate/fail the GFX or session path cleanly. Mid-connection codec switching is not part of MVP.
+
+---
+
+## 10. Detailed ownership model
+
+| Resource | Owner | Release point |
+|---|---|---|
+| XRGB capture mapping | Existing xorgxrdp/xrdp capture path | Existing completed-item/acknowledgement lifecycle |
+| `XRDP_ENC_DATA` GFX work item | Existing xrdp encoder worker | Existing destructor/completion lifecycle |
+| Persistent main NV12 view | Single external AVC444 handle | Resize, reset, or handle deletion |
+| Persistent auxiliary NV12 view | Single external AVC444 handle | Resize, reset, or handle deletion |
+| Raw bytes after `write()` | Kernel/FFmpeg | Consumed by child; parent may reuse view only after the entire corresponding raw picture is written |
+| Ordered picture tag | External handle pending FIFO | Matching NUT packet associated or generation discarded |
+| NUT parser buffer | External handle | Parsed/compacted or child reset |
+| Encoded main packet | Pair assembly owned by handle | RDPGFX output object takes ownership or generation fails |
+| Encoded auxiliary packet | Pair assembly owned by handle | RDPGFX output object takes ownership or generation fails |
+| FFmpeg child/fds | External handle | Resize, reset, failure, or session teardown |
+| RDPGFX compressed output | Existing `XRDP_ENC_DATA_DONE` path | Existing send/destructor lifecycle |
+
+The xrdp encoder worker is the only thread allowed to mutate the handle in MVP. This removes the need for a second internal encoder queue or child-control protocol.
+
+---
+
+## 11. Proposed C interfaces
+
+These are design sketches, not final ABI.
+
+```c
+struct xrdp_ffmpeg_avc444_config
+{
+    const char *path;                  /* absolute ffmpeg path */
+    int desktop_fps;
+    int stream_ready_timeout_ms;
+    int picture_timeout_ms;
+    int pair_timeout_ms;
+    int terminate_grace_ms;
+    size_t max_nut_header_bytes;
+    size_t max_encoded_picture_bytes;
+    size_t max_encoded_pair_bytes;
+    int quality_crf;
+    int gop_pictures;
+    struct list *allowed_extra_x264_args;
+};
+
+struct xrdp_avc444_encoded_picture
+{
+    uint8_t *data;
+    size_t bytes;
+    int nut_keyframe;
+    uint64_t pts;
+};
+
+struct xrdp_avc444_encoded_pair
+{
+    uint64_t generation;
+    uint64_t desktop_sequence;
+    struct xrdp_avc444_encoded_picture main;
+    struct xrdp_avc444_encoded_picture auxiliary;
+};
+
+void *
+xrdp_encoder_ffmpeg_avc444_create(
+    const struct xrdp_ffmpeg_avc444_config *config,
+    int surface_id,
+    int actual_width,
+    int actual_height);
+
+int
+xrdp_encoder_ffmpeg_avc444_encode_pair(
+    void *handle,
+    const uint8_t *xrgb,
+    int xrgb_stride,
+    int actual_width,
+    int actual_height,
+    const struct xrdp_egfx_rect *rects,
+    int rect_count,
+    uint64_t desktop_sequence,
+    struct xrdp_avc444_encoded_pair *result);
+
+int
+xrdp_encoder_ffmpeg_avc444_restart(
+    void *handle,
+    int actual_width,
+    int actual_height,
+    enum xrdp_encoder_reset_reason reason);
+
+void
+xrdp_encoder_ffmpeg_avc444_delete(void *handle);
+```
+
+The handle computes 16-aligned coded dimensions internally. A distinct pair-returning interface is preferred over forcing AVC444 into the current one-buffer `xrdp_encoder_h264_encode()` signature. Resize should normally delete and recreate the handle; the restart operation is shown only as a possible internal lifecycle helper and must still kill/reap the old child.
+
+---
+
+## 12. Coded dimensions and padding
+
+The visible RDP surface may have arbitrary dimensions. The H.264 coded picture may not.
+
+### FR-DIM-1: Mandatory 16-pixel alignment
+
+MS-RDPEGFX requires the width and height of each AVC420 H.264 bitstream—including each AVC444 substream—to be aligned to a multiple of 16:
+
+```c
+coded_width  = (actual_width  + 15) & ~15;
+coded_height = (actual_height + 15) & ~15;
+```
+
+This is a protocol requirement, not an encoder-profile preference.
+
+### FR-DIM-2: Arbitrary visible resize
+
+No alignment restriction is imposed on the RDP window or desktop. The AVC420 metablock region mask crops display/update regions to actual coordinates. For a full reset, the visible region is `[0, 0, actual_width, actual_height]` while the encoded NV12 pictures use coded dimensions.
+
+### FR-DIM-3: Padding contents
+
+Initialize all padded pixels. Replicate the final visible row and column into right/bottom padding for both synthetic views. Never expose or encode uninitialized bytes.
+
+### FR-DIM-4: Resize behavior
+
+Every actual width/height change kills and recreates the FFmpeg child, even when the rounded coded dimensions remain unchanged. The new generation starts with a fully reconstructed padded `LC=0` pair.
+
+### FR-DIM-5: Encoder restrictions
+
+MVP does not negotiate profile-declared alignment beyond 16. The pre-confirm probe uses the actual 16-aligned session geometry; if the exact libx264 command cannot open or produce compliant output at that size, the external candidate is removed before codec-order selection. A later unexpected real-child spawn failure fails GFX after bounded retry. Hardware encoders requiring larger alignment are deferred.
+
+---
+
+## 13. Failure handling matrix
+
+| Failure | Required action |
+|---|---|
+| Probe spawn/command failure | Remove external AVC444 candidate before capability confirmation |
+| Real-child spawn failure after capability confirmation | Bounded retry; then fail/reset GFX or the session; no codec switch in MVP |
+| FFmpeg exits before NUT stream-ready | Log bounded stderr; kill/reap; fail generation |
+| Invalid NUT header/syncpoint/CRC | Kill/reap child; discard generation; increment parser failure |
+| Broken input pipe or stdout EOF | Kill/reap; discard all pending tags and half-pair state |
+| Stderr flood | Continue draining; rate-limit retained/logged bytes |
+| Main or auxiliary deadline exceeded | Kill/reap; discard half-pair; never continue stream |
+| Packet exceeds hard safety ceiling | Kill/reap; reject generation; never truncate |
+| Packet count not 1:1 | Probe reject or runtime generation failure |
+| Reordered/non-monotonic output | Probe reject or runtime generation failure |
+| First packet lacks SPS/PPS/IDR | Probe reject or runtime reset failure |
+| Resize | Kill/reap old child unconditionally; create new generation |
+| Topology becomes multi-monitor | Kill/reap child and fail/restart the GFX connection path; no encoder remapping or mid-stream codec switch |
+| Repeated runtime failures | Disable external AVC444 for the connection and terminate/fail GFX or the session; no mid-stream codec switch in MVP |
+| Encoder-object teardown | Cancel poll loop, close fds, terminate/reap child, then complete worker teardown |
+
+No runtime failure permits sending one member of a pair, skipping an encoded picture, or splicing a new child into the old H.264 stream.
+
+---
+
+## 14. Compatibility strategy
+
+### 14.1 MVP FFmpeg support contract
+
+The exact configured binary is supported only when the behavioral probe passes. Version strings and `-encoders` output are diagnostic, not sufficient evidence.
+
+**Deployment prerequisite (build configuration).** `libx264` is only present in a **GPL-enabled** ffmpeg build (`--enable-gpl --enable-libx264`); LGPL-only or minimal distribution packages (e.g. some RHEL/rpmfusion-free-less or hardened builds) omit it, and the MVP command then fails at encoder-open. This is a packaging/deployment prerequisite to document, not merely a runtime-probe outcome. (Debian's stock `ffmpeg`, tested here, is GPL-enabled with `libx264`.)
+
+Required executable features:
+
+- rawvideo demuxer;
+- NV12 input;
+- `libx264` encoder;
+- NUT muxer with normal syncpoints;
+- `-write_index 0`;
+- passthrough/no-drop timing;
+- no B-picture reordering;
+- `h264_mp4toannexb`; and
+- libx264 `repeat-headers=1` support.
+
+The MVP profile is:
+
+```text
+encoder = libx264
+args = -preset ultrafast -tune zerolatency -crf 18 -g 240
+structural = -bf 0 -x264-params repeat-headers=1
+```
+
+Quality and GOP values are configurable; structural behavior is not.
+
+### 14.2 Future Linux/Unix hardware profiles
+
+QSV, VAAPI, NVENC, and other encoders are future work. A later profile must demonstrate:
+
+- the same two-picture/single-stream ordering;
+- standard NUT packetization;
+- one packet per picture;
+- Annex-B payloads with usable reset parameter sets;
+- no reordering;
+- bounded startup and steady-state delay; and
+- MSTSC AVC444 interoperability.
+
+Only after a real profile fails should the shared implementation add mechanisms such as NUT-extradata parameter-set synthesis or hardware-specific reset control.
+
+---
+
+## 15. Testing requirements
+
+## 15.1 Unit tests
+
+### Capability classification
+
+FR-CAP-2 is pure input→output logic (capability version + flags → AVC444-v1 / AVC420 / none) and per CLAUDE.md rule 5 requires table-driven unit tests independent of a live client:
+
+- `RDPGFX_CAPVERSION_8` → no AVC candidate;
+- v8.1 with `AVC420_ENABLED` → AVC420 only; v8.1 without it → none;
+- v10.0 with `AVC_DISABLED` clear → AVC444 v1; any v10.x with `AVC_DISABLED` set → none;
+- v10.1 (reserved-only capset) → not eligible for the v1-only MVP;
+- v10.2–v10.7 with `AVC_DISABLED` clear → AVC444 v1;
+- highest-supported-version tie-break when several eligible sets of the same mode are advertised;
+- `AVC_THINCLIENT` treated as a preference, not a prerequisite.
+
+### Converter and color
+
+- exact full-range BT.709 matrix vectors, including clamp boundaries;
+- canonical AVC444 v1 two-view vectors;
+- solid colors and color bars;
+- luma-only and chroma-only source changes;
+- red/blue one-pixel text edges;
+- odd visible dimensions;
+- proof that every submitted update reconstructs the complete views regardless of dirty-rectangle shape;
+- 16-pixel coded padding and edge replication;
+- full reset after partial history.
+
+### NUT demuxer
+
+- normal standard-syncpoint streams generated by stock FFmpeg;
+- fragmented one-byte reads and multiple packets per read;
+- repeated headers and syncpoints;
+- valid/invalid CRCs;
+- oversized variable-length integers;
+- malformed frame-code tables;
+- wrong stream count/codec;
+- packet/header safety ceilings;
+- truncated EOF at every field boundary;
+- fuzz corpus and regression minimization.
+
+Do not include no-syncpoint/PIPE fixtures in MVP.
+
+### H.264 adapter
+
+- Annex-B start-code scanning;
+- NUT extradata parsing/bounds without synthesis;
+- first-packet SPS/PPS/IDR detection;
+- auxiliary VCL detection;
+- absence/presence of AUD;
+- malformed/truncated NAL streams;
+- key flag disagreement;
+- packet size ceilings.
+
+### Process state machine
+
+- partial raw writes;
+- stdout/stderr output while input blocks;
+- child early exit;
+- stream-ready, picture, and pair timeout;
+- SIGTERM/SIGKILL escalation;
+- resize in every state;
+- topology change to multiple monitors;
+- xrdp termination in every state;
+- no zombies or fd leaks.
+
+## 15.2 Executable behavior tests
+
+Required MVP environment:
+
+- stock Linux/Unix distribution FFmpeg containing `libx264`;
+- standard NUT output;
+- actual-session-geometry pre-confirm probes, plus 32×32 parser/command fixtures and real 1080p tests;
+- arbitrary visible dimensions such as 1919×1079 with 1920×1088 coded frames;
+- rapid resize sequences;
+- repeated connect/disconnect;
+- deliberately throttled child to verify bounded backpressure.
+
+The local PRD review used Debian FFmpeg 7.1.5. Four NV12 input pictures produced four ordered NUT packets. `h264_mp4toannexb` produced Annex-B packet payloads but did not put SPS/PPS in the first packet until `-x264-params repeat-headers=1` was supplied. This behavior is captured as a regression fixture/command, not treated as a universal version guarantee.
+
+## 15.3 MSTSC interoperability
+
+Minimum target:
+
+- Windows 10 / Windows Server 2016-generation `mstsc.exe` advertising an eligible RDP 10 AVC444 v1 capability set.
+
+Also test current Windows 10/11 MSTSC versions available to the project. Capability content, not reported OS identity, determines selection.
+
+Test content:
+
+- grayscale and ClearType text;
+- red text on black and blue text on white;
+- terminal/browser scrolling;
+- window movement;
+- video playback;
+- static idle desktop;
+- arbitrary window resize;
+- initial multi-monitor codec-order fallback before capability confirmation; and
+- post-confirm topology-change failure without a mid-session codec switch.
+
+## 15.4 Packet capture verification
+
+Verify:
+
+- selected capability version and flags;
+- codec order decision and explicit `AVC444` log;
+- `WireToSurface1` codec ID `0x000E`;
+- `LC=0`;
+- exact first-substream length;
+- two valid AVC420 metablocks;
+- both coded dimensions aligned to 16;
+- region rectangles cropped to actual dimensions;
+- main then auxiliary H.264 order;
+- first generation packet contains SPS/PPS/IDR;
+- reset generation after every resize; and
+- no stale old-generation output.
+
+---
+
+## 16. Acceptance criteria
+
+The MVP is complete when all of the following are true:
+
+1. xrdp builds without FFmpeg development headers/libraries and without linked x264/OpenH264.
+2. An administrator configures an absolute stock FFmpeg path containing `libx264`.
+3. The behavioral probe completes before AVC444 capability confirmation.
+4. Codec order remains authoritative; `RFX` can still preempt H.264 when configured earlier.
+5. Eligible RDP 10.0 or 10.2–10.7 capabilities are classified for AVC444 v1; v8.1 is AVC420-only; v10.1 is not misused as AVC444 v1. With `h264_encoder = "ffmpeg"`, only the AVC444-v1 class is selectable.
+6. A Windows Server 2016-era or newer eligible MSTSC displays codec ID `0x000E` AVC444 output.
+7. XRGB8888 capture is converted with the exact full-range BT.709 matrix.
+8. Arbitrary visible dimensions work while both H.264 coded dimensions are multiples of 16.
+9. Every logical update is one main and one auxiliary picture through the same persistent FFmpeg stream.
+10. Child stdout is standard NUT with normal syncpoints; xrdp never relies on `read()` boundaries.
+11. The first main packet of every generation contains Annex-B SPS, PPS, and IDR; `repeat-headers=1` is enforced.
+12. Every resize kills and reaps the child before new-size input, then sends a full `LC=0` reset pair.
+13. Child failure, malformed NUT, timeout, pipe break, and output-size violation cannot deadlock xrdp or emit a half-pair.
+14. Queueing is bounded to committed work plus at most the newest unsubmitted state.
+15. Encoded buffers grow best-effort under independent hard safety ceilings and do not reuse the legacy GFX compressed-size limit.
+16. Single-monitor behavior passes; an initial multi-monitor topology causes normal pre-confirm codec-order fallback, while a post-confirm transition fails/restarts GFX without switching codecs.
+17. The NUT parser passes unit tests, provenance-checked fixtures, and fuzzing.
+18. No shell invocation, zombie process, unintended fd inheritance, or stale-generation output exists; the FFmpeg child is spawned with a minimal controlled environment carrying no session secrets in argv or environment (NFR-SEC-4).
+19. No non-target platform-specific runtime or documentation path remains in the MVP PRD.
+20. Capability classification (FR-CAP-2) passes table-driven unit tests independent of a live client.
+21. Backpressure/health metrics (FR-BP-7) are exposed and validated under the throttled-child test — at minimum restart count, timeout count, parser errors, and coalesced/dropped-before-submit counts.
+
+---
+
+## 17. Implementation plan and pull-request decomposition
+
+### PR 1: Capability policy, build guards, and single-monitor gate
+
+- Add explicit AVC modes and separate AVC444/AVC420 candidates.
+- Implement the exact capability table and codec-order interaction.
+- Exclude version 10.1 from v1 selection.
+- Gate external AVC444 on one monitor and successful pre-confirm probe.
+- Refactor x264/OpenH264-only compile guards around common GFX AVC code.
+
+### PR 2: XRGB8888 capture mode
+
+- Add `CC_GFX_AVC444`.
+- Allocate/transport XRGB8888 capture with stride and actual dimensions.
+- Preserve existing capture acknowledgement.
+- Kill/recreate state on every visible resize.
+
+### PR 3: Color conversion, AVC444 views, and 16-aligned padding
+
+- Implement exact full-range BT.709 integer conversion.
+- Implement Microsoft AVC444 v1 main/Chroma420 mapping.
+- Add persistent NV12 views, complete-view reconstruction, and edge-replicated padding.
+- Reconstruct both complete views on every submitted update.
+- Add specification-derived vectors.
+
+### PR 4: Secure FFmpeg process runner and pre-confirm probe
+
+- Implement argv builder, fd mapping, nonblocking `poll()`, stderr drainage, deadlines, termination/reaping.
+- Target stock `libx264` only.
+- Run the four-picture behavioral probe at the actual 16-aligned session geometry before capability confirmation, then terminate/reap that probe child before starting the real stream.
+
+### PR 5: Standard NUT demuxer
+
+- Implement only standard syncpoints with `-write_index 0`.
+- Add independent format notes, provenance-recorded fixtures, bounds, CRC handling, and fuzz target.
+- Do not implement experimental PIPE/no-syncpoint mode.
+
+### PR 6: H.264 validation
+
+- Require Annex B, one packet per picture, monotonic FIFO order.
+- Enforce `repeat-headers=1` and check first packet SPS/PPS/IDR.
+- Parse/bound NUT extradata but do not synthesize parameter sets.
+
+### PR 7: Pair backend and output-size safety
+
+- Connect converter → raw pipe → NUT demuxer.
+- Add pair API, ordered tags, dynamic output buffers, and independent safety ceilings.
+- Add bounded backpressure and metrics.
+
+### PR 8: RDPGFX AVC444 v1 serializer
+
+- Emit `LC=0`, two AVC420 substreams, and codec ID `0x000E`.
+- Apply actual-dimension region masks over 16-aligned coded pictures.
+- Reuse `gfx_send_done()` completion path.
+
+### PR 9: Resize/reset/failure hardening and MSTSC acceptance
+
+- Enforce kill/reap on every resize and every stream discontinuity.
+- Add failure thresholds and clean GFX/session failure behavior without mid-stream codec switching.
+- Complete Windows Server 2016-generation MSTSC and current MSTSC tests.
+
+### Later PRs
+
+- AVC444v2.
+- `LC=1`/`LC=2` deferred chroma.
+- Independent main/chroma damage.
+- Multi-monitor ownership.
+- Linux/Unix hardware FFmpeg profiles.
+- Parameter-set synthesis from NUT extradata only when required by a demonstrated profile.
+- Optional shared-memory/libavcodec performance tier.
+
+---
+
+## 18. Review path used for this PRD
+
+### Review pass 1: Architecture consistency
+
+Confirmed:
+
+- two AVC444 pictures must use one H.264 encoder/decoder stream;
+- one persistent FFmpeg child is therefore required;
+- raw pipe boundaries are fixed by NV12 picture size;
+- encoded boundaries require a container demuxer;
+- NUT demuxing is not H.264 decoding;
+- full-frame process copies are an accepted portability tradeoff.
+
+### Review pass 2: Current xrdp/xorgxrdp `devel` mapping
+
+Reviewed current raw source for:
+
+- `xrdp_mm_egfx_caps_advertise()` sorting capability sets and applying configured codec order;
+- its current single `best_h264_index` and generic `XRDP_EGFX_H264` result;
+- x264/OpenH264 compile guards surrounding common GFX H.264 behavior;
+- encoder-worker ownership and `gfx_send_done()` completion;
+- `gfx_wiretosurface1()` and existing H.264 handle slots;
+- current NV12 AVC420 capture; and
+- existing 32-bit xorgxrdp capture handling.
+
+Refinement: the implementation must split AVC444-v1 and AVC420 candidates, preserve codec-order iteration, extend the existing `h264_encoder` selector with `ffmpeg`, and gate MVP on `monitorCount <= 1`.
+
+### Review pass 3: Microsoft protocol review
+
+Confirmed:
+
+- v8.1 advertises AVC420 with `AVC420_ENABLED`;
+- v10.0 and v10.2–v10.7 with `AVC_DISABLED` clear imply YUV444 capability;
+- v10.1 carries a reserved-only capset (no AVC flags) and is not accepted as a v1 substitute;
+- only the selected `CAPS_CONFIRM` set applies to the connection;
+- AVC444 contains two AVC420-form substreams encoded by one H.264 encoder;
+- full-range BT.709 is normative; and
+- each AVC420 H.264 coded width and height must be a multiple of 16 and is cropped by the region mask.
+
+Refinement: arbitrary visible resize is preserved through coded padding; “no alignment” is not protocol-correct.
+
+### Review pass 4: FFmpeg/NUT executable behavior
+
+Using installed Debian FFmpeg 7.1.5 with `libx264` and four synthetic 32×32 NV12 pictures:
+
+- standard `-f nut -write_index 0` produced one ordered packet per picture;
+- packet data used Annex-B start codes with `h264_mp4toannexb`;
+- SPS/PPS remained in NUT extradata and were absent from the first packet with the bitstream filter alone;
+- adding `-x264-params repeat-headers=1` put SPS/PPS in the first key packet before the IDR; and
+- packet flags/timestamps remained ordered with `-bf 0` and zero-latency settings.
+
+Refinement: `repeat-headers=1` and direct SPS/PPS/IDR packet validation are mandatory for MVP; extradata synthesis is deferred.
+
+### Review pass 5: NUT subset and licensing boundary
+
+Confirmed:
+
+- FFmpeg documents normal NUT syncpoints as low-overhead and recommends them over `syncpoints=none`;
+- `-write_index 0` is suitable for endless streaming without removing syncpoints;
+- FFmpeg's NUT implementation is LGPL-2.1-or-later; and
+- a clean independently implemented bounded parser with generated fixtures avoids copying source implementation details.
+
+Refinement: remove all experimental PIPE/no-syncpoint code and tests from MVP.
+
+### Review pass 6: Lifecycle, limits, and topology
+
+Walked through:
+
+- partial input write;
+- stdout/stderr backpressure;
+- delayed output;
+- half-pair failure;
+- size ceiling;
+- timeout;
+- resize with and without changed rounded coded dimensions;
+- child exit;
+- session teardown; and
+- multi-monitor advertisement/topology change.
+
+Refinement: the legacy compressed limit is not reused, every visible resize creates a new generation, both complete AVC444 views are reconstructed from XRGB for every submitted MVP update, and MVP is explicitly single-monitor.
+
+### Review pass 7: Final cross-section consistency and artifact lint
+
+Rechecked the complete document for:
+
+- one persistent FFmpeg child and one H.264 stream for both AVC444 pictures;
+- no accidental claim that the complete xrdp deployment contains only two processes;
+- no mid-session codec fallback after capability confirmation;
+- initial multi-monitor codec-order fallback versus post-confirm topology failure;
+- actual-session-geometry probing and mandatory disposal of the probe child;
+- full-view reconstruction rather than dirty-only conversion in MVP;
+- standard NUT syncpoints only;
+- first-packet SPS/PPS/IDR validation with `repeat-headers=1`;
+- 16-aligned coded dimensions with arbitrary visible dimensions; and
+- Linux/Unix-only platform scope.
+
+The Markdown was parsed with Pandoc, code-fence counts were checked, headings were checked for duplicates, and stale platform/open-question markers were searched before publishing `PRD_v2.md`.
+
+### Review pass 8: Automated multi-source re-verification (2026-07-13)
+
+A fan-out verification cross-checked every concrete claim against ground truth on this working tree (commit `4d61d13b`), with each change-proposing finding adversarially re-derived before acceptance:
+
+- **Codebase** — all Section 6 / Section 11 seams confirmed against `/work` and `/workUpdateXorgXrdp`, with real file:line: `xrdp_encoder.c` (`xrdp_encoder_create`/`delete`, `gfx_send_done`, `gfx_wiretosurface1`, `process_enc_h264` dummy, `codec_handle_h264_gfx[16]`, `CC_GFX_A2`/`XRDP_nv12_709fr`), the `#if defined(XRDP_X264) || defined(XRDP_OPENH264)` guards, `xrdp_encoder_x264.c` reconstruction, and `xrdp_mm.c` (`init_libh264_loaded`, `xrdp_mm_egfx_caps_advertise`, `best_h264_index`). Corrections: named the real serializer `xrdp_egfx_wire_to_surface1()`; documented that `init_libh264_loaded()` keys on the `XRDP_H264` umbrella macro (`xrdp/xrdp.h:41-43`), not `XRDP_X264`; identified the current GFX capture as `XRDP_nv12_709fr` (BT.709 full-range); and surfaced the pre-existing unimplemented `XRDP_yuv444*_709fr` constants the new capture mode should reuse.
+- **FFmpeg/NUT** — the exact FR-PROC-5 argv was re-run end-to-end on stock Debian `ffmpeg 7.1.5` (GPL, `libx264`): valid single-stream NUT, in-band Annex-B SPS/PPS/IDR with `repeat-headers=1`. Added the GPL-build (`--enable-libx264`) deployment prerequisite and the `yuvj420p` full-range tag note.
+- **MS-RDPEGFX** — codec IDs (AVC420 `0x000B`, AVC444 `0x000E`, AVC444v2 `0x000F`), capability constants/flags, the full-range BT.709 matrix, the two-view mapping, LC semantics, and 16-pixel alignment all match the spec. Corrections: renamed the info word to `avc420EncodedBitstreamInfo` with named subfields (`cbAvc420EncodedBitstream1`/`LC`, MS-RDPEGFX 2.2.4.5); softened the v10.1 "implies AVC444v2" wording to "reserved-only capset."
+- **Consistency/security** — added format-string-safety (NFR-SEC-8), explicit NUT integer-overflow discipline (FR-NUT-7), and closed FR↔acceptance/test gaps for capability classification (§15.1) and metrics (§16). No design-level contradictions were found.
+
+---
+
+## 19. Required pre-implementation code review
+
+Immediately before implementation, pin immutable xrdp and xorgxrdp commit IDs and refresh these exact seams:
+
+1. `xrdp_mm_egfx_caps_advertise()` capability arrays, sorting, codec-order representation, and the point where `CAPS_CONFIRM` is sent;
+2. how/when initial monitor count is known before capability confirmation;
+3. `XRDP_ENC_DATA` GFX command layout and its `codec_id`, dimensions, rectangles, and surface identity;
+4. enqueue/dequeue points for `fifo_to_proc` and `fifo_processed`;
+5. the exact xorgxrdp acknowledgement permitting capture-buffer reuse;
+6. resize ordering among capture reallocation, surface recreation, queued work, and `xrdp_encoder` lifetime;
+7. compile guards for GFX H.264 code and definitions of `XRDP_H264`, `XRDP_X264`, and `XRDP_OPENH264`;
+8. codec constants for AVC420/AVC444 and available XRGB/YUV format constants;
+9. typed `gfx.toml` parsing and existing `H.264`/`RFX` order spelling; and
+10. output-buffer ownership in `xrdp_egfx_wire_to_surface1()` and `XRDP_ENC_DATA_DONE`.
+
+The implementation PR must include a seam-review note with old/new function names and line references. Any codebase drift updates this PRD's mapping rather than adding an undocumented queue, copy, or fallback.
+
+---
+
+## 20. Resolved design questions
+
+### 20.1 Capability policy and codec order
+
+**Resolution:** Classify AVC444 v1 for eligible v10.0 and v10.2–v10.7 sets with AVC enabled; classify AVC420 for v8.1 only when `AVC420_ENABLED`; exclude v10.1 (its reserved-only capset carries no AVC flags and is treated as AVC444v2 territory, not a v1 substitute). Preserve configured codec order and extend `h264_encoder` with `ffmpeg`. In MVP, `ffmpeg` supplies AVC444 v1 only and never silently falls back to a linked encoder.
+
+### 20.2 Capture format
+
+**Resolution:** XRGB8888. It is clear, full-chroma, and compatible with existing 32-bit capture handling. Prototype conversion compute is accepted.
+
+### 20.3 Color conversion
+
+**Resolution:** MS-RDPEGFX full-range BT.709 using the exact integer equations in section 3.3.8.3.1. Do not start with a configurable colorspace matrix.
+
+### 20.4 Coded alignment
+
+**Resolution:** Visible dimensions remain arbitrary, but H.264 coded width and height are always rounded up to multiples of 16 as required by MS-RDPEGFX. Region masks crop to actual dimensions. There is no additional profile alignment in MVP.
+
+### 20.5 NUT subset
+
+**Resolution:** Standard NUT with normal syncpoints and `-write_index 0` only. Experimental `syncpoints=none` / PIPE mode is deferred and absent from parser/tests.
+
+### 20.6 Parameter sets
+
+**Resolution:** `h264_mp4toannexb` alone is insufficient in the tested mundane libx264/NUT path. MVP adds `-x264-params repeat-headers=1` and requires SPS/PPS/IDR in the first packet. It parses but does not synthesize from NUT extradata. Revisit only for a demonstrated later hardware profile.
+
+### 20.7 Reset keyframes
+
+**Resolution:** No runtime force-IDR control. Child creation is the reset mechanism. Bounded timeouts and first-packet SPS/PPS/IDR checks determine success.
+
+### 20.8 Probe and fallback timing
+
+**Resolution:** Probe once in the connection process before capability confirmation, without persistent disk/cross-process caching. The client capability is not what changes; the server's ability to honor AVC444 can change between processes after executable/configuration/permission updates. Runtime failure uses bounded restart and then GFX/session failure, not capability mutation or mid-stream codec fallback.
+
+### 20.9 Compressed limits
+
+**Resolution:** Do not apply the current GFX maximum compressed-byte setting per subframe or pair. Allocate best-effort dynamically under independent hard parser/allocation safety ceilings; never truncate encoded output.
+
+### 20.10 Multi-monitor topology
+
+**Resolution:** One logical display only, represented by current `monitorCount` 0 or 1. Initial multi-monitor makes the external AVC444 candidate unavailable; a later transition to multi-monitor kills/reaps the child and fails/restarts GFX rather than switching codecs or remapping contexts.
+
+### 20.11 NUT licensing and test vectors
+
+**Resolution:** NUT is a publicly documented transport rather than a proprietary FFmpeg-only interface. FFmpeg publishes its implementation under LGPL-2.1-or-later. xrdp executes, rather than links, the separately installed encoder binary. Implement the demuxer independently from public format documentation, do not copy FFmpeg parser source/tests, and generate provenance-recorded fixtures with stock FFmpeg. Maintainer/legal review remains authoritative.
+
+### 20.12 Server platform scope
+
+**Resolution:** Linux and supported Unix-like xrdp/xorgxrdp servers only. Non-target platform-specific encoder discussion is removed from MVP.
+
+---
+
+## 21. Risks and mitigations
+
+| Risk | Mitigation |
+|---|---|
+| NUT parser complexity | Standard-syncpoint-only subset, independent design note, provenance fixtures, fuzzing, strict bounds |
+| Parser licensing concern | No copied FFmpeg parser code/tests; public format implementation; maintainer/legal review |
+| Annex-B packet lacks reset headers | Enforce libx264 `repeat-headers=1`; probe/runtime SPS/PPS/IDR checks |
+| FFmpeg buffers or reorders | `-bf 0`, zero-latency profile, one-to-one packet probe, bounded deadlines |
+| Encoder cannot sustain 2× picture rate | Not a correctness promise; bounded pre-submit coalescing and metrics |
+| Pipe throughput at high resolution | Accepted MVP tradeoff; no hidden deep pipe queue; future optimization tier |
+| Half-pair failure corrupts stream | Kill/reap child; discard complete generation; never continue |
+| Resize race | Every visible resize stops old work, kills/reaps child, discards old output, sends full reset pair |
+| Misaligned arbitrary window size | 16-aligned coded buffers plus actual-dimension region masks |
+| Color mismatch | Exact MS full-range BT.709 equations and MSTSC color/text vectors |
+| Output allocation abuse | Dynamic buffers under independent 128 MiB packet / 256 MiB pair default safety caps |
+| Runtime child fails after capability confirmation | Bounded restart, failure threshold, then clean GFX/session failure; no mid-stream codec switch |
+| Multi-monitor use | Offer external AVC444 only when current `monitorCount <= 1`; reject/fail topology transition tests |
+| FFmpeg CLI drift | Exact behavioral probe using shared command builder |
+| User arguments break invariants | Allowlisted token arrays; structural argv owned by xrdp |
+| Process deadlock/leak | Nonblocking three-fd poll loop, deterministic close/kill/waitpid tests |
+| Codebase changes before implementation | Pin commits and include seam-review note in each PR |
+
+---
+
+## 22. Source and specification references
+
+### xrdp and xorgxrdp `devel`
+
+- xrdp encoder implementation:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/xrdp/xrdp_encoder.c
+- xrdp encoder structures:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/xrdp/xrdp_encoder.h
+- current x264 backend:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/xrdp/xrdp_encoder_x264.c
+- GFX capability selection:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/xrdp/xrdp_mm.c
+- codec and pixel-format constants:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/common/xrdp_constants.h
+- xorgxrdp capture/shared-memory path:  
+  https://raw.githubusercontent.com/neutrinolabs/xorgxrdp/refs/heads/devel/module/rdpClientCon.c
+- GFX configuration:  
+  https://raw.githubusercontent.com/neutrinolabs/xrdp/refs/heads/devel/xrdp/gfx.toml
+
+### Microsoft MS-RDPEGFX
+
+- Versioning and capability negotiation:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/31c6e2b1-335b-4a75-9454-bb2309958c21
+- Capability version 8.1 / AVC420 flag:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/487e57cc-cd16-44c4-add8-60b84bf6d9e4
+- Capability version 10 / AVC444 implication:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/d1899912-2b84-4e0d-9e6d-da0fd25d14bc
+- Capability version 10.1:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/5985e67e-4080-49a7-85e3-eb3ba0653ff6
+- Capability version 10.3 / AVC flags:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/fef125c5-60be-43af-8ad1-2158761f4b32
+- AVC420 stream and 16-pixel coded alignment:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/5f12c20e-2ea1-4ad1-a2a0-019ee3893731
+- AVC444 two-substream structure:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/844018a5-d717-4bc9-bddb-8b4d6be5dd3f
+- Full-range BT.709 color conversion:  
+  https://learn.microsoft.com/en-us/openspecs/windows_protocols/ms-rdpegfx/954d7546-6873-4466-95c8-20a7569c43e5
+- Windows Server 2016-generation AVC444 context:  
+  https://techcommunity.microsoft.com/blog/microsoft-security-blog/remote-desktop-protocol-rdp-10-avch-264-improvements-in-windows-10-and-windows-s/249588
+- `AVC444ModePreferred` platform support floor:  
+  https://learn.microsoft.com/en-us/windows/win32/termserv/win32-tsclientsetting
+
+### FFmpeg and NUT
+
+- FFmpeg formats documentation / NUT syncpoint and `write_index` options:  
+  https://ffmpeg.org/ffmpeg-formats.html
+- FFmpeg H.264 bitstream-filter documentation:  
+  https://ffmpeg.org/ffmpeg-bitstream-filters.html
+- NUT format documentation:  
+  https://ffmpeg.org/nut.html
+- FFmpeg NUT definitions and LGPL notice:  
+  https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/libavformat/nut.h
+- FFmpeg NUT muxer and LGPL notice:  
+  https://raw.githubusercontent.com/FFmpeg/FFmpeg/master/libavformat/nutenc.c
+
+### Local executable review record
+
+- FFmpeg tested: Debian `7.1.5-0+deb13u1` (libavcodec 61.19.101), configured `--enable-gpl --enable-libx264`.
+- Test geometry: four 32×32 NV12 pictures at a nominal coded-picture rate of 120 fps. This validates the command/parser assumptions only; connection admission still requires the specified probe at the actual session coded dimensions.
+- Result without repeated headers: four ordered NUT packets; first packet Annex B but no SPS/PPS in packet payload; SPS/PPS present as NUT extradata.
+- Result with `-x264-params repeat-headers=1`: first key packet contained Annex-B SPS, PPS, and IDR.
+- 2026-07-13 re-verification: the exact FR-PROC-5 argv was re-run end-to-end on `7.1.5-0+deb13u1` (raw NV12 in via `pipe:3`, NUT out via `pipe:1`). It exits 0, emits a valid single-H.264-stream NUT container, and with `repeat-headers=1` carries SPS(7)/PPS(8)/IDR(5) in-band as Annex B in the first packet — matching the 7.1.x behavior above. `-f nut`, `-write_index 0`, `-fps_mode passthrough`, `-nostdin`, `h264_mp4toannexb`, and the `nv12` pixel format were all accepted.
+
+---
+
+## 23. Decision record
+
+| Decision | Status |
+|---|---|
+| Use an unmodified stock FFmpeg executable | Accepted |
+| MVP executable encoder is `libx264` | Accepted |
+| No compile-time FFmpeg/x264 dependency for external backend | Required |
+| Preserve existing codec-order semantics | Required |
+| Extend `h264_encoder` with `ffmpeg`; that backend supplies AVC444 v1 only | Accepted |
+| Eligible AVC444 v1 sets are v10.0 and v10.2–v10.7 with AVC enabled | Required |
+| Version 10.1 is not used for AVC444 v1 | Required |
+| Capture XRGB8888 | Accepted |
+| Use exact full-range BT.709 conversion | Required |
+| One logical display (`monitorCount` 0 or 1) / one surface / one FFmpeg child | Accepted MVP scope |
+| Encode main and auxiliary through the same stream | Required |
+| Serialize complete reconstructed NV12 pictures over a pipe | Accepted |
+| Use standard NUT syncpoints with `-write_index 0` | Required |
+| Do not implement experimental NUT PIPE/no-syncpoint mode | Accepted |
+| Implement in-tree NUT demuxer, not H.264 decoder | Required |
+| Clean-room parser and provenance-generated fixtures | Required process |
+| Use `h264_mp4toannexb` plus `repeat-headers=1` | Required MVP behavior |
+| Do not synthesize SPS/PPS from extradata in MVP | Accepted |
+| Coded dimensions aligned to 16; visible dimensions arbitrary | Required |
+| Kill/reap child on every resize | Required |
+| No runtime force-IDR RPC; use restart and timeout checks | Accepted |
+| Probe before capability confirmation; no persistent cache | Required MVP behavior |
+| Legacy GFX compressed limit does not cap AVC444 subframes/pair | Accepted |
+| Dynamic best-effort output buffers retain hard safety ceilings | Required |
+| Encoder throughput is not guaranteed | Accepted |
+| AVC444v2, deferred chroma, multi-monitor, and hardware profiles | Deferred |
+
+---
+
+## 24. Final implementation principle
+
+The backend is a portability adapter, not an encoder implementation.
+
+xrdp owns:
+
+- RDP capability negotiation;
+- full-chroma capture contract;
+- complete AVC444 view construction for every submitted MVP update;
+- update ordering;
+- process lifecycle;
+- raw-picture submission;
+- NUT demuxing;
+- H.264 stream validation;
+- AVC444 wire framing;
+- resize/reset correctness;
+- bounded latency policy.
+
+The user's FFmpeg installation owns:
+
+- software or hardware encoder selection;
+- driver/device integration;
+- H.264 compression;
+- rate control;
+- encoder-specific performance.
+
+Correctness ends at maintaining a valid, ordered, resettable AVC444 stream. Real-time throughput remains a property of the selected binary, profile, hardware, and workload.
+
