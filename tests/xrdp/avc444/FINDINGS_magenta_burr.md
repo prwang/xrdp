@@ -67,7 +67,15 @@ still burrs:
 
 So the burr cannot be tuned away on the v1 wire; it is inherent to v1.
 
-## The fix — emit AVC444 **v2** (LC=1, ChromaV2)
+## The fix — emit AVC444 **v2** (codecId 0x000F, ChromaV2)
+
+Note: v1 vs v2 is selected by the **codecId** in the WireToSurface1 PDU
+(`RDPGFX_CODECID_AVC444` = 0x000E vs `RDPGFX_CODECID_AVC444V2` = 0x000F), not by
+the stream's LC field. LC (the `op` byte, 0/1/2) only says which sub-streams are
+present and is orthogonal — both v1 and v2 use LC=0 (luma stream 1 + chroma
+stream 2). FreeRDP `avc444_decompress` keys the ChromaV1/V2 choice purely off
+codecId (`libfreerdp/codec/h264.c:646`). So emitting v2 keeps today's LC=0
+two-stream framing and only changes the codecId.
 
 AVC444 v2 uses a different chroma transport (ChromaV2): the aux views carry the
 odd-column chroma for every row plus the remaining even-row samples, and the
@@ -85,9 +93,11 @@ packing in FreeRDP `prim_YUV.c:172` (`general_ChromaV2ToYUV444`) /
 `sse/prim_YUV_sse4.1.c:1579`; v2 encoder `prim_YUV.c:2149,2304`. Spec:
 MS-RDPEGFX 3.3.8.3.3 (YUV420 combination for YUV444v2).
 
-Emitting v2 is a real feature: advertise/emit LC=1 and produce the ChromaV2
-auxiliary packing, gated on the client advertising v2 support (fall back to v1
-otherwise). Tracked in BACKLOG.md.
+Emitting v2 is a real feature: produce the ChromaV2 auxiliary packing and emit
+codecId 0x000F (keeping LC=0), gated on the client advertising v2 support via
+`RDPGFX_CAPVERSION_101` (fall back to v1 codecId 0x000E otherwise). The ffmpeg
+interface is unchanged — the child still receives two NV12 pictures per frame
+regardless of v1/v2. Tracked in BACKLOG.md.
 
 ## Secondary correctness notes (not the burr cure)
 
