@@ -44,35 +44,55 @@ Replaced with a single verbatim passthrough:
   tokens go straight to `execve` with no shell, so there is no injection surface.
   Bounds are enforced on count and per-token length.
 
-## AVC444 magenta-fringe on P-frames — IN PROGRESS (root cause open, 2026-07-14)
+## AVC444 magenta burr — ROOT CAUSE FOUND: it's AVC444 v1; fix = emit v2 (2026-07-14)
 
-**Symptom.** Live captures (`wierd_red_burr.png`, `red_burr_v2.png`) show
-magenta dots around saturated green terminal text.
+**Symptom.** Client captures (`wierd_red_burr.png`, `red_burr_v2.png`) show
+magenta speckles on saturated green terminal text.
 
-**Corrected understanding (a prior x264-quantization theory was DISPROVEN).**
-An earlier offline repro (single main/aux frame pair recombined in Python) was
-*not faithful* to FreeRDP's decoder — it reported ~3 magenta px on a crop and led
-to a wrong "x264 lossy chroma, fix with crf 16 + chroma-qp-offset=-4" conclusion.
-A full end-to-end harness (real `xfreerdp3` client into `Xvfb :99`, capturing the
-client-decoded framebuffer) refuted it: with `crf 16 + chroma-qp-offset=-4`
-**live**, the magenta persists (~190+ px on the prompt line; up to ~2800 px after
-`ls --color` output).
+**Root cause (proven with a faithful offline harness — see
+`tests/xrdp/avc444/FINDINGS_magenta_burr.md`).** The burr is **inherent to
+AVC444 v1 (LC=0) chroma reconstruction in the FreeRDP v3.15 client decoder**, not
+an xrdp packing or encoder-quantization defect:
+- reproduces losslessly (`-qp 0`) and all-intra (`keyint=1`) → not H.264
+  quantization, not a P-frame effect (both earlier theories DISPROVEN);
+- reproduces when **FreeRDP's own** encoder feeds FreeRDP's own decoder — the
+  dedicated `RGBToAVC444YUV` (v1) → ChromaV1 combine still yields ~100 burr px on
+  a 192x64 green-text crop. Since the reference encoder+decoder pair burrs on its
+  own, **no server-side v1 packing removes it.**
+- Mechanism: v1 does not transmit every chroma sample; the decoder extrapolates
+  the missing (even,even) chroma as `4*U00 - neighbours` with a `CONDITIONAL_CLIP`
+  (FreeRDP `prim_internal.h:215`, `sse/prim_YUV_sse4.1.c:212`). At sharp
+  green/black text edges it overshoots past neutral into the complementary hue
+  (magenta).
 
-**Key behavioral finding (points at the real cause).** On reconnect — a fresh
-full-screen **keyframe** — the frame is **clean (0 magenta)**. Magenta then
-appears and accumulates only as new text is drawn via **incremental (P-frame)
-updates**, and persists until that region is refreshed. So the defect is in the
-**inter-frame (P-frame) path of the AVC444 stream, not the keyframe/quantization
-path**. Leading hypothesis: main and aux views are fed as consecutive frames
-into one libx264 stream, so x264 P-codes each frame from the previous one —
-cross-referencing main↔aux (which share no temporal coherence) and corrupting
-reconstructed chroma. Next step: confirm with the harness by forcing all-intra
-(`keyint=1`) vs. lossless (`-qp 0`), then design the fix (likely: keep main/aux
-temporally independent — separate GOP/refresh handling or per-view encoding).
+**Fix — emit AVC444 v2 (LC=1, ChromaV2).** v2 transmits the actual chroma for
+every position (no extrapolation). Verified end-to-end through FreeRDP's own
+v2 encoder+decoder: **v1 = 100 burr / v2 = 0 burr**, visibly clean, ~4x lower
+mean error. Spec MS-RDPEGFX 3.3.8.3.3; FreeRDP `general_ChromaV2ToYUV444`
+(`prim_YUV.c:172`). This is a new feature (advertise/emit LC=1, produce the
+ChromaV2 aux packing, gate on client v2 support with v1 fallback) — TODO below.
 
-Harness + findings live under `tests/xrdp/avc444/` (to be committed with the fix,
-not with this architecture change). The magenta fix is deliberately **not** part
-of the encoder-args passthrough commit above.
+**Faithful repro method (the earlier light repro was unfaithful and misled us):**
+capture pristine source via `x11grab :10`; pack with the real
+`xrdp_avc444_convert.o`; decode with a harness that calls FreeRDP's runtime
+`primitives_get()` **SSE4.1** path (the general/C path gives a false 0-burr).
+
+### TODO — AVC444 v2 emission
+- `xrdp_avc444_convert.c`: add a ChromaV2 packing (aux plane layout per
+  3.3.8.3.3) alongside the existing v1 path; unit-test the split against a known
+  vector.
+- Capability negotiation: advertise/select v2 (LC=1) only when the client
+  supports it; fall back to v1 otherwise (no regression when absent).
+- Serializer: set LC=1 in `RFX_AVC444_BITMAP_STREAM` for v2 frames.
+
+### Secondary correctness fixes (independent of the burr; do alongside v2)
+- v1 main-view chroma should be the 2x2 **average** (FreeRDP's canonical
+  `RGBToAVC444YUV`), not the current point sample (lowers mean error; not a burr
+  cure). No U/V swap (ours already matches; FreeRDP's Split-path swap is a
+  FreeRDP defect, correctly not reproduced).
+- Colorspace: our converter + ffmpeg flags use BT.709 full range but FreeRDP's
+  `YUV444ToRGB` is hard-coded BT.601 full range (`prim_internal.h:229`), causing
+  a mild desaturation/hue shift. Match BT.601 for color accuracy.
 
 ## AVC444 encoding — MVP WORKING (deployed + validated on this box)
 
