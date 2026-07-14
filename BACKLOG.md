@@ -51,7 +51,8 @@ magenta speckles on saturated green terminal text.
 
 **Root cause (proven with a faithful offline harness — see
 `tests/xrdp/avc444/FINDINGS_magenta_burr.md`).** The burr is **inherent to
-AVC444 v1 (LC=0) chroma reconstruction in the FreeRDP v3.15 client decoder**, not
+AVC444 v1 (codecId 0x000E) chroma reconstruction in the FreeRDP v3.15 client
+decoder**, not
 an xrdp packing or encoder-quantization defect:
 - reproduces losslessly (`-qp 0`) and all-intra (`keyint=1`) → not H.264
   quantization, not a P-frame effect (both earlier theories DISPROVEN);
@@ -69,14 +70,19 @@ an xrdp packing or encoder-quantization defect:
   decoder, the burr is invariant to the server's v1 packing choice (point=109,
   2x2-avg=100, pre-distort=153) — so it cannot be tuned away on the v1 wire.
 
-**Fix — emit AVC444 v2 (LC=1, ChromaV2).** v2 uses a different chroma transport
-(ChromaV2 aux + block-average main chroma) that feeds the same always-on reverse
-filter consistent data, so it reconstructs the true value instead of
-overshooting. Verified end-to-end through FreeRDP's own v2 encoder+decoder:
-**v1 = 100 burr / v2 = 0 burr**, visibly clean, ~4x lower mean error. Spec
-MS-RDPEGFX 3.3.8.3.3; FreeRDP `general_ChromaV2ToYUV444` (`prim_YUV.c:172`). This
-is a new feature (advertise/emit LC=1, produce the ChromaV2 aux packing, gate on
-client v2 support with v1 fallback) — TODO below.
+**Fix — emit AVC444 v2 (codecId 0x000F, ChromaV2).** v2 uses a different chroma
+transport (ChromaV2 aux + block-average main chroma) that feeds the same
+always-on reverse filter consistent data, so it reconstructs the true value
+instead of overshooting. Verified end-to-end through FreeRDP's own v2
+encoder+decoder: **v1 = 100 burr / v2 = 0 burr**, visibly clean, ~4x lower mean
+error. Spec MS-RDPEGFX 3.3.8.3.3; FreeRDP `general_ChromaV2ToYUV444`
+(`prim_YUV.c:172`). v1/v2 is chosen by the **codecId**, not the LC bit: FreeRDP
+`avc444_decompress` (`h264.c:646`) sets ChromaV1/V2 from
+`codecId == RDPGFX_CODECID_AVC444` (0x0E) vs `...V2` (0x0F); the LC/`op` field
+stays 0 (both streams present) for v2 exactly as for v1. This is a new feature
+(produce the ChromaV2 aux packing, emit codecId 0x000F, gate on client v2
+support with v1 fallback) — TODO below. The ffmpeg interface and encoder_args
+are unchanged: the child still gets two NV12 pictures per frame in both modes.
 
 **Protocol-level cross-check (not FreeRDP-specific):** the reverse filter +
 cutoff-30 threshold is the spec's own optional decode step (MS-RDPEGFX 3.3.8.3.2
@@ -95,9 +101,11 @@ capture pristine source via `x11grab :10`; pack with the real
 - `xrdp_avc444_convert.c`: add a ChromaV2 packing (aux plane layout per
   3.3.8.3.3) alongside the existing v1 path; unit-test the split against a known
   vector.
-- Capability negotiation: advertise/select v2 (LC=1) only when the client
-  supports it; fall back to v1 otherwise (no regression when absent).
-- Serializer: set LC=1 in `RFX_AVC444_BITMAP_STREAM` for v2 frames.
+- Capability negotiation: advertise/select v2 only when the client advertises
+  `RDPGFX_CAPVERSION_101`; fall back to v1 otherwise (no regression when absent).
+- Serializer: emit `codecId = RDPGFX_CODECID_AVC444V2` (0x000F) for v2 frames via
+  `xrdp_egfx_wire_to_surface1()`; keep the LC/`op` field at 0 (two-stream
+  layout, same as v1). No ffmpeg-interface change.
 
 ### Secondary correctness fixes (independent of the burr; do alongside v2)
 - v1 main-view chroma should be the 2x2 **average** (FreeRDP's canonical
