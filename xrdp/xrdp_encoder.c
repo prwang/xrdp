@@ -396,9 +396,9 @@ xrdp_encoder_create(struct xrdp_mm *mm)
 void
 xrdp_encoder_delete(struct xrdp_encoder *self)
 {
-#if defined(XRDP_RFXCODEC) || defined(XRDP_X264) || defined(XRDP_OPENH264)
+    /* used by the always-compiled ffmpeg AVC444 reap loop (and the codec loops
+     * when those are enabled) */
     int index;
-#endif
 
 
     LOG_DEVEL(LOG_LEVEL_INFO, "xrdp_encoder_delete:");
