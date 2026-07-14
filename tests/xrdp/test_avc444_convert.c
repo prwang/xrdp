@@ -3,6 +3,7 @@
 #endif
 
 #include <string.h>
+#include <stdlib.h>
 #include "xrdp_avc444_convert.h"
 #include "test_xrdp.h"
 
@@ -271,6 +272,113 @@ START_TEST(test_avc444_dims_and_padding)
 END_TEST
 
 /******************************************************************************/
+/* Odd visible dimensions must round the coded (H.264) dimensions up to the
+ * next multiple of 16 and edge-replicate the source into the padding columns
+ * and rows, so the encoder never reads uninitialized memory and the padding
+ * carries the nearest real pixel (no ringing at the coded border). This is
+ * the 16-pixel-alignment path a client resize to an odd size exercises. */
+START_TEST(test_avc444_odd_dims_alignment)
+{
+    /* {visible_w, visible_h, expected_coded_w, expected_coded_h} */
+    static const int cases[][4] =
+    {
+        {   1,   1,   16,   16},
+        {  15,  15,   16,   16},
+        {  16,  16,   16,   16},
+        {  17,  17,   32,   32},
+        {1281, 721, 1296,  736}, /* odd resize target from the task */
+        {1366, 769, 1376,  784}
+    };
+    int n = (int)(sizeof(cases) / sizeof(cases[0]));
+    int t;
+
+    for (t = 0; t < n; t++)
+    {
+        struct xrdp_avc444_conv *c;
+        int w = cases[t][0];
+        int h = cases[t][1];
+        int expect_cw = cases[t][2];
+        int expect_ch = cases[t][3];
+        int expect_size;
+
+        c = xrdp_avc444_conv_create(w, h);
+        ck_assert_ptr_ne(c, NULL);
+        ck_assert_int_eq(c->coded_width, expect_cw);
+        ck_assert_int_eq(c->coded_height, expect_ch);
+        /* coded dims are a multiple of 16 and cover the visible surface */
+        ck_assert_int_eq(c->coded_width % 16, 0);
+        ck_assert_int_eq(c->coded_height % 16, 0);
+        ck_assert_int_ge(c->coded_width, w);
+        ck_assert_int_lt(c->coded_width - w, 16);
+        ck_assert_int_ge(c->coded_height, h);
+        ck_assert_int_lt(c->coded_height - h, 16);
+        expect_size = expect_cw * expect_ch + expect_cw * (expect_ch / 2);
+        ck_assert_int_eq(c->nv12_size, expect_size);
+        xrdp_avc444_conv_delete(c);
+    }
+}
+END_TEST
+
+/******************************************************************************/
+/* Edge replication into the coded padding: with a per-column color gradient,
+ * the padding columns [w, coded_width) of the main Y plane must equal the
+ * last real column (w-1), and the padding rows [h, coded_height) must equal
+ * the last real row (h-1). Verified at an odd size (1281x721 -> 1296x736). */
+START_TEST(test_avc444_odd_padding_edge_replicated)
+{
+    struct xrdp_avc444_conv *c;
+    unsigned char *xrgb;
+    int w = 1281;
+    int h = 721;
+    int stride = w * 4;
+    int x;
+    int y;
+
+    xrgb = (unsigned char *)malloc((size_t)stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    /* horizontal gradient: R varies by column, so each column has a distinct
+     * luma; the last real column (w-1) is what padding should replicate */
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            unsigned int r = (unsigned int)(x & 0xff);
+            unsigned int g = (unsigned int)((x * 3 + y) & 0xff);
+            unsigned int b = (unsigned int)((y * 5) & 0xff);
+            unsigned int px = (r << 16) | (g << 8) | b;
+            memcpy(xrgb + (size_t)y * stride + (size_t)x * 4, &px, 4);
+        }
+    }
+    c = xrdp_avc444_conv_create(w, h);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->coded_width, 1296);
+    ck_assert_int_eq(c->coded_height, 736);
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+
+    /* padding columns of each real row replicate the last real column */
+    for (y = 0; y < h; y++)
+    {
+        unsigned char edge = c->main_nv12[y * c->coded_width + (w - 1)];
+        for (x = w; x < c->coded_width; x++)
+        {
+            ck_assert_int_eq(c->main_nv12[y * c->coded_width + x], edge);
+        }
+    }
+    /* padding rows replicate the last real row across the whole coded width */
+    for (x = 0; x < c->coded_width; x++)
+    {
+        unsigned char edge = c->main_nv12[(h - 1) * c->coded_width + x];
+        for (y = h; y < c->coded_height; y++)
+        {
+            ck_assert_int_eq(c->main_nv12[y * c->coded_width + x], edge);
+        }
+    }
+    xrdp_avc444_conv_delete(c);
+    free(xrgb);
+}
+END_TEST
+
+/******************************************************************************/
 Suite *
 make_suite_avc444_convert(void)
 {
@@ -282,6 +390,8 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_color_primaries);
     tcase_add_test(tc, test_avc444_roundtrip_exact);
     tcase_add_test(tc, test_avc444_dims_and_padding);
+    tcase_add_test(tc, test_avc444_odd_dims_alignment);
+    tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);
     suite_add_tcase(s, tc);
     return s;
 }

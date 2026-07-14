@@ -33,8 +33,11 @@ EXTRA_DIST = \
   gfx/gfx_h264_encoder_undefined.toml \
   gfx/gfx_h264_encoder_x264.toml \
   gfx/gfx_missing_h264.toml \
+  gfx/gfx_avc444_ffmpeg.toml \
   avc444/fixture_4frame.nut \
-  avc444/PROVENANCE.md
+  avc444/PROVENANCE.md \
+  avc444/repro_ffmpeg_latency.py \
+  avc444/FINDINGS_ffmpeg_latency.md
 
 TESTS = test_xrdp
 check_PROGRAMS = test_xrdp

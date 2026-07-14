@@ -29,6 +29,81 @@ moved out so far), unit tests for the new integration seams, PR9
 resize/reset/failure-threshold hardening, Windows `mstsc` interop, and a
 commit (nothing committed yet).
 
+### Resize / 16-alignment lifecycle — TESTED (2026-07-14)
+
+Added coverage for the client-resize path that recycles the ffmpeg child at
+new 16-aligned coded dimensions (task: "resize to odd width and height"):
+
+- **Converter alignment (deterministic, always runs):**
+  `tests/xrdp/test_avc444_convert.c` — `test_avc444_odd_dims_alignment`
+  (odd visible sizes 1/15/17/1281×721/1366×769 round coded dims up to the next
+  multiple of 16; nv12_size matches) and `test_avc444_odd_padding_edge_replicated`
+  (1281×721 → 1296×736: padding columns/rows edge-replicate the last real
+  pixel, so the encoder never reads uninitialized memory).
+- **ffmpeg recycle lifecycle (gated on `XRDP_TEST_FFMPEG_PATH`):**
+  `test_avc444_ffmpeg.c` — `test_ffmpeg_resize_recycle` walks even→odd→odd→odd→
+  even sizes, recreating the child each time exactly as
+  `gfx_wiretosurface1_avc444()` does on a size change; each generation spawns at
+  the correct 16-aligned coded dims, encodes, and is fully reaped before the
+  next spawns (N resizes leak no processes/fds). `make check` green (50 xrdp
+  tests with a real ffmpeg; the two ffmpeg tests skip without one).
+- **Live on-box validation (2026-07-14):** `xfreerdp3 /dynamic-resolution
+  /gfx:AVC444`, resized mid-session via `xdotool windowsize` to an odd target.
+  Server aligns the desktop to even and the encoder to /16: 900×605 → desktop
+  900×604 → ffmpeg `coded 912x608 generation 1` (old child reaped, new pid
+  spawned); post-resize XFCE desktop renders correctly with correct colors.
+  Log evidence: two distinct `spawned ffmpeg pid … coded WxH` lines per resize.
+
+### CRITICAL FINDING refined — the latency is x264 encoder-side, `-tune zerolatency` fixes it
+
+Offline repro `tests/xrdp/avc444/repro_ffmpeg_latency.py` + writeup
+`FINDINGS_ffmpeg_latency.md` pin the root cause definitively (measured, not
+recalled). Feeding one NV12 frame at a time to a persistent pipe:
+- **production (no tune):** per-frame output `[304,0,0,…]`, i.e. only the NUT
+  header, then nothing — all encoded pictures withheld until EOF.
+- **`-tune zerolatency`:** per-frame `[3967,337,193,…]`, tail-after-EOF 5092→26
+  bytes — one encoded picture out per input frame.
+
+So the withholding is **entirely x264 encoder-side output delay**, not ffmpeg
+input/AVIO/demux/probe buffering, and it has two additive parts: (1) lookahead
+/ B-frame reordering (`rc-lookahead`, `sync-lookahead`, bframes) and (2)
+threaded frame-parallelism (~threads−1 frames; `-threads 1` alone doesn't fix
+it, but zerolatency's sliced-threads does). The prior "low-latency flags break
+it" note was about *input-side* flags (`-fflags nobuffer` breaks encode,
+`-probesize 32`/`-avioflags direct` corrupt the demuxer) — the repro reproduces
+those failures too. **Consequence:** adding `-tune zerolatency` to the encoder
+argv would allow the simpler synchronous write-pair/read-pair model and remove
+the ~1-update pipeline lag; it is also the correct tune for interactive remote
+desktop (the in-tree x264 GFX path already uses it). Deferred as a follow-up to
+validate on-screen with the harness rather than change the working runner blind.
+
+### `-tune zerolatency` — now a config default (deployed + re-validated 2026-07-14)
+
+`-tune zerolatency` was already present in the encoder argv (hard-coded literal
+since 13f59ae8, alongside `-preset ultrafast -bf 0`), so the deployed child was
+already streaming per-frame. This change makes it a **real config knob** rather
+than a magic string:
+- `struct xrdp_ffmpeg_avc444_config` gains `char tune[16]`;
+  `xrdp_ffmpeg_avc444_config_default()` sets it to `"zerolatency"`; `build_argv`
+  emits `-tune <tune>` only when non-empty (set `tune = ""` to omit it).
+- `gfx.toml [avc444_ffmpeg] tune` parsed in `xrdp_tconfig.c`
+  (`avc444_ffmpeg_tune`, default `"zerolatency"`), plumbed through
+  `xrdp_encoder` (create + `gfx_wiretosurface1_avc444`) and the
+  `xrdp_mm_egfx_caps_advertise()` probe so both probe and live child use it.
+- Tests: `test_tconfig.c` gains `…avc444_ffmpeg_defaults` (no table → default
+  zerolatency) and `…avc444_ffmpeg_override` (explicit table overrides every
+  field incl. tune) with stub `gfx/gfx_avc444_ffmpeg.toml`. `make check` = 52/52.
+- Deploy + re-validate: rebuilt `/usr/sbin/xrdp`, restarted, reconnected
+  `/gfx:AVC444`. Live child argv (`/proc/<pid>/cmdline`) shows
+  `… -preset ultrafast -tune zerolatency -crf 18 -g 240 …`; full XFCE desktop
+  renders with correct colors; child reaped on disconnect (no leak). Deployed
+  `/etc/xrdp/gfx.toml [avc444_ffmpeg]` now carries `tune = "zerolatency"`.
+
+This does not by itself remove the pipelined runner's ~1-update lag — that is a
+separate follow-up (make the runner return the just-submitted pair now that
+output is reliably per-frame). The tune is the enabler; the runner change is
+not yet done.
+
 ## AVC444 encoding — IN PROGRESS (superseded by the section above)
 
 **Goal.** Add an external stock-`ffmpeg` AVC444 (RDPGFX `0x000E`) H.264 backend

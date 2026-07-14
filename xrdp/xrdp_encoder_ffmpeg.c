@@ -118,6 +118,12 @@ void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
+    /* zerolatency disables x264 lookahead + B-frame reorder + threaded-frame
+     * delay, so the child streams one encoded picture per input frame instead
+     * of withholding several until EOF (see tests/xrdp/avc444/
+     * FINDINGS_ffmpeg_latency.md). It is the correct tune for interactive RDP
+     * and can be overridden via gfx.toml [avc444_ffmpeg] tune. */
+    snprintf(cfg->tune, sizeof(cfg->tune), "%s", "zerolatency");
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
@@ -257,8 +263,11 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
     ADD("0");
     ADD("-preset");
     ADD("ultrafast");
-    ADD("-tune");
-    ADD("zerolatency");
+    if (cfg->tune[0] != '\0')
+    {
+        ADD("-tune");
+        ADD(cfg->tune);
+    }
     ADD("-crf");
     ADDNUM("%d", cfg->quality_crf);
     ADD("-g");

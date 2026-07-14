@@ -407,6 +407,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     /* external stock-ffmpeg AVC444 backend defaults + [avc444_ffmpeg] table */
     g_strncpy(config->avc444_ffmpeg_path, "/usr/bin/ffmpeg",
               sizeof(config->avc444_ffmpeg_path) - 1);
+    g_strncpy(config->avc444_ffmpeg_tune, "zerolatency",
+              sizeof(config->avc444_ffmpeg_tune) - 1);
     config->avc444_ffmpeg_crf = 18;
     config->avc444_ffmpeg_gop = 240;
     {
@@ -414,6 +416,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         if (avc != NULL)
         {
             toml_datum_t path = toml_string_in(avc, "path");
+            toml_datum_t tune = toml_string_in(avc, "tune");
             toml_datum_t crf = toml_int_in(avc, "quality_crf");
             toml_datum_t gop = toml_int_in(avc, "gop_pictures");
             if (path.ok)
@@ -421,6 +424,12 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                 g_strncpy(config->avc444_ffmpeg_path, path.u.s,
                           sizeof(config->avc444_ffmpeg_path) - 1);
                 free(path.u.s);
+            }
+            if (tune.ok)
+            {
+                g_strncpy(config->avc444_ffmpeg_tune, tune.u.s,
+                          sizeof(config->avc444_ffmpeg_tune) - 1);
+                free(tune.u.s);
             }
             if (crf.ok)
             {

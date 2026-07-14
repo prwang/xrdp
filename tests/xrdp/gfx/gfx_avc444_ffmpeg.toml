@@ -1,0 +1,9 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/opt/custom/ffmpeg"
+tune = "film"
+quality_crf = 22
+gop_pictures = 120

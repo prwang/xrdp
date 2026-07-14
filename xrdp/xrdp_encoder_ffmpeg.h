@@ -40,6 +40,7 @@
 struct xrdp_ffmpeg_avc444_config
 {
     char path[256];                 /* absolute ffmpeg path                */
+    char tune[16];                  /* libx264 -tune (default zerolatency) */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;
