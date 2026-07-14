@@ -82,6 +82,7 @@ struct xrdp_tconfig_gfx
         openh264_param[NUM_CONNECTION_TYPES];
     /* external stock-ffmpeg AVC444 backend (h264_encoder = "ffmpeg") */
     char avc444_ffmpeg_path[256];
+    char avc444_ffmpeg_tune[16];
     int avc444_ffmpeg_crf;
     int avc444_ffmpeg_gop;
 };

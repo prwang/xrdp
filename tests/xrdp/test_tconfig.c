@@ -145,6 +145,34 @@ START_TEST(test_tconfig_gfx_missing_h264)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_defaults)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* the stub gfx.toml has no [avc444_ffmpeg] table, so the built-in
+     * defaults apply: -tune zerolatency for the low-latency AVC444 child */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/usr/bin/ffmpeg");
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_tune, "zerolatency");
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_crf, 18);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_gop, 240);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_override)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* an explicit [avc444_ffmpeg] table overrides every field incl. tune */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_ffmpeg.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.h264_encoder, XTC_H264_FFMPEG);
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/opt/custom/ffmpeg");
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_tune, "film");
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_crf, 22);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_gop, 120);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -169,6 +197,8 @@ make_suite_tconfig_load_gfx(void)
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_x264);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_undefined);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_invalid);
+    tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_defaults);
+    tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_override);
 
     suite_add_tcase(s, tc_tconfig_load_gfx);
 

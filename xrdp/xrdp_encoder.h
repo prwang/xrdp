@@ -48,6 +48,7 @@ struct xrdp_encoder
     /* external stock-ffmpeg AVC444 backend (opaque handles) */
     int avc444_ffmpeg;
     char avc444_path[256];
+    char avc444_tune[16];
     int avc444_crf;
     int avc444_gop;
     unsigned long long avc444_seq;
