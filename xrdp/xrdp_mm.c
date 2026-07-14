@@ -1209,6 +1209,7 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     best_h264_index = -1;
     best_pro_index = -1;
     int avc444_v2_capable = 0;
+    int best_v2_index = -1;
     for (index = 0; index < caps_count; index++)
     {
         version = ver_flags[index].version;
@@ -1217,7 +1218,10 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             version, flags, index);
         if (xrdp_avc444_caps_supports_v2(version, flags))
         {
+            /* ver_flags is sorted ascending, so this keeps the highest
+             * v2-capable capset to confirm when emitting v2 */
             avc444_v2_capable = 1;
+            best_v2_index = index;
         }
         switch (version)
         {
@@ -1310,10 +1314,14 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             if (avc444_ffmpeg_ok && best_h264_index >= 0)
             {
                 self->avc444_v2 = avc444_v2_capable;
+                /* when emitting v2 (codec id 0x000F) confirm a v2-capable
+                 * capset (v10.1+) so strict clients (e.g. mstsc) accept the
+                 * v2 frames; otherwise confirm the best AVC (v1) capset */
+                best_index = self->avc444_v2 ? best_v2_index : best_h264_index;
                 LOG(LOG_LEVEL_INFO, "Matched H264/AVC444 (ffmpeg) mode, "
-                    "AVC444 %s", self->avc444_v2 ? "v2 (0x000F)"
-                    : "v1 (0x000E)");
-                best_index = best_h264_index;
+                    "AVC444 %s, confirming capset index %d (0x%8.8x)",
+                    self->avc444_v2 ? "v2 (0x000F)" : "v1 (0x000E)",
+                    best_index, ver_flags[best_index].version);
                 self->egfx_flags = XRDP_EGFX_H264;
                 self->avc444_ffmpeg = 1;
                 break;
