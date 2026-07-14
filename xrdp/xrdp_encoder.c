@@ -240,10 +240,8 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_ffmpeg = 1;
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
                   sizeof(self->avc444_path) - 1);
-        g_strncpy(self->avc444_tune, mm->wm->gfx_config->avc444_ffmpeg_tune,
-                  sizeof(self->avc444_tune) - 1);
-        self->avc444_crf = mm->wm->gfx_config->avc444_ffmpeg_crf;
-        self->avc444_gop = mm->wm->gfx_config->avc444_ffmpeg_gop;
+        self->avc444_encoder_args =
+            mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
     }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
     else if (mm->libh264_loaded && (mm->egfx_flags & XRDP_EGFX_H264) != 0)
@@ -961,9 +959,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         struct xrdp_ffmpeg_avc444_config cfg;
         xrdp_ffmpeg_avc444_config_default(&cfg);
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
-        g_strncpy(cfg.tune, self->avc444_tune, sizeof(cfg.tune) - 1);
-        cfg.quality_crf = self->avc444_crf;
-        cfg.gop_pictures = self->avc444_gop;
+        cfg.encoder_args = self->avc444_encoder_args;
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {

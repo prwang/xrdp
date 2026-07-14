@@ -37,17 +37,42 @@
 
 #include <stddef.h>
 
+/*
+ * Verbatim encoder-argument passthrough.
+ *
+ * xrdp owns only two hard contracts in the ffmpeg command line: the INPUT
+ * (raw NV12 on pipe:3 at the 16-aligned coded size, fed by the AVC444
+ * converter) and the OUTPUT (Annex-B H.264 wrapped in NUT on pipe:1, which
+ * the in-tree NUT demux and h264 parser require). Everything in between --
+ * the codec choice (-c:v) and all of its tuning -- is supplied verbatim by
+ * the administrator via gfx.toml [avc444_ffmpeg] encoder_args and is not
+ * enumerated or interpreted by xrdp. Each array element becomes exactly one
+ * execve() argv token (there is no shell, so no tokenization or quoting),
+ * which is what makes hardware encoders (nvenc/qsv/vaapi) expressible without
+ * changing xrdp. gfx.toml is root-owned admin config, trusted like sshd_config.
+ *
+ * The chosen encoder MUST emit decodable Annex-B H.264 (for libx264 include
+ * repeat-headers=1 so every IDR carries SPS/PPS); otherwise the client cannot
+ * decode. See the gfx.toml man page for the contract and examples.
+ */
+#define XRDP_AVC444_MAX_ENC_ARGS 64
+#define XRDP_AVC444_ENC_ARG_LEN  256
+
+struct xrdp_avc444_encoder_args
+{
+    char arg[XRDP_AVC444_MAX_ENC_ARGS][XRDP_AVC444_ENC_ARG_LEN];
+    int count;
+};
+
 struct xrdp_ffmpeg_avc444_config
 {
     char path[256];                 /* absolute ffmpeg path                */
-    char tune[16];                  /* libx264 -tune (default zerolatency) */
+    struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;
     int pair_timeout_ms;
     int terminate_grace_ms;
-    int quality_crf;
-    int gop_pictures;
     size_t max_nut_header_bytes;
     size_t max_encoded_picture_bytes;
     size_t max_encoded_pair_bytes;
@@ -56,6 +81,14 @@ struct xrdp_ffmpeg_avc444_config
 /** Populate cfg with the MVP defaults (path left empty). */
 void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg);
+
+/**
+ * Fill args with the built-in default encoder block used when gfx.toml does
+ * not supply an explicit [avc444_ffmpeg] encoder_args list. Shared by the
+ * config default and the tconfig loader so both stay identical.
+ */
+void
+xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args);
 
 struct xrdp_ffmpeg_avc444_metrics
 {

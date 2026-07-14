@@ -44,9 +44,12 @@
 #include "xrdp_h264_annexb.h"
 #include "log.h"
 #include "os_calls.h"
+#include "string_calls.h"
 
 #define FF_CHILD_RAW_FD 3
-#define FF_MAX_ARGV 80
+/* fixed input+output framing (~40 tokens) plus up to XRDP_AVC444_MAX_ENC_ARGS
+ * verbatim encoder tokens, with headroom */
+#define FF_MAX_ARGV 128
 #define FF_READ_CHUNK 65536
 #define FF_MAX_INFLIGHT_PAIRS 8
 
@@ -115,22 +118,53 @@ struct xrdp_ffmpeg_avc444
 
 /*****************************************************************************/
 void
+xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
+{
+    /*
+     * Built-in default encoder block (used when gfx.toml supplies no explicit
+     * encoder_args). libx264 tuned for interactive RDP:
+     *   -tune zerolatency   disables x264 lookahead + B-frame reorder +
+     *                       threaded-frame delay, so the child streams one
+     *                       encoded picture per input frame instead of
+     *                       withholding several until EOF (see tests/xrdp/
+     *                       avc444/FINDINGS_ffmpeg_latency.md).
+     *   repeat-headers=1    emit SPS/PPS before every IDR so the client can
+     *                       always decode.
+     * This reproduces the historic hard-coded argv exactly; tuning is the
+     * administrator's job via gfx.toml [avc444_ffmpeg] encoder_args.
+     */
+    static const char *const def[] =
+    {
+        "-c:v", "libx264",
+        "-bf", "0",
+        "-preset", "ultrafast",
+        "-tune", "zerolatency",
+        "-crf", "18",
+        "-g", "240",
+        "-x264-params", "repeat-headers=1"
+    };
+    int i;
+    int count = (int)(sizeof(def) / sizeof(def[0]));
+
+    memset(args, 0, sizeof(*args));
+    for (i = 0; i < count && i < XRDP_AVC444_MAX_ENC_ARGS; i++)
+    {
+        g_strncpy(args->arg[i], def[i], XRDP_AVC444_ENC_ARG_LEN - 1);
+    }
+    args->count = i;
+}
+
+/*****************************************************************************/
+void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
-    /* zerolatency disables x264 lookahead + B-frame reorder + threaded-frame
-     * delay, so the child streams one encoded picture per input frame instead
-     * of withholding several until EOF (see tests/xrdp/avc444/
-     * FINDINGS_ffmpeg_latency.md). It is the correct tune for interactive RDP
-     * and can be overridden via gfx.toml [avc444_ffmpeg] tune. */
-    snprintf(cfg->tune, sizeof(cfg->tune), "%s", "zerolatency");
+    xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
     cfg->pair_timeout_ms = 2000;
     cfg->terminate_grace_ms = 250;
-    cfg->quality_crf = 18;
-    cfg->gop_pictures = 240;
     cfg->max_nut_header_bytes = 1024 * 1024;
     cfg->max_encoded_picture_bytes = (size_t)128 * 1024 * 1024;
     cfg->max_encoded_pair_bytes = (size_t)256 * 1024 * 1024;
@@ -257,23 +291,16 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
     ADD("-dn");
     ADD("-fps_mode");
     ADD("passthrough");
-    ADD("-c:v");
-    ADD("libx264");
-    ADD("-bf");
-    ADD("0");
-    ADD("-preset");
-    ADD("ultrafast");
-    if (cfg->tune[0] != '\0')
+    /* encoder block: verbatim admin passthrough (-c:v + tuning). xrdp does
+     * not interpret these; each token is one execve argv element. */
     {
-        ADD("-tune");
-        ADD(cfg->tune);
+        int i;
+        for (i = 0; i < cfg->encoder_args.count &&
+                i < XRDP_AVC444_MAX_ENC_ARGS; i++)
+        {
+            ADD(cfg->encoder_args.arg[i]);
+        }
     }
-    ADD("-crf");
-    ADDNUM("%d", cfg->quality_crf);
-    ADD("-g");
-    ADDNUM("%d", cfg->gop_pictures);
-    ADD("-x264-params");
-    ADD("repeat-headers=1");
     ADD("-bsf:v");
     ADD("h264_mp4toannexb");
     ADD("-flush_packets");

@@ -1276,10 +1276,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             xrdp_ffmpeg_avc444_config_default(&cfg);
             g_strncpy(cfg.path, self->wm->gfx_config->avc444_ffmpeg_path,
                       sizeof(cfg.path) - 1);
-            g_strncpy(cfg.tune, self->wm->gfx_config->avc444_ffmpeg_tune,
-                      sizeof(cfg.tune) - 1);
-            cfg.quality_crf = self->wm->gfx_config->avc444_ffmpeg_crf;
-            cfg.gop_pictures = self->wm->gfx_config->avc444_ffmpeg_gop;
+            cfg.encoder_args =
+                self->wm->gfx_config->avc444_ffmpeg_encoder_args;
             LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
                 "AVC444 %s at %dx%d", cfg.path, cw, ch);
             if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)

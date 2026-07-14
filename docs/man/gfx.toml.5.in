@@ -119,6 +119,91 @@ Sets an upper limit of the bitrate in bps.
 \fBMaxFrameRate\fR = \fI<float>\fR
 Sets the maximum frame rate that the encoder will process per second.
 
+.SH "AVC444_FFMPEG"
+
+\fB[avc444_ffmpeg]\fR configures the external stock-\fBffmpeg\fR AVC444 backend,
+used when \fBh264_encoder = "ffmpeg"\fR is selected in \fB[codec]\fR. xrdp spawns
+one persistent \fBffmpeg\fR child per surface (via \fBfork\fR/\fBexecve\fR \(em
+no shell is involved) and streams raw NV12 into it, muxing both AVC444 views
+(main YUV420 and the Chroma420 auxiliary) into a single H.264 stream.
+
+xrdp owns only two fixed contracts of the \fBffmpeg\fR command line and does not
+interpret anything in between:
+
+.TP
+.B Input contract (fixed)
+Raw NV12 on \fBpipe:3\fR at the 16\(hyaligned coded size, BT.709 full range,
+fed by the AVC444 converter. Not configurable.
+
+.TP
+.B Output contract (fixed)
+Annex\(hyB H.264 wrapped in NUT on \fBpipe:1\fR
+(\fB\-bsf:v h264_mp4toannexb \-f nut pipe:1\fR), which the in\(hytree NUT demux
+and H.264 parser require. Not configurable.
+
+.PP
+Everything between those contracts \(em the codec selection (\fB\-c:v\fR) and
+all of its tuning \(em is supplied verbatim by the administrator and passed
+straight through to \fBexecve\fR. This is a deliberate design choice: xrdp does
+\fBnot\fR enumerate individual encoder flags, so arbitrary tuning and hardware
+encoders (\fBh264_nvenc\fR, \fBh264_qsv\fR, \fBh264_vaapi\fR, and so on) can be
+expressed without changing xrdp.
+
+.TP
+\fBpath\fR = \fI<string>\fR
+Absolute path to the \fBffmpeg\fR binary. Default: \fB/usr/bin/ffmpeg\fR.
+
+.TP
+\fBencoder_args\fR = \fI<array of strings>\fR
+The encoder block, inserted verbatim into the \fBffmpeg\fR argv immediately
+after the input mapping and before the output framing. Each array element
+becomes exactly one \fBexecve\fR argv token; because there is no shell, there is
+no quoting, splitting or variable expansion \(em put each flag and each value in
+its own element (e.g. \fB"\-crf", "16"\fR, not \fB"\-crf 16"\fR). Up to 64
+tokens of 255 characters each are accepted; excess tokens are dropped with a
+warning. An omitted key, or an explicitly empty array, selects the built\(hyin
+default block.
+
+The chosen encoder \fBmust\fR emit decodable Annex\(hyB H.264. For \fBlibx264\fR
+this means including \fBrepeat\-headers=1\fR in \fB\-x264\-params\fR so every IDR
+carries SPS/PPS; otherwise a client that joins the stream cannot decode it.
+
+Because \fBgfx.toml\fR is root\(hyowned server configuration (trusted like
+\fBsshd_config\fR), these tokens are not treated as untrusted input.
+
+The built\(hyin default is tuned for interactive RDP:
+
+.nf
+encoder_args = [
+  "\-c:v", "libx264",
+  "\-bf", "0",
+  "\-preset", "ultrafast",
+  "\-tune", "zerolatency",
+  "\-crf", "18",
+  "\-g", "240",
+  "\-x264\-params", "repeat\-headers=1",
+]
+.fi
+
+\fB\-tune zerolatency\fR disables x264 lookahead, B\(hyframe reordering and
+threaded\(hyframe delay so the child emits one encoded picture per input frame
+instead of withholding several until end\(hyof\(hystream.
+
+Example selecting an NVIDIA hardware encoder (xrdp needs no change to support
+this):
+
+.nf
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+encoder_args = [
+  "\-c:v", "h264_nvenc",
+  "\-preset", "p1",
+  "\-tune", "ll",
+  "\-rc", "constqp",
+  "\-qp", "20",
+]
+.fi
+
 .SH "CONNECTION TYPES"
 
 \fB[x264]\fR and \fB[OpenH264]\fR section are tables (also known as
