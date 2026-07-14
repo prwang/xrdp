@@ -1208,12 +1208,17 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     g_qsort(ver_flags, caps_count, sizeof(struct ver_flags_t), cmpverfunc);
     best_h264_index = -1;
     best_pro_index = -1;
+    int avc444_v2_capable = 0;
     for (index = 0; index < caps_count; index++)
     {
         version = ver_flags[index].version;
         flags = ver_flags[index].flags;
         LOG(LOG_LEVEL_INFO, "  version 0x%8.8x flags 0x%8.8x (index: %d)",
             version, flags, index);
+        if (xrdp_avc444_caps_supports_v2(version, flags))
+        {
+            avc444_v2_capable = 1;
+        }
         switch (version)
         {
             case XR_RDPGFX_CAPVERSION_8: /* FALLTHROUGH */
@@ -1304,7 +1309,10 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
         {
             if (avc444_ffmpeg_ok && best_h264_index >= 0)
             {
-                LOG(LOG_LEVEL_INFO, "Matched H264/AVC444 (ffmpeg) mode");
+                self->avc444_v2 = avc444_v2_capable;
+                LOG(LOG_LEVEL_INFO, "Matched H264/AVC444 (ffmpeg) mode, "
+                    "AVC444 %s", self->avc444_v2 ? "v2 (0x000F)"
+                    : "v1 (0x000E)");
                 best_index = best_h264_index;
                 self->egfx_flags = XRDP_EGFX_H264;
                 self->avc444_ffmpeg = 1;

@@ -83,6 +83,42 @@ START_TEST(test_caps_unknown_none)
 }
 END_TEST
 
+START_TEST(test_caps_v2_support)
+{
+    int i;
+    int versions[6];
+
+    /* v10.1 signals v2 regardless of flags (reserved-only capset) */
+    ck_assert_int_eq(xrdp_avc444_caps_supports_v2(XR_RDPGFX_CAPVERSION_101, 0),
+                     1);
+    ck_assert_int_eq(
+        xrdp_avc444_caps_supports_v2(XR_RDPGFX_CAPVERSION_101, AVC420_EN), 1);
+
+    /* v10.2..10.7 support v2 unless AVC is disabled on that capset */
+    versions[0] = XR_RDPGFX_CAPVERSION_102;
+    versions[1] = XR_RDPGFX_CAPVERSION_103;
+    versions[2] = XR_RDPGFX_CAPVERSION_104;
+    versions[3] = XR_RDPGFX_CAPVERSION_105;
+    versions[4] = XR_RDPGFX_CAPVERSION_106;
+    versions[5] = XR_RDPGFX_CAPVERSION_107;
+    for (i = 0; i < 6; i++)
+    {
+        ck_assert_int_eq(xrdp_avc444_caps_supports_v2(versions[i], 0), 1);
+        ck_assert_int_eq(xrdp_avc444_caps_supports_v2(versions[i], THIN), 1);
+        ck_assert_int_eq(xrdp_avc444_caps_supports_v2(versions[i], AVC_DIS), 0);
+    }
+
+    /* pre-v2 capsets and unknowns never signal v2 */
+    ck_assert_int_eq(xrdp_avc444_caps_supports_v2(XR_RDPGFX_CAPVERSION_8, 0),
+                     0);
+    ck_assert_int_eq(xrdp_avc444_caps_supports_v2(XR_RDPGFX_CAPVERSION_81,
+                     AVC420_EN), 0);
+    ck_assert_int_eq(xrdp_avc444_caps_supports_v2(XR_RDPGFX_CAPVERSION_10, 0),
+                     0);
+    ck_assert_int_eq(xrdp_avc444_caps_supports_v2(0x12345678, 0), 0);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_caps(void)
@@ -98,6 +134,7 @@ make_suite_avc444_caps(void)
     tcase_add_test(tc, test_caps_v101_excluded);
     tcase_add_test(tc, test_caps_v102_to_107);
     tcase_add_test(tc, test_caps_unknown_none);
+    tcase_add_test(tc, test_caps_v2_support);
     suite_add_tcase(s, tc);
     return s;
 }

@@ -15,14 +15,24 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * MS-RDPEGFX AVC444 v1 view reconstruction and full-range BT.709 color.
+ * MS-RDPEGFX AVC444 view reconstruction and full-range BT.709 color.
  *
- * Reconstructs the two YUV420 (NV12) views MS-RDPEGFX AVC444 v1 (LC=0)
- * requires from a full-chroma XRGB8888 source: a main YUV420 view and a
- * Chroma420 auxiliary view. Both views share the same 16-aligned coded
- * dimensions because a single ffmpeg rawvideo input reads fixed-size
- * frames (PRD FR-IN-1). This module contains no external dependency; it
- * is pure integer logic and is unit tested against specification vectors.
+ * Reconstructs the two YUV420 (NV12) views MS-RDPEGFX AVC444 requires from a
+ * full-chroma XRGB8888 source: a main YUV420 view and an auxiliary chroma
+ * view. Both views share the same 16-aligned coded dimensions because a
+ * single ffmpeg rawvideo input reads fixed-size frames (PRD FR-IN-1). This
+ * module contains no external dependency; it is pure integer logic and is
+ * unit tested against specification vectors.
+ *
+ * Two auxiliary packings are supported, selected by chroma_v2:
+ *   v1 (ChromaV1, codec id 0x000E) - the (even,even) main chroma is a point
+ *     sample and the aux view bands odd-row chroma; the FreeRDP decoder
+ *     extrapolates the (even,even) chroma and overshoots at sharp saturated
+ *     edges (the magenta "burr").
+ *   v2 (ChromaV2, codec id 0x000F) - the main chroma is the 2x2 block average
+ *     and the aux view carries odd-column chroma for every row plus the
+ *     even-column/odd-row chroma, so the same decoder filter reconstructs the
+ *     true chroma instead of overshooting (MS-RDPEGFX 3.3.8.3.3).
  */
 
 #ifndef _XRDP_AVC444_CONVERT_H
@@ -48,8 +58,9 @@ struct xrdp_avc444_conv
     int coded_width;   /* actual_width  rounded up to a multiple of 16 */
     int coded_height;  /* actual_height rounded up to a multiple of 16 */
     int nv12_size;     /* bytes of one NV12 picture at coded dimensions  */
+    int chroma_v2;     /* 0 = AVC444 v1 (ChromaV1); 1 = AVC444 v2         */
     unsigned char *main_nv12; /* persistent main YUV420 (NV12) view      */
-    unsigned char *aux_nv12;  /* persistent Chroma420 (NV12) view        */
+    unsigned char *aux_nv12;  /* persistent auxiliary chroma (NV12) view */
 };
 
 /**

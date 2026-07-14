@@ -44,7 +44,7 @@ Replaced with a single verbatim passthrough:
   tokens go straight to `execve` with no shell, so there is no injection surface.
   Bounds are enforced on count and per-token length.
 
-## AVC444 magenta burr — ROOT CAUSE FOUND: it's AVC444 v1; fix = emit v2 (2026-07-14)
+## AVC444 magenta burr — FIXED: it was AVC444 v1; v2 emission implemented (2026-07-14)
 
 **Symptom.** Client captures (`wierd_red_burr.png`, `red_burr_v2.png`) show
 magenta speckles on saturated green terminal text.
@@ -97,15 +97,27 @@ capture pristine source via `x11grab :10`; pack with the real
 `xrdp_avc444_convert.o`; decode with a harness that calls FreeRDP's runtime
 `primitives_get()` **SSE4.1** path (the general/C path gives a false 0-burr).
 
-### TODO — AVC444 v2 emission
-- `xrdp_avc444_convert.c`: add a ChromaV2 packing (aux plane layout per
-  3.3.8.3.3) alongside the existing v1 path; unit-test the split against a known
-  vector.
-- Capability negotiation: advertise/select v2 only when the client advertises
-  `RDPGFX_CAPVERSION_101`; fall back to v1 otherwise (no regression when absent).
-- Serializer: emit `codecId = RDPGFX_CODECID_AVC444V2` (0x000F) for v2 frames via
-  `xrdp_egfx_wire_to_surface1()`; keep the LC/`op` field at 0 (two-stream
-  layout, same as v1). No ffmpeg-interface change.
+### DONE — AVC444 v2 emission (2026-07-14)
+- `xrdp_avc444_convert.c`: added the ChromaV2 packing (`fill_aux_v2` + 2x2-average
+  main chroma, gated on `conv->chroma_v2`) per 3.3.8.3.3; unit-tested
+  (`test_avc444_v2_packing`, `test_avc444_v2_default_is_v1`) against directly
+  computed placement/average vectors.
+- Capability negotiation: `xrdp_avc444_caps_supports_v2()` (unit-tested,
+  `test_caps_v2_support`); `xrdp_mm.c` ORs it across advertised capsets and sets
+  `avc444_v2` only when a v2 capset (v10.1+) is present, else v1 (no regression).
+- Serializer: `xrdp_encoder.c` emits `codecId = RDPGFX_CODECID_AVC444V2` (0x000F)
+  for v2 frames, LC stays 0; plumbed `avc444_v2` mm -> encoder -> conv. ffmpeg
+  interface/encoder_args unchanged. All 56 unit tests pass.
+- Verified end-to-end through the FULL live path (xrdp + libx264 H.264 + real
+  xfreerdp3 3.15 SSE decode), identical full-screen green-on-black scene:
+  **v1 (forced via client `/gfx:mask`) = 50.4% of green pixels burred magenta;
+  v2 = 0.6%** (residual is ordinary scattered H.264 chroma noise, not the
+  structural edge burr). Server log confirms `AVC444 v2 (0x000F)` negotiated with
+  a stock xfreerdp3 `/gfx:AVC444` client. Offline (lossless) faithful decode:
+  my v2 converter -> FreeRDP SSE ChromaV2 = 0 burr.
+
+Secondary correctness note: the BT.709-vs-decoder-BT.601 colorspace mismatch is
+still present and independent of the burr (see FINDINGS "Secondary correctness").
 
 ### Secondary correctness fixes (independent of the burr; do alongside v2)
 - v1 main-view chroma should be the 2x2 **average** (FreeRDP's canonical

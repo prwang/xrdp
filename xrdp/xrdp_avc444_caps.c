@@ -63,3 +63,29 @@ xrdp_avc444_classify_caps(int version, int flags)
             return XRDP_GFX_AVC_NONE;
     }
 }
+
+/*****************************************************************************/
+int
+xrdp_avc444_caps_supports_v2(int version, int flags)
+{
+    switch (version)
+    {
+        case XR_RDPGFX_CAPVERSION_101:
+            /* the reserved-only v10.1 capset exists specifically to advertise
+             * AVC444 v2 (ChromaV2); its mere presence signals v2 support */
+            return 1;
+
+        case XR_RDPGFX_CAPVERSION_102:
+        case XR_RDPGFX_CAPVERSION_103:
+        case XR_RDPGFX_CAPVERSION_104:
+        case XR_RDPGFX_CAPVERSION_105:
+        case XR_RDPGFX_CAPVERSION_106:
+        case XR_RDPGFX_CAPVERSION_107:
+            /* v10.2+ supersede v10.1 and retain v2 support unless the client
+             * disables AVC entirely on that capset */
+            return (flags & XR_RDPGFX_CAPS_FLAG_AVC_DISABLED) ? 0 : 1;
+
+        default:
+            return 0;
+    }
+}

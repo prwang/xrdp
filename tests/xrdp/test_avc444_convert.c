@@ -234,6 +234,155 @@ START_TEST(test_avc444_roundtrip_exact)
 }
 END_TEST
 
+/* ------------------------------------------------------------------------ */
+/* AVC444 v2 (ChromaV2) packing. Reconstruct the full 4:4:4 chroma from the   */
+/* v2 planes exactly as FreeRDP general_ChromaV2ToYUV444 does (no reverse     */
+/* filter) and assert every transmitted position carries the true sample and */
+/* the (even,even) main position carries the 2x2 block average.              */
+
+static void
+exp_sample(const unsigned char *xrgb, int stride, int w, int h,
+           int x, int y, int *Y, int *U, int *V)
+{
+    unsigned int px;
+    if (x < 0)
+    {
+        x = 0;
+    }
+    if (x > w - 1)
+    {
+        x = w - 1;
+    }
+    if (y < 0)
+    {
+        y = 0;
+    }
+    if (y > h - 1)
+    {
+        y = h - 1;
+    }
+    memcpy(&px, xrgb + (size_t)y * stride + (size_t)x * 4, 4);
+    xrdp_avc444_rgb_to_yuv709fr((px >> 16) & 0xff, (px >> 8) & 0xff,
+                                px & 0xff, Y, U, V);
+}
+
+START_TEST(test_avc444_v2_packing)
+{
+    const int w = 16;
+    const int h = 16;
+    const int stride = w * 4;
+    unsigned char xrgb[16 * 16 * 4];
+    struct xrdp_avc444_conv *c;
+    unsigned char *yp;
+    unsigned char *uvp;
+    int cw;
+    int ch;
+    int x;
+    int y;
+    int cx;
+    int cy;
+
+    build_source(xrgb, stride, w, h);
+    c = xrdp_avc444_conv_create(w, h);
+    ck_assert_ptr_ne(c, NULL);
+    c->chroma_v2 = 1;
+    ck_assert_int_eq(c->coded_width, 16);
+    ck_assert_int_eq(c->coded_height, 16);
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    cw = c->coded_width;
+    ch = c->coded_height;
+    yp = c->aux_nv12;
+    uvp = c->aux_nv12 + cw * ch;
+
+    /* main Y plane is the identity luma */
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            int ey;
+            int eu;
+            int ev;
+            exp_sample(xrgb, stride, w, h, x, y, &ey, &eu, &ev);
+            ck_assert_int_eq(main_y(c, x, y), ey);
+        }
+    }
+
+    /* main chroma at (even,even) is the 2x2 block average (no U/V swap) */
+    for (cy = 0; cy < ch / 2; cy++)
+    {
+        for (cx = 0; cx < cw / 2; cx++)
+        {
+            int u0;
+            int v0;
+            int u1;
+            int v1;
+            int u2;
+            int v2;
+            int u3;
+            int v3;
+            int t;
+            exp_sample(xrgb, stride, w, h, 2 * cx, 2 * cy, &t, &u0, &v0);
+            exp_sample(xrgb, stride, w, h, 2 * cx + 1, 2 * cy, &t, &u1, &v1);
+            exp_sample(xrgb, stride, w, h, 2 * cx, 2 * cy + 1, &t, &u2, &v2);
+            exp_sample(xrgb, stride, w, h, 2 * cx + 1, 2 * cy + 1,
+                       &t, &u3, &v3);
+            ck_assert_int_eq(main_u(c, cx, cy), (u0 + u1 + u2 + u3 + 2) / 4);
+            ck_assert_int_eq(main_v(c, cx, cy), (v0 + v1 + v2 + v3 + 2) / 4);
+        }
+    }
+
+    /* B4/B5: aux luma plane row y holds U at odd columns in [0,cw/2) and V
+     * at odd columns in [cw/2,cw), for every row */
+    for (y = 0; y < h; y++)
+    {
+        for (cx = 0; cx < w / 2; cx++)
+        {
+            int ey;
+            int eu;
+            int ev;
+            exp_sample(xrgb, stride, w, h, 2 * cx + 1, y, &ey, &eu, &ev);
+            ck_assert_int_eq(yp[y * cw + cx], eu);
+            ck_assert_int_eq(yp[y * cw + cw / 2 + cx], ev);
+        }
+    }
+
+    /* B6-B9: aux chroma plane holds even-column/odd-row chroma. Pair index x
+     * in [0,cw/4): byte0 = U(4x,odd), byte1 = U(4x+2,odd); pair index cw/4+x:
+     * byte0 = V(4x,odd), byte1 = V(4x+2,odd) */
+    for (cy = 0; cy < ch / 2; cy++)
+    {
+        int row = 2 * cy + 1;
+        for (x = 0; x < cw / 4 && 4 * x + 2 < w; x++)
+        {
+            int ey;
+            int ua;
+            int va;
+            int ub;
+            int vb;
+            exp_sample(xrgb, stride, w, h, 4 * x, row, &ey, &ua, &va);
+            exp_sample(xrgb, stride, w, h, 4 * x + 2, row, &ey, &ub, &vb);
+            ck_assert_int_eq(uvp[cy * cw + 2 * x], ua);
+            ck_assert_int_eq(uvp[cy * cw + 2 * x + 1], ub);
+            ck_assert_int_eq(uvp[cy * cw + 2 * (cw / 4 + x)], va);
+            ck_assert_int_eq(uvp[cy * cw + 2 * (cw / 4 + x) + 1], vb);
+        }
+    }
+
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
+/* v1 remains the default (chroma_v2 == 0) so existing behavior is preserved */
+START_TEST(test_avc444_v2_default_is_v1)
+{
+    struct xrdp_avc444_conv *c;
+    c = xrdp_avc444_conv_create(64, 64);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->chroma_v2, 0);
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
 START_TEST(test_avc444_dims_and_padding)
 {
     struct xrdp_avc444_conv *c;
@@ -389,6 +538,8 @@ make_suite_avc444_convert(void)
     tc = tcase_create("avc444_convert");
     tcase_add_test(tc, test_avc444_color_primaries);
     tcase_add_test(tc, test_avc444_roundtrip_exact);
+    tcase_add_test(tc, test_avc444_v2_packing);
+    tcase_add_test(tc, test_avc444_v2_default_is_v1);
     tcase_add_test(tc, test_avc444_dims_and_padding);
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);
