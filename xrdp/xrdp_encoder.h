@@ -147,4 +147,14 @@ xrdp_encoder_delete(struct xrdp_encoder *self);
 THREAD_RV THREAD_CC
 proc_enc_msg(void *arg);
 
+struct xrdp_egfx_rect;
+struct stream;
+/* Emit an RFX_AVC420_METABLOCK for the AVC420/AVC444 GFX paths. Exposed for
+ * unit testing the even-alignment of the emitted region-rect origins. */
+int
+out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
+                         struct stream *s,
+                         struct xrdp_egfx_rect *rects,
+                         int num_rects);
+
 #endif

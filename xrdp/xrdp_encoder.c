@@ -727,8 +727,8 @@ process_enc_rfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 /*****************************************************************************/
 /* Emit an RFX_AVC420_METABLOCK. Kept outside the x264/OpenH264 guard so the
  * external ffmpeg AVC444 backend can reuse it without a linked H.264 library
- * (PRD FR-CAP-0). */
-static int
+ * (PRD FR-CAP-0). Not static: the origin even-alignment below is unit tested. */
+int
 out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
                          struct stream *s,
                          struct xrdp_egfx_rect *rects,
@@ -759,6 +759,16 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
     index = 0;
     while (xrdp_region_get_rect(reg, index, &rect) == 0)
     {
+        /* Even-align the rect origin to the chroma sampling grid. The AVC444
+         * decoder reconstructs chroma one region rect at a time, indexing the
+         * odd columns/rows relative to the rect origin (MS-RDPEGFX 3.3.8.3.x);
+         * an odd left/top flips chroma parity and fringes the rect's left/top
+         * edge (magenta/teal burr on high-contrast edges). Rounding the origin
+         * down to even only grows the already 1px-expanded rect by <= 1px and
+         * never exceeds the surface (left/top >= 0). right/bottom need no
+         * alignment: the decoder covers odd widths via (width + 1) / 2. */
+        rect.left &= ~1;
+        rect.top &= ~1;
         out_uint16_le(s, rect.left);
         out_uint16_le(s, rect.top);
         out_uint16_le(s, rect.right);
@@ -824,6 +834,89 @@ gfx_send_done(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
     /* signal completion for main thread */
     g_set_wait_obj(self->xrdp_encoder_event_processed);
     return 0;
+}
+
+/*****************************************************************************/
+/* Debug-only capture (env XRDP_AVC444_DUMP=<dir>): write the exact main/aux
+ * Annex-B H.264 substreams the client receives, plus the surface dimensions and
+ * damage rects, one set of files per emitted frame keyed by desktop sequence.
+ * Off unless the env var is set; lets a hard-to-reproduce, resize-triggered
+ * decode artifact be captured from a live session and decoded/inspected
+ * offline. Best-effort; failures are silent so capture never affects the
+ * session. */
+static void
+avc444_debug_dump(unsigned long long seq, int twidth, int theight,
+                  int cwidth, int cheight,
+                  struct xrdp_egfx_rect *d_rects, int num_rects,
+                  const struct xrdp_avc444_encoded_pair *pair,
+                  const struct xrdp_avc444_conv *conv)
+{
+    const char *dir;
+    char path[512];
+    char meta[2048];
+    int fd;
+    int i;
+    int n;
+
+    dir = g_getenv("XRDP_AVC444_DUMP");
+    if (dir == NULL || dir[0] == '\0')
+    {
+        return;
+    }
+    if (!g_directory_exist(dir))
+    {
+        g_mkdir(dir);
+    }
+    /* also dump the converter's NV12 views (pre-H.264): losslessly combinable
+     * with no reference chain, so the converter can be isolated from the H.264
+     * encode/decode. These are the CURRENT frame's converter output. */
+    if (conv != NULL)
+    {
+        g_snprintf(path, sizeof(path), "%s/%06llu_conv_main.nv12", dir, seq);
+        fd = g_file_open_ex(path, 0, 1, 1, 1);
+        if (fd >= 0)
+        {
+            g_file_write(fd, (const char *)conv->main_nv12, conv->nv12_size);
+            g_file_close(fd);
+        }
+        g_snprintf(path, sizeof(path), "%s/%06llu_conv_aux.nv12", dir, seq);
+        fd = g_file_open_ex(path, 0, 1, 1, 1);
+        if (fd >= 0)
+        {
+            g_file_write(fd, (const char *)conv->aux_nv12, conv->nv12_size);
+            g_file_close(fd);
+        }
+    }
+    g_snprintf(path, sizeof(path), "%s/%06llu_main.264", dir, seq);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        g_file_write(fd, (const char *)pair->main_data, pair->main_len);
+        g_file_close(fd);
+    }
+    g_snprintf(path, sizeof(path), "%s/%06llu_aux.264", dir, seq);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        g_file_write(fd, (const char *)pair->aux_data, pair->aux_len);
+        g_file_close(fd);
+    }
+    n = g_snprintf(meta, sizeof(meta),
+                   "seq=%llu surf=%dx%d coded=%dx%d nrects=%d rects=",
+                   seq, twidth, theight, cwidth, cheight, num_rects);
+    for (i = 0; i < num_rects && n < (int)sizeof(meta) - 48; i++)
+    {
+        n += g_snprintf(meta + n, sizeof(meta) - n, "%d,%d,%d,%d;",
+                        d_rects[i].x1, d_rects[i].y1,
+                        d_rects[i].x2, d_rects[i].y2);
+    }
+    g_snprintf(path, sizeof(path), "%s/%06llu_meta.txt", dir, seq);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        g_file_write(fd, meta, g_strlen(meta));
+        g_file_close(fd);
+    }
 }
 
 /*****************************************************************************/
@@ -996,6 +1089,10 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         g_free(d_rects); /* pipeline priming: empty frame this update */
         return NULL;
     }
+
+    avc444_debug_dump(pair.desktop_sequence, twidth, theight,
+                      conv->coded_width, conv->coded_height,
+                      d_rects, num_rects_d, &pair, conv);
 
     need = 4 + pair.main_len + pair.aux_len + num_rects_d * 24 + 512;
     s = &ls;
