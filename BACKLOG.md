@@ -59,18 +59,32 @@ an xrdp packing or encoder-quantization defect:
   dedicated `RGBToAVC444YUV` (v1) → ChromaV1 combine still yields ~100 burr px on
   a 192x64 green-text crop. Since the reference encoder+decoder pair burrs on its
   own, **no server-side v1 packing removes it.**
-- Mechanism: v1 does not transmit every chroma sample; the decoder extrapolates
-  the missing (even,even) chroma as `4*U00 - neighbours` with a `CONDITIONAL_CLIP`
-  (FreeRDP `prim_internal.h:215`, `sse/prim_YUV_sse4.1.c:212`). At sharp
-  green/black text edges it overshoots past neutral into the complementary hue
-  (magenta).
+- Mechanism: the decoder's YUV444->RGB step re-derives every block's (even,even)
+  chroma with an **always-on** reverse filter `4*U00 - neighbours` +
+  `CONDITIONAL_CLIP` (threshold 30) — FreeRDP `prim_YUV.c:358`,
+  `sse/prim_YUV_sse4.1.c:212,356`, `prim_internal.h:215`; runs for both v1 and
+  v2. In v1 the (even,even) chroma is a subsampled main-view value, so the filter
+  is a genuine extrapolation and overshoots past neutral into the complementary
+  hue (magenta) at sharp green/black edges. Measured through the faithful SSE
+  decoder, the burr is invariant to the server's v1 packing choice (point=109,
+  2x2-avg=100, pre-distort=153) — so it cannot be tuned away on the v1 wire.
 
-**Fix — emit AVC444 v2 (LC=1, ChromaV2).** v2 transmits the actual chroma for
-every position (no extrapolation). Verified end-to-end through FreeRDP's own
-v2 encoder+decoder: **v1 = 100 burr / v2 = 0 burr**, visibly clean, ~4x lower
-mean error. Spec MS-RDPEGFX 3.3.8.3.3; FreeRDP `general_ChromaV2ToYUV444`
-(`prim_YUV.c:172`). This is a new feature (advertise/emit LC=1, produce the
-ChromaV2 aux packing, gate on client v2 support with v1 fallback) — TODO below.
+**Fix — emit AVC444 v2 (LC=1, ChromaV2).** v2 uses a different chroma transport
+(ChromaV2 aux + block-average main chroma) that feeds the same always-on reverse
+filter consistent data, so it reconstructs the true value instead of
+overshooting. Verified end-to-end through FreeRDP's own v2 encoder+decoder:
+**v1 = 100 burr / v2 = 0 burr**, visibly clean, ~4x lower mean error. Spec
+MS-RDPEGFX 3.3.8.3.3; FreeRDP `general_ChromaV2ToYUV444` (`prim_YUV.c:172`). This
+is a new feature (advertise/emit LC=1, produce the ChromaV2 aux packing, gate on
+client v2 support with v1 fallback) — TODO below.
+
+**Protocol-level cross-check (not FreeRDP-specific):** the reverse filter +
+cutoff-30 threshold is the spec's own optional decode step (MS-RDPEGFX 3.3.8.3.2
+v1 / 3.3.8.3.3 v2). Reproducible against a real Windows RDP server (Server 2022
+Eval, "Prioritize H.264/AVC 444" GPO, Event ID 162 confirms 4:4:4) with
+`xfreerdp3 /gfx:AVC444` and `WLOG_FILTER=...rdpgfx.client:DEBUG,...gdi:TRACE` to
+read the negotiated `RDPGFX_CODECID_AVC444` (0x0E, v1) vs `...V2` (0x0F). See the
+"Independent validation" section in `tests/xrdp/avc444/FINDINGS_magenta_burr.md`.
 
 **Faithful repro method (the earlier light repro was unfaithful and misled us):**
 capture pristine source via `x11grab :10`; pack with the real
