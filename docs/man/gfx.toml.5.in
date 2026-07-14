@@ -149,6 +149,16 @@ straight through to \fBexecve\fR. This is a deliberate design choice: xrdp does
 encoders (\fBh264_nvenc\fR, \fBh264_qsv\fR, \fBh264_vaapi\fR, and so on) can be
 expressed without changing xrdp.
 
+.PP
+The AVC444 version is negotiated automatically per client and needs no
+configuration. When the client advertises AVC444 v2 support (MS-RDPEGFX
+capability version 10.1 or later) xrdp emits AVC444 v2 (codec id 0x000F,
+ChromaV2), which avoids the magenta/purple chroma fringing that AVC444 v1
+produces on saturated colored text and edges; clients that advertise only v1
+(capability version 10.0) transparently receive AVC444 v1 (codec id 0x000E).
+Both versions feed the same two NV12 pictures per frame to \fBffmpeg\fR, so the
+\fBencoder_args\fR below apply unchanged to either version.
+
 .TP
 \fBpath\fR = \fI<string>\fR
 Absolute path to the \fBffmpeg\fR binary. Default: \fB/usr/bin/ffmpeg\fR.

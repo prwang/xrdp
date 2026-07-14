@@ -115,6 +115,13 @@ capture pristine source via `x11grab :10`; pack with the real
   structural edge burr). Server log confirms `AVC444 v2 (0x000F)` negotiated with
   a stock xfreerdp3 `/gfx:AVC444` client. Offline (lossless) faithful decode:
   my v2 converter -> FreeRDP SSE ChromaV2 = 0 burr.
+- Capset confirm: when emitting v2, reply with the highest v2-capable capset the
+  client advertised (v10.1..10.7) rather than the best AVC v1 capset. FreeRDP
+  tolerates a mismatched confirm, but strict clients (mstsc) expect the confirmed
+  capability version to be consistent with the codec ids sent. Tracked as
+  `best_v2_index`; v1 confirm behavior unchanged.
+- **Confirmed live with Microsoft mstsc** (on-screen): server negotiates and
+  emits v2 (`AVC444 v2 (0x000F)`, confirming v10.7) and the magenta burr is gone.
 
 Secondary correctness note: the BT.709-vs-decoder-BT.601 colorspace mismatch is
 still present and independent of the burr (see FINDINGS "Secondary correctness").
