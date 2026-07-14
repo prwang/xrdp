@@ -38,7 +38,8 @@ EXTRA_DIST = \
   avc444/fixture_4frame.nut \
   avc444/PROVENANCE.md \
   avc444/repro_ffmpeg_latency.py \
-  avc444/FINDINGS_ffmpeg_latency.md
+  avc444/FINDINGS_ffmpeg_latency.md \
+  avc444/FINDINGS_magenta_burr.md
 
 TESTS = test_xrdp
 check_PROGRAMS = test_xrdp
