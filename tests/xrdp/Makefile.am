@@ -53,6 +53,7 @@ test_xrdp_SOURCES = \
     test_tconfig.c \
     test_avc444_convert.c \
     test_avc444_caps.c \
+    test_avc444_metablock.c \
     test_avc444_h264.c \
     test_avc444_nut.c \
     test_avc444_ffmpeg.c \
