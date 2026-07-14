@@ -8,6 +8,66 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 resize comb burr — ROOT CAUSE FOUND: substreams not independently decodable → dual-encoder fix (TODO, 2026-07-14)
+
+Branch `dev/avc444_dual_ffmpeg`.
+
+**Symptom.** On mstsc, after the user *resizes the desktop width* to a
+non-16-multiple (repro width 2184 -> coded 2192, 8px pad), a **~16px vertical
+band of period-2 alternating chroma** appears at window left edges (cyan/purple
+comb) and persists. Fresh logins are clean; it only surfaces after resizing.
+FreeRDP does **not** show it; only mstsc.
+
+**What it is NOT (all ruled out with a live tap + faithful offline decode):**
+- Not the converter. Dumped the real converter NV12 output at the bug frame and
+  decoded it losslessly: **clean** (mean err 4.89 vs source, window edges clean;
+  user confirmed on the pulled `conv33.png`).
+- Not the metablock rect origin parity (the even-align fix on `dev/ipc_avc444`
+  is a real but *separate* improvement; the comb persisted with it deployed).
+- Not H.264 quantization / coded-width padding. A one-decoder H.264 decode of
+  the real dumped substreams matches the converter within **2.38** mean err.
+
+**ROOT CAUSE.** The ffmpeg backend encodes **both AVC444 views through one
+libx264**, alternating pictures `main0,aux0,main1,aux1,...` in a single stream.
+Consequences, confirmed from the captured bitstream:
+- The keyframe only ever lands on **main** pictures; the **aux substream never
+  carries its own SPS/PPS/IDR** (29/29 captured aux frames were P-only). Decoded
+  as an independent stream it yields **0 frames**.
+- Every P-frame references the *immediately preceding picture*, so aux P-frames
+  reference **main** pictures and vice-versa — the two `avc420EncodedBitstream`s
+  are **mutually dependent**, not self-contained. Even main only "works" because
+  it has a starting IDR then limps via error-concealment of its missing refs.
+- **FreeRDP** feeds both substreams to **one** decoder (shared DPB) so refs
+  resolve -> clean. **mstsc** treats each substream as self-contained; after a
+  resize (new stream / ref discontinuity) its chroma decoder drifts -> the comb.
+
+**Flags cannot fix it (verified).** Forcing periodic aux keyframes leaves the
+between-keyframe aux frames referencing main; forcing *every* aux to intra makes
+aux self-contained but shifts the co-dependency onto main (its P-frames then
+reference the aux IDRs). A single interleaved encoder can only make *both* views
+independent via all-intra everything (`-g 1`) — bitrate-prohibitive.
+
+**FIX (this branch): dual encoder.** Encode main and aux as **two independent
+H.264 streams** — two libx264 instances (two ffmpeg children per surface, or one
+ffmpeg with two independent encoder outputs), each with its own SPS/PPS/IDR and a
+reference chain confined to its own view. Each `avc420EncodedBitstream` becomes a
+valid standalone AVC420 stream, decodable by both the two-decoder (mstsc) and
+one-decoder (FreeRDP) client models. Scope:
+- `xrdp_encoder_ffmpeg.c`: input contract changes from one interleaved pipe to
+  two per-view streams; two NUT demuxes / two annexb validations; pair assembly
+  from the two children. Keep encoder_args passthrough per view.
+- Reset/resize: recreate both children; both emit a fresh IDR (LC=0 reset pair).
+- Acceptance: **tap-verified** each substream carries SPS/PPS/IDR and decodes
+  standalone (0-frame aux -> full decode); mstsc shows no comb after width
+  resize; FreeRDP still clean; no regression to the single-surface happy path.
+
+**Tooling built for this (keep, env-gated, off by default).** `XRDP_AVC444_DUMP=
+<dir>` in `gfx_wiretosurface1_avc444` dumps per frame: main/aux Annex-B H.264,
+the converter NV12 views, and meta (surf/coded dims + damage rects). Plus an
+offline decoder (FreeRDP-faithful Luma+ChromaV2 combine + reverse-filter RGB)
+that reproduces the one-decoder path and isolates converter vs encode vs decode.
+This is how the root cause was found and how the fix will be verified.
+
 ## AVC444 encoder-args passthrough — DONE (architecture, 2026-07-14)
 
 Behavior-preserving refactor of the ffmpeg backend config. The previous design
@@ -43,6 +103,52 @@ Replaced with a single verbatim passthrough:
 - Security: `gfx.toml` is root-owned admin config (trusted like `sshd_config`);
   tokens go straight to `execve` with no shell, so there is no injection surface.
   Bounds are enforced on count and per-token length.
+
+## AVC444 edge burr on partial updates — FIXED: odd region-rect origin (2026-07-14)
+
+**Symptom (reported after v2 shipped).** With AVC444 v2, a chroma burr appears
+at the left/top edge of every window/updated region, most visible at odd
+desktop/window widths. Initially hypothesized as a 16-align **padding** bug.
+
+**Root cause (padding disproven; proven with source + offline + live).**
+*Not* padding: FreeRDP passes the combine `nTotalWidth = alignedWidth =
+round_up_16(width)` (yuv.c:507-517) — identical to our `coded_width` — so the
+U/V split at `cw/2` and `cw/4` matches our converter exactly. Full-surface
+reconstruction at odd width 1479->coded 1488 is bit-exact (offline MAE 0.00).
+
+The real bug is **odd `roi->left`/`roi->top` in the per-region-rect chroma
+combine**. FreeRDP `general_ChromaV2ToYUV444` (prim_YUV.c) writes the aux
+odd-column chroma to columns `roi->left + 2x + 1`. When the rect origin is
+**odd**, those land on **even** (wrong-parity) global columns, corrupting
+chroma exactly at the rect's left/top edge (same parity issue for v1's
+ChromaV1). xrdp manufactured the odd origin in `out_RFX_AVC420_METABLOCK`
+(`xrdp_encoder.c`): `rect.left = x1 - 1` (and `top = y1 - 1`), so any damage
+rect starting at an **even** x/y (windows, text — most content) emitted an odd
+origin. Full-screen repaints start at x=0 (even origin after -1 -> 0), which is
+why earlier full-frame tests looked clean.
+
+**Evidence.**
+- Offline (our real converter .o -> FreeRDP verbatim `ChromaV2ToYUV444`): even
+  left=0/302 -> 0 bad px; odd left=301 -> 1200 bad px, spike at the edge column.
+- Live (xfreerdp3 /gfx:AVC444 v2, 1479x850, partial-damage patch sweep): even
+  patch x (odd metablock origin) -> edge-fringe err ~380; odd patch x (even
+  origin) -> ~0. Perfect parity correlation.
+
+**Fix (systematic — all AVC420/AVC444 GFX paths).** Even-align the emitted
+region-rect origin to the chroma grid in `out_RFX_AVC420_METABLOCK`
+(`rect.left &= ~1; rect.top &= ~1;` after `xrdp_region_get_rect`, applied to the
+final emitted rects so region coalescing can't reintroduce oddness). Only grows
+the already 1px-expanded rect by <=1px, never exceeds the surface; right/bottom
+need no change (decoder covers odd extents via `(width + 1) / 2`). Shared helper,
+so v1, v2 and the linked x264/OpenH264 AVC420/AVC444 paths all benefit; no
+regression when origins were already even.
+
+**Test.** `tests/xrdp/test_avc444_metablock.c` (function exposed non-static +
+prototype in `xrdp_encoder.h`): asserts every emitted region-rect origin is
+even for even-x1, odd-x1, and mixed/edge inputs. Verified the test **fails
+without the fix** (even-x1 case emits left=301) and passes with it; `make check`
+= **59/59** (3 new). astyle pending (not installed locally; style followed by
+hand, CI 3.4.14 will confirm).
 
 ## Hardware H.264 via ffmpeg encoder_args (VAAPI/nvenc/qsv) — TODO (2026-07-14)
 
