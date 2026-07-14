@@ -238,6 +238,9 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         client_info->capture_format = XRDP_a8r8g8b8;
         self->gfx = 1;
         self->avc444_ffmpeg = 1;
+        self->avc444_v2 = mm->avc444_v2;
+        LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: AVC444 %s",
+            self->avc444_v2 ? "v2 (ChromaV2, 0x000F)" : "v1 (0x000E)");
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
                   sizeof(self->avc444_path) - 1);
         self->avc444_encoder_args =
@@ -825,7 +828,9 @@ gfx_send_done(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
 
 /*****************************************************************************/
 /* RFX_AVC444_BITMAP_STREAM (LC=0) serializer for the external ffmpeg AVC444
- * backend (PRD FR-WIRE). Submits the current frame's pair to the pipelined
+ * backend (PRD FR-WIRE). Emits AVC444 v1 (codec id 0x000E) or, when the client
+ * advertised v2 support, AVC444 v2 (0x000F) with ChromaV2 packing; the LC field
+ * stays 0 in both cases. Submits the current frame's pair to the pipelined
  * encoder and emits the oldest completed pair; returns NULL while the
  * pipeline primes (that frame becomes an empty GFX update — process_enc_egfx
  * still sends STARTFRAME/ENDFRAME — so the client keeps its prior content,
@@ -951,6 +956,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             g_free(d_rects);
             return NULL;
         }
+        conv->chroma_v2 = self->avc444_v2;
         self->avc444_conv[mon_index] = conv;
     }
     ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon_index];
@@ -1020,7 +1026,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     out_uint8a(s, pair.aux_data, pair.aux_len);
     s_mark_end(s);
     {
-        /* cbAvc420EncodedBitstream1 (bits 0..29), LC = 0 (bits 30..31) */
+        /* cbAvc420EncodedBitstream1 (bits 0..29), LC = 0 (bits 30..31). LC
+         * stays 0 for both v1 and v2 (both send luma + chroma sub-streams);
+         * v1 vs v2 is selected by the codec id below, not by LC. */
         unsigned int info = (unsigned int)sub1_len & 0x3FFFFFFF;
         s->data[0] = (char)(info & 0xff);
         s->data[1] = (char)((info >> 8) & 0xff);
@@ -1029,7 +1037,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     }
     bitmap_data_length = (int)(s->end - s->data);
     rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
-                                    XR_RDPGFX_CODECID_AVC444,
+                                    self->avc444_v2
+                                    ? XR_RDPGFX_CODECID_AVC444V2
+                                    : XR_RDPGFX_CODECID_AVC444,
                                     pixel_format, &dst_rect,
                                     s->data, bitmap_data_length);
     g_free(s->data);

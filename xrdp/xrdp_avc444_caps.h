@@ -53,4 +53,16 @@ enum xrdp_gfx_avc_mode
 enum xrdp_gfx_avc_mode
 xrdp_avc444_classify_caps(int version, int flags);
 
+/**
+ * Whether a single advertised capset indicates AVC444 v2 (ChromaV2) support.
+ *
+ * v2 is advertised by the reserved v10.1 capset (RDPGFX_CAPVERSION_101) and is
+ * retained by the later v10.2..10.7 capsets. Returns 1 if this capset signals
+ * v2 support (and AVC is not disabled on it), 0 otherwise. The caller ORs this
+ * across every advertised capset to decide whether the client can decode
+ * codec id 0x000F; a client without any v2 capset falls back to v1 (0x000E).
+ */
+int
+xrdp_avc444_caps_supports_v2(int version, int flags);
+
 #endif /* _XRDP_AVC444_CAPS_H */

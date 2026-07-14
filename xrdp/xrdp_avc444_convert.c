@@ -165,7 +165,32 @@ xrdp_avc444_conv_delete(struct xrdp_avc444_conv *self)
 }
 
 /*****************************************************************************/
-/* main view: B1 luma (identity), B2/B3 chroma (even-col/even-row, no swap)*/
+/* average the 2x2 chroma block whose top-left source pixel is (2cx,2cy)    */
+static void
+sample_chroma_avg(const unsigned char *xrgb, int stride, int w, int h,
+                  int cx, int cy, int *u, int *v)
+{
+    int y0;
+    int u0;
+    int v0;
+    int u1;
+    int v1;
+    int u2;
+    int v2;
+    int u3;
+    int v3;
+
+    sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy, &y0, &u0, &v0);
+    sample_yuv(xrgb, stride, w, h, 2 * cx + 1, 2 * cy, &y0, &u1, &v1);
+    sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy + 1, &y0, &u2, &v2);
+    sample_yuv(xrgb, stride, w, h, 2 * cx + 1, 2 * cy + 1, &y0, &u3, &v3);
+    *u = (u0 + u1 + u2 + u3 + 2) / 4;
+    *v = (v0 + v1 + v2 + v3 + 2) / 4;
+}
+
+/*****************************************************************************/
+/* main view: B1 luma (identity), B2/B3 chroma at (even-col/even-row).      */
+/* v1 stores a point sample; v2 stores the 2x2 block average (no U/V swap). */
 static void
 fill_main(struct xrdp_avc444_conv *self,
           const unsigned char *xrgb, int stride, int w, int h)
@@ -194,7 +219,14 @@ fill_main(struct xrdp_avc444_conv *self,
     {
         for (cx = 0; cx < cw / 2; cx++)
         {
-            sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy, &yy, &uu, &vv);
+            if (self->chroma_v2)
+            {
+                sample_chroma_avg(xrgb, stride, w, h, cx, cy, &uu, &vv);
+            }
+            else
+            {
+                sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy, &yy, &uu, &vv);
+            }
             uvp[cy * cw + 2 * cx] = (unsigned char)uu;
             uvp[cy * cw + 2 * cx + 1] = (unsigned char)vv;
         }
@@ -271,6 +303,58 @@ fill_aux(struct xrdp_avc444_conv *self,
 }
 
 /*****************************************************************************/
+/* auxiliary view (ChromaV2, codec id 0x000F): the aux luma plane carries   */
+/* odd-column chroma for every row (U in the left half, V in the right), and */
+/* the aux chroma plane carries the even-column/odd-row chroma. This is the  */
+/* exact inverse of FreeRDP general_ChromaV2ToYUV444 (MS-RDPEGFX 3.3.8.3.3). */
+static void
+fill_aux_v2(struct xrdp_avc444_conv *self,
+            const unsigned char *xrgb, int stride, int w, int h)
+{
+    const int cw = self->coded_width;
+    const int ch = self->coded_height;
+    unsigned char *yp = self->aux_nv12;
+    unsigned char *uvp = self->aux_nv12 + cw * ch;
+    int x;
+    int y;
+    int cx;
+    int cy;
+    int row;
+    int yy;
+    int ua;
+    int va;
+    int ub;
+    int vb;
+
+    /* B4/B5: odd-column chroma for every row, U in [0,cw/2), V in [cw/2,cw) */
+    for (y = 0; y < ch; y++)
+    {
+        for (cx = 0; cx < cw / 2; cx++)
+        {
+            sample_yuv(xrgb, stride, w, h, 2 * cx + 1, y, &yy, &ua, &va);
+            yp[y * cw + cx] = (unsigned char)ua;
+            yp[y * cw + cw / 2 + cx] = (unsigned char)va;
+        }
+    }
+    /* B6-B9: even-column/odd-row chroma, interleaved into the aux chroma
+     * plane. Deinterleaved by the decoder into an aux U plane (columns 4x,
+     * left half U / right half V) and an aux V plane (columns 4x+2). */
+    for (cy = 0; cy < ch / 2; cy++)
+    {
+        row = 2 * cy + 1;
+        for (x = 0; x < cw / 4; x++)
+        {
+            sample_yuv(xrgb, stride, w, h, 4 * x, row, &yy, &ua, &va);
+            sample_yuv(xrgb, stride, w, h, 4 * x + 2, row, &yy, &ub, &vb);
+            uvp[cy * cw + 2 * x] = (unsigned char)ua;
+            uvp[cy * cw + 2 * x + 1] = (unsigned char)ub;
+            uvp[cy * cw + 2 * (cw / 4 + x)] = (unsigned char)va;
+            uvp[cy * cw + 2 * (cw / 4 + x) + 1] = (unsigned char)vb;
+        }
+    }
+}
+
+/*****************************************************************************/
 int
 xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
                         const unsigned char *xrgb, int stride,
@@ -289,6 +373,13 @@ xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
         return 1;
     }
     fill_main(self, xrgb, stride, width, height);
-    fill_aux(self, xrgb, stride, width, height);
+    if (self->chroma_v2)
+    {
+        fill_aux_v2(self, xrgb, stride, width, height);
+    }
+    else
+    {
+        fill_aux(self, xrgb, stride, width, height);
+    }
     return 0;
 }
