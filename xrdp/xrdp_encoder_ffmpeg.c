@@ -160,6 +160,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
 {
     memset(cfg, 0, sizeof(*cfg));
     xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
+    cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
@@ -918,7 +919,9 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     self->pid = -1;
     self->actual_width = actual_width;
     self->actual_height = actual_height;
-    self->coded_width = round_up_16(actual_width);
+    self->coded_width = (cfg->chroma_align == 32)
+                        ? ((actual_width + 31) & ~31)
+                        : round_up_16(actual_width);
     self->coded_height = round_up_16(actual_height);
     self->nv12_size = self->coded_width * self->coded_height +
                       self->coded_width * (self->coded_height / 2);

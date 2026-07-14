@@ -411,12 +411,27 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
               sizeof(config->avc444_ffmpeg_path) - 1);
     xrdp_ffmpeg_avc444_default_encoder_args(
         &config->avc444_ffmpeg_encoder_args);
+    config->avc444_ffmpeg_chroma_align = 32;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
         {
             toml_datum_t path = toml_string_in(avc, "path");
             toml_array_t *ea = toml_array_in(avc, "encoder_args");
+            toml_datum_t ca = toml_int_in(avc, "chroma_align");
+            if (ca.ok)
+            {
+                if (ca.u.i == 16 || ca.u.i == 32)
+                {
+                    config->avc444_ffmpeg_chroma_align = (int)ca.u.i;
+                }
+                else
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] chroma_align must "
+                          "be 16 or 32, got %lld; using 32",
+                          (long long)ca.u.i);
+                }
+            }
             if (path.ok)
             {
                 g_strncpy(config->avc444_ffmpeg_path, path.u.s,

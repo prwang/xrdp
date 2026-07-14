@@ -28,6 +28,10 @@ have_ffmpeg(struct xrdp_ffmpeg_avc444_config *cfg)
         return 0;
     }
     xrdp_ffmpeg_avc444_config_default(cfg);
+    /* pin 16-alignment so the runner's coded width matches the converters this
+     * suite creates with align 16 and its round_up_16 expectations (the default
+     * is 32; the two must always agree, which the real encoder guarantees) */
+    cfg->chroma_align = 16;
     snprintf(cfg->path, sizeof(cfg->path), "%s", path);
     return 1;
 }
@@ -67,7 +71,7 @@ START_TEST(test_ffmpeg_encode_pair)
     }
     xrgb = (unsigned char *)malloc(stride * h);
     ck_assert_ptr_ne(xrgb, NULL);
-    conv = xrdp_avc444_conv_create(w, h);
+    conv = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(conv, NULL);
     enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
     ck_assert_ptr_ne(enc, NULL);
@@ -153,7 +157,7 @@ run_one_generation(struct xrdp_ffmpeg_avc444_config *cfg, int w, int h)
 
     xrgb = (unsigned char *)malloc((size_t)stride * h);
     ck_assert_ptr_ne(xrgb, NULL);
-    conv = xrdp_avc444_conv_create(w, h);
+    conv = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(conv, NULL);
     ck_assert_int_eq(conv->coded_width, expect_cw);
     ck_assert_int_eq(conv->coded_height, expect_ch);

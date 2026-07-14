@@ -164,6 +164,24 @@ Both versions feed the same two NV12 pictures per frame to \fBffmpeg\fR, so the
 Absolute path to the \fBffmpeg\fR binary. Default: \fB/usr/bin/ffmpeg\fR.
 
 .TP
+\fBchroma_align\fR = \fI<integer>\fR
+Coded\(hywidth alignment for the AVC444 v2 chroma (ChromaV2) auxiliary view,
+either \fB16\fR or \fB32\fR. Default: \fB32\fR.
+
+The auxiliary view packs its U and V halves split at \fIcoded_width / 2\fR.
+Clients derive that split from the surface width but with different rounding:
+Microsoft \fBmstsc\fR uses a 32\(hyaligned width, while \fBFreeRDP\fR uses a
+16\(hyaligned width. When the two differ \(em i.e. the 16\(hyaligned width is
+not already 32\(hyaligned (an odd macroblock count) \(em a client using the
+other rounding reads the V samples 16 pixels displaced, producing a period\(hy2
+chroma "comb" left of high\(hycontrast vertical edges plus a variable
+right\(hyedge strip, on roughly half of window widths.
+
+Set \fB32\fR (the default) for \fBmstsc\fR / Windows Remote Desktop clients; set
+\fB16\fR for \fBFreeRDP\fR\(hybased clients. A deployment cannot satisfy both
+alignments at a non\(hy32\(hyaligned width simultaneously.
+
+.TP
 \fBencoder_args\fR = \fI<array of strings>\fR
 The encoder block, inserted verbatim into the \fBffmpeg\fR argv immediately
 after the input mapping and before the output framing. Each array element

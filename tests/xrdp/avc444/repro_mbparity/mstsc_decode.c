@@ -29,7 +29,9 @@ static void ChV2(BYTE*s0,BYTE*s1,BYTE*s2,int S0,int S1,int S2,UINT32 nT,BYTE*D1,
 static void RGB(BYTE*Y,BYTE*U,BYTE*V,int st,int W,int H,BYTE*rgb){int x,y;
  for(y=0;y+1<H;y+=2){BYTE*pY[2]={Y+(size_t)y*st,Y+(size_t)(y+1)*st},*pU[2]={U+(size_t)y*st,U+(size_t)(y+1)*st},*pV[2]={V+(size_t)y*st,V+(size_t)(y+1)*st};
   for(x=0;x+1<W;x+=2)for(int i=0;i<2;i++)for(int j=0;j<2;j++){BYTE yy=pY[i][x+j];INT32 u=pU[i][x+j],v=pV[i][x+j];if(i==0&&j==0){u=CCLIP(4*u-((INT32)pU[0][x+1]+pU[1][x]+pU[1][x+1]),pU[i][x+j]);v=CCLIP(4*v-((INT32)pV[0][x+1]+pV[1][x]+pV[1][x+1]),pV[i][x+j]);}BYTE*o=rgb+((size_t)(y+i)*W+(x+j))*3;o[0]=R_(yy,u,v);o[1]=G_(yy,u,v);o[2]=B_(yy,u,v);}}}
-int main(int c,char**v){int W=atoi(v[3]),H=atoi(v[4]),cw=(W+15)&~15,ch=(H+15)&~15,chw=cw/2;
+int main(int c,char**v){int W=atoi(v[3]),H=atoi(v[4]),ch=(H+15)&~15;
+ int cw = (c>7) ? atoi(v[7]) : ((W+15)&~15);  /* coded WIDTH / plane stride     */
+ int chw=cw/2;
  int nT = (c>6) ? atoi(v[6]) : cw;            /* U|V split width (mstsc override) */
  size_t nv=(size_t)cw*ch*3/2;BYTE*M=malloc(nv),*A=malloc(nv);
  FILE*f=fopen(v[1],"rb");fread(M,1,nv,f);fclose(f);f=fopen(v[2],"rb");fread(A,1,nv,f);fclose(f);

@@ -68,6 +68,8 @@ struct xrdp_ffmpeg_avc444_config
 {
     char path[256];                 /* absolute ffmpeg path                */
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
+    int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
+                                    /* match the converter's width_align     */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;

@@ -49,6 +49,7 @@ struct xrdp_encoder
     /* external stock-ffmpeg AVC444 backend (opaque handles) */
     int avc444_ffmpeg;
     int avc444_v2;   /* emit AVC444 v2 (ChromaV2, codec id 0x000F)    */
+    int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;
     unsigned long long avc444_seq;
