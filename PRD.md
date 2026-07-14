@@ -2116,3 +2116,45 @@ The user's FFmpeg installation owns:
 
 Correctness ends at maintaining a valid, ordered, resettable AVC444 stream. Real-time throughput remains a property of the selected binary, profile, hardware, and workload.
 
+## 25. Delivered — implementation history
+
+Completed work (moved here from BACKLOG, which tracks only upcoming items).
+Detailed root-cause writeups live under `tests/xrdp/avc444/`.
+
+- **AVC444 v1 MVP over external stock ffmpeg.** Capability classification,
+  full-range BT.709 converter + MS-RDPEGFX two-view construction, bounded NUT
+  demux, H.264 Annex-B validation, secure fork/execve process runner + probe,
+  `RFX_AVC444_BITMAP_STREAM` (LC=0) serializer. Deployed and validated on-box;
+  no compile-time FFmpeg dependency (FR-CAP-0). Pipelined runner (one desktop
+  update of latency) — see `avc444/FINDINGS_ffmpeg_latency.md`.
+
+- **encoder_args verbatim passthrough.** Replaced the typed per-flag config with
+  a single verbatim `[avc444_ffmpeg] encoder_args` array between the fixed NV12
+  input and Annex-B/NUT output contracts, so hardware encoders are expressible
+  with no xrdp change. Built-in default reproduces the historic libx264 argv.
+
+- **AVC444 v2 (ChromaV2, codec id 0x000F) + auto-negotiation.** Fixed the
+  magenta/purple burr on saturated colored text (a property of AVC444 v1 chroma
+  reconstruction, not an xrdp defect). Auto-negotiated per client (v2 for
+  capability v10.1+, else v1). mstsc-verified. See
+  `avc444/FINDINGS_magenta_burr.md`.
+
+- **AVC444 resize "comb" burr — chroma_align flag (live-verified, 2026-07-15).**
+  The ChromaV2 aux U|V split is at `coded_width/2`, but clients derive it from
+  the surface width with different rounding — mstsc `round_up_32`, FreeRDP
+  `round_up_16` — so an odd coded-macroblock-count width read V 16px displaced
+  (period-2 comb + right-edge strip, ~1/2 of widths, mstsc-only). Added
+  `gfx.toml [avc444_ffmpeg] chroma_align = 16|32` (default 32) setting the coded
+  width alignment; converter and runner are plumbed to agree. Confirmed clean on
+  mstsc across multiple widths. Reproducer + writeup:
+  `avc444/repro_mbparity/` (`FINDINGS_mstsc_split.md`).
+
+- **Metablock region-rect origin even-alignment.** `out_RFX_AVC420_METABLOCK`
+  rounds emitted rect origins down to even (chroma grid) — a separate real
+  correctness fix for an odd-origin chroma parity fringe. Kept on the working
+  branch with its unit test.
+
+- **Debug tap + offline harness.** Env-gated `XRDP_AVC444_DUMP` dumps per-frame
+  main/aux Annex-B H.264 + converter NV12 + meta; plus a FreeRDP-faithful
+  offline decoder. The tooling that found and verified the chroma-split fix.
+
