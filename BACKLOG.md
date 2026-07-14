@@ -8,6 +8,72 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 encoder-args passthrough — DONE (architecture, 2026-07-14)
+
+Behavior-preserving refactor of the ffmpeg backend config. The previous design
+enumerated each ffmpeg flag as a typed field (`tune`/`quality_crf`/
+`gop_pictures`), parsed by name in `xrdp_tconfig.c`, stored in three structs and
+re-emitted in `build_argv`. That is a hard-coded allow-list: it does not scale
+and cannot express the hardware encoders (nvenc/qsv/vaapi) the PRD plans.
+Replaced with a single verbatim passthrough:
+
+- `struct xrdp_avc444_encoder_args` (`xrdp_encoder_ffmpeg.h`): fixed array of up
+  to 64 tokens × 255 chars + count. `build_argv` inserts these tokens verbatim
+  between the fixed **input** contract (raw NV12 on `pipe:3`) and the fixed
+  **output** contract (Annex-B in NUT on `pipe:1`); it emits no `-c:v`/tuning of
+  its own. `FF_MAX_ARGV` 80 → 128 for headroom.
+- `xrdp_ffmpeg_avc444_default_encoder_args()` is the single source of the
+  built-in default block, which **reproduces the historic hard-coded argv
+  exactly** (libx264 ultrafast zerolatency crf 18 g 240 x264-params
+  repeat-headers=1) — so absent/empty config is a strict no-op vs. before.
+  Shared by `config_default()` and the tconfig loader so they never diverge.
+- `gfx.toml [avc444_ffmpeg]`: `tune`/`quality_crf`/`gop_pictures` **dropped**;
+  new `encoder_args = [ … ]` array parsed in `xrdp_tconfig.c` (bounds-checked,
+  truncation warns, an empty array falls back to the default). `path` kept.
+  Plumbed as one struct copy through `xrdp_encoder` (create +
+  `gfx_wiretosurface1_avc444`) and the `xrdp_mm_egfx_caps_advertise` probe.
+- Tests (`test_tconfig.c`): defaults assert the libx264/zerolatency/crf-18
+  block; override (`gfx_avc444_ffmpeg.toml`, selecting `h264_nvenc`) asserts the
+  default does not leak; new empty-array fallback test. `make check` = **53/53**
+  (incl. the real-ffmpeg probe/encode/resize tests, which exercise the new
+  passthrough end-to-end).
+- Docs: `docs/man/gfx.toml.5.in` gains a full `[avc444_ffmpeg]` section (input/
+  output contracts, `encoder_args` semantics, the no-shell one-token-per-element
+  rule, the Annex-B/`repeat-headers` requirement, and an nvenc example).
+- Security: `gfx.toml` is root-owned admin config (trusted like `sshd_config`);
+  tokens go straight to `execve` with no shell, so there is no injection surface.
+  Bounds are enforced on count and per-token length.
+
+## AVC444 magenta-fringe on P-frames — IN PROGRESS (root cause open, 2026-07-14)
+
+**Symptom.** Live captures (`wierd_red_burr.png`, `red_burr_v2.png`) show
+magenta dots around saturated green terminal text.
+
+**Corrected understanding (a prior x264-quantization theory was DISPROVEN).**
+An earlier offline repro (single main/aux frame pair recombined in Python) was
+*not faithful* to FreeRDP's decoder — it reported ~3 magenta px on a crop and led
+to a wrong "x264 lossy chroma, fix with crf 16 + chroma-qp-offset=-4" conclusion.
+A full end-to-end harness (real `xfreerdp3` client into `Xvfb :99`, capturing the
+client-decoded framebuffer) refuted it: with `crf 16 + chroma-qp-offset=-4`
+**live**, the magenta persists (~190+ px on the prompt line; up to ~2800 px after
+`ls --color` output).
+
+**Key behavioral finding (points at the real cause).** On reconnect — a fresh
+full-screen **keyframe** — the frame is **clean (0 magenta)**. Magenta then
+appears and accumulates only as new text is drawn via **incremental (P-frame)
+updates**, and persists until that region is refreshed. So the defect is in the
+**inter-frame (P-frame) path of the AVC444 stream, not the keyframe/quantization
+path**. Leading hypothesis: main and aux views are fed as consecutive frames
+into one libx264 stream, so x264 P-codes each frame from the previous one —
+cross-referencing main↔aux (which share no temporal coherence) and corrupting
+reconstructed chroma. Next step: confirm with the harness by forcing all-intra
+(`keyint=1`) vs. lossless (`-qp 0`), then design the fix (likely: keep main/aux
+temporally independent — separate GOP/refresh handling or per-view encoding).
+
+Harness + findings live under `tests/xrdp/avc444/` (to be committed with the fix,
+not with this architecture change). The magenta fix is deliberately **not** part
+of the encoder-args passthrough commit above.
+
 ## AVC444 encoding — MVP WORKING (deployed + validated on this box)
 
 **End-to-end AVC444 is live on `127.0.0.1:3389` (2026-07-13).** With

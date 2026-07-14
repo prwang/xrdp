@@ -4,6 +4,12 @@ h264_encoder = "ffmpeg"
 
 [avc444_ffmpeg]
 path = "/opt/custom/ffmpeg"
-tune = "film"
-quality_crf = 22
-gop_pictures = 120
+# verbatim encoder-arg passthrough (execve tokens, no shell). Replaces the
+# built-in default encoder block entirely.
+encoder_args = [
+  "-c:v", "h264_nvenc",
+  "-preset", "p1",
+  "-tune", "ll",
+  "-rc", "constqp",
+  "-qp", "20",
+]

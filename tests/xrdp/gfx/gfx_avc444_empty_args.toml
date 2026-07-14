@@ -1,0 +1,9 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+# an explicitly empty list must fall back to the built-in default encoder
+# block rather than leaving the command with no encoder at all
+encoder_args = []

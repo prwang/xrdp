@@ -404,40 +404,55 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         }
     }
 
-    /* external stock-ffmpeg AVC444 backend defaults + [avc444_ffmpeg] table */
+    /* external stock-ffmpeg AVC444 backend: path plus a verbatim encoder-arg
+     * passthrough (-c:v + tuning). xrdp does not enumerate individual flags;
+     * see struct xrdp_avc444_encoder_args and the gfx.toml man page. */
     g_strncpy(config->avc444_ffmpeg_path, "/usr/bin/ffmpeg",
               sizeof(config->avc444_ffmpeg_path) - 1);
-    g_strncpy(config->avc444_ffmpeg_tune, "zerolatency",
-              sizeof(config->avc444_ffmpeg_tune) - 1);
-    config->avc444_ffmpeg_crf = 18;
-    config->avc444_ffmpeg_gop = 240;
+    xrdp_ffmpeg_avc444_default_encoder_args(
+        &config->avc444_ffmpeg_encoder_args);
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
         {
             toml_datum_t path = toml_string_in(avc, "path");
-            toml_datum_t tune = toml_string_in(avc, "tune");
-            toml_datum_t crf = toml_int_in(avc, "quality_crf");
-            toml_datum_t gop = toml_int_in(avc, "gop_pictures");
+            toml_array_t *ea = toml_array_in(avc, "encoder_args");
             if (path.ok)
             {
                 g_strncpy(config->avc444_ffmpeg_path, path.u.s,
                           sizeof(config->avc444_ffmpeg_path) - 1);
                 free(path.u.s);
             }
-            if (tune.ok)
+            if (ea != NULL)
             {
-                g_strncpy(config->avc444_ffmpeg_tune, tune.u.s,
-                          sizeof(config->avc444_ffmpeg_tune) - 1);
-                free(tune.u.s);
-            }
-            if (crf.ok)
-            {
-                config->avc444_ffmpeg_crf = (int)crf.u.i;
-            }
-            if (gop.ok)
-            {
-                config->avc444_ffmpeg_gop = (int)gop.u.i;
+                struct xrdp_avc444_encoder_args *dst =
+                        &config->avc444_ffmpeg_encoder_args;
+                int i;
+                int nelem = toml_array_nelem(ea);
+                memset(dst, 0, sizeof(*dst));
+                for (i = 0; i < nelem &&
+                        dst->count < XRDP_AVC444_MAX_ENC_ARGS; i++)
+                {
+                    toml_datum_t tok = toml_string_at(ea, i);
+                    if (tok.ok)
+                    {
+                        g_strncpy(dst->arg[dst->count], tok.u.s,
+                                  XRDP_AVC444_ENC_ARG_LEN - 1);
+                        dst->count++;
+                        free(tok.u.s);
+                    }
+                }
+                if (i < nelem)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] encoder_args "
+                          "truncated to %d tokens", XRDP_AVC444_MAX_ENC_ARGS);
+                }
+                /* an explicitly empty array would leave no encoder at all;
+                 * fall back to the built-in default in that case */
+                if (dst->count == 0)
+                {
+                    xrdp_ffmpeg_avc444_default_encoder_args(dst);
+                }
             }
         }
     }

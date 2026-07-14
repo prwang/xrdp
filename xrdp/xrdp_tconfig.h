@@ -27,6 +27,7 @@
 #define _XRDP_TCONFIG_H_
 
 #include "arch.h"
+#include "xrdp_encoder_ffmpeg.h"
 
 /* The number of connection types in MS-RDPBCGR 2.2.1.3.2 */
 #define NUM_CONNECTION_TYPES 7
@@ -82,9 +83,7 @@ struct xrdp_tconfig_gfx
         openh264_param[NUM_CONNECTION_TYPES];
     /* external stock-ffmpeg AVC444 backend (h264_encoder = "ffmpeg") */
     char avc444_ffmpeg_path[256];
-    char avc444_ffmpeg_tune[16];
-    int avc444_ffmpeg_crf;
-    int avc444_ffmpeg_gop;
+    struct xrdp_avc444_encoder_args avc444_ffmpeg_encoder_args;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =
