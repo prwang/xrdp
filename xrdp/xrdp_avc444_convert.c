@@ -119,8 +119,18 @@ round_up_16(int v)
 }
 
 /*****************************************************************************/
+/* round v up to a multiple of align (align must be a power of two); the
+ * coded WIDTH uses this so mstsc (which derives the ChromaV2 U|V split from a
+ * 32-aligned width) and FreeRDP (16-aligned) can be matched via width_align. */
+static int
+round_up(int v, int align)
+{
+    return (v + align - 1) & ~(align - 1);
+}
+
+/*****************************************************************************/
 struct xrdp_avc444_conv *
-xrdp_avc444_conv_create(int actual_width, int actual_height)
+xrdp_avc444_conv_create(int actual_width, int actual_height, int width_align)
 {
     struct xrdp_avc444_conv *self;
 
@@ -129,6 +139,12 @@ xrdp_avc444_conv_create(int actual_width, int actual_height)
     {
         return NULL;
     }
+    /* only 16 or 32 are meaningful; anything else falls back to 16 (the H.264
+     * macroblock size), which is the historic behavior */
+    if (width_align != 32)
+    {
+        width_align = 16;
+    }
     self = (struct xrdp_avc444_conv *)g_malloc(sizeof(*self), 1);
     if (self == NULL)
     {
@@ -136,7 +152,7 @@ xrdp_avc444_conv_create(int actual_width, int actual_height)
     }
     self->actual_width = actual_width;
     self->actual_height = actual_height;
-    self->coded_width = round_up_16(actual_width);
+    self->coded_width = round_up(actual_width, width_align);
     self->coded_height = round_up_16(actual_height);
     /* NV12: Y plane (cw*ch) followed by interleaved UV plane (cw*ch/2) */
     self->nv12_size = self->coded_width * self->coded_height +

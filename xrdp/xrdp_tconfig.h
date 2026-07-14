@@ -84,6 +84,7 @@ struct xrdp_tconfig_gfx
     /* external stock-ffmpeg AVC444 backend (h264_encoder = "ffmpeg") */
     char avc444_ffmpeg_path[256];
     struct xrdp_avc444_encoder_args avc444_ffmpeg_encoder_args;
+    int avc444_ffmpeg_chroma_align; /* coded WIDTH alignment: 16 or 32 */
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

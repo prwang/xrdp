@@ -80,7 +80,9 @@ int main(int argc,char**argv){
     int W=atoi(argv[2]), H=atoi(argv[3]);
     FILE*f=fopen(argv[1],"rb"); unsigned char*src=malloc((size_t)W*H*4);
     fread(src,1,(size_t)W*H*4,f); fclose(f);
-    struct xrdp_avc444_conv*c=xrdp_avc444_conv_create(W,H);
+    /* BURR_ALIGN env: coded WIDTH alignment 16 (default) or 32 (the fix) */
+    const char*ea=getenv("BURR_ALIGN"); int align=ea?atoi(ea):16;
+    struct xrdp_avc444_conv*c=xrdp_avc444_conv_create(W,H,align);
     c->chroma_v2=1;
     xrdp_avc444_conv_update(c,src,W*4,W,H);
     int cw=c->coded_width, ch=c->coded_height, chw=cw/2;

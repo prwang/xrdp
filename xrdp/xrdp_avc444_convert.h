@@ -65,10 +65,14 @@ struct xrdp_avc444_conv
 
 /**
  * Create a converter for a surface of the given visible dimensions.
- * Returns NULL on invalid dimensions or allocation failure.
+ * width_align is the coded-WIDTH alignment (16 or 32; other values fall back
+ * to 16). 32 makes the coded width a 32-multiple so the ChromaV2 U|V split at
+ * coded_width/2 matches clients that derive it from a 32-aligned width (mstsc);
+ * 16 preserves the historic behavior (matches FreeRDP). Coded height is always
+ * 16-aligned. Returns NULL on invalid dimensions or allocation failure.
  */
 struct xrdp_avc444_conv *
-xrdp_avc444_conv_create(int actual_width, int actual_height);
+xrdp_avc444_conv_create(int actual_width, int actual_height, int width_align);
 
 void
 xrdp_avc444_conv_delete(struct xrdp_avc444_conv *self);

@@ -204,7 +204,7 @@ START_TEST(test_avc444_roundtrip_exact)
     int y;
 
     build_source(xrgb, stride, w, h);
-    c = xrdp_avc444_conv_create(w, h);
+    c = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->coded_width, 32);
     ck_assert_int_eq(c->coded_height, 32);
@@ -283,7 +283,7 @@ START_TEST(test_avc444_v2_packing)
     int cy;
 
     build_source(xrgb, stride, w, h);
-    c = xrdp_avc444_conv_create(w, h);
+    c = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(c, NULL);
     c->chroma_v2 = 1;
     ck_assert_int_eq(c->coded_width, 16);
@@ -376,7 +376,7 @@ END_TEST
 START_TEST(test_avc444_v2_default_is_v1)
 {
     struct xrdp_avc444_conv *c;
-    c = xrdp_avc444_conv_create(64, 64);
+    c = xrdp_avc444_conv_create(64, 64, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->chroma_v2, 0);
     xrdp_avc444_conv_delete(c);
@@ -390,23 +390,23 @@ START_TEST(test_avc444_dims_and_padding)
     int i;
 
     /* coded dims round up to 16; arbitrary visible dims allowed */
-    c = xrdp_avc444_conv_create(1919, 1079);
+    c = xrdp_avc444_conv_create(1919, 1079, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->coded_width, 1920);
     ck_assert_int_eq(c->coded_height, 1088);
     xrdp_avc444_conv_delete(c);
 
     /* invalid dims rejected */
-    ck_assert_ptr_eq(xrdp_avc444_conv_create(0, 100), NULL);
-    ck_assert_ptr_eq(xrdp_avc444_conv_create(100, -1), NULL);
-    ck_assert_ptr_eq(xrdp_avc444_conv_create(99999, 100), NULL);
+    ck_assert_ptr_eq(xrdp_avc444_conv_create(0, 100, 16), NULL);
+    ck_assert_ptr_eq(xrdp_avc444_conv_create(100, -1, 16), NULL);
+    ck_assert_ptr_eq(xrdp_avc444_conv_create(99999, 100, 16), NULL);
 
     /* mismatched update dims rejected, no write */
     for (i = 0; i < 8 * 4; i++)
     {
         ((unsigned int *)xrgb)[i] = 0;
     }
-    c = xrdp_avc444_conv_create(8, 4);
+    c = xrdp_avc444_conv_create(8, 4, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, 8 * 4, 7, 4), 1);
     ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, 8 * 4, 8, 4), 0);
@@ -450,7 +450,7 @@ START_TEST(test_avc444_odd_dims_alignment)
         int expect_ch = cases[t][3];
         int expect_size;
 
-        c = xrdp_avc444_conv_create(w, h);
+        c = xrdp_avc444_conv_create(w, h, 16);
         ck_assert_ptr_ne(c, NULL);
         ck_assert_int_eq(c->coded_width, expect_cw);
         ck_assert_int_eq(c->coded_height, expect_ch);
@@ -498,7 +498,7 @@ START_TEST(test_avc444_odd_padding_edge_replicated)
             memcpy(xrgb + (size_t)y * stride + (size_t)x * 4, &px, 4);
         }
     }
-    c = xrdp_avc444_conv_create(w, h);
+    c = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->coded_width, 1296);
     ck_assert_int_eq(c->coded_height, 736);
@@ -527,6 +527,34 @@ START_TEST(test_avc444_odd_padding_edge_replicated)
 }
 END_TEST
 
+/* coded WIDTH alignment: 16 rounds to a 16-multiple (FreeRDP split), 32 rounds
+ * to a 32-multiple (mstsc split); other values fall back to 16. Coded height is
+ * always 16-aligned. Uses an odd-macroblock-count width (2184: round_up_16=2192
+ * is 137 MB, odd) where 16 and 32 alignment differ. */
+START_TEST(test_avc444_width_align)
+{
+    struct xrdp_avc444_conv *c;
+
+    c = xrdp_avc444_conv_create(2184, 850, 16);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->coded_width, 2192);   /* round_up_16 */
+    ck_assert_int_eq(c->coded_height, 864);
+    xrdp_avc444_conv_delete(c);
+
+    c = xrdp_avc444_conv_create(2184, 850, 32);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->coded_width, 2208);   /* round_up_32 */
+    ck_assert_int_eq(c->coded_height, 864);   /* height stays 16-aligned */
+    xrdp_avc444_conv_delete(c);
+
+    /* invalid alignment falls back to 16 */
+    c = xrdp_avc444_conv_create(2184, 850, 7);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->coded_width, 2192);
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_convert(void)
@@ -543,6 +571,7 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_dims_and_padding);
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);
+    tcase_add_test(tc, test_avc444_width_align);
     suite_add_tcase(s, tc);
     return s;
 }
