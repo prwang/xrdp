@@ -1,5 +1,12 @@
 # AVC444 magenta/red burr on colored text — root cause
 
+> **Status: FIXED.** AVC444 v2 (ChromaV2, codec id 0x000F) emission is
+> implemented (`xrdp_avc444_convert.c` / `xrdp_avc444_caps.c` / `xrdp_mm.c` /
+> `xrdp_encoder.c`) and auto-negotiated per client with a v1 fallback. Verified
+> end-to-end through the full live path (xrdp + libx264 + real xfreerdp3 SSE
+> decode): the burr drops from 50.4% of green pixels (v1) to 0.6% (v2), and
+> confirmed on-screen with Microsoft mstsc. See BACKLOG.md for the change log.
+
 ## Symptom
 
 Client captures (`wierd_red_burr.png`, `red_burr_v2.png`) show magenta/purple
