@@ -8,65 +8,49 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
-## AVC444 resize comb burr — ROOT CAUSE FOUND: substreams not independently decodable → dual-encoder fix (TODO, 2026-07-14)
-
-Branch `dev/avc444_dual_ffmpeg`.
+## AVC444 resize comb burr — OPEN. Working from the debug-tap commit (2026-07-14)
 
 **Symptom.** On mstsc, after the user *resizes the desktop width* to a
 non-16-multiple (repro width 2184 -> coded 2192, 8px pad), a **~16px vertical
 band of period-2 alternating chroma** appears at window left edges (cyan/purple
-comb) and persists. Fresh logins are clean; it only surfaces after resizing.
-FreeRDP does **not** show it; only mstsc.
+comb, `broken` == flicker) and persists. Fresh logins are clean; it only
+surfaces after resizing. FreeRDP does **not** show it; only mstsc.
 
-**What it is NOT (all ruled out with a live tap + faithful offline decode):**
-- Not the converter. Dumped the real converter NV12 output at the bug frame and
-  decoded it losslessly: **clean** (mean err 4.89 vs source, window edges clean;
-  user confirmed on the pulled `conv33.png`).
-- Not the metablock rect origin parity (the even-align fix on `dev/ipc_avc444`
+**What it is NOT (each ruled out with the live tap + faithful offline decode):**
+- Not the converter. The real converter NV12 output at the bug frame decodes
+  losslessly **clean** (mean err 4.89 vs source, window edges clean; user
+  confirmed on the pulled `conv33.png`).
+- Not the metablock rect-origin parity (the even-align change kept on this branch
   is a real but *separate* improvement; the comb persisted with it deployed).
-- Not H.264 quantization / coded-width padding. A one-decoder H.264 decode of
-  the real dumped substreams matches the converter within **2.38** mean err.
+- Not H.264 quantization / coded-width padding. A one-decoder H.264 decode of the
+  real dumped substreams matches the converter within **2.38** mean err.
+- **NOT the substream structure — the "dual encoder" idea is WRONG (disproven).**
+  The client decodes BOTH substreams with **one** H.264 decoder in interleaved
+  order `main0,aux0,main1,aux1,...`. Encoding the two views as two *independent*
+  libx264 streams (tried, 56/56 unit tests, reverted) corrupts the decode for
+  **both** FreeRDP and mstsc (`broken_split.png`): two independent streams each
+  restart `frame_num` at 0, so once interleaved into one decoder `main1`'s
+  reference resolves to `aux0` -> garbage. The single interleaved encoder is
+  therefore CORRECT, and "the aux never carries its own IDR / aux P-frames
+  reference main" is FINE for a one-decoder client, not the bug. Do not retry
+  two-ffmpeg or per-view keyframing.
 
-**ROOT CAUSE.** The ffmpeg backend encodes **both AVC444 views through one
-libx264**, alternating pictures `main0,aux0,main1,aux1,...` in a single stream.
-Consequences, confirmed from the captured bitstream:
-- The keyframe only ever lands on **main** pictures; the **aux substream never
-  carries its own SPS/PPS/IDR** (29/29 captured aux frames were P-only). Decoded
-  as an independent stream it yields **0 frames**.
-- Every P-frame references the *immediately preceding picture*, so aux P-frames
-  reference **main** pictures and vice-versa — the two `avc420EncodedBitstream`s
-  are **mutually dependent**, not self-contained. Even main only "works" because
-  it has a starting IDR then limps via error-concealment of its missing refs.
-- **FreeRDP** feeds both substreams to **one** decoder (shared DPB) so refs
-  resolve -> clean. **mstsc** treats each substream as self-contained; after a
-  resize (new stream / ref discontinuity) its chroma decoder drifts -> the comb.
+**Root cause is OPEN.** It is specific to **mstsc's decoder**, only **after a
+width resize** (coded dims change mid-session), never FreeRDP. So it is about how
+mstsc handles a mid-stream resolution/SPS change (the encoder child is recreated
+on resize -> new SPS with new coded dims + fresh IDR), or the coded-vs-actual
+padding at the resize width. Next step: use the tap **across a resize** and
+compare the exact pre- and post-resize frames the client receives — does xrdp
+send a proper IDR with the correct new SPS/dimensions, and does the surface/coded
+geometry the client is told match what is actually encoded?
 
-**Flags cannot fix it (verified).** Forcing periodic aux keyframes leaves the
-between-keyframe aux frames referencing main; forcing *every* aux to intra makes
-aux self-contained but shifts the co-dependency onto main (its P-frames then
-reference the aux IDRs). A single interleaved encoder can only make *both* views
-independent via all-intra everything (`-g 1`) — bitrate-prohibitive.
-
-**FIX (this branch): dual encoder.** Encode main and aux as **two independent
-H.264 streams** — two libx264 instances (two ffmpeg children per surface, or one
-ffmpeg with two independent encoder outputs), each with its own SPS/PPS/IDR and a
-reference chain confined to its own view. Each `avc420EncodedBitstream` becomes a
-valid standalone AVC420 stream, decodable by both the two-decoder (mstsc) and
-one-decoder (FreeRDP) client models. Scope:
-- `xrdp_encoder_ffmpeg.c`: input contract changes from one interleaved pipe to
-  two per-view streams; two NUT demuxes / two annexb validations; pair assembly
-  from the two children. Keep encoder_args passthrough per view.
-- Reset/resize: recreate both children; both emit a fresh IDR (LC=0 reset pair).
-- Acceptance: **tap-verified** each substream carries SPS/PPS/IDR and decodes
-  standalone (0-frame aux -> full decode); mstsc shows no comb after width
-  resize; FreeRDP still clean; no regression to the single-surface happy path.
-
-**Tooling built for this (keep, env-gated, off by default).** `XRDP_AVC444_DUMP=
-<dir>` in `gfx_wiretosurface1_avc444` dumps per frame: main/aux Annex-B H.264,
-the converter NV12 views, and meta (surf/coded dims + damage rects). Plus an
-offline decoder (FreeRDP-faithful Luma+ChromaV2 combine + reverse-filter RGB)
-that reproduces the one-decoder path and isolates converter vs encode vs decode.
-This is how the root cause was found and how the fix will be verified.
+**Tooling (kept on this branch, env-gated, off by default) — work from here.**
+`XRDP_AVC444_DUMP=<dir>` in `gfx_wiretosurface1_avc444` dumps per frame: main/aux
+Annex-B H.264, the converter NV12 views, and meta (surf/coded dims + damage
+rects). Plus the out-of-tree offline decoder (interleave main+aux AUs with AU
+delimiters, decode as ONE stream, FreeRDP-faithful Luma+ChromaV2 combine +
+reverse-filter RGB) — this reproduces the one-decoder client and isolates
+converter vs encode vs decode. This is the harness for the reopened investigation.
 
 ## AVC444 encoder-args passthrough — DONE (architecture, 2026-07-14)
 
