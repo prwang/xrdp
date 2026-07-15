@@ -2158,3 +2158,18 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   main/aux Annex-B H.264 + converter NV12 + meta; plus a FreeRDP-faithful
   offline decoder. The tooling that found and verified the chroma-split fix.
 
+- **Hardware H.264 via VAAPI (live-verified, 2026-07-15).** No xrdp code change —
+  the encoder_args passthrough already expresses it. `gfx.toml [avc444_ffmpeg]`
+  with `-vaapi_device /dev/dri/renderD128 -vf format=nv12,hwupload -c:v
+  h264_vaapi …` drives GPU H.264. Because the AVC444 input is already-decoded
+  raw NV12, the GPU-*encode* path uses `hwupload` (all post-`-i`, so
+  expressible), not `-hwaccel` decode. ffmpeg is forked from the xrdp connection
+  worker, which runs as **root** in standard xrdp (manual and Debian/systemd,
+  no `User=`), so it opens the `root:root 0660` render node with no change — the
+  session-user permission concern applies only to a hardened non-root xrdp.
+  Validated end-to-end on this box: the real runner+probe pass with VAAPI at
+  256x256 and 1792x1152; live mstsc AVC444-v2 session shows the child running
+  `h264_vaapi` with `drm-driver: amdgpu` and multi-second `drm-engine-enc` GPU
+  encode-engine time (hardware, not software). Recipe documented in
+  `docs/man/gfx.toml.5.in`.
+

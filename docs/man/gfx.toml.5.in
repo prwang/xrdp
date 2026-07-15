@@ -232,6 +232,41 @@ encoder_args = [
 ]
 .fi
 
+.PP
+Example selecting a VAAPI hardware encoder (Intel/AMD render node). The AVC444
+views arrive as system\(hymemory NV12, so they are uploaded to the GPU with
+\fB\-vf format=nv12,hwupload\fR before \fBh264_vaapi\fR; \fB\-bf 0
+\-async_depth 1\fR keep one encoded picture per input frame. Use
+\fB\-vaapi_device\fR (which is accepted after \fB\-i\fR) rather than the global
+\fB\-hwaccel/\-init_hw_device\fR forms, since \fBencoder_args\fR are inserted
+after the input mapping:
+
+.nf
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+encoder_args = [
+  "\-vaapi_device", "/dev/dri/renderD128",
+  "\-vf", "format=nv12,hwupload",
+  "\-c:v", "h264_vaapi",
+  "\-rc_mode", "CQP",
+  "\-qp", "20",
+  "\-bf", "0",
+  "\-async_depth", "1",
+]
+.fi
+
+.PP
+The \fBffmpeg\fR child is spawned by the xrdp connection process, which in a
+standard install runs as \fBroot\fR, so it can open the render node
+(\fB/dev/dri/renderD128\fR, typically \fBroot:root 0660\fR) with no extra
+setup. If a deployment hardens xrdp to run as a non\(hyroot service user, add
+that user to the render node's group (for example \fBchgrp render
+/dev/dri/renderD128\fR and add the user to the \fBrender\fR group). The child is
+started with a minimal environment (\fBPATH=/usr/bin:/bin\fR only); libva
+normally autodetects the driver from the render node, but a GPU that needs an
+explicit \fBLIBVA_DRIVER_NAME\fR cannot currently be steered through
+\fBgfx.toml\fR.
+
 .SH "CONNECTION TYPES"
 
 \fB[x264]\fR and \fB[OpenH264]\fR section are tables (also known as
