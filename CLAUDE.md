@@ -84,3 +84,19 @@ All durable rules and "memory" for this project live here, in-tree and committed
   `devel`).
 - Surface any scope/security/regression concern in `BACKLOG.md` rather than
   silently expanding scope.
+
+## Demo & reproduction scaffolding
+
+- **`PR-demo/`** holds box-specific reproduction harnesses (and their committed
+  reference result images) that show a feature working end-to-end — e.g. the
+  AVC444-vs-AVC420 visual A/B. Check these in **so they survive container
+  restarts** and so a PR can show reproducible results, rather than leaving them
+  in `/tmp`. They may hardcode this dev box (session display, `tester`,
+  `127.0.0.1:3389`); document the assumptions and make the knobs env-overridable.
+- Portable, dependency-light helpers (no live session/GPU needed) belong in
+  `tools/`, not `PR-demo/`. The CI regression backstop is always an in-tree unit
+  test under `tests/`; `PR-demo/` is a visual aid, never a substitute for it.
+- This is our own **dev branch**. The upstream PR against `devel` needs a
+  separate clean-room pass — reviewable commit slices plus written rationale —
+  and does **not** necessarily carry `PR-demo/` as-is; treat that folder as the
+  reproducibility scaffold, not part of the final slicing.
