@@ -456,6 +456,85 @@ START_TEST(test_avc444_main_only_420)
 }
 END_TEST
 
+/* Iso-luminant chroma regression — the offline form of the 444-vs-420 visual
+ * demo (see tools/gen_isoluma.py, PR-demo/). A 1px column pattern of two
+ * equal-luma / opposite-chroma colors (magenta, green): the color detail lives
+ * ONLY in chroma, so 4:2:0 must lose it while 4:4:4 keeps it.
+ *
+ * AVC420 (main_only) carries only the 2x2-averaged main chroma, which is
+ * uniform for this pattern -> the per-column detail is gone. AVC444 v2 fills
+ * the same flat main plus an aux view that carries the distinct per-column
+ * chroma -> the detail is retained. This asserts the mechanism the demo shows
+ * (420 main chroma flat; 444 aux non-flat) without a live client. */
+START_TEST(test_avc420_isoluminant_chroma_loss)
+{
+    const int w = 16;
+    const int h = 16;
+    const int stride = w * 4;
+    unsigned char xrgb[16 * 16 * 4];
+    struct xrdp_avc444_conv *c;
+    int x;
+    int y;
+    int i;
+    int aux_min;
+    int aux_max;
+    unsigned int mag = (200u << 16) | (100u << 8) | 200u; /* Y ~ 127 */
+    unsigned int grn = (70u << 16) | (150u << 8) | 70u;   /* Y ~ 126 */
+
+    /* even columns magenta, odd columns green: a 1px chroma-only alternation */
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            unsigned int px = (x % 2 == 0) ? mag : grn;
+            memcpy(xrgb + y * stride + x * 4, &px, 4);
+        }
+    }
+
+    /* AVC420: the 2x2-averaged main chroma is uniform -> detail discarded */
+    c = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(c, NULL);
+    c->main_only = 1;
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    {
+        unsigned char u = main_u(c, 0, 0);
+        unsigned char v = main_v(c, 0, 0);
+        for (y = 0; y < c->coded_height / 2; y++)
+        {
+            for (x = 0; x < c->coded_width / 2; x++)
+            {
+                ck_assert_int_eq(main_u(c, x, y), u);
+                ck_assert_int_eq(main_v(c, x, y), v);
+            }
+        }
+    }
+    xrdp_avc444_conv_delete(c);
+
+    /* AVC444 v2: the same flat main, but the aux view spans a wide chroma
+     * range (magenta ~ (166,173) vs green ~ (97,91)) -> detail retained */
+    c = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(c, NULL);
+    c->chroma_v2 = 1;
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    aux_min = 255;
+    aux_max = 0;
+    for (i = 0; i < c->nv12_size; i++)
+    {
+        int b = c->aux_nv12[i];
+        if (b < aux_min)
+        {
+            aux_min = b;
+        }
+        if (b > aux_max)
+        {
+            aux_max = b;
+        }
+    }
+    ck_assert_int_gt(aux_max - aux_min, 50);
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
 START_TEST(test_avc444_dims_and_padding)
 {
     struct xrdp_avc444_conv *c;
@@ -642,6 +721,7 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_v2_packing);
     tcase_add_test(tc, test_avc444_v2_default_is_v1);
     tcase_add_test(tc, test_avc444_main_only_420);
+    tcase_add_test(tc, test_avc420_isoluminant_chroma_loss);
     tcase_add_test(tc, test_avc444_dims_and_padding);
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);
