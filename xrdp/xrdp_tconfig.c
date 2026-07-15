@@ -412,6 +412,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     xrdp_ffmpeg_avc444_default_encoder_args(
         &config->avc444_ffmpeg_encoder_args);
     config->avc444_ffmpeg_chroma_align = 32;
+    config->avc444_ffmpeg_avc_mode = XTC_AVC_AUTO;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
@@ -419,6 +420,29 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t path = toml_string_in(avc, "path");
             toml_array_t *ea = toml_array_in(avc, "encoder_args");
             toml_datum_t ca = toml_int_in(avc, "chroma_align");
+            toml_datum_t am = toml_string_in(avc, "avc_mode");
+            if (am.ok)
+            {
+                if (g_strcasecmp(am.u.s, "auto") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_AUTO;
+                }
+                else if (g_strcasecmp(am.u.s, "444") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_444;
+                }
+                else if (g_strcasecmp(am.u.s, "420") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_420;
+                }
+                else
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] avc_mode must "
+                          "be \"auto\", \"444\" or \"420\", got \"%s\"; using "
+                          "auto", am.u.s);
+                }
+                free(am.u.s);
+            }
             if (ca.ok)
             {
                 if (ca.u.i == 16 || ca.u.i == 32)

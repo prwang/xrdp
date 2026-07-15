@@ -48,6 +48,7 @@ struct xrdp_encoder
     void *codec_handle_h264_gfx[16];
     /* external stock-ffmpeg AVC444 backend (opaque handles) */
     int avc444_ffmpeg;
+    int avc420_ffmpeg; /* emit plain AVC420 (codec id 0x000B), single view */
     int avc444_v2;   /* emit AVC444 v2 (ChromaV2, codec id 0x000F)    */
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];

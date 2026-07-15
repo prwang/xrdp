@@ -771,6 +771,55 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
 }
 
 /*****************************************************************************/
+/* pop the oldest completed single picture (AVC420) into the main result     */
+/* buffer and validate it. returns 0 ok, 1 validation failure.              */
+static int
+pop_single(struct xrdp_ffmpeg_avc444 *self,
+           struct xrdp_avc444_encoded_pair *result)
+{
+    struct ff_pkt *m = &self->pk[self->pk_head];
+    unsigned long long seq;
+
+    if (grow(&self->main_buf, &self->main_cap, m->len) != 0)
+    {
+        return 1;
+    }
+    memcpy(self->main_buf, m->data, m->len);
+    self->main_len = m->len;
+    self->main_key = m->keyframe;
+    self->pk_head += 1;
+
+    if (self->pairs_returned == 0)
+    {
+        if (!xrdp_h264_main_reset_ok(self->main_buf, self->main_len))
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: reset packet lacks "
+                "SPS/PPS/IDR");
+            return 1;
+        }
+    }
+    else if (!xrdp_h264_aux_ok(self->main_buf, self->main_len))
+    {
+        return 1;
+    }
+    seq = 0;
+    if (self->seq_count > self->seq_head)
+    {
+        seq = self->seq[self->seq_head++];
+    }
+    result->generation = self->generation;
+    result->desktop_sequence = seq;
+    result->main_data = self->main_buf;
+    result->main_len = self->main_len;
+    result->main_keyframe = self->main_key;
+    result->aux_data = NULL;
+    result->aux_len = 0;
+    self->pairs_returned++;
+    self->metrics.pairs_completed++;
+    return 0;
+}
+
+/*****************************************************************************/
 static int
 seq_push(struct xrdp_ffmpeg_avc444 *self, unsigned long long s)
 {
@@ -841,6 +890,58 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     if (self->pairs_submitted - self->pairs_returned > FF_MAX_INFLIGHT_PAIRS)
     {
         LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: encoder stalled, %llu pairs in "
+            "flight", (unsigned long long)(self->pairs_submitted -
+                                           self->pairs_returned));
+        self->metrics.timeouts++;
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    return XRDP_FFMPEG_PAIR_PENDING;
+}
+
+/*****************************************************************************/
+int
+xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
+                                 const unsigned char *nv12,
+                                 int nv12_size,
+                                 unsigned long long desktop_sequence,
+                                 struct xrdp_avc444_encoded_pair *result)
+{
+    int st;
+
+    if (self == NULL || nv12 == NULL ||
+            nv12_size != self->nv12_size || result == NULL || self->flushing)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    /* queue this frame's single picture for writing */
+    if (grow(&self->inq, &self->inq_cap, self->inq_len + nv12_size) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    memcpy(self->inq + self->inq_len, nv12, nv12_size);
+    self->inq_len += nv12_size;
+    if (seq_push(self, desktop_sequence) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    self->pairs_submitted++;
+
+    st = pump(self, now_ms() + self->cfg.picture_timeout_ms, 0);
+    if (st == 1 || st == 2)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (pk_available(self) >= 1)
+    {
+        if (pop_single(self, result) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        return XRDP_FFMPEG_PAIR_READY;
+    }
+    if (self->pairs_submitted - self->pairs_returned > FF_MAX_INFLIGHT_PAIRS)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: encoder stalled, %llu frames in "
             "flight", (unsigned long long)(self->pairs_submitted -
                                            self->pairs_returned));
         self->metrics.timeouts++;

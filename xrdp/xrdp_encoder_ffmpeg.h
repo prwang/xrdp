@@ -157,6 +157,20 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
                                struct xrdp_avc444_encoded_pair *result);
 
 /**
+ * Single-view variant for plain AVC420 (codec id 0x000B): submit one NV12
+ * picture and return the oldest completed encoded picture in result->main_*
+ * (result->aux_* are cleared). Same pipeline latency and return codes as
+ * encode_pair. A handle must be driven either by encode_pair (AVC444) or by
+ * encode_single (AVC420), not both.
+ */
+int
+xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
+                                 const unsigned char *nv12,
+                                 int nv12_size,
+                                 unsigned long long desktop_sequence,
+                                 struct xrdp_avc444_encoded_pair *result);
+
+/**
  * Close the input (first call) and drain remaining completed pairs, one per
  * call. Returns XRDP_FFMPEG_PAIR_READY (result filled), XRDP_FFMPEG_PAIR_DONE
  * (no more pairs), or XRDP_FFMPEG_PAIR_ERROR. After flushing, the child is

@@ -1266,18 +1266,37 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     struct xrdp_tconfig_gfx_codec_order *co = &self->wm->gfx_config->codec;
     char cobuff[64];
     int avc444_ffmpeg_ok = 0;
+    int avc420_ffmpeg_ok = 0;
 
-    /* external stock-ffmpeg AVC444 backend eligibility (FR-CAP / FR-PROBE):
-     * the MVP ffmpeg backend supplies AVC444 v1 only, on a single monitor,
-     * and only after a successful behavioral probe at the session geometry */
+    /* external stock-ffmpeg backend eligibility (FR-CAP / FR-PROBE): single
+     * monitor, and only after a successful behavioral probe at the session
+     * geometry. avc_mode (gfx.toml) selects AVC444 vs plain AVC420: AUTO
+     * prefers AVC444 and falls back to AVC420; "420" forces AVC420 for any
+     * H.264-capable client (so mstsc, which always offers AVC444, can be
+     * tested on the AVC420 path); "444" serves AVC444 only. */
     if (self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG &&
             best_h264_index >= 0 &&
             self->wm->client_info->display_sizes.monitorCount <= 1)
     {
+        enum xrdp_tconfig_avc_mode cfgmode =
+            self->wm->gfx_config->avc444_ffmpeg_avc_mode;
         enum xrdp_gfx_avc_mode m;
+        int want_420;
         m = xrdp_avc444_classify_caps(ver_flags[best_h264_index].version,
                                       ver_flags[best_h264_index].flags);
-        if (m == XRDP_GFX_AVC444)
+        if (cfgmode == XTC_AVC_FORCE_420)
+        {
+            want_420 = 1;
+        }
+        else if (cfgmode == XTC_AVC_FORCE_444)
+        {
+            want_420 = 0;
+        }
+        else
+        {
+            want_420 = (m != XRDP_GFX_AVC444);
+        }
+        if (want_420 || m == XRDP_GFX_AVC444)
         {
             struct xrdp_ffmpeg_avc444_config cfg;
             int cw = (screen->width + 15) & ~15;
@@ -1288,16 +1307,25 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             cfg.encoder_args =
                 self->wm->gfx_config->avc444_ffmpeg_encoder_args;
             LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
-                "AVC444 %s at %dx%d", cfg.path, cw, ch);
+                "%s %s at %dx%d", want_420 ? "AVC420" : "AVC444", cfg.path,
+                cw, ch);
             if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
             {
-                avc444_ffmpeg_ok = 1;
-                LOG(LOG_LEVEL_INFO, "  ffmpeg AVC444 probe OK");
+                if (want_420)
+                {
+                    avc420_ffmpeg_ok = 1;
+                }
+                else
+                {
+                    avc444_ffmpeg_ok = 1;
+                }
+                LOG(LOG_LEVEL_INFO, "  ffmpeg %s probe OK",
+                    want_420 ? "AVC420" : "AVC444");
             }
             else
             {
-                LOG(LOG_LEVEL_WARNING, "  ffmpeg AVC444 probe FAILED; "
-                    "removing external AVC444 candidate");
+                LOG(LOG_LEVEL_WARNING, "  ffmpeg probe FAILED; removing "
+                    "external AVC candidate");
             }
         }
     }
@@ -1324,6 +1352,16 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                     best_index, ver_flags[best_index].version);
                 self->egfx_flags = XRDP_EGFX_H264;
                 self->avc444_ffmpeg = 1;
+                break;
+            }
+            if (avc420_ffmpeg_ok && best_h264_index >= 0)
+            {
+                best_index = best_h264_index;
+                LOG(LOG_LEVEL_INFO, "Matched H264/AVC420 (ffmpeg) mode, "
+                    "confirming capset index %d (0x%8.8x)",
+                    best_index, ver_flags[best_index].version);
+                self->egfx_flags = XRDP_EGFX_H264;
+                self->avc420_ffmpeg = 1;
                 break;
             }
             /* ffmpeg backend chosen but not eligible: skip H.264, fall

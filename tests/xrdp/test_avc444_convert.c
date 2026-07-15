@@ -379,6 +379,79 @@ START_TEST(test_avc444_v2_default_is_v1)
     c = xrdp_avc444_conv_create(64, 64, 16);
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->chroma_v2, 0);
+    ck_assert_int_eq(c->main_only, 0);
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
+/* main_only (plain AVC420): the main view carries the 2x2 averaged chroma and
+ * the auxiliary view is not produced at all. */
+START_TEST(test_avc444_main_only_420)
+{
+    const int w = 16;
+    const int h = 16;
+    const int stride = w * 4;
+    unsigned char xrgb[16 * 16 * 4];
+    struct xrdp_avc444_conv *c;
+    int cw;
+    int ch;
+    int x;
+    int y;
+    int cx;
+    int cy;
+    int t;
+
+    build_source(xrgb, stride, w, h);
+    c = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(c, NULL);
+    c->main_only = 1;
+    /* poison the aux view to prove main_only leaves it untouched */
+    memset(c->aux_nv12, 0xAB, c->nv12_size);
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    cw = c->coded_width;
+    ch = c->coded_height;
+
+    /* main Y plane is the identity luma */
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            int ey;
+            int eu;
+            int ev;
+            exp_sample(xrgb, stride, w, h, x, y, &ey, &eu, &ev);
+            ck_assert_int_eq(main_y(c, x, y), ey);
+        }
+    }
+
+    /* main chroma at (even,even) is the 2x2 block average (same as v2 main) */
+    for (cy = 0; cy < ch / 2; cy++)
+    {
+        for (cx = 0; cx < cw / 2; cx++)
+        {
+            int u0;
+            int v0;
+            int u1;
+            int v1;
+            int u2;
+            int v2;
+            int u3;
+            int v3;
+            exp_sample(xrgb, stride, w, h, 2 * cx, 2 * cy, &t, &u0, &v0);
+            exp_sample(xrgb, stride, w, h, 2 * cx + 1, 2 * cy, &t, &u1, &v1);
+            exp_sample(xrgb, stride, w, h, 2 * cx, 2 * cy + 1, &t, &u2, &v2);
+            exp_sample(xrgb, stride, w, h, 2 * cx + 1, 2 * cy + 1,
+                       &t, &u3, &v3);
+            ck_assert_int_eq(main_u(c, cx, cy), (u0 + u1 + u2 + u3 + 2) / 4);
+            ck_assert_int_eq(main_v(c, cx, cy), (v0 + v1 + v2 + v3 + 2) / 4);
+        }
+    }
+
+    /* the auxiliary view was never written */
+    for (t = 0; t < c->nv12_size; t++)
+    {
+        ck_assert_int_eq(c->aux_nv12[t], 0xAB);
+    }
     xrdp_avc444_conv_delete(c);
 }
 END_TEST
@@ -568,6 +641,7 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_roundtrip_exact);
     tcase_add_test(tc, test_avc444_v2_packing);
     tcase_add_test(tc, test_avc444_v2_default_is_v1);
+    tcase_add_test(tc, test_avc444_main_only_420);
     tcase_add_test(tc, test_avc444_dims_and_padding);
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);

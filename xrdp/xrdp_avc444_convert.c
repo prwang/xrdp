@@ -206,7 +206,8 @@ sample_chroma_avg(const unsigned char *xrgb, int stride, int w, int h,
 
 /*****************************************************************************/
 /* main view: B1 luma (identity), B2/B3 chroma at (even-col/even-row).      */
-/* v1 stores a point sample; v2 stores the 2x2 block average (no U/V swap). */
+/* v1 stores a point sample; v2 and plain AVC420 (main_only) store the 2x2  */
+/* block average (no U/V swap). */
 static void
 fill_main(struct xrdp_avc444_conv *self,
           const unsigned char *xrgb, int stride, int w, int h)
@@ -235,7 +236,7 @@ fill_main(struct xrdp_avc444_conv *self,
     {
         for (cx = 0; cx < cw / 2; cx++)
         {
-            if (self->chroma_v2)
+            if (self->chroma_v2 || self->main_only)
             {
                 sample_chroma_avg(xrgb, stride, w, h, cx, cy, &uu, &vv);
             }
@@ -389,7 +390,11 @@ xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
         return 1;
     }
     fill_main(self, xrgb, stride, width, height);
-    if (self->chroma_v2)
+    if (self->main_only)
+    {
+        /* plain AVC420: no auxiliary chroma view */
+    }
+    else if (self->chroma_v2)
     {
         fill_aux_v2(self, xrgb, stride, width, height);
     }

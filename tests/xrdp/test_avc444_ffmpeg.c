@@ -132,6 +132,80 @@ START_TEST(test_ffmpeg_encode_pair)
 }
 END_TEST
 
+/* Single-view AVC420 path: a main_only converter feeds encode_single, and the
+ * child returns one encoded picture per frame (one update behind, matching the
+ * live path which reaps without flushing). Verify the returned pictures arrive
+ * in submit order with the first being the reset keyframe. */
+START_TEST(test_ffmpeg_encode_single)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pic;
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    int i;
+    int nsub = 4;
+    unsigned long long got_seq[8];
+    int got_key[8];
+    int ngot = 0;
+    int rc;
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    conv->main_only = 1;
+    enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+    ck_assert_ptr_ne(enc, NULL);
+
+    for (i = 0; i < nsub; i++)
+    {
+        int j;
+        for (j = 0; j < w * h; j++)
+        {
+            unsigned int r = (j * 7 + i * 20) & 0xff;
+            unsigned int g = (j * 13 + i) & 0xff;
+            unsigned int b = (j * 5) & 0xff;
+            unsigned int px = (r << 16) | (g << 8) | b;
+            memcpy(xrgb + j * 4, &px, 4);
+        }
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, stride, w, h), 0);
+        rc = xrdp_ffmpeg_avc444_encode_single(enc, conv->main_nv12,
+                                              conv->nv12_size,
+                                              (unsigned long long)i, &pic);
+        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
+        if (rc == XRDP_FFMPEG_PAIR_READY)
+        {
+            ck_assert_int_gt(pic.main_len, 0);
+            ck_assert_int_eq(pic.aux_len, 0);
+            ck_assert_ptr_eq((void *)pic.aux_data, NULL);
+            got_seq[ngot] = pic.desktop_sequence;
+            got_key[ngot] = pic.main_keyframe;
+            ngot++;
+        }
+    }
+
+    /* the pipeline holds the final picture (one-behind), so nsub-1 come back */
+    ck_assert_int_eq(ngot, nsub - 1);
+    for (i = 0; i < ngot; i++)
+    {
+        ck_assert_int_eq((int)got_seq[i], i);
+    }
+    ck_assert_int_eq(got_key[0], 1);
+
+    xrdp_ffmpeg_avc444_delete(enc);
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
 /*
  * Drive one encode generation at a given visible size through the real child:
  * create converter + child, submit nsub distinguishable pairs, flush, and
@@ -261,6 +335,7 @@ make_suite_avc444_ffmpeg(void)
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ffmpeg_probe);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
+    tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);
     suite_add_tcase(s, tc);
     return s;
