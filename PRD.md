@@ -2194,3 +2194,116 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   edges versus AVC444's crisp ones, with identical luma. Unit tests:
   `test_avc444_main_only_420`, `test_ffmpeg_encode_single`.
 
+## 26. Related work and differentiation
+
+Written after the fact (the project began without an upstream survey). Provenance:
+PR #3774's metadata and file list were **verified directly** via the GitHub REST
+API (2026 snapshot); thread quotes and other-project internals come from a
+research pass over GitHub/GitLab primary sources and are attributed but not all
+re-verified here. Treat PR/issue status as a snapshot.
+
+### 26.1 Upstream xrdp H.264/GFX today
+
+xrdp's GFX H.264 path is a function-pointer abstraction
+(`xrdp_encoder_h264_create/delete/encode`) with **compile-time-linked backends**:
+`xrdp_encoder_x264.c` (libx264, Jay Sorg 2024-05), `xrdp_encoder_openh264.c`
+(OpenH264 2024-11), and NVENC via the `xrdp_accel_assist` module (2024-05,
+`--enable-nvenc`). The MS-RDPEGFX channel and capture-format vocabulary came from
+Nexarian (EGFX 2022-2023; the `XRDP_nv12_709fr` and — notably —
+`XRDP_yuv444_v1/v2_stream_709fr` constants, 2023-12). **Two facts frame our
+work:** (1) every upstream backend emits single-stream **AVC420 (0x000B) only —
+there is no AVC444 encoder anywhere in upstream `devel`**; the `yuv444_v2_stream`
+constants exist but are unused. (2) xorgxrdp's capture converts RGB→NV12 with a
+hard-coded **BT.601 limited-range** matrix and has no 709/full-range or YUV444
+path, so AVC444 assembly and the correct color matrix are necessarily an
+xrdp-encoder-side concern — which our converter is.
+
+### 26.2 The closest effort — neutrinolabs/xrdp PR #3774 (open)
+
+"gfx/xup: add FFmpeg/dma-buf based VAAPI/Vulkan encoding support" (author
+**FlyGoat**, **open**, created 2026-03-26, updated 2026-05-08, +3514/−142, 20
+files, not merged — verified via REST API). It adds an optional FFmpeg backend
+(`xrdp/xrdp_encoder_ffmpeg.c` +2138 — same filename as ours, **opposite
+design**) plus a dma-buf capture transport (xup + xorgxrdp PR #424). Crucial
+differences from our work:
+
+- It **links `libavcodec`/`libav*` in-process** (software libx264, `h264_vaapi`,
+  `h264_vulkan` via `hwupload`), not the stock `ffmpeg` CLI. It is thus still an
+  ABI-coupled, compile-time backend — the very coupling our approach removes.
+- It is **AVC420-only** (no dual-stream/chroma assembly, no 0x000E/0x000F).
+- Per the thread, it is **stalled and being redirected**: the lead (jsorg71)
+  steered GPU work into `xrdp_accel_assist` with Vulkan, and the author agreed to
+  **drop the FFmpeg path** ("I'll give up FFMpeg… but I'd like to keep Vulkan and
+  DMA-BUF"). jsorg71 also named two blockers — the "non-standard [MS] color
+  conversion matrix" and "the YUV444 algorithm in GFX" — that our converter
+  already solves.
+
+So the nearest upstream hardware-H.264 effort is complementary, not competing:
+different codec breadth (AVC420 vs our AVC444 v2 + AVC420), different integration
+(linked libav vs stock-CLI subprocess), and it does not touch the AVC444/color
+problems we solve. (The `xrdp_encoder_ffmpeg.c` filename collision is a mechanical
+merge note, not a design conflict.)
+
+### 26.3 Adjacent RDP servers
+
+| Project | Codec integration | SW/HW | AVC444 server encode |
+|---|---|---|---|
+| xrdp upstream `devel` | linked (x264/OpenH264/NVENC) | SW + HW | **No** (AVC420 only) |
+| xrdp PR #3774 (open) | linked (libavcodec) | SW + HW (vaapi/vulkan) | No (AVC420 only) |
+| **this work** | **stock `ffmpeg` subprocess, verbatim args** | SW + any HW ffmpeg encoder | **Yes (AVC444 v2 0x000F + AVC420)** |
+| FreeRDP shadow/proxy | linked (OpenH264 / ffmpeg-libav) | SW default, opt HW (vaapi) | Yes (AVC444 + v2) |
+| gnome-remote-desktop | linked (libva / NVENC SDK / Vulkan) | HW-only | Yes (AVC444v2, MR !302) |
+| Weston RDP backend | linked (FreeRDP) | — | No H.264 (RFX only) |
+| Microsoft AVD/RDP | closed | closed | Yes (client decodes v2) |
+
+FreeRDP and gnome-remote-desktop already encode AVC444(v2) server-side for their
+own ecosystems; **xrdp is the gap** our work fills.
+
+### 26.4 The subprocess-vs-linked-library axis
+
+Across remote-desktop and game-streaming projects surveyed (Sunshine, wayvnc/
+neatvnc, gnome-remote-desktop, GStreamer-based neko/Selkies), **the entire field
+links a codec library in-process; none spawns a stock `ffmpeg` CLI fed raw frames
+over a pipe.** Our approach is deliberately the outlier, and the trade is
+explicit:
+
+- **We gain** ABI-independence (any ffmpeg encoder — nvenc/qsv/vaapi/vulkan and
+  even H.265 — becomes config, zero xrdp code; §E2 in `PR-demo/RESULTS.md`
+  measured 7 H.264 + 6 HEVC reachable), process isolation (a codec crash/exploit
+  is contained to a reap-and-restart child), and a licensing posture where an
+  arms-length CLI invocation avoids GPL propagation into xrdp (libx264/libx265
+  are GPL; linking them makes the host GPL, as Sunshine's GPL-3.0 shows).
+- **We pay** with no zero-copy GPU path — we feed raw NV12 over a pipe, forgoing
+  the dma-buf zero-copy that #3774/neatvnc/grd pursue — and one desktop-update of
+  pipeline latency. The copy CPU itself is negligible (§E5: ~0.09 ms/frame).
+
+### 26.5 Differentiation and orthogonality
+
+- **Build on, don't duplicate:** the EGFX channel, the `xrdp_encoder_h264_*`
+  abstraction, the `yuv444_v2_stream` capture constants, and `xrdp_accel_assist`
+  as the GPU home. We reuse these rather than re-plumb GFX.
+- **Genuinely additive/unique:** AVC444 v2 + AVC420 server-side encode (absent
+  from all of upstream and #3774), and codec-as-subprocess with verbatim
+  `encoder_args` (unique in this ecosystem).
+- **Objections and answers:** *extra process* — one long-lived child per surface,
+  frame-paced, not per-frame spawn (latency vs linked x264 still to be measured —
+  `RESULTS.md` P3); *pipe copies / no zero-copy* — acknowledged real cost,
+  complementary to a future dma-buf path (align with #424), traded for
+  ABI-independence; *stock-ffmpeg dependency* — standard packaged runtime,
+  arms-length, licensing-favorable, and the linked x264/OpenH264 backends remain
+  as fallback (opt-in, no regression); *spawn security surface* — argv is our own
+  root-owned config, never client data (SECURITY.md), input is raw pixels on a
+  pipe.
+- **Complement, not conflict:** there is no upstream AVC444 effort to collide
+  with; our AVC444 assembly (dual-stream packing + MS color matrix) is orthogonal
+  to *how* the H.264 substreams are produced, so it composes with either the
+  subprocess-ffmpeg path today or a future linked/Vulkan encoder.
+
+### 26.6 Open items / to verify before upstreaming
+
+- Latency of the subprocess path vs linked x264 is unmeasured (`RESULTS.md` P3).
+- #3774 / xorgxrdp #423–#424 are a 2026-03→05 snapshot and may have moved; track
+  before proposing anything that overlaps `xrdp_accel_assist`/Vulkan.
+- Thread quotes in §26.2 are attributed from the research pass, not all
+  re-verified here; re-read the live threads before quoting in an upstream PR.
+
