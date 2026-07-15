@@ -248,6 +248,25 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_chroma_align =
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
     }
+    else if (mm->avc420_ffmpeg)
+    {
+        /* external stock-ffmpeg backend, plain AVC420 (single YUV420 view,
+         * codec id 0x000B). Same full-chroma XRGB capture and converter as
+         * AVC444 — only the main view is produced and encoded. */
+        LOG(LOG_LEVEL_INFO,
+            "xrdp_encoder_create: starting ffmpeg AVC420 gfx session");
+        self->in_codec_mode = 1;
+        client_info->capture_code = CC_GFX_AVC444;
+        client_info->capture_format = XRDP_a8r8g8b8;
+        self->gfx = 1;
+        self->avc420_ffmpeg = 1;
+        g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
+                  sizeof(self->avc444_path) - 1);
+        self->avc444_encoder_args =
+            mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
+        self->avc444_chroma_align =
+            mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
+    }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
     else if (mm->libh264_loaded && (mm->egfx_flags & XRDP_EGFX_H264) != 0)
     {
@@ -922,6 +941,204 @@ avc444_debug_dump(unsigned long long seq, int twidth, int theight,
 }
 
 /*****************************************************************************/
+/* RFX_AVC420_BITMAP_STREAM serializer for the external ffmpeg backend, plain
+ * AVC420 (codec id 0x000B): a single RFX_AVC420_METABLOCK followed by one
+ * H.264 sub-stream — no avc420EncodedBitstreamInfo/LC word and no second
+ * (auxiliary) sub-stream. The converter fills only the main YUV420 view and
+ * the child encodes one picture per frame. Like the AVC444 path it is
+ * pipelined: returns NULL while the pipeline primes (that frame becomes an
+ * empty GFX update, so the client keeps its prior content). */
+static struct stream *
+gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
+                          struct xrdp_egfx_bulk *bulk, struct stream *in_s,
+                          XRDP_ENC_DATA *enc)
+{
+    int index;
+    int surface_id;
+    int codec_id;
+    int pixel_format;
+    int num_rects_d;
+    int num_rects_c;
+    int flags;
+    int mon_index;
+    short left;
+    short top;
+    short width;
+    short height;
+    short twidth;
+    short theight;
+    struct xrdp_egfx_rect *d_rects;
+    struct xrdp_egfx_rect dst_rect;
+    struct xrdp_enc_gfx_cmd *enc_gfx_cmd = &(enc->u.gfx);
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_ffmpeg_avc444 *ff;
+    struct xrdp_avc444_encoded_pair pic;
+    struct stream ls;
+    struct stream *s;
+    struct stream *rv;
+    int enc_rv;
+    int bitmap_data_length;
+    int need;
+
+    if (!s_check_rem(in_s, 11))
+    {
+        return NULL;
+    }
+    in_uint16_le(in_s, surface_id);
+    in_uint16_le(in_s, codec_id);
+    in_uint8(in_s, pixel_format);
+    in_uint32_le(in_s, flags);
+    mon_index = (flags >> 28) & 0xF;
+    (void)codec_id; /* the AVC mode is authoritative; override to AVC420 */
+    in_uint16_le(in_s, num_rects_d);
+    if ((num_rects_d < 1) || (num_rects_d > 16 * 1024) ||
+            (!s_check_rem(in_s, num_rects_d * 8)))
+    {
+        return NULL;
+    }
+    d_rects = g_new0(struct xrdp_egfx_rect, num_rects_d);
+    if (d_rects == NULL)
+    {
+        return NULL;
+    }
+    for (index = 0; index < num_rects_d; index++)
+    {
+        in_uint16_le(in_s, left);
+        in_uint16_le(in_s, top);
+        in_uint16_le(in_s, width);
+        in_uint16_le(in_s, height);
+        d_rects[index].x1 = left;
+        d_rects[index].y1 = top;
+        d_rects[index].x2 = left + width;
+        d_rects[index].y2 = top + height;
+    }
+    if (!s_check_rem(in_s, 2))
+    {
+        g_free(d_rects);
+        return NULL;
+    }
+    in_uint16_le(in_s, num_rects_c);
+    if ((num_rects_c < 1) || (num_rects_c > 16 * 1024) ||
+            (!s_check_rem(in_s, num_rects_c * 8 + 8)))
+    {
+        g_free(d_rects);
+        return NULL;
+    }
+    in_uint8s(in_s, num_rects_c * 8); /* c_rects unused in MVP */
+    in_uint16_le(in_s, left);
+    in_uint16_le(in_s, top);
+    in_uint16_le(in_s, width);
+    in_uint16_le(in_s, height);
+    twidth = width;
+    theight = height;
+    dst_rect.x1 = 0;
+    dst_rect.y1 = 0;
+    dst_rect.x2 = width;
+    dst_rect.y2 = height;
+
+    if (twidth < 1 || theight < 1 ||
+            twidth * theight * 4 > enc_gfx_cmd->data_bytes)
+    {
+        g_free(d_rects);
+        return NULL;
+    }
+
+    /* lazily (re)create the per-surface converter and ffmpeg child; a visible
+     * resize drops both so the new generation starts with a fresh IDR */
+    conv = (struct xrdp_avc444_conv *)self->avc444_conv[mon_index];
+    if (conv != NULL &&
+            (conv->actual_width != twidth || conv->actual_height != theight))
+    {
+        xrdp_avc444_conv_delete(conv);
+        self->avc444_conv[mon_index] = NULL;
+        conv = NULL;
+        if (self->avc444_ffmpeg_handle[mon_index] != NULL)
+        {
+            xrdp_ffmpeg_avc444_delete((struct xrdp_ffmpeg_avc444 *)
+                                      self->avc444_ffmpeg_handle[mon_index]);
+            self->avc444_ffmpeg_handle[mon_index] = NULL;
+        }
+    }
+    if (conv == NULL)
+    {
+        conv = xrdp_avc444_conv_create(twidth, theight,
+                                       self->avc444_chroma_align);
+        if (conv == NULL)
+        {
+            g_free(d_rects);
+            return NULL;
+        }
+        conv->main_only = 1;
+        self->avc444_conv[mon_index] = conv;
+    }
+    ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon_index];
+    if (ff == NULL)
+    {
+        struct xrdp_ffmpeg_avc444_config cfg;
+        xrdp_ffmpeg_avc444_config_default(&cfg);
+        cfg.chroma_align = self->avc444_chroma_align;
+        g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
+        cfg.encoder_args = self->avc444_encoder_args;
+        ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
+        if (ff == NULL)
+        {
+            g_free(d_rects);
+            return NULL;
+        }
+        self->avc444_ffmpeg_handle[mon_index] = ff;
+    }
+
+    if (xrdp_avc444_conv_update(conv, (const unsigned char *)enc_gfx_cmd->data,
+                                twidth * 4, twidth, theight) != 0)
+    {
+        g_free(d_rects);
+        return NULL;
+    }
+    enc_rv = xrdp_ffmpeg_avc444_encode_single(ff, conv->main_nv12,
+             conv->nv12_size, self->avc444_seq++, &pic);
+    if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
+    {
+        xrdp_ffmpeg_avc444_delete(ff);
+        self->avc444_ffmpeg_handle[mon_index] = NULL;
+        g_free(d_rects);
+        return NULL;
+    }
+    if (enc_rv != XRDP_FFMPEG_PAIR_READY)
+    {
+        g_free(d_rects); /* pipeline priming: empty frame this update */
+        return NULL;
+    }
+
+    need = pic.main_len + num_rects_d * 24 + 512;
+    s = &ls;
+    g_memset(s, 0, sizeof(struct stream));
+    s->size = need;
+    s->data = g_new(char, s->size);
+    if (s->data == NULL)
+    {
+        g_free(d_rects);
+        return NULL;
+    }
+    s->p = s->data;
+    if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, num_rects_d) != 0)
+    {
+        g_free(s->data);
+        g_free(d_rects);
+        return NULL;
+    }
+    out_uint8a(s, pic.main_data, pic.main_len);
+    s_mark_end(s);
+    bitmap_data_length = (int)(s->end - s->data);
+    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
+                                    XR_RDPGFX_CODECID_AVC420,
+                                    pixel_format, &dst_rect,
+                                    s->data, bitmap_data_length);
+    g_free(s->data);
+    g_free(d_rects);
+    return rv;
+}
+
+/*****************************************************************************/
 /* RFX_AVC444_BITMAP_STREAM (LC=0) serializer for the external ffmpeg AVC444
  * backend (PRD FR-WIRE). Emits AVC444 v1 (codec id 0x000E) or, when the client
  * advertised v2 support, AVC444 v2 (0x000F) with ChromaV2 packing; the LC field
@@ -1157,6 +1374,10 @@ gfx_wiretosurface1(struct xrdp_encoder *self,
     if (self->avc444_ffmpeg)
     {
         return gfx_wiretosurface1_avc444(self, bulk, in_s, enc);
+    }
+    if (self->avc420_ffmpeg)
+    {
+        return gfx_wiretosurface1_avc420(self, bulk, in_s, enc);
     }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
     int index;

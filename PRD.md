@@ -2173,3 +2173,24 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   encode-engine time (hardware, not software). Recipe documented in
   `docs/man/gfx.toml.5.in`.
 
+- **AVC420 (single YUV420 view, codec id 0x000B) over the ffmpeg IPC backend
+  (offscreen-verified, 2026-07-15).** Lets a deployment serve non-AVC444 clients
+  (and drop the linked x264/OpenH264 library) through the same external ffmpeg
+  child. AVC420 is AVC444 minus the aux view: the converter gains a `main_only`
+  mode (2x2-averaged main chroma, no aux packing), the runner gains
+  `encode_single` (one NV12 picture in, one Annex-B picture out; same pump/NUT/
+  validator/pipeline as the pair path), and a new `gfx_wiretosurface1_avc420`
+  emits one `RFX_AVC420_METABLOCK` + one sub-stream (no LC word) with codec id
+  0x000B. The whole ffmpeg contract — input NV12, Annex-B/NUT output, verbatim
+  `encoder_args` (incl. VAAPI) — is unchanged, so hardware encode applies to 420
+  too. Because the RDP client elects the codec (mstsc has no 420/444 knob and
+  always offers AVC444), a `gfx.toml [avc444_ffmpeg] avc_mode = "auto"|"444"|
+  "420"` selector (default auto) forces AVC420 for a fixed client, effective on
+  reconnect (no restart). Negotiation prefers AVC444 and falls back to AVC420.
+  Verified offscreen through the full live path (xrdp + libx264 + real xfreerdp3
+  3.15): default connect negotiates AVC444 v2, `/gfx:AVC420` negotiates
+  "Matched H264/AVC420 (ffmpeg) mode" and decodes correctly; a 6x zoom of
+  saturated colored text shows AVC420's expected softer (half-resolution) chroma
+  edges versus AVC444's crisp ones, with identical luma. Unit tests:
+  `test_avc444_main_only_420`, `test_ffmpeg_encode_single`.
+

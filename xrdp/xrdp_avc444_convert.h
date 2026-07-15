@@ -33,6 +33,11 @@
  *     and the aux view carries odd-column chroma for every row plus the
  *     even-column/odd-row chroma, so the same decoder filter reconstructs the
  *     true chroma instead of overshooting (MS-RDPEGFX 3.3.8.3.3).
+ *
+ * Setting main_only produces just the main YUV420 view (with the 2x2 averaged
+ * chroma), for plain AVC420 (codec id 0x000B) over the same ffmpeg backend.
+ * AVC420 is decoded as ordinary H.264 YUV420 (no aux, no reverse chroma
+ * filter), so there is no burr but chroma detail is halved versus AVC444.
  */
 
 #ifndef _XRDP_AVC444_CONVERT_H
@@ -59,6 +64,8 @@ struct xrdp_avc444_conv
     int coded_height;  /* actual_height rounded up to a multiple of 16 */
     int nv12_size;     /* bytes of one NV12 picture at coded dimensions  */
     int chroma_v2;     /* 0 = AVC444 v1 (ChromaV1); 1 = AVC444 v2         */
+    int main_only;     /* 1 = plain AVC420: fill only main_nv12 (2x2      */
+    /* averaged chroma); the aux view is not produced */
     unsigned char *main_nv12; /* persistent main YUV420 (NV12) view      */
     unsigned char *aux_nv12;  /* persistent auxiliary chroma (NV12) view */
 };

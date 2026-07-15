@@ -437,6 +437,7 @@ struct xrdp_mm
     int egfx_up;
     enum xrdp_egfx_flags egfx_flags;
     int avc444_ffmpeg; /* external stock-ffmpeg AVC444 backend selected */
+    int avc420_ffmpeg; /* external ffmpeg backend, plain AVC420 (0x000B) */
     int avc444_v2;     /* client supports AVC444 v2 (ChromaV2, 0x000F)   */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
