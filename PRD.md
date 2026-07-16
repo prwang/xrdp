@@ -2194,28 +2194,33 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   edges versus AVC444's crisp ones, with identical luma. Unit tests:
   `test_avc444_main_only_420`, `test_ffmpeg_encode_single`.
 
-- **AVC444/AVC420 tail-frame withholding fix — interactive input lag
-  (A/B-verified, 2026-07-16).** Field symptom: the last typed character was not
-  shown until unrelated damage (another keystroke, a tooltip, continuous
-  glxgears) pushed it out. Root cause (traced + measured + confirmed against
-  FFmpeg source): the external stock-ffmpeg child runs the fftools scheduler
-  (`ffmpeg_sched.c`) — every stage is its own pthread joined by **bounded
-  blocking queues** (frame queues hard-capped at 2), the encoder flushes only on
-  NULL/EOF, and the demux thread blocks on `read()` until stdin closes — so it
-  **withholds the tail frame(s) of an idle-bounded burst** until more input.
-  Isolated away from our code: raw `-f h264` (bypasses our NUT demux),
-  `-avioflags direct`, and `-threads 1` all behave identically; **no ffmpeg flag
-  drives the depth to 0**. The linked x264 path is immune (synchronous in-process
-  encode). Fix: a bounded, one-shot idle **tail-flush** — after a real frame the
-  worker (`proc_enc_msg`) arms a 33 ms timeout; on idle it feeds at most
-  `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4, ≥ the researched pipeline depth) duplicate
-  frames (the retained `conv` NV12) to push the withheld frame out, emits it once
-  as a STARTFRAME+WireToSurface1+ENDFRAME reusing the last frame id (frame-ack
-  flow control unchanged), then does not re-arm — so idle never becomes a
-  fixed-fps duplicate stream and continuous input is unaffected. Verified by A/B
-  on-box (cursor hidden, type a word, idle): pre-fix drops the last char
-  (`TAILFLUSHxO`), fixed delivers it (`TAILFLUSHxOK`). `xrdp_encoder.c` (flush +
-  worker timeout), `xrdp_encoder_ffmpeg.{c,h}` (`_inflight`).
+- **AVC444/AVC420 tail-frame withholding — root cause corrected + last-resort
+  guard (A/B-verified, 2026-07-16).** Field symptom: the last typed character was
+  not shown until unrelated damage (another keystroke, a tooltip, continuous
+  glxgears) pushed it out. **Corrected root cause** (measured on-box, superseding
+  an earlier fftools-scheduler hypothesis): the withhold is a property of the
+  **encoder pipeline DEPTH**, not the pipe or the scheduler. Feeding an encoder
+  frames with stdin held open and counting emitted vs. withheld pictures
+  (`PR-demo/tail_flush_ab/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
+  -async_depth N` withholds exactly **N−1** frames; `libx264` frame-threading
+  withholds its whole thread window; **`-async_depth 1` and `libx264 -tune
+  zerolatency`/`-threads 1` withhold ZERO** and emit every input picture in
+  ~3–9 ms (single views *and* AVC444 main+aux pairs). The shipped `gfx.toml`
+  already uses these low-latency args, so **the root-cause fix is configuration**,
+  not a code workaround; the earlier claim that "no ffmpeg flag drives the depth
+  to 0" was wrong. End-to-end A/B through real xrdp→FreeRDP (5 trials/group, a
+  fullscreen colour sequence ending RED, then idle): `async_depth 2` withholds
+  **5/5** (client shows the prior colour); `async_depth 1` delivers **5/5**;
+  `tail_flush=true` at `async_depth 2` also delivers **5/5**
+  (`PR-demo/tail_flush_ab/`). The **33 ms same-frame tail-flush** is **retained
+  as an opt-in last resort** for encoders whose depth cannot be lowered, now
+  **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when armed, after a
+  real frame the worker (`proc_enc_msg`) waits a 33 ms idle timeout then feeds at
+  most `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4) duplicate frames to push the withheld
+  frame out, emits it once as STARTFRAME+WireToSurface1+ENDFRAME reusing the last
+  frame id (frame-ack flow control unchanged), and does not re-arm. `xrdp_tconfig.{c,h}`
+  (`tail_flush` parse), `xrdp_encoder.{c,h}` (`avc444_flush_enabled` gate),
+  `xrdp_encoder_ffmpeg.c` (corrected header rationale), `gfx.toml`.
 
 ## 26. Related work and differentiation
 

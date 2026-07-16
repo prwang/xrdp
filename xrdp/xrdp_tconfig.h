@@ -97,6 +97,11 @@ struct xrdp_tconfig_gfx
     struct xrdp_avc444_encoder_args avc444_ffmpeg_encoder_args;
     int avc444_ffmpeg_chroma_align; /* coded WIDTH alignment: 16 or 32 */
     enum xrdp_tconfig_avc_mode avc444_ffmpeg_avc_mode; /* AVC444/420 select */
+    /* Last-resort tail-flush (33ms same-frame drain). Default OFF: the
+     * root-cause fix for the withheld tail is a low-latency encoder pipeline
+     * (h264_vaapi -async_depth 1, or libx264 -tune zerolatency). Enable this
+     * only when stuck on an encoder whose pipeline depth cannot be lowered. */
+    int avc444_ffmpeg_tail_flush;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

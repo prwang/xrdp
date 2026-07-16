@@ -24,6 +24,13 @@ h264_encoder = "x264"
 # # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
 # # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
 # avc_mode = "auto"
+# # tail_flush: last-resort workaround for interactive "last frame withheld"
+# # lag. Default false. The ROOT-CAUSE fix is a low-latency encoder pipeline
+# # (h264_vaapi -async_depth 1, or libx264 -tune zerolatency), which emits every
+# # frame immediately; enable this only when stuck on an encoder whose pipeline
+# # depth cannot be lowered. When on, an idle 33ms timer drains a bounded number
+# # of duplicate frames to push a withheld tail frame out.
+# tail_flush = false
 # encoder_args = [
 #   "-c:v", "libx264",
 #   "-bf", "0",

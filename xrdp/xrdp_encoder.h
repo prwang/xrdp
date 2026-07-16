@@ -56,9 +56,14 @@ struct xrdp_encoder
     unsigned long long avc444_seq;
     void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
     void *avc444_conv[16];           /* struct xrdp_avc444_conv *    */
-    /* tail-flush: ffmpeg withholds the last frame of an idle-bounded burst in
-     * its pipeline; after a real frame, arm a short idle timer and drain a
-     * bounded number of duplicate frames to push the withheld frame out */
+    /* tail-flush (OPT-IN last resort, gfx.toml tail_flush; default off): a deep
+     * encoder pipeline (e.g. -async_depth > 1) withholds the last frame of an
+     * idle-bounded burst until the next input. The root-cause fix is a shallow
+     * pipeline (-async_depth 1 / -tune zerolatency); when that is impossible,
+     * arm a short idle timer after a real frame and drain a bounded number of
+     * duplicate frames to push the withheld frame out. */
+    int avc444_flush_enabled;        /* gfx.toml tail_flush opt-in (last   */
+                                     /* resort; default off)               */
     int avc444_flush_armed;          /* a tail frame may be withheld       */
     int avc444_flush_mon;            /* which surface to flush             */
     unsigned long long avc444_flush_seq; /* desktop_seq of latest real frame */

@@ -413,6 +413,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         &config->avc444_ffmpeg_encoder_args);
     config->avc444_ffmpeg_chroma_align = 32;
     config->avc444_ffmpeg_avc_mode = XTC_AVC_AUTO;
+    config->avc444_ffmpeg_tail_flush = 0;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
@@ -421,6 +422,11 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_array_t *ea = toml_array_in(avc, "encoder_args");
             toml_datum_t ca = toml_int_in(avc, "chroma_align");
             toml_datum_t am = toml_string_in(avc, "avc_mode");
+            toml_datum_t tf = toml_bool_in(avc, "tail_flush");
+            if (tf.ok)
+            {
+                config->avc444_ffmpeg_tail_flush = tf.u.b ? 1 : 0;
+            }
             if (am.ok)
             {
                 if (g_strcasecmp(am.u.s, "auto") == 0)
