@@ -1,11 +1,50 @@
 [codec]
 order = [ "H.264", "RFX" ]
 
-# Specify a preferred H.264 encoder, "x264" or "OpenH264".
+# Specify a preferred H.264 encoder: "x264", "OpenH264", or "ffmpeg".
 # This parameter takes effect only when more than one encoder is
 # enabled at compile time. If only one encoder is enabled, the encoder
 # will be used regardless the value of this parameter.
+#
+# "ffmpeg" selects the external stock-ffmpeg AVC444/AVC420 backend (no linked
+# codec library). It encodes MS-RDPEGFX AVC444 v2 (0x000F) / AVC420 (0x000B)
+# via a stock `ffmpeg` child, and needs the matching xorgxrdp (>= the
+# CC_GFX_AVC444 capture) installed. See `man 5 gfx.toml` for the full contract.
 h264_encoder = "x264"
+
+# -----------------------------------------------------------------------------
+# External stock-ffmpeg AVC444/AVC420 backend. Uncomment [avc444_ffmpeg] AND set
+# h264_encoder = "ffmpeg" above to enable it. The encoder line (-c:v + tuning)
+# is passed verbatim to ffmpeg, so any encoder ffmpeg has works with no xrdp
+# change. The block below is the software (libx264) default; a hardware (VAAPI)
+# example follows.
+# -----------------------------------------------------------------------------
+# [avc444_ffmpeg]
+# path = "/usr/bin/ffmpeg"
+# # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
+# # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
+# avc_mode = "auto"
+# encoder_args = [
+#   "-c:v", "libx264",
+#   "-bf", "0",
+#   "-preset", "ultrafast",
+#   "-tune", "zerolatency",
+#   "-crf", "18",
+#   "-g", "240",
+#   "-x264-params", "repeat-headers=1",
+# ]
+#
+# Hardware H.264 via VAAPI (Intel/AMD render node). ffmpeg runs as root under
+# xrdp so it can open the render node; frames arrive as system-memory NV12 and
+# are uploaded to the GPU (-vf format=nv12,hwupload) before h264_vaapi. Replace
+# the encoder_args above with:
+# encoder_args = [
+#   "-vaapi_device", "/dev/dri/renderD128",
+#   "-vf", "format=nv12,hwupload",
+#   "-c:v", "h264_vaapi",
+#   "-rc_mode", "CQP", "-qp", "20",
+#   "-bf", "0", "-async_depth", "1",
+# ]
 
 #
 # Configurations for x264
