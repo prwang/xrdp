@@ -23,13 +23,17 @@
  * is invoked and no FFmpeg library is linked. All structural argv is owned
  * by xrdp; the child is driven with a nonblocking poll() loop.
  *
- * Pipeline note: a stock ffmpeg reading a *persistent* pipe emits output
- * one picture behind its input and never flushes the final picture without
- * EOF (empirically verified; the PRD's synchronous model held only for
- * EOF-terminated input). The runner is therefore pipelined: encode_pair()
- * submits a pair and returns the oldest *completed* pair, so a submitted
- * pair becomes available one desktop update later. flush_next() closes the
- * input and drains the remaining pairs (used at reset/teardown).
+ * Pipeline note: how many pictures the child holds before emitting depends on
+ * the encoder's pipeline DEPTH, not the pipe. With the shipped low-latency args
+ * (h264_vaapi -async_depth 1, or libx264 -tune zerolatency) the child streams
+ * one encoded picture per input picture with zero delay (measured ~3-9ms);
+ * a deeper pipeline (-async_depth N, or default frame-threading) holds N-1
+ * pictures until the next input or EOF. The runner is pipelined to be correct
+ * either way: encode_pair() submits a pair and returns the oldest *completed*
+ * pair -- with a shallow pipeline that IS the just-submitted pair (READY); with
+ * a deep one an older pair, and the newest becomes available a few desktop
+ * updates later (PENDING). flush_next() closes the input and drains the
+ * remaining pairs (used at reset/teardown). See PRD s25.
  */
 
 #ifndef _XRDP_ENCODER_FFMPEG_H
@@ -184,9 +188,10 @@ int
 xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
 
 /**
- * Frames submitted but not yet returned = frames still held in ffmpeg's
- * transcode pipeline (its bounded scheduler queues). The tail-flush drains at
- * most this many duplicate frames to push the withheld tail out.
+ * Frames submitted but not yet returned = frames still held in the encoder's
+ * pipeline (depth = async_depth-1 for VAAPI, the frame-thread window for x264;
+ * zero with the shipped low-latency args). The opt-in tail-flush drains at most
+ * this many duplicate frames to push a withheld tail out.
  */
 int
 xrdp_ffmpeg_avc444_inflight(struct xrdp_ffmpeg_avc444 *self);

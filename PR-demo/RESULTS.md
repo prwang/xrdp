@@ -118,8 +118,8 @@ seccomp/namespace jail — a hardening opportunity, not a regression.
 ## E5 — Cost of the copy-oriented pipe
 
 **Claim.** Feeding raw NV12 through a pipe (rather than sharing memory with a
-linked encoder) costs negligible CPU; the genuine cost is a one-frame pipeline
-latency, which is already documented and bounded.
+linked encoder) costs negligible CPU, and — with the shipped low-latency encoder
+args — adds no persistent frame of latency.
 
 **Result [measured]** (`bench/copy_bandwidth.py`): a coded 1080p NV12 picture is
 3.13 MB; host memcpy runs ~72 GB/s, so one userspace copy of an AVC444 frame
@@ -127,11 +127,16 @@ latency, which is already documented and bounded.
 runner queue, kernel copy-in on `write`, kernel copy-out on the child's `read`)
 that is ~1.5% of a single core at 60 fps. The pipe is not the bottleneck.
 
-The real, honest cost is **latency, not throughput**: a stock ffmpeg reading a
-persistent pipe emits one picture behind its input, so the pipelined runner adds
-**one desktop update** of latency (documented in `xrdp_encoder_ffmpeg.h` and PRD
-§25). That is the price of the subprocess boundary; it is bounded and constant,
-not per-byte.
+The subprocess boundary does **not** inherently add a frame of latency. Whether
+the child holds a frame is a property of the encoder's **pipeline depth**, not
+the pipe: measured on-box (`tail_flush_ab/ffmpeg_pipeline_depth_probe.py`), a
+low-latency encoder (`h264_vaapi -async_depth 1`, or `libx264 -tune zerolatency`)
+emits every input picture in ~3–9 ms with **zero** frames withheld — one-in,
+one-out. A deep pipeline (`-async_depth N`, or default frame-threading) would add
+`N−1` frames, but that is an `encoder_args` choice the operator controls, and the
+shipped defaults are low-latency. See PRD §25 and `tail_flush_ab/RESULTS.md` for
+the end-to-end A/B. The price of the subprocess boundary is the copy, not a
+frame.
 
 **Threats to validity.** memcpy bandwidth is box-specific, but the conclusion
 (copy CPU ≪ encode CPU) holds across any modern host by orders of magnitude.
@@ -153,7 +158,8 @@ These sharpen the above on the *same* box (except where noted):
   (`ffmpeg -lavfi libvmaf`) is on-box.
 - **P3 — glass-to-glass latency.** Timestamp a change in the session and its
   appearance in the decoded client frame (x11grab), comparing the linked-x264
-  path vs the ffmpeg pipe path, to quantify the one-frame pipeline cost in ms.
+  path vs the ffmpeg pipe path, to confirm the low-latency config adds no frame
+  of glass-to-glass latency over the linked encoder.
 - **P4 — other hardware backends.** nvenc/qsv are enumerated (E2) but need an
   NVIDIA/Intel GPU; run on a cloud instance with that hardware — no code change,
   same `encoder_args` mechanism, which is itself the point being demonstrated.

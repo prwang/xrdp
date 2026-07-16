@@ -4,6 +4,19 @@ Reproduce with `./repro_ffmpeg_latency.py` (needs a real ffmpeg + libx264).
 This documents *why* the AVC444 runner is pipelined and what actually causes
 the "one-frame lag", superseding the memory-level note in `BACKLOG.md`.
 
+> **Status update (2026-07-16).** The finding below (withholding is *encoder-side
+> output delay*, cured by a shallow/low-latency pipeline) is confirmed and is now
+> the shipped behaviour: the default `encoder_args` **include `-tune
+> zerolatency`**, so the historical "ships without zerolatency" line in the
+> Consequence section is stale — see the current `gfx.toml`. The same mechanism
+> generalises beyond libx264 to hardware encoders: `h264_vaapi` withholds
+> `async_depth − 1` frames, and `-async_depth 1` (the shipped VAAPI arg) drives
+> it to zero. An end-to-end xrdp→FreeRDP A/B and an isolated depth probe live in
+> `PR-demo/tail_flush_ab/`; PRD §25 carries the summary. The 33 ms same-frame
+> "tail-flush" is retained only as an **opt-in last resort**
+> (`[avc444_ffmpeg] tail_flush`, default off) for encoders whose depth cannot be
+> lowered — it is not needed by, and does not fire in, the shipped config.
+
 ## Symptom
 
 xrdp feeds the ffmpeg child one raw NV12 picture at a time over a persistent
@@ -109,12 +122,13 @@ mechanism:
 
 ## Consequence / recommendation
 
-The runner ships without `-tune zerolatency` and works around the delay by
-pipelining (`encode_pair()` returns the oldest completed pair). Adding
-`-tune zerolatency` to the encoder argv makes the child stream one encoded
-picture per input frame, which would permit the simpler synchronous model the
-PRD originally assumed and remove the ~1-update display lag. It is also the
-correct tune for an interactive remote-desktop encoder (the in-tree x264 GFX
-path already uses `tune = "zerolatency"` in `gfx.toml`). Changing the deployed,
-working runner is a follow-up that should be validated on-screen with the
-harness, not applied blind — tracked in `BACKLOG.md`.
+The runner is pipelined (`encode_pair()` returns the oldest completed pair) so it
+is correct at any pipeline depth. **The shipped `encoder_args` now include
+`-tune zerolatency`** (software) and `-async_depth 1` (the VAAPI example), so the
+child streams one encoded picture per input frame and the pipelined runner
+returns the just-submitted pair immediately — no display lag, and the tail-flush
+never fires. Keeping the pipeline shallow via `encoder_args` is the root-cause
+guarantee; it is also the correct tune for an interactive remote-desktop encoder
+(the in-tree x264 GFX path likewise uses `tune = "zerolatency"`). This was
+validated on-screen with the harness in `PR-demo/tail_flush_ab/` (5/5 delivered
+at `async_depth 1`; 5/5 withheld at `async_depth 2` with the flush off).

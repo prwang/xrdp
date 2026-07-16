@@ -1065,9 +1065,9 @@ xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self)
 }
 
 /*****************************************************************************/
-/* number of submitted frames not yet returned = frames held in the ffmpeg   */
-/* transcode pipeline (its bounded scheduler queues). Used to bound the       */
-/* tail-flush drain to the real backlog. */
+/* number of submitted frames not yet returned = frames held in the encoder  */
+/* pipeline (depth = async_depth-1 for VAAPI / frame-thread window for x264;  */
+/* zero with the shipped low-latency args). Bounds the tail-flush drain.      */
 int
 xrdp_ffmpeg_avc444_inflight(struct xrdp_ffmpeg_avc444 *self)
 {
