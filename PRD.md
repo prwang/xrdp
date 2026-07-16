@@ -2194,6 +2194,29 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   edges versus AVC444's crisp ones, with identical luma. Unit tests:
   `test_avc444_main_only_420`, `test_ffmpeg_encode_single`.
 
+- **AVC444/AVC420 tail-frame withholding fix — interactive input lag
+  (A/B-verified, 2026-07-16).** Field symptom: the last typed character was not
+  shown until unrelated damage (another keystroke, a tooltip, continuous
+  glxgears) pushed it out. Root cause (traced + measured + confirmed against
+  FFmpeg source): the external stock-ffmpeg child runs the fftools scheduler
+  (`ffmpeg_sched.c`) — every stage is its own pthread joined by **bounded
+  blocking queues** (frame queues hard-capped at 2), the encoder flushes only on
+  NULL/EOF, and the demux thread blocks on `read()` until stdin closes — so it
+  **withholds the tail frame(s) of an idle-bounded burst** until more input.
+  Isolated away from our code: raw `-f h264` (bypasses our NUT demux),
+  `-avioflags direct`, and `-threads 1` all behave identically; **no ffmpeg flag
+  drives the depth to 0**. The linked x264 path is immune (synchronous in-process
+  encode). Fix: a bounded, one-shot idle **tail-flush** — after a real frame the
+  worker (`proc_enc_msg`) arms a 33 ms timeout; on idle it feeds at most
+  `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4, ≥ the researched pipeline depth) duplicate
+  frames (the retained `conv` NV12) to push the withheld frame out, emits it once
+  as a STARTFRAME+WireToSurface1+ENDFRAME reusing the last frame id (frame-ack
+  flow control unchanged), then does not re-arm — so idle never becomes a
+  fixed-fps duplicate stream and continuous input is unaffected. Verified by A/B
+  on-box (cursor hidden, type a word, idle): pre-fix drops the last char
+  (`TAILFLUSHxO`), fixed delivers it (`TAILFLUSHxOK`). `xrdp_encoder.c` (flush +
+  worker timeout), `xrdp_encoder_ffmpeg.{c,h}` (`_inflight`).
+
 ## 26. Related work and differentiation
 
 Written after the fact (the project began without an upstream survey). Provenance:

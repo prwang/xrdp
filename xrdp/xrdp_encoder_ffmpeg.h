@@ -182,6 +182,14 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
 
 int
 xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
+
+/**
+ * Frames submitted but not yet returned = frames still held in ffmpeg's
+ * transcode pipeline (its bounded scheduler queues). The tail-flush drains at
+ * most this many duplicate frames to push the withheld tail out.
+ */
+int
+xrdp_ffmpeg_avc444_inflight(struct xrdp_ffmpeg_avc444 *self);
 int
 xrdp_ffmpeg_avc444_coded_height(struct xrdp_ffmpeg_avc444 *self);
 
