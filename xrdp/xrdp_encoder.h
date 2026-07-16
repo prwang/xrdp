@@ -56,6 +56,15 @@ struct xrdp_encoder
     unsigned long long avc444_seq;
     void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
     void *avc444_conv[16];           /* struct xrdp_avc444_conv *    */
+    /* tail-flush: ffmpeg withholds the last frame of an idle-bounded burst in
+     * its pipeline; after a real frame, arm a short idle timer and drain a
+     * bounded number of duplicate frames to push the withheld frame out */
+    int avc444_flush_armed;          /* a tail frame may be withheld       */
+    int avc444_flush_mon;            /* which surface to flush             */
+    unsigned long long avc444_flush_seq; /* desktop_seq of latest real frame */
+    int avc444_flush_frame_id;       /* last GFX frame id, reused for marks */
+    int avc444_flush_surface_id[16]; /* retained per-surface emit context  */
+    int avc444_flush_pixel_format[16];
     int frame_id_client; /* last frame id received from client */
     int frame_id_server; /* last frame id received from Xorg */
     int frame_id_server_sent;

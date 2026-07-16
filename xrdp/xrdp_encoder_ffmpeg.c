@@ -1057,6 +1057,20 @@ xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self)
 }
 
 /*****************************************************************************/
+/* number of submitted frames not yet returned = frames held in the ffmpeg   */
+/* transcode pipeline (its bounded scheduler queues). Used to bound the       */
+/* tail-flush drain to the real backlog. */
+int
+xrdp_ffmpeg_avc444_inflight(struct xrdp_ffmpeg_avc444 *self)
+{
+    if (self == NULL)
+    {
+        return 0;
+    }
+    return (int)(self->pairs_submitted - self->pairs_returned);
+}
+
+/*****************************************************************************/
 int
 xrdp_ffmpeg_avc444_coded_height(struct xrdp_ffmpeg_avc444 *self)
 {

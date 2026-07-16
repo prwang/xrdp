@@ -1103,6 +1103,13 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
+    /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
+     * tail-flush so it is delivered even if no further damage arrives */
+    self->avc444_flush_surface_id[mon_index] = surface_id;
+    self->avc444_flush_pixel_format[mon_index] = pixel_format;
+    self->avc444_flush_seq = self->avc444_seq - 1;
+    self->avc444_flush_mon = mon_index;
+    self->avc444_flush_armed = 1;
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
         g_free(d_rects); /* pipeline priming: empty frame this update */
@@ -1305,6 +1312,13 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
+    /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
+     * tail-flush so it is delivered even if no further damage arrives */
+    self->avc444_flush_surface_id[mon_index] = surface_id;
+    self->avc444_flush_pixel_format[mon_index] = pixel_format;
+    self->avc444_flush_seq = self->avc444_seq - 1;
+    self->avc444_flush_mon = mon_index;
+    self->avc444_flush_armed = 1;
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
         g_free(d_rects); /* pipeline priming: empty frame this update */
@@ -2047,6 +2061,12 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         /* setup for next cmd */
         in_s.p = holdp + cmd_bytes;
         in_s.end = holdend;
+        if (got_frame_id)
+        {
+            /* remember the last GFX frame id so an idle tail-flush can reuse it
+             * for its own STARTFRAME/ENDFRAME without perturbing frame acks */
+            self->avc444_flush_frame_id = frame_id;
+        }
         if (s != NULL)
         {
             /* send message to main thread */
@@ -2068,6 +2088,203 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         }
     }
     return 0;
+}
+
+/*****************************************************************************/
+/* Tail-flush for the external-ffmpeg AVC444/AVC420 backend (BACKLOG:
+ * "AVC444/AVC420 tail-frame withholding"). ffmpeg's fftools transcode runs
+ * each stage on its own thread joined by bounded blocking queues, so it holds
+ * the last frame(s) of an idle-bounded burst until more input or EOF. After a
+ * real frame we arm a short idle timer; on expiry we feed a BOUNDED number of
+ * duplicate frames (the retained NV12) to push the withheld real frame out and
+ * emit it once. Bounded to the researched pipeline depth and one-shot per idle
+ * burst, so idle never becomes a fixed-fps duplicate stream. */
+#define XRDP_AVC444_FLUSH_MS 33          /* ~one frame at the 30fps floor  */
+#define XRDP_AVC444_FLUSH_MAX_DRAIN 4    /* >= ffmpeg pipeline depth (filter
+                                          * 2 + enc 2 + libx264 latch): cap */
+
+/* Build the WireToSurface1 PDU for a flushed frame. Mirrors the emit tail of
+ * gfx_wiretosurface1_avc444/avc420 for a single full-surface region. */
+static struct stream *
+avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
+                        struct xrdp_avc444_encoded_pair *pair)
+{
+    struct xrdp_avc444_conv *conv =
+        (struct xrdp_avc444_conv *)self->avc444_conv[mon];
+    struct xrdp_egfx_bulk *bulk = self->mm->egfx->bulk;
+    struct xrdp_egfx_rect dst_rect;
+    struct xrdp_egfx_rect d_rects[1];
+    struct stream ls;
+    struct stream *s = &ls;
+    struct stream *rv;
+    int sub1_len;
+    int bitmap_data_length;
+    int surface_id = self->avc444_flush_surface_id[mon];
+    int pixel_format = self->avc444_flush_pixel_format[mon];
+
+    dst_rect.x1 = 0;
+    dst_rect.y1 = 0;
+    dst_rect.x2 = conv->actual_width;
+    dst_rect.y2 = conv->actual_height;
+    d_rects[0] = dst_rect;
+
+    g_memset(s, 0, sizeof(struct stream));
+    s->size = 4 + pair->main_len + pair->aux_len + 24 + 512;
+    s->data = g_new(char, s->size);
+    if (s->data == NULL)
+    {
+        return NULL;
+    }
+    s->p = s->data;
+    if (is420)
+    {
+        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
+        {
+            g_free(s->data);
+            return NULL;
+        }
+        out_uint8a(s, pair->main_data, pair->main_len);
+        s_mark_end(s);
+        bitmap_data_length = (int)(s->end - s->data);
+        rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
+                                        XR_RDPGFX_CODECID_AVC420,
+                                        pixel_format, &dst_rect,
+                                        s->data, bitmap_data_length);
+    }
+    else
+    {
+        out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
+        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
+        {
+            g_free(s->data);
+            return NULL;
+        }
+        out_uint8a(s, pair->main_data, pair->main_len);
+        sub1_len = (int)(s->p - s->data) - 4;
+        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
+        {
+            g_free(s->data);
+            return NULL;
+        }
+        out_uint8a(s, pair->aux_data, pair->aux_len);
+        s_mark_end(s);
+        {
+            unsigned int info = (unsigned int)sub1_len & 0x3FFFFFFF;
+            s->data[0] = (char)(info & 0xff);
+            s->data[1] = (char)((info >> 8) & 0xff);
+            s->data[2] = (char)((info >> 16) & 0xff);
+            s->data[3] = (char)((info >> 24) & 0xff);
+        }
+        bitmap_data_length = (int)(s->end - s->data);
+        rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
+                                        self->avc444_v2
+                                        ? XR_RDPGFX_CODECID_AVC444V2
+                                        : XR_RDPGFX_CODECID_AVC444,
+                                        pixel_format, &dst_rect,
+                                        s->data, bitmap_data_length);
+    }
+    g_free(s->data);
+    return rv;
+}
+
+static void
+avc444_flush_tail(struct xrdp_encoder *self)
+{
+    int mon = self->avc444_flush_mon;
+    int is420 = self->avc420_ffmpeg;
+    struct xrdp_ffmpeg_avc444 *ff;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair;
+    struct stream *s_start;
+    struct stream *s_wts1;
+    struct stream *s_end;
+    XRDP_ENC_DATA *fenc;
+    int fid = self->avc444_flush_frame_id;
+    int i;
+    int rv;
+    int got = 0;
+
+    self->avc444_flush_armed = 0; /* one-shot: do not re-arm after a flush */
+    if (mon < 0 || mon >= 16)
+    {
+        return;
+    }
+    ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon];
+    conv = (struct xrdp_avc444_conv *)self->avc444_conv[mon];
+    if (ff == NULL || conv == NULL)
+    {
+        return;
+    }
+    if (xrdp_ffmpeg_avc444_inflight(ff) <= 0)
+    {
+        return; /* nothing withheld */
+    }
+    /* feed bounded duplicate frames until the latest real frame emerges */
+    for (i = 0; i < XRDP_AVC444_FLUSH_MAX_DRAIN; i++)
+    {
+        if (is420)
+        {
+            rv = xrdp_ffmpeg_avc444_encode_single(ff, conv->main_nv12,
+                                                  conv->nv12_size,
+                                                  self->avc444_seq++, &pair);
+        }
+        else
+        {
+            rv = xrdp_ffmpeg_avc444_encode_pair(ff, conv->main_nv12,
+                                                conv->aux_nv12, conv->nv12_size,
+                                                self->avc444_seq++, &pair);
+        }
+        if (rv == XRDP_FFMPEG_PAIR_ERROR)
+        {
+            xrdp_ffmpeg_avc444_delete(ff);
+            self->avc444_ffmpeg_handle[mon] = NULL;
+            return;
+        }
+        if (rv == XRDP_FFMPEG_PAIR_READY &&
+                pair.desktop_sequence == self->avc444_flush_seq)
+        {
+            got = 1;
+            break; /* the latest real frame is now out */
+        }
+        /* intermediate real frame or pending: keep draining (bounded) */
+    }
+    if (!got)
+    {
+        return;
+    }
+
+    /* emit STARTFRAME + WireToSurface1 + ENDFRAME, reusing the last frame id so
+     * frame-ack flow control (frame_id_server/frame_id_client) is unchanged */
+    s_wts1 = avc444_flush_build_wts1(self, mon, is420, &pair);
+    if (s_wts1 == NULL)
+    {
+        return;
+    }
+    s_start = xrdp_egfx_frame_start(self->mm->egfx->bulk, fid, 0);
+    s_end = xrdp_egfx_frame_end(self->mm->egfx->bulk, fid);
+    fenc = g_new0(XRDP_ENC_DATA, 1);
+    if (s_start == NULL || s_end == NULL || fenc == NULL)
+    {
+        free_stream(s_start);
+        free_stream(s_wts1);
+        free_stream(s_end);
+        g_free(fenc);
+        return;
+    }
+    /* synthesized enc: GFX bit set, cmd/shmem NULL so the main thread frees it
+     * cleanly on the last (ENDFRAME) enc_done */
+    ENC_SET_BIT(fenc->flags, ENC_FLAGS_GFX_BIT);
+    gfx_send_done(self, fenc, (int)(s_start->end - s_start->data), 0,
+                  s_start->data, 0, 0, 0);
+    gfx_send_done(self, fenc, (int)(s_wts1->end - s_wts1->data), 0,
+                  s_wts1->data, 0, 0, 0);
+    gfx_send_done(self, fenc, (int)(s_end->end - s_end->data), 0,
+                  s_end->data, 1, fid, 1);
+    g_free(s_start); /* main thread owns/free the ->data via comp_pad_data */
+    g_free(s_wts1);
+    g_free(s_end);
+    LOG_DEVEL(LOG_LEVEL_DEBUG, "avc444_flush_tail: flushed seq %llu after "
+              "%d dup(s)", (unsigned long long)self->avc444_flush_seq, i + 1);
 }
 
 /**
@@ -2109,7 +2326,10 @@ proc_enc_msg(void *arg)
     cont = 1;
     while (cont)
     {
-        timeout = -1;
+        /* when a frame may be withheld in the ffmpeg pipeline, wait only a
+         * short time so an idle tail-flush can push it out (BACKLOG:
+         * AVC444/AVC420 tail-frame withholding) */
+        timeout = self->avc444_flush_armed ? XRDP_AVC444_FLUSH_MS : -1;
         robjs_count = 0;
         wobjs_count = 0;
         robjs[robjs_count++] = term_obj;
@@ -2152,6 +2372,11 @@ proc_enc_msg(void *arg)
                 enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
                 tc_mutex_unlock(mutex);
             }
+        }
+        else if (self->avc444_flush_armed)
+        {
+            /* idle timeout with no new damage: push the withheld tail frame */
+            avc444_flush_tail(self);
         }
 
     } /* end while (cont) */
