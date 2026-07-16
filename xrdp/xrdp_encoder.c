@@ -247,6 +247,8 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
         self->avc444_chroma_align =
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
+        self->avc444_flush_enabled =
+            mm->wm->gfx_config->avc444_ffmpeg_tail_flush;
     }
     else if (mm->avc420_ffmpeg)
     {
@@ -266,6 +268,8 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
         self->avc444_chroma_align =
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
+        self->avc444_flush_enabled =
+            mm->wm->gfx_config->avc444_ffmpeg_tail_flush;
     }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
     else if (mm->libh264_loaded && (mm->egfx_flags & XRDP_EGFX_H264) != 0)
@@ -1105,11 +1109,14 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     }
     /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
      * tail-flush so it is delivered even if no further damage arrives */
-    self->avc444_flush_surface_id[mon_index] = surface_id;
-    self->avc444_flush_pixel_format[mon_index] = pixel_format;
-    self->avc444_flush_seq = self->avc444_seq - 1;
-    self->avc444_flush_mon = mon_index;
-    self->avc444_flush_armed = 1;
+    if (self->avc444_flush_enabled)
+    {
+        self->avc444_flush_surface_id[mon_index] = surface_id;
+        self->avc444_flush_pixel_format[mon_index] = pixel_format;
+        self->avc444_flush_seq = self->avc444_seq - 1;
+        self->avc444_flush_mon = mon_index;
+        self->avc444_flush_armed = 1;
+    }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
         g_free(d_rects); /* pipeline priming: empty frame this update */
@@ -1314,11 +1321,14 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     }
     /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
      * tail-flush so it is delivered even if no further damage arrives */
-    self->avc444_flush_surface_id[mon_index] = surface_id;
-    self->avc444_flush_pixel_format[mon_index] = pixel_format;
-    self->avc444_flush_seq = self->avc444_seq - 1;
-    self->avc444_flush_mon = mon_index;
-    self->avc444_flush_armed = 1;
+    if (self->avc444_flush_enabled)
+    {
+        self->avc444_flush_surface_id[mon_index] = surface_id;
+        self->avc444_flush_pixel_format[mon_index] = pixel_format;
+        self->avc444_flush_seq = self->avc444_seq - 1;
+        self->avc444_flush_mon = mon_index;
+        self->avc444_flush_armed = 1;
+    }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
         g_free(d_rects); /* pipeline priming: empty frame this update */

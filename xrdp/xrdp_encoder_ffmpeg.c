@@ -17,10 +17,18 @@
  *
  * External stock-ffmpeg AVC444 process runner (PRD sections 8.4, 8.6, 8.13).
  *
- * A stock ffmpeg reading a persistent pipe emits output one picture behind
- * its input and flushes the final picture only on EOF. The runner is
- * therefore pipelined: encode_pair() submits a pair and returns the oldest
+ * The runner is pipelined: encode_pair() submits a pair and returns the oldest
  * completed pair; flush_next() closes the input and drains the remainder.
+ *
+ * How many pictures the child holds before emitting is a property of the
+ * encoder's pipeline DEPTH, not of the pipe: measured on this box, a low-
+ * latency encoder (h264_vaapi -async_depth 1, or libx264 -tune zerolatency /
+ * -threads 1) emits every input picture in ~3-9ms with ZERO frames withheld,
+ * while a deeper pipeline holds (async_depth - 1) frames (VAAPI) or the whole
+ * frame-thread window (x264) until the next input or EOF. The root-cause fix
+ * for the withheld-tail interactive lag is therefore to keep the pipeline
+ * shallow via encoder_args; the gfx.toml [avc444_ffmpeg] tail_flush knob is a
+ * last-resort same-frame drain for encoders whose depth cannot be lowered.
  */
 
 #if defined(HAVE_CONFIG_H)
