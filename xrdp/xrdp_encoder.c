@@ -2101,17 +2101,19 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 }
 
 /*****************************************************************************/
-/* Tail-flush for the external-ffmpeg AVC444/AVC420 backend (BACKLOG:
- * "AVC444/AVC420 tail-frame withholding"). ffmpeg's fftools transcode runs
- * each stage on its own thread joined by bounded blocking queues, so it holds
- * the last frame(s) of an idle-bounded burst until more input or EOF. After a
- * real frame we arm a short idle timer; on expiry we feed a BOUNDED number of
- * duplicate frames (the retained NV12) to push the withheld real frame out and
- * emit it once. Bounded to the researched pipeline depth and one-shot per idle
- * burst, so idle never becomes a fixed-fps duplicate stream. */
+/* OPT-IN tail-flush for the external-ffmpeg AVC444/AVC420 backend, gated by
+ * gfx.toml [avc444_ffmpeg] tail_flush (default off; see PRD s25). A deep
+ * encoder pipeline (e.g. -async_depth N>1, or default frame-threading) holds
+ * the last N-1 frame(s) of an idle-bounded burst until more input or EOF. The
+ * root-cause fix is a shallow pipeline (-async_depth 1 / -tune zerolatency),
+ * which is the shipped default and withholds nothing; this flush exists only
+ * for encoders whose depth cannot be lowered. When enabled: after a real frame
+ * we arm a short idle timer; on expiry we feed a BOUNDED number of duplicate
+ * frames (the retained NV12) to push the withheld real frame out and emit it
+ * once. Bounded and one-shot per idle burst, so idle never becomes a fixed-fps
+ * duplicate stream. */
 #define XRDP_AVC444_FLUSH_MS 33          /* ~one frame at the 30fps floor  */
-#define XRDP_AVC444_FLUSH_MAX_DRAIN 4    /* >= ffmpeg pipeline depth (filter
-                                          * 2 + enc 2 + libx264 latch): cap */
+#define XRDP_AVC444_FLUSH_MAX_DRAIN 4    /* >= plausible pipeline depth    */
 
 /* Build the WireToSurface1 PDU for a flushed frame. Mirrors the emit tail of
  * gfx_wiretosurface1_avc444/avc420 for a single full-surface region. */
