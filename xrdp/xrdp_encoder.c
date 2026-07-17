@@ -750,6 +750,50 @@ process_enc_rfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 #endif
 
 /*****************************************************************************/
+/* Diagnostic: XRDP_GFX_TRACE=1 logs the per-frame damage region so a stuck
+ * on-screen frame can be checked for a wrong/degenerate metablock region. */
+static int
+gfx_enc_trace_on(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char *e = g_getenv("XRDP_GFX_TRACE");
+        cached = (e != NULL && e[0] == '1') ? 1 : 0;
+    }
+    return cached;
+}
+
+/*****************************************************************************/
+static void
+gfx_trace_rects(const char *tag, int surface_id, int num_rects,
+                struct xrdp_egfx_rect *rects)
+{
+    int i;
+    int bx1 = 1 << 30;
+    int by1 = 1 << 30;
+    int bx2 = 0;
+    int by2 = 0;
+
+    if (!gfx_enc_trace_on())
+    {
+        return;
+    }
+    for (i = 0; i < num_rects; i++)
+    {
+        bx1 = MIN(bx1, rects[i].x1);
+        by1 = MIN(by1, rects[i].y1);
+        bx2 = MAX(bx2, rects[i].x2);
+        by2 = MAX(by2, rects[i].y2);
+    }
+    LOG(LOG_LEVEL_INFO, "GFX_TRACE %s surface=%d num_rects=%d "
+        "bbox=(%d,%d)-(%d,%d) first=(%d,%d)-(%d,%d)", tag, surface_id,
+        num_rects, bx1, by1, bx2, by2,
+        num_rects > 0 ? rects[0].x1 : -1, num_rects > 0 ? rects[0].y1 : -1,
+        num_rects > 0 ? rects[0].x2 : -1, num_rects > 0 ? rects[0].y2 : -1);
+}
+
+/*****************************************************************************/
 /* Emit an RFX_AVC420_METABLOCK. Kept outside the x264/OpenH264 guard so the
  * external ffmpeg AVC444 backend can reuse it without a linked H.264 library
  * (PRD FR-CAP-0). Not static: the origin even-alignment below is unit tested. */
@@ -949,9 +993,9 @@ avc444_debug_dump(unsigned long long seq, int twidth, int theight,
  * AVC420 (codec id 0x000B): a single RFX_AVC420_METABLOCK followed by one
  * H.264 sub-stream — no avc420EncodedBitstreamInfo/LC word and no second
  * (auxiliary) sub-stream. The converter fills only the main YUV420 view and
- * the child encodes one picture per frame. Like the AVC444 path it is
- * pipelined: returns NULL while the pipeline primes (that frame becomes an
- * empty GFX update, so the client keeps its prior content). */
+ * the child encodes one picture per frame. Like the AVC444 path the encode is
+ * synchronous (content always matches this frame's damage region); NULL on
+ * encoder error only (defensive PENDING keeps prior client content). */
 static struct stream *
 gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
                           struct xrdp_egfx_bulk *bulk, struct stream *in_s,
@@ -1029,6 +1073,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         return NULL;
     }
     in_uint8s(in_s, num_rects_c * 8); /* c_rects unused in MVP */
+    gfx_trace_rects("avc dmg", surface_id, num_rects_d, d_rects);
     in_uint16_le(in_s, left);
     in_uint16_le(in_s, top);
     in_uint16_le(in_s, width);
@@ -1100,6 +1145,19 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     }
     enc_rv = xrdp_ffmpeg_avc444_encode_single(ff, conv->main_nv12,
              conv->nv12_size, self->avc444_seq++, &pic);
+    if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
+    {
+        int cy_off = (conv->coded_height / 2) * conv->coded_width
+                     + conv->coded_width / 2;
+        LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
+            "%lld rv=%s inflight=%d centerY=%d",
+            (unsigned long long)(self->avc444_seq - 1),
+            enc_rv == XRDP_FFMPEG_PAIR_READY
+            ? (long long)pic.desktop_sequence : -1LL,
+            enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
+            xrdp_ffmpeg_avc444_inflight(ff),
+            (int)conv->main_nv12[cy_off]);
+    }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
         xrdp_ffmpeg_avc444_delete(ff);
@@ -1107,8 +1165,8 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
-    /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
-     * tail-flush so it is delivered even if no further damage arrives */
+    /* legacy opt-in tail-flush: with the synchronous encode nothing is
+     * normally left in flight (the drain no-ops); kept as a backstop */
     if (self->avc444_flush_enabled)
     {
         self->avc444_flush_surface_id[mon_index] = surface_id;
@@ -1119,7 +1177,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
-        g_free(d_rects); /* pipeline priming: empty frame this update */
+        g_free(d_rects); /* defensive: no pair; client keeps prior content */
         return NULL;
     }
 
@@ -1156,11 +1214,12 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
 /* RFX_AVC444_BITMAP_STREAM (LC=0) serializer for the external ffmpeg AVC444
  * backend (PRD FR-WIRE). Emits AVC444 v1 (codec id 0x000E) or, when the client
  * advertised v2 support, AVC444 v2 (0x000F) with ChromaV2 packing; the LC field
- * stays 0 in both cases. Submits the current frame's pair to the pipelined
- * encoder and emits the oldest completed pair; returns NULL while the
- * pipeline primes (that frame becomes an empty GFX update — process_enc_egfx
- * still sends STARTFRAME/ENDFRAME — so the client keeps its prior content,
- * costing about one desktop update of latency). */
+ * stays 0 in both cases. The encode is synchronous: the emitted H.264 pair is
+ * exactly this frame's capture, so the metablock damage region always matches
+ * the content (a prior pipelined design emitted the previous frame's pair
+ * under this frame's region — region-strict clients like mstsc then showed a
+ * permanently stale screen). NULL on encoder error only (defensive PENDING
+ * keeps prior client content via an empty STARTFRAME/ENDFRAME update). */
 static struct stream *
 gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
                           struct xrdp_egfx_bulk *bulk, struct stream *in_s,
@@ -1239,6 +1298,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         return NULL;
     }
     in_uint8s(in_s, num_rects_c * 8); /* c_rects unused in MVP */
+    gfx_trace_rects("avc dmg", surface_id, num_rects_d, d_rects);
     in_uint16_le(in_s, left);
     in_uint16_le(in_s, top);
     in_uint16_le(in_s, width);
@@ -1312,6 +1372,21 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     enc_rv = xrdp_ffmpeg_avc444_encode_pair(ff, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             self->avc444_seq++, &pair);
+    if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
+    {
+        /* centre luma of the CURRENT capture: proves which colour this
+         * submission carries vs which sequence the popped pair returns */
+        int cy_off = (conv->coded_height / 2) * conv->coded_width
+                     + conv->coded_width / 2;
+        LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
+            "%lld rv=%s inflight=%d centerY=%d",
+            (unsigned long long)(self->avc444_seq - 1),
+            enc_rv == XRDP_FFMPEG_PAIR_READY
+            ? (long long)pair.desktop_sequence : -1LL,
+            enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
+            xrdp_ffmpeg_avc444_inflight(ff),
+            (int)conv->main_nv12[cy_off]);
+    }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
         xrdp_ffmpeg_avc444_delete(ff);
@@ -1319,8 +1394,8 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
-    /* the just-submitted frame is now held in ffmpeg's pipeline; arm the idle
-     * tail-flush so it is delivered even if no further damage arrives */
+    /* legacy opt-in tail-flush: with the synchronous encode nothing is
+     * normally left in flight (the drain no-ops); kept as a backstop */
     if (self->avc444_flush_enabled)
     {
         self->avc444_flush_surface_id[mon_index] = surface_id;
@@ -1331,7 +1406,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
-        g_free(d_rects); /* pipeline priming: empty frame this update */
+        g_free(d_rects); /* defensive: no pair; client keeps prior content */
         return NULL;
     }
 

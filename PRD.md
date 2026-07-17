@@ -2207,29 +2207,37 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   xrdp→FreeRDP with a *fresh login* (not just reconnect — config binds at login;
   colour sequence ending RED, then idle): `async_depth 2` withholds (client shows
   the prior colour); `tail_flush=true` at `async_depth 2` delivers.
-  **Open reproducibility gap (2026-07-17) — do not treat "async_depth 1" as
-  settled.** The above A/B used `xfreerdp3`, never `mstsc`. A live **mstsc**
-  deployment on the **same passed-through GPU** still withholds the tail frame at
-  `-async_depth 1`, which the GPU/driver cannot explain (identical hardware).
-  So there is a **second, client/transport-level** cause that the xfreerdp test
-  cannot observe (mstsc and xfreerdp differ in FRAME_ACK cadence, ack
-  suspension, and final-frame presentation). An earlier "VAAPI-driver dependent"
-  explanation here was speculation and is withdrawn. To localise it on the real
-  client, the build carries an env-gated per-frame server trace
-  (`XRDP_GFX_TRACE=1` → `GFX_TRACE send/ack` lines with frame ids and
-  timestamps): a `send last=1` for the last update with no on-screen change
-  points at client/transport; no `send` until the next damage points at a
-  server/encoder hold. Until that trace is read from an mstsc session, the
-  **practical, verified fix is `tail_flush = true`** (it re-emits the last frame
-  and unblocks it regardless of where it is stuck). The **33 ms same-frame
-  tail-flush** is **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when
-  armed, after a
-  real frame the worker (`proc_enc_msg`) waits a 33 ms idle timeout then feeds at
-  most `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4) duplicate frames to push the withheld
-  frame out, emits it once as STARTFRAME+WireToSurface1+ENDFRAME reusing the last
-  frame id (frame-ack flow control unchanged), and does not re-arm. `xrdp_tconfig.{c,h}`
-  (`tail_flush` parse), `xrdp_encoder.{c,h}` (`avc444_flush_enabled` gate),
-  `xrdp_encoder_ffmpeg.c` (corrected header rationale), `gfx.toml`.
+  **RESOLVED (2026-07-17) — true root cause: pipelined-runner content/region
+  desync; fix: synchronous encode.** A live mstsc repro on the same GPU at
+  `-async_depth 1` disproved the pure-depth story and the forensic chain
+  (per-frame `XRDP_GFX_TRACE`: send/ack, damage-region bbox, and a
+  submitted-vs-returned sequence trace with capture centre-luma) pinned the
+  real mechanism: the runner *returned the oldest completed pair* while the
+  caller built the AVC metablock from the *current* frame's damage rects.
+  After any slow first frame (VAAPI driver warmup) or deep pipeline, it went
+  **permanently one-behind** — trace showed `returned_seq = submitted_seq − 1`
+  on every frame — i.e. frame N−1's pixels shipped under frame N's region.
+  mstsc honours region rects strictly: it decoded and **acked** each frame
+  (`decoded` counter advanced) but blitted stale full-screen content, revealing
+  the newest picture only inside later small damage rects — exactly the field
+  screenshot (stuck `n=2` red screen; hovering a tooltip painted only that
+  rect green, from the already-decoded newer surface). FreeRDP masked the bug
+  by presenting the whole decoded surface, which is why every xfreerdp A/B
+  read "delivered"; the tail-flush masked it by draining the pipe and
+  re-emitting full-surface. **Fix** (`xrdp_encoder_ffmpeg.c`):
+  `encode_pair()`/`encode_single()` now wait synchronously (bounded by
+  `pair/picture_timeout_ms`) for exactly the submitted picture and verify
+  `desktop_sequence`; mismatch or timeout fails loudly and restarts the
+  encoder. Verified: keystroke-driven colour test (r/g/b/w) shows the correct
+  colour on every keypress, `submitted_seq == returned_seq` with `inflight=0`
+  from frame 0, no timeouts (VAAPI `-async_depth 1` returns each picture in
+  ~3–9 ms). Requires a zero-latency encoder pipeline (shipped defaults); a
+  too-deep pipeline now errors loudly instead of silently desyncing. The
+  `tail_flush` knob (default off) remains as a defensive backstop but is
+  normally a no-op (nothing left in flight). Diagnostics kept, all gated by
+  `XRDP_GFX_TRACE=1`: per-frame send/ack, damage bbox, seq/luma enc trace
+  (`xrdp_mm.c`, `xrdp_encoder.c`); keystroke harness in
+  `PR-demo/tail_flush_ab/` (`colorkey.sh`, `MSTSC_TRACE.md`).
 
 ## 26. Related work and differentiation
 

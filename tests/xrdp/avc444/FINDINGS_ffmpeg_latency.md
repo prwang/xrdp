@@ -11,14 +11,17 @@ the "one-frame lag", superseding the memory-level note in `BACKLOG.md`.
 > Consequence section is stale — see the current `gfx.toml`. The same mechanism
 > generalises beyond libx264 to hardware encoders: `h264_vaapi` withholds
 > `async_depth − 1` frames (measured with the isolated depth probe and an
-> xfreerdp end-to-end A/B). **Open gap (2026-07-17):** those tests used
-> xfreerdp, not mstsc. A live **mstsc** deployment on the **same** GPU still
-> withholds the tail at `-async_depth 1`, so a second, **client/transport-level**
-> cause exists that the xfreerdp test cannot see; an earlier "VAAPI-driver
-> dependent" note was speculation and is withdrawn. Diagnose on the real client
-> with `XRDP_GFX_TRACE=1` (per-frame `GFX_TRACE send/ack` lines). The verified
-> practical fix meanwhile is `[avc444_ffmpeg] tail_flush = true`. See PRD §25 and
-> `PR-demo/tail_flush_ab/`.
+> xfreerdp end-to-end A/B). **Resolution (2026-07-17):** a live mstsc repro on
+> the same GPU exposed the real field bug — not encoder withholding but a
+> **runner content/region desync**: the pipelined runner returned the *oldest*
+> completed picture while the metablock carried the *current* damage region, so
+> after any slow first frame it ran permanently one-behind
+> (`returned_seq = submitted_seq − 1` in the trace) and region-strict clients
+> (mstsc) displayed stale full-screen content forever. Fixed by making
+> `encode_pair()/encode_single()` **synchronous** (bounded wait for the
+> submitted picture + sequence verification). This *relies on* the shallow
+> pipeline documented below — a deep pipeline now errors loudly instead of
+> desyncing. See PRD §25 and `PR-demo/tail_flush_ab/`.
 
 ## Symptom
 

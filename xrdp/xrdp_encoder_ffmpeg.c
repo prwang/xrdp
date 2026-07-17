@@ -17,18 +17,23 @@
  *
  * External stock-ffmpeg AVC444 process runner (PRD sections 8.4, 8.6, 8.13).
  *
- * The runner is pipelined: encode_pair() submits a pair and returns the oldest
- * completed pair; flush_next() closes the input and drains the remainder.
+ * The runner is SYNCHRONOUS: encode_pair()/encode_single() wait (bounded by
+ * pair/picture_timeout_ms) for the picture(s) just submitted and return
+ * exactly that frame; flush_next() closes the input and drains the remainder.
  *
- * How many pictures the child holds before emitting is a property of the
- * encoder's pipeline DEPTH, not of the pipe: measured on this box, a low-
- * latency encoder (h264_vaapi -async_depth 1, or libx264 -tune zerolatency /
- * -threads 1) emits every input picture in ~3-9ms with ZERO frames withheld,
- * while a deeper pipeline holds (async_depth - 1) frames (VAAPI) or the whole
- * frame-thread window (x264) until the next input or EOF. The root-cause fix
- * for the withheld-tail interactive lag is therefore to keep the pipeline
- * shallow via encoder_args; the gfx.toml [avc444_ffmpeg] tail_flush knob is a
- * last-resort same-frame drain for encoders whose depth cannot be lowered.
+ * History: an earlier pipelined design returned the OLDEST completed pair
+ * instead. Whenever the encoder's first frame was slow (VAAPI driver warmup)
+ * or its pipeline deep (-async_depth > 1, x264 frame-threading), the runner
+ * went permanently one-behind: frame N's H.264 content was emitted under
+ * frame N+1's damage region. Clients that strictly honour the AVC metablock
+ * region rects (mstsc) then blit stale pixels forever and reveal the newest
+ * picture only inside later small damage rects (the "stuck last frame /
+ * tooltip reveals it" field bug); FreeRDP hid it by presenting the whole
+ * decoded surface. The synchronous wait makes content/region desync
+ * impossible; an encoder that cannot return the submitted picture in time
+ * (pipeline too deep) fails LOUDLY and is restarted -- configure a zero-
+ * latency pipeline (h264_vaapi -async_depth 1, libx264 -tune zerolatency;
+ * ~3-9ms/picture measured, well inside an interactive frame budget).
  */
 
 #if defined(HAVE_CONFIG_H)
@@ -882,28 +887,50 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     }
     self->pairs_submitted++;
 
-    st = pump(self, now_ms() + self->cfg.picture_timeout_ms, 0);
-    if (st == 1 || st == 2)
+    /* SYNCHRONOUS: wait (bounded) for THE pair just submitted. Returning any
+     * older pair would ship stale pixels under the caller's current damage
+     * region -- the content/region desync behind the mstsc "stuck last frame"
+     * bug. A too-deep encoder pipeline (e.g. -async_depth > 1) that cannot
+     * return the submitted picture without further input times out here and
+     * fails LOUDLY (teardown + respawn) instead of silently desyncing; use a
+     * zero-latency encoder config (see gfx.toml). */
     {
-        return XRDP_FFMPEG_PAIR_ERROR;
-    }
-    if (pk_available(self) >= 2)
-    {
-        if (pop_pair(self, result) != 0)
+        long long deadline = now_ms() + self->cfg.pair_timeout_ms;
+        for (;;)
         {
-            return XRDP_FFMPEG_PAIR_ERROR;
+            st = pump(self, deadline, 0);
+            if (st == 1 || st == 2)
+            {
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
+            if (pk_available(self) >= 2)
+            {
+                break;
+            }
+            if (now_ms() >= deadline)
+            {
+                LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: submitted pair not "
+                    "returned within %d ms (encoder pipeline too deep? use "
+                    "-async_depth 1 / -tune zerolatency); restarting encoder",
+                    self->cfg.pair_timeout_ms);
+                self->metrics.timeouts++;
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
         }
-        return XRDP_FFMPEG_PAIR_READY;
     }
-    if (self->pairs_submitted - self->pairs_returned > FF_MAX_INFLIGHT_PAIRS)
+    if (pop_pair(self, result) != 0)
     {
-        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: encoder stalled, %llu pairs in "
-            "flight", (unsigned long long)(self->pairs_submitted -
-                                           self->pairs_returned));
-        self->metrics.timeouts++;
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    return XRDP_FFMPEG_PAIR_PENDING;
+    if (result->desktop_sequence != desktop_sequence)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: pair sequence mismatch "
+            "(got %llu want %llu); restarting encoder",
+            (unsigned long long)result->desktop_sequence,
+            (unsigned long long)desktop_sequence);
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    return XRDP_FFMPEG_PAIR_READY;
 }
 
 /*****************************************************************************/
@@ -934,28 +961,46 @@ xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
     }
     self->pairs_submitted++;
 
-    st = pump(self, now_ms() + self->cfg.picture_timeout_ms, 0);
-    if (st == 1 || st == 2)
+    /* SYNCHRONOUS: wait (bounded) for THE picture just submitted; see the
+     * matching comment in encode_pair for why returning an older one is a
+     * correctness bug (content/region desync). */
     {
-        return XRDP_FFMPEG_PAIR_ERROR;
-    }
-    if (pk_available(self) >= 1)
-    {
-        if (pop_single(self, result) != 0)
+        long long deadline = now_ms() + self->cfg.picture_timeout_ms;
+        for (;;)
         {
-            return XRDP_FFMPEG_PAIR_ERROR;
+            st = pump(self, deadline, 0);
+            if (st == 1 || st == 2)
+            {
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
+            if (pk_available(self) >= 1)
+            {
+                break;
+            }
+            if (now_ms() >= deadline)
+            {
+                LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: submitted picture not "
+                    "returned within %d ms (encoder pipeline too deep? use "
+                    "-async_depth 1 / -tune zerolatency); restarting encoder",
+                    self->cfg.picture_timeout_ms);
+                self->metrics.timeouts++;
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
         }
-        return XRDP_FFMPEG_PAIR_READY;
     }
-    if (self->pairs_submitted - self->pairs_returned > FF_MAX_INFLIGHT_PAIRS)
+    if (pop_single(self, result) != 0)
     {
-        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: encoder stalled, %llu frames in "
-            "flight", (unsigned long long)(self->pairs_submitted -
-                                           self->pairs_returned));
-        self->metrics.timeouts++;
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    return XRDP_FFMPEG_PAIR_PENDING;
+    if (result->desktop_sequence != desktop_sequence)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: picture sequence mismatch "
+            "(got %llu want %llu); restarting encoder",
+            (unsigned long long)result->desktop_sequence,
+            (unsigned long long)desktop_sequence);
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    return XRDP_FFMPEG_PAIR_READY;
 }
 
 /*****************************************************************************/

@@ -23,17 +23,16 @@
  * is invoked and no FFmpeg library is linked. All structural argv is owned
  * by xrdp; the child is driven with a nonblocking poll() loop.
  *
- * Pipeline note: how many pictures the child holds before emitting depends on
- * the encoder's pipeline DEPTH, not the pipe. With the shipped low-latency args
- * (h264_vaapi -async_depth 1, or libx264 -tune zerolatency) the child streams
- * one encoded picture per input picture with zero delay (measured ~3-9ms);
- * a deeper pipeline (-async_depth N, or default frame-threading) holds N-1
- * pictures until the next input or EOF. The runner is pipelined to be correct
- * either way: encode_pair() submits a pair and returns the oldest *completed*
- * pair -- with a shallow pipeline that IS the just-submitted pair (READY); with
- * a deep one an older pair, and the newest becomes available a few desktop
- * updates later (PENDING). flush_next() closes the input and drains the
- * remaining pairs (used at reset/teardown). See PRD s25.
+ * Latency note: the runner is SYNCHRONOUS -- encode_pair()/encode_single()
+ * wait (bounded) for the just-submitted picture(s) and return exactly that
+ * frame, so the H.264 content always matches the caller's damage region.
+ * Returning an older picture instead (the previous pipelined design) shipped
+ * stale pixels under the current region; region-strict clients (mstsc) then
+ * displayed a permanently stale screen (see the header of the .c file).
+ * Requires a shallow encoder pipeline (h264_vaapi -async_depth 1, libx264
+ * -tune zerolatency; ~3-9ms/picture): a pipeline that cannot return the
+ * submitted picture without more input times out and errors. flush_next()
+ * closes the input and drains the remainder (reset/teardown). See PRD s25.
  */
 
 #ifndef _XRDP_ENCODER_FFMPEG_H
