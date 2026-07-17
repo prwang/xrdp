@@ -44,6 +44,7 @@ test_xrdp_SOURCES = \
     test_xrdp_keymap.c \
     test_xrdp_region.c \
     test_tconfig.c \
+    test_avc444_convert.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \
@@ -65,6 +66,7 @@ test_xrdp_LDADD = \
     $(top_builddir)/xrdp/xrdp_wm.o \
     $(top_builddir)/xrdp/xrdp_font.o \
     $(top_builddir)/xrdp/xrdp_egfx.o \
+    $(top_builddir)/xrdp/xrdp_avc444_convert.o \
     $(top_builddir)/xrdp/xrdp_cache.o \
     $(top_builddir)/xrdp/xrdp_region.o \
     $(top_builddir)/xrdp/xrdp_listen.o \

@@ -83,6 +83,8 @@ xrdp_SOURCES = \
   xrdp_main_utils.c \
   xrdp_tconfig.c \
   xrdp_tconfig.h \
+  xrdp_avc444_convert.c \
+  xrdp_avc444_convert.h \
   $(XRDP_EXTRA_SOURCES)
 
 xrdp_LDADD = \
