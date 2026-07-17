@@ -32,6 +32,8 @@
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
+#include "xrdp_avc444_caps.h"
+#include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_sockets.h"
 #include "xrdp_egfx.h"
 #include "libxrdp.h"
@@ -1206,12 +1208,21 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     g_qsort(ver_flags, caps_count, sizeof(struct ver_flags_t), cmpverfunc);
     best_h264_index = -1;
     best_pro_index = -1;
+    int avc444_v2_capable = 0;
+    int best_v2_index = -1;
     for (index = 0; index < caps_count; index++)
     {
         version = ver_flags[index].version;
         flags = ver_flags[index].flags;
         LOG(LOG_LEVEL_INFO, "  version 0x%8.8x flags 0x%8.8x (index: %d)",
             version, flags, index);
+        if (xrdp_avc444_caps_supports_v2(version, flags))
+        {
+            /* ver_flags is sorted ascending, so this keeps the highest
+             * v2-capable capset to confirm when emitting v2 */
+            avc444_v2_capable = 1;
+            best_v2_index = index;
+        }
         switch (version)
         {
             case XR_RDPGFX_CAPVERSION_8: /* FALLTHROUGH */
@@ -1254,11 +1265,109 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     int best_index = -1;
     struct xrdp_tconfig_gfx_codec_order *co = &self->wm->gfx_config->codec;
     char cobuff[64];
+    int avc444_ffmpeg_ok = 0;
+    int avc420_ffmpeg_ok = 0;
+
+    /* external stock-ffmpeg backend eligibility: single
+     * monitor, and only after a successful behavioral probe at the session
+     * geometry. avc_mode (gfx.toml) selects AVC444 vs plain AVC420: AUTO
+     * prefers AVC444 and falls back to AVC420; "420" forces AVC420 for any
+     * H.264-capable client (so mstsc, which always offers AVC444, can be
+     * tested on the AVC420 path); "444" serves AVC444 only. */
+    if (self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG &&
+            best_h264_index >= 0 &&
+            self->wm->client_info->display_sizes.monitorCount <= 1)
+    {
+        enum xrdp_tconfig_avc_mode cfgmode =
+            self->wm->gfx_config->avc444_ffmpeg_avc_mode;
+        enum xrdp_gfx_avc_mode m;
+        int want_420;
+        m = xrdp_avc444_classify_caps(ver_flags[best_h264_index].version,
+                                      ver_flags[best_h264_index].flags);
+        if (cfgmode == XTC_AVC_FORCE_420)
+        {
+            want_420 = 1;
+        }
+        else if (cfgmode == XTC_AVC_FORCE_444)
+        {
+            want_420 = 0;
+        }
+        else
+        {
+            want_420 = (m != XRDP_GFX_AVC444);
+        }
+        if (want_420 || m == XRDP_GFX_AVC444)
+        {
+            struct xrdp_ffmpeg_avc444_config cfg;
+            int cw = (screen->width + 15) & ~15;
+            int ch = (screen->height + 15) & ~15;
+            xrdp_ffmpeg_avc444_config_default(&cfg);
+            g_strncpy(cfg.path, self->wm->gfx_config->avc444_ffmpeg_path,
+                      sizeof(cfg.path) - 1);
+            cfg.encoder_args =
+                self->wm->gfx_config->avc444_ffmpeg_encoder_args;
+            LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
+                "%s %s at %dx%d", want_420 ? "AVC420" : "AVC444", cfg.path,
+                cw, ch);
+            if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
+            {
+                if (want_420)
+                {
+                    avc420_ffmpeg_ok = 1;
+                }
+                else
+                {
+                    avc444_ffmpeg_ok = 1;
+                }
+                LOG(LOG_LEVEL_INFO, "  ffmpeg %s probe OK",
+                    want_420 ? "AVC420" : "AVC444");
+            }
+            else
+            {
+                LOG(LOG_LEVEL_WARNING, "  ffmpeg probe FAILED; removing "
+                    "external AVC candidate");
+            }
+        }
+    }
 
     LOG(LOG_LEVEL_INFO, "Codec search order is %s",
         tconfig_codec_order_to_str(co, cobuff, sizeof(cobuff)));
     for (index = 0 ; index < co->codec_count ; ++index)
     {
+        /* external stock-ffmpeg AVC444 backend (compiles without a linked
+         * H.264 library); administrator policy, no silent fallback */
+        if (co->codecs[index] == XTC_H264 &&
+                self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG)
+        {
+            if (avc444_ffmpeg_ok && best_h264_index >= 0)
+            {
+                self->avc444_v2 = avc444_v2_capable;
+                /* when emitting v2 (codec id 0x000F) confirm a v2-capable
+                 * capset (v10.1+) so strict clients (e.g. mstsc) accept the
+                 * v2 frames; otherwise confirm the best AVC (v1) capset */
+                best_index = self->avc444_v2 ? best_v2_index : best_h264_index;
+                LOG(LOG_LEVEL_INFO, "Matched H264/AVC444 (ffmpeg) mode, "
+                    "AVC444 %s, confirming capset index %d (0x%8.8x)",
+                    self->avc444_v2 ? "v2 (0x000F)" : "v1 (0x000E)",
+                    best_index, ver_flags[best_index].version);
+                self->egfx_flags = XRDP_EGFX_H264;
+                self->avc444_ffmpeg = 1;
+                break;
+            }
+            if (avc420_ffmpeg_ok && best_h264_index >= 0)
+            {
+                best_index = best_h264_index;
+                LOG(LOG_LEVEL_INFO, "Matched H264/AVC420 (ffmpeg) mode, "
+                    "confirming capset index %d (0x%8.8x)",
+                    best_index, ver_flags[best_index].version);
+                self->egfx_flags = XRDP_EGFX_H264;
+                self->avc420_ffmpeg = 1;
+                break;
+            }
+            /* ffmpeg backend chosen but not eligible: skip H.264, fall
+             * through to the next configured codec */
+            continue;
+        }
 #if defined(XRDP_H264)
         if (co->codecs[index] == XTC_H264 && best_h264_index >= 0)
         {
@@ -1363,6 +1472,7 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
     return 0;
 }
 
+/*****************************************************************************/
 static int
 xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
                        int frames_decoded)
