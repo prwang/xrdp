@@ -89,6 +89,8 @@ xrdp_SOURCES = \
   xrdp_h264_annexb.h \
   xrdp_nut.c \
   xrdp_nut.h \
+  xrdp_avc444_caps.c \
+  xrdp_avc444_caps.h \
   $(XRDP_EXTRA_SOURCES)
 
 xrdp_LDADD = \
