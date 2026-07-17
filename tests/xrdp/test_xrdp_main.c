@@ -59,6 +59,7 @@ int main (void)
     srunner_add_suite(sr, make_suite_egfx_base_functions());
     srunner_add_suite(sr, make_suite_region());
     srunner_add_suite(sr, make_suite_tconfig_load_gfx());
+    srunner_add_suite(sr, make_suite_avc444_h264());
     srunner_add_suite(sr, make_suite_avc444_convert());
 
     srunner_set_tap(sr, "-");

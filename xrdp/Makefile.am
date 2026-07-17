@@ -85,6 +85,8 @@ xrdp_SOURCES = \
   xrdp_tconfig.h \
   xrdp_avc444_convert.c \
   xrdp_avc444_convert.h \
+  xrdp_h264_annexb.c \
+  xrdp_h264_annexb.h \
   $(XRDP_EXTRA_SOURCES)
 
 xrdp_LDADD = \
