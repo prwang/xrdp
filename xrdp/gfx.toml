@@ -24,15 +24,14 @@ h264_encoder = "x264"
 # # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
 # # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
 # avc_mode = "auto"
-# # tail_flush: fix for the interactive "last frame withheld until next input"
-# # lag, off by default. Enable (= true) if the client shows the previous frame
-# # until the next keystroke/mouse move. A shallow encoder pipeline
-# # (libx264 -tune zerolatency, or h264_vaapi -async_depth 1) removes one source
-# # of the lag, but a client/transport-level source can remain (seen with mstsc
-# # where an xfreerdp test did not) -- tail_flush covers that case too by
-# # re-emitting the last frame on a 33ms idle timer. To diagnose which stage
-# # holds the frame, start xrdp with XRDP_GFX_TRACE=1 and read the GFX_TRACE
-# # send/ack lines in the xrdp log during an on-screen test.
+# # tail_flush: legacy backstop, off by default and normally unnecessary. The
+# # historical "last frame withheld until next input" lag was a runner bug
+# # (stale content emitted under the current damage region) fixed by the now-
+# # synchronous encode; nothing is left in flight, so this drain no-ops. The
+# # synchronous encode needs a zero-latency encoder pipeline (libx264
+# # -tune zerolatency, or h264_vaapi -async_depth 1); a deeper pipeline fails
+# # loudly at encode instead of lagging silently. To diagnose frame delivery,
+# # start xrdp with XRDP_GFX_TRACE=1 and read the GFX_TRACE lines in the log.
 # tail_flush = false
 # encoder_args = [
 #   "-c:v", "libx264",

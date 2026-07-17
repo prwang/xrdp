@@ -53,15 +53,21 @@ with stdin held open and counting emitted vs. withheld):
    `async_depth − 1` (VAAPI) or the frame-thread window (x264), **as seen by an
    xfreerdp client**. `libx264 -tune zerolatency`/`-threads 1` drives that to
    zero.
-   **OPEN GAP — this A/B used xfreerdp, not mstsc.** A live mstsc deployment on
-   the **same** GPU still withholds the last frame at `-async_depth 1`, so a
-   second, client/transport-level cause exists that this screenshot test cannot
-   observe (an earlier "VAAPI-driver dependent" reading was speculation and is
-   withdrawn — the GPU is identical). Diagnose it on the real client with the
-   `XRDP_GFX_TRACE=1` server trace (see below); the verified practical fix is
-   `tail_flush = true`. **Method note:** config binds at session **login**, not
-   TCP reconnect — a reconnect-only test reads a stale encoder and can give a
-   false "delivered"; use fresh logins.
+   **RESOLVED — the field bug was runner content/region desync, not encoder
+   withholding.** A live mstsc repro on the same GPU (stuck full-screen frame;
+   hovering a tooltip revealed the newer colour only inside the tooltip rect)
+   plus the `GFX_TRACE` forensic chain showed the pipelined runner permanently
+   one-behind (`returned_seq = submitted_seq − 1` on every frame after a slow
+   first frame): frame N−1's pixels were emitted under frame N's damage
+   region. mstsc blits region rects strictly → stale screen; FreeRDP presents
+   the whole decoded surface → all xfreerdp A/Bs read "delivered" (their false
+   negative). Fix: synchronous encode (bounded wait for the submitted picture
+   + `desktop_sequence` verification) in `xrdp_encoder_ffmpeg.c`. Verified with
+   the keystroke-driven `colorkey.sh` harness: correct colour on every
+   keypress, `submitted_seq == returned_seq`, `inflight=0`, no timeouts.
+   **Method notes:** config binds at session **login**, not TCP reconnect; and
+   a client-side screenshot of a lenient client (xfreerdp) cannot detect
+   region-desync — use the seq trace.
 2. The **`tail_flush` spammer** independently eliminates the withhold (5/5),
    confirming it as a valid **last-resort** for encoders whose depth cannot be
    lowered. It is **off by default** and opt-in via
