@@ -5,6 +5,7 @@
 #include "arch.h"
 #include "fifo.h"
 #include "xrdp_client_info.h"
+#include "xrdp_encoder_ffmpeg.h"
 
 #define ENC_IS_BIT_SET(_flags, _bit) (((_flags) & (1 << (_bit))) != 0)
 #define ENC_SET_BIT(_flags, _bit) do { _flags |= (1 << (_bit)); } while (0)
@@ -45,6 +46,16 @@ struct xrdp_encoder
     void *codec_handle_h264;
     void *codec_handle_prfx_gfx[16];
     void *codec_handle_h264_gfx[16];
+    /* external stock-ffmpeg AVC444 backend (opaque handles) */
+    int avc444_ffmpeg;
+    int avc420_ffmpeg; /* emit plain AVC420 (codec id 0x000B), single view */
+    int avc444_v2;   /* emit AVC444 v2 (ChromaV2, codec id 0x000F)    */
+    int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
+    char avc444_path[256];
+    struct xrdp_avc444_encoder_args avc444_encoder_args;
+    unsigned long long avc444_seq;
+    void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
+    void *avc444_conv[16];           /* struct xrdp_avc444_conv *    */
     int frame_id_client; /* last frame id received from client */
     int frame_id_server; /* last frame id received from Xorg */
     int frame_id_server_sent;
