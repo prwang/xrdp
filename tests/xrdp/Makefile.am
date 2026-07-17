@@ -32,6 +32,8 @@ EXTRA_DIST = \
   gfx/gfx_h264_encoder_openh264.toml \
   gfx/gfx_h264_encoder_undefined.toml \
   gfx/gfx_h264_encoder_x264.toml \
+  avc444/fixture_4frame.nut \
+  avc444/PROVENANCE.md \
   gfx/gfx_missing_h264.toml
 
 TESTS = test_xrdp
@@ -46,6 +48,7 @@ test_xrdp_SOURCES = \
     test_tconfig.c \
     test_avc444_convert.c \
     test_avc444_h264.c \
+    test_avc444_nut.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \
@@ -67,6 +70,7 @@ test_xrdp_LDADD = \
     $(top_builddir)/xrdp/xrdp_wm.o \
     $(top_builddir)/xrdp/xrdp_font.o \
     $(top_builddir)/xrdp/xrdp_egfx.o \
+    $(top_builddir)/xrdp/xrdp_nut.o \
     $(top_builddir)/xrdp/xrdp_h264_annexb.o \
     $(top_builddir)/xrdp/xrdp_avc444_convert.o \
     $(top_builddir)/xrdp/xrdp_cache.o \

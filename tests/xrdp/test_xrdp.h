@@ -11,4 +11,5 @@ Suite *make_suite_tconfig_load_gfx(void);
 
 Suite *make_suite_avc444_convert(void);
 Suite *make_suite_avc444_h264(void);
+Suite *make_suite_avc444_nut(void);
 #endif /* TEST_XRDP_H */
