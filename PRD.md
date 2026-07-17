@@ -2373,6 +2373,14 @@ explicit:
 
 ### 26.6 Open items / to verify before upstreaming
 
+- **TODO (raise during PR review): enable the real-ffmpeg tests in upstream
+  CI.** The regression guards for the two field bugs (content/region desync;
+  low-resolution probesize deadlock — §25 addendum) live in
+  `tests/xrdp/test_avc444_ffmpeg.c` but are gated on
+  `XRDP_TEST_FFMPEG_PATH`, so stock CI skips them and only on-box runs
+  enforce them. Enabling them needs an ffmpeg install plus that env var in
+  `.github/workflows/build.yml` — a CI-infrastructure change that is the
+  maintainers' call; propose it in the PR rather than pre-committing it.
 - Latency of the subprocess path vs linked x264 is unmeasured (`RESULTS.md` P3).
 - #3774 / xorgxrdp #423–#424 are a 2026-03→05 snapshot and may have moved; track
   before proposing anything that overlaps `xrdp_accel_assist`/Vulkan.
