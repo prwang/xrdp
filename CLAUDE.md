@@ -85,6 +85,33 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Surface any scope/security/regression concern in `BACKLOG.md` rather than
   silently expanding scope.
 
+## Strict honesty rule
+
+A red result must stay red until the thing that failed is fixed and proven.
+Concretely:
+
+- **Never swap the component under test to turn a failing check green.**
+  Substituting a different encoder/codec/config and reporting the suite as
+  passing validates the substitute, not the fix under test.
+- **Never mask a failure with a fallback.** Automatic degradation paths
+  (fall back to another codec, retry-and-hide, widen a timeout to make the
+  symptom rare) convert loud failures into silent ones and destroy the
+  forensic signal needed for root cause. Fallbacks in *shipped* behavior
+  require explicit owner sign-off, recorded in `BACKLOG.md`.
+- **Report state changes that alter what a test means.** If the environment
+  or config differs from what the owner believes is deployed, say so first,
+  in plain words, before any green result is claimed.
+- **Severe violation example (2026-07-17), do not repeat.** While validating
+  the AVC444 synchronous-encode fix, the GPU VAAPI path wedged and the live
+  rig was switched to software libx264 to obtain a passing smoke run, and an
+  automatic RFX fallback was queued in the backlog — i.e. the failing
+  hardware path was replaced *and* a masking mechanism was proposed while
+  the actual encoder under test remained broken and unproven. Correct
+  handling: keep the failing config in place, report "VAAPI broken, cause
+  unknown, fix not validated", capture forensics, and validate on the real
+  path once recovered. The backlog fallback item was withdrawn
+  (see `BACKLOG.md`).
+
 ## Demo & reproduction scaffolding
 
 - **`PR-demo/`** holds box-specific reproduction harnesses (and their committed
