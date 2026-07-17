@@ -66,10 +66,14 @@ The dev branch stays as-is (history + scaffold); the PR is rebuilt clean.
   Keep `flush_next` — that is the teardown/resize drain, unrelated to the
   spammer.
 
-### Base the clean-room branch on FRESH `origin/devel`, not local `devel`
-Local `devel` (21d38d0c, 2026-06-17) is **25 commits behind** `origin/devel`.
-Because of that staleness, `git diff devel..HEAD` currently shows a set of
-changes that are **upstream, not ours**, and must NOT appear in the PR:
+### Base the clean-room branch on `origin/devel`, not local `devel`
+Cut the clean branch from `origin/devel` (currently 8812646d, 2026-07-16;
+remote cache is synced — do not run `git fetch`, this env has no push/fetch
+creds). Against that ref our branch is **41 ours-only / 3 origin-only**,
+merge-base `3af31df3` (Jul 2). Do NOT use the local `devel` ref (21d38d0c,
+Jun 17) as the base or comparison — it is ~a month stale, and that staleness
+is why `git diff devel..HEAD` shows a set of changes that are **upstream, not
+ours**, and must NOT appear in the PR:
 - `libxrdp/xrdp_caps.c`, `xrdp_rdp.c`, `xrdp_sec.c` — upstream CVE fixes
   (CVE-2026-55639 GCC OOB read, and merged fork hardening).
 - `vnc/vnc.c`, `vnc/vnc.h` — CVE-2026-41252 heap overflow + desktop-size
