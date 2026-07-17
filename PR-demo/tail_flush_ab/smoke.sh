@@ -4,8 +4,10 @@
 # LIVE binary+config via xfreerdp, asserting every keypress renders and the
 # encoder logged no restarts during the run. Exit 0 = safe to hand over.
 set -u
+D=$(cd "$(dirname "$0")" && pwd)
+mkdir -p /tmp/ab
 MARK=$(date '+%H:%M:%S')
-bash /tmp/ab/keytest.sh >/tmp/ab/smoke_last.out 2>&1
+bash "$D/keytest.sh" >/tmp/ab/smoke_last.out 2>&1
 ok=$(grep -c "  ok$" /tmp/ab/smoke_last.out)
 lag=$(grep -c "LAG" /tmp/ab/smoke_last.out)
 errs=$(awk -F'T' -v m="$MARK" '$2 >= m' /var/log/xrdp.log 2>/dev/null \

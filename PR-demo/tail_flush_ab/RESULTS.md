@@ -65,6 +65,11 @@ with stdin held open and counting emitted vs. withheld):
    + `desktop_sequence` verification) in `xrdp_encoder_ffmpeg.c`. Verified with
    the keystroke-driven `colorkey.sh` harness: correct colour on every
    keypress, `submitted_seq == returned_seq`, `inflight=0`, no timeouts.
+   Smoke-validated on **both** encoder paths: `h264_vaapi -async_depth 1`
+   (2026-07-17, after a container restart cleared a wedged VCN engine —
+   8/8 keypresses, 0 lag, 0 encoder errors, 4–9 ms/picture) and
+   `libx264 -tune zerolatency`. mstsc (region-strict) confirmation on the
+   VAAPI path is the owner's final gate.
    **Method notes:** config binds at session **login**, not TCP reconnect; and
    a client-side screenshot of a lenient client (xfreerdp) cannot detect
    region-desync — use the seq trace.

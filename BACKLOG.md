@@ -32,22 +32,11 @@ Microsoft clients with the HEVC Video Extension + capable GPU. Revisit only if
 those values get documented or captured; the spec-grounded, interoperable
 ceiling for xrdp remains AVC444/AVC444v2 (shipped).
 
-## Graceful degradation on persistent encoder failure — TODO (2026-07-17)
+## ~~Graceful degradation on persistent encoder failure~~ — WITHDRAWN (2026-07-17)
 
-**Problem.** When the external ffmpeg encoder persistently fails mid-session
-(e.g. a wedged GPU VAAPI/VCN engine: encode returns nothing until EOF, vainfo
-hangs), the synchronous AVC444 path times out per frame, tears down and
-respawns the encoder in a loop, and the user sees a black/frozen desktop. The
-session-setup probe only guards *connect time*; there is no *mid-session*
-fallback. Observed live: GPU wedged between two test runs, every generation
-timed out ("submitted pair not returned within 2000 ms"), qterminal never
-painted.
-
-**Acceptance criteria.**
-- After N consecutive encode timeouts/errors (small, e.g. 3), stop retrying
-  H.264, log one clear line, and degrade the session to a working codec (RFX
-  path) rather than looping black.
-- Degradation must not corrupt the GFX pipeline (client re-negotiation or
-  surface reset as required), and must be covered by a unit test for the
-  failure-counting logic.
-- No behavior change when the encoder is healthy.
+Withdrawn by explicit owner decision: an automatic RFX fallback would *mask*
+persistent encoder failure instead of surfacing it, and masking is exactly the
+failure mode that prolonged the AVC444 lag investigation (see the honesty rule
+in `CLAUDE.md`). A persistently failing encoder must fail loudly (per-frame
+ERROR lines, visible breakage) so the root cause gets fixed — on this project,
+do not re-add any silent codec fallback without explicit owner sign-off.
