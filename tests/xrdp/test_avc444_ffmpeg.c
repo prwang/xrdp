@@ -78,7 +78,15 @@ START_TEST(test_ffmpeg_encode_pair)
     ck_assert_int_eq(xrdp_ffmpeg_avc444_coded_width(enc), conv->coded_width);
     ck_assert_int_eq(xrdp_ffmpeg_avc444_coded_height(enc), conv->coded_height);
 
-    /* submit several pairs; the pipeline returns each one an update later */
+    /* REGRESSION GUARDS (both proven in the field, see PRD 25):
+     * - content/region desync: the runner must return THE submitted pair
+     *   from the same call (READY, matching desktop_sequence), never an
+     *   older one -- a pipelined runner shipping pair N-1 under frame N's
+     *   damage region froze region-strict clients (mstsc) on stale frames.
+     * - low-resolution startup deadlock: at this coded size one pair is far
+     *   below ffmpeg's default 5 MB probesize, so any input-side analysis
+     *   hold (framerate > ~100 fps without the one-frame -probesize cap)
+     *   times these calls out and fails the suite. */
     for (i = 0; i < nsub; i++)
     {
         int j;
@@ -94,30 +102,18 @@ START_TEST(test_ffmpeg_encode_pair)
         rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             (unsigned long long)i, &pair);
-        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
-        if (rc == XRDP_FFMPEG_PAIR_READY)
-        {
-            ck_assert_int_gt(pair.main_len, 0);
-            ck_assert_int_gt(pair.aux_len, 0);
-            got_seq[ngot] = pair.desktop_sequence;
-            got_key[ngot] = pair.main_keyframe;
-            ngot++;
-        }
-    }
-    /* flush the remaining pipelined pairs */
-    for (;;)
-    {
-        rc = xrdp_ffmpeg_avc444_flush_next(enc, &pair);
-        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
-        if (rc == XRDP_FFMPEG_PAIR_DONE)
-        {
-            break;
-        }
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_gt(pair.main_len, 0);
+        ck_assert_int_gt(pair.aux_len, 0);
+        ck_assert_int_eq((int)pair.desktop_sequence, i);
         got_seq[ngot] = pair.desktop_sequence;
         got_key[ngot] = pair.main_keyframe;
         ngot++;
     }
-    /* every submitted pair comes back exactly once, in submit order, and the
+    /* synchronous runner: nothing left in flight to flush */
+    rc = xrdp_ffmpeg_avc444_flush_next(enc, &pair);
+    ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_DONE);
+    /* every submitted pair came back exactly once, in submit order, and the
      * first pair of the generation is the reset keyframe */
     ck_assert_int_eq(ngot, nsub);
     for (i = 0; i < nsub; i++)
@@ -206,9 +202,10 @@ END_TEST
 
 /*
  * Drive one encode generation at a given visible size through the real child:
- * create converter + child, submit nsub distinguishable pairs, flush, and
- * check every submitted pair returns exactly once in order with the first
- * being the reset keyframe. Asserts the child adopts the 16-aligned coded
+ * create converter + child, submit nsub distinguishable pairs, and check
+ * every call returns its own pair synchronously, in order, with the first
+ * being the reset keyframe (regression guards as in test_ffmpeg_encode_pair,
+ * here across resolutions). Asserts the child adopts the 16-aligned coded
  * dimensions (odd visible sizes round up). Returns with everything reaped.
  */
 static void
@@ -257,24 +254,15 @@ run_one_generation(struct xrdp_ffmpeg_avc444_config *cfg, int w, int h)
         rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             (unsigned long long)i, &pair);
-        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
-        if (rc == XRDP_FFMPEG_PAIR_READY)
-        {
-            ck_assert_int_gt(pair.main_len, 0);
-            ck_assert_int_gt(pair.aux_len, 0);
-            got_seq[ngot++] = pair.desktop_sequence;
-        }
-    }
-    for (;;)
-    {
-        rc = xrdp_ffmpeg_avc444_flush_next(enc, &pair);
-        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
-        if (rc == XRDP_FFMPEG_PAIR_DONE)
-        {
-            break;
-        }
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_gt(pair.main_len, 0);
+        ck_assert_int_gt(pair.aux_len, 0);
+        ck_assert_int_eq((int)pair.desktop_sequence, i);
         got_seq[ngot++] = pair.desktop_sequence;
     }
+    /* synchronous runner: nothing left in flight to flush */
+    rc = xrdp_ffmpeg_avc444_flush_next(enc, &pair);
+    ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_DONE);
     ck_assert_int_eq(ngot, nsub);
     for (i = 0; i < nsub; i++)
     {
