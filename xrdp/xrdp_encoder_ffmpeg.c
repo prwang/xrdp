@@ -296,6 +296,16 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
     ADD("bt709");
     ADD("-color_trc");
     ADD("bt709");
+    /* End stream analysis after exactly one frame. With a declared input
+     * rate above ~100 fps, avformat_find_stream_info() distrusts the
+     * timebase and buffers frames for rate estimation up to the default
+     * 5 MB probesize -- 4+ pictures at 1024x768 -- before emitting
+     * anything. The synchronous encode then times out on the first pair
+     * at any resolution where a pair is smaller than that window. The
+     * rate needs no estimation (-framerate is explicit), so cap the
+     * analysis window at one frame. */
+    ADD("-probesize");
+    ADDNUM("%d", cw * ch + cw * (ch / 2));
     ADD("-i");
     ADD("pipe:3");
     ADD("-map");
