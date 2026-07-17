@@ -95,6 +95,18 @@ the only non-AVC444 file the PR touches should be `common/xrdp_client_info.h`
 / licensing attestation) — fold it into the NUT slice and the PR cover letter;
 maintainers will ask.
 
+### Divergence risk: none textual, one semantic touchpoint to verify
+The only commits on `origin/devel` past our merge-base (3af31df3..8812646d)
+are the 3-commit DYNVC multi-chunk reassembly fix (#3829), touching a single
+file, `libxrdp/xrdp_channel.c` — which our branch never touches. Zero conflict
+surface, so **do not rebase the dev branch to "derisk"**: there is nothing to
+resolve, and the clean-room slices apply onto `origin/devel` (which already
+has the fix) as a clean textual apply. One semantic note: large full-screen
+AVC444 frames are chunked over drdynvc, and #3829 corrects multi-chunk
+reassembly — a correctness fix we *inherit* by basing on `origin/devel`.
+Confirm during clean-room smoke that large AVC444 frames reassemble cleanly on
+the new base (expected: fine / better; not a risk, just a checkpoint).
+
 ### Acceptance
 - PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
   AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
