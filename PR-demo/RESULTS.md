@@ -129,14 +129,14 @@ that is ~1.5% of a single core at 60 fps. The pipe is not the bottleneck.
 
 The subprocess boundary does **not** inherently add a frame of latency. Whether
 the child holds a frame is a property of the encoder's **pipeline depth**, not
-the pipe: measured on-box (`tail_flush_ab/ffmpeg_pipeline_depth_probe.py`), a
-low-latency encoder (`h264_vaapi -async_depth 1`, or `libx264 -tune zerolatency`)
-emits every input picture in ~3–9 ms with **zero** frames withheld — one-in,
-one-out. A deep pipeline (`-async_depth N`, or default frame-threading) would add
-`N−1` frames, but that is an `encoder_args` choice the operator controls, and the
-shipped defaults are low-latency. See PRD §25 and `tail_flush_ab/RESULTS.md` for
-the end-to-end A/B. The price of the subprocess boundary is the copy, not a
-frame.
+the pipe: measured on-box (`tail_flush_ab/ffmpeg_pipeline_depth_probe.py`),
+`libx264 -tune zerolatency` emits every input picture in ~3–9 ms with **zero**
+frames withheld — one-in, one-out — and on the AMD/Mesa dev box `h264_vaapi
+-async_depth 1` does too. **Caveat:** the floor is VAAPI-driver dependent; some
+HW stacks (Intel iHD, NVIDIA VAAPI, virtualised passthrough) still hold one frame
+at `-async_depth 1`, in which case software zerolatency or `tail_flush = true`
+recovers it (`tail_flush_ab/diagnose_env.sh` measures a given box). The price of
+the subprocess boundary itself is the copy, not a frame.
 
 **Threats to validity.** memcpy bandwidth is box-specific, but the conclusion
 (copy CPU ≪ encode CPU) holds across any modern host by orders of magnitude.

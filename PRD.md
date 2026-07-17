@@ -2202,19 +2202,24 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   **encoder pipeline DEPTH**, not the pipe or the scheduler. Feeding an encoder
   frames with stdin held open and counting emitted vs. withheld pictures
   (`PR-demo/tail_flush_ab/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
-  -async_depth N` withholds exactly **N−1** frames; `libx264` frame-threading
-  withholds its whole thread window; **`-async_depth 1` and `libx264 -tune
-  zerolatency`/`-threads 1` withhold ZERO** and emit every input picture in
-  ~3–9 ms (single views *and* AVC444 main+aux pairs). The shipped `gfx.toml`
-  already uses these low-latency args, so **the root-cause fix is configuration**,
-  not a code workaround; the earlier claim that "no ffmpeg flag drives the depth
-  to 0" was wrong. End-to-end A/B through real xrdp→FreeRDP (5 trials/group, a
-  fullscreen colour sequence ending RED, then idle): `async_depth 2` withholds
-  **5/5** (client shows the prior colour); `async_depth 1` delivers **5/5**;
-  `tail_flush=true` at `async_depth 2` also delivers **5/5**
-  (`PR-demo/tail_flush_ab/`). The **33 ms same-frame tail-flush** is **retained
-  as an opt-in last resort** for encoders whose depth cannot be lowered, now
-  **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when armed, after a
+  -async_depth N` withholds **N−1** frames on the tested GPU, and `libx264`
+  frame-threading withholds its whole thread window. End-to-end A/B through real
+  xrdp→FreeRDP with a *fresh login* (not just reconnect — config binds at login;
+  colour sequence ending RED, then idle): `async_depth 2` withholds (client shows
+  the prior colour); `tail_flush=true` at `async_depth 2` delivers.
+  **Important driver caveat (corrects an earlier overclaim).** How low
+  `async_depth` can drive the depth is **VAAPI-driver/hardware dependent**. On
+  the dev box (AMD `amdgpu`/Mesa) `-async_depth 1` reaches depth **0** — so we
+  wrongly concluded "async_depth 1 is the universal fix". A deployment on other
+  VAAPI hardware (e.g. Intel iHD, NVIDIA's VAAPI, or a virtualised/passthrough
+  GPU) reproducibly still withholds one frame at `-async_depth 1`, because that
+  driver keeps a frame in flight regardless. There, the practical fixes are
+  **software `libx264 -tune zerolatency`** (no fixed HW latency) or
+  **`tail_flush = true`**. Run `PR-demo/tail_flush_ab/diagnose_env.sh` on the
+  affected box to measure its floor depth. The **33 ms same-frame tail-flush** is
+  **retained as an opt-in fix** for encoders whose depth cannot be driven to zero
+  (which — per the caveat — is the common case for HW VAAPI, not a rare edge),
+  now **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when armed, after a
   real frame the worker (`proc_enc_msg`) waits a 33 ms idle timeout then feeds at
   most `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4) duplicate frames to push the withheld
   frame out, emits it once as STARTFRAME+WireToSurface1+ENDFRAME reusing the last

@@ -50,10 +50,17 @@ with stdin held open and counting emitted vs. withheld):
 
 1. The withhold is **real end-to-end** and is a property of the encoder's
    **pipeline depth**, not the pipe or the fftools scheduler: withheld frames =
-   `async_depth − 1` (VAAPI) or the frame-thread window (x264). A low-latency
-   config (`-async_depth 1`, or `-tune zerolatency`/`-threads 1`) drives it to
-   **zero** — this is the **root-cause fix**, and it is what the shipped
-   `gfx.toml` uses.
+   `async_depth − 1` (VAAPI) or the frame-thread window (x264). `libx264 -tune
+   zerolatency`/`-threads 1` drives it to **zero on any host**.
+   **Driver caveat:** how low `-async_depth` can go for `h264_vaapi` is
+   VAAPI-driver/hardware dependent. On this dev box (AMD `amdgpu`/Mesa)
+   `-async_depth 1` reaches zero; on other stacks (Intel iHD, NVIDIA VAAPI,
+   virtualised/passthrough GPUs) the driver keeps one frame in flight even at
+   `-async_depth 1`, so it still withholds. There the fix is software zerolatency
+   or `tail_flush = true`. Run `diagnose_env.sh` on the target box to measure its
+   floor. **Note on method:** config binds at session **login**, not at TCP
+   reconnect — these results are from full fresh logins; a reconnect-only test
+   can read a stale encoder and give a false "delivered".
 2. The **`tail_flush` spammer** independently eliminates the withhold (5/5),
    confirming it as a valid **last-resort** for encoders whose depth cannot be
    lowered. It is **off by default** and opt-in via

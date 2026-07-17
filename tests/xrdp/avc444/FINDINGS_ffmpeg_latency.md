@@ -10,12 +10,16 @@ the "one-frame lag", superseding the memory-level note in `BACKLOG.md`.
 > zerolatency`**, so the historical "ships without zerolatency" line in the
 > Consequence section is stale — see the current `gfx.toml`. The same mechanism
 > generalises beyond libx264 to hardware encoders: `h264_vaapi` withholds
-> `async_depth − 1` frames, and `-async_depth 1` (the shipped VAAPI arg) drives
-> it to zero. An end-to-end xrdp→FreeRDP A/B and an isolated depth probe live in
-> `PR-demo/tail_flush_ab/`; PRD §25 carries the summary. The 33 ms same-frame
-> "tail-flush" is retained only as an **opt-in last resort**
-> (`[avc444_ffmpeg] tail_flush`, default off) for encoders whose depth cannot be
-> lowered — it is not needed by, and does not fire in, the shipped config.
+> `async_depth − 1` frames. **Driver caveat:** how low `async_depth` can drive
+> the depth is VAAPI-driver/hardware dependent — on the dev box (AMD/Mesa)
+> `-async_depth 1` reaches depth 0, but other VAAPI stacks (Intel iHD, NVIDIA's
+> VAAPI, virtualised/passthrough GPUs) keep a frame in flight even at
+> `-async_depth 1`. On those, use software `libx264 -tune zerolatency` or
+> `tail_flush = true`. An end-to-end xrdp→FreeRDP A/B (fresh login), an isolated
+> depth probe, and an on-box env diagnostic live in `PR-demo/tail_flush_ab/`;
+> PRD §25 carries the summary. The 33 ms same-frame "tail-flush" is an **opt-in
+> fix** (`[avc444_ffmpeg] tail_flush`, default off) for encoders whose depth
+> cannot be driven to zero.
 
 ## Symptom
 
