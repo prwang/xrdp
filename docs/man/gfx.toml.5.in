@@ -119,6 +119,179 @@ Sets an upper limit of the bitrate in bps.
 \fBMaxFrameRate\fR = \fI<float>\fR
 Sets the maximum frame rate that the encoder will process per second.
 
+.SH "AVC444_FFMPEG"
+
+\fB[avc444_ffmpeg]\fR configures the external stock-\fBffmpeg\fR AVC444 backend,
+used when \fBh264_encoder = "ffmpeg"\fR is selected in \fB[codec]\fR. xrdp spawns
+one persistent \fBffmpeg\fR child per surface (via \fBfork\fR/\fBexecve\fR \(em
+no shell is involved) and streams raw NV12 into it, muxing both AVC444 views
+(main YUV420 and the Chroma420 auxiliary) into a single H.264 stream.
+
+xrdp owns only two fixed contracts of the \fBffmpeg\fR command line and does not
+interpret anything in between:
+
+.TP
+.B Input contract (fixed)
+Raw NV12 on \fBpipe:3\fR at the 16\(hyaligned coded size, BT.709 full range,
+fed by the AVC444 converter. Not configurable.
+
+.TP
+.B Output contract (fixed)
+Annex\(hyB H.264 wrapped in NUT on \fBpipe:1\fR
+(\fB\-bsf:v h264_mp4toannexb \-f nut pipe:1\fR), which the in\(hytree NUT demux
+and H.264 parser require. Not configurable.
+
+.PP
+Everything between those contracts \(em the codec selection (\fB\-c:v\fR) and
+all of its tuning \(em is supplied verbatim by the administrator and passed
+straight through to \fBexecve\fR. This is a deliberate design choice: xrdp does
+\fBnot\fR enumerate individual encoder flags, so arbitrary tuning and hardware
+encoders (\fBh264_nvenc\fR, \fBh264_qsv\fR, \fBh264_vaapi\fR, and so on) can be
+expressed without changing xrdp.
+
+.PP
+The AVC444 version is negotiated automatically per client and needs no
+configuration. When the client advertises AVC444 v2 support (MS-RDPEGFX
+capability version 10.1 or later) xrdp emits AVC444 v2 (codec id 0x000F,
+ChromaV2), which avoids the magenta/purple chroma fringing that AVC444 v1
+produces on saturated colored text and edges; clients that advertise only v1
+(capability version 10.0) transparently receive AVC444 v1 (codec id 0x000E).
+Both versions feed the same two NV12 pictures per frame to \fBffmpeg\fR, so the
+\fBencoder_args\fR below apply unchanged to either version.
+
+.TP
+\fBpath\fR = \fI<string>\fR
+Absolute path to the \fBffmpeg\fR binary. Default: \fB/usr/bin/ffmpeg\fR.
+
+.TP
+\fBchroma_align\fR = \fI<integer>\fR
+Coded\(hywidth alignment for the AVC444 v2 chroma (ChromaV2) auxiliary view,
+either \fB16\fR or \fB32\fR. Default: \fB32\fR.
+
+The auxiliary view packs its U and V halves split at \fIcoded_width / 2\fR.
+Clients derive that split from the surface width but with different rounding:
+Microsoft \fBmstsc\fR uses a 32\(hyaligned width, while \fBFreeRDP\fR uses a
+16\(hyaligned width. When the two differ \(em i.e. the 16\(hyaligned width is
+not already 32\(hyaligned (an odd macroblock count) \(em a client using the
+other rounding reads the V samples 16 pixels displaced, producing a period\(hy2
+chroma "comb" left of high\(hycontrast vertical edges plus a variable
+right\(hyedge strip, on roughly half of window widths.
+
+Set \fB32\fR (the default) for \fBmstsc\fR / Windows Remote Desktop clients; set
+\fB16\fR for \fBFreeRDP\fR\(hybased clients. A deployment cannot satisfy both
+alignments at a non\(hy32\(hyaligned width simultaneously.
+
+.TP
+\fBavc_mode\fR = \fI<string>\fR
+Selects AVC444 versus plain AVC420 (codec id \fB0x000B\fR, a single YUV420 view)
+over the same \fBffmpeg\fR backend. One of \fB"auto"\fR, \fB"444"\fR or
+\fB"420"\fR. Default: \fB"auto"\fR.
+
+.RS
+.IP \(bu 3
+\fB"auto"\fR \(em serve AVC444 to clients that advertise it, otherwise AVC420.
+This is the recommended setting.
+.IP \(bu 3
+\fB"444"\fR \(em serve AVC444 only; a client that advertises solely AVC420 gets
+no H.264 (the next configured codec, if any, is used).
+.IP \(bu 3
+\fB"420"\fR \(em force AVC420 for any H.264\(hycapable client. Because the RDP
+client, not the server, has no user\(hyfacing 420/444 switch (it advertises a
+capability set and the server elects the codec), this is how a fixed client such
+as \fBmstsc\fR \(em which always advertises AVC444 \(em can be exercised on the
+AVC420 path. Takes effect on the next connection; no restart is required.
+.RE
+
+AVC420 halves chroma resolution versus AVC444, so saturated colored text and
+edges look softer; it is provided mainly for compatibility and A/B comparison.
+The same \fBencoder_args\fR (including hardware encoders) apply to both.
+
+.TP
+\fBencoder_args\fR = \fI<array of strings>\fR
+The encoder block, inserted verbatim into the \fBffmpeg\fR argv immediately
+after the input mapping and before the output framing. Each array element
+becomes exactly one \fBexecve\fR argv token; because there is no shell, there is
+no quoting, splitting or variable expansion \(em put each flag and each value in
+its own element (e.g. \fB"\-crf", "16"\fR, not \fB"\-crf 16"\fR). Up to 64
+tokens of 255 characters each are accepted; excess tokens are dropped with a
+warning. An omitted key, or an explicitly empty array, selects the built\(hyin
+default block.
+
+The chosen encoder \fBmust\fR emit decodable Annex\(hyB H.264. For \fBlibx264\fR
+this means including \fBrepeat\-headers=1\fR in \fB\-x264\-params\fR so every IDR
+carries SPS/PPS; otherwise a client that joins the stream cannot decode it.
+
+Because \fBgfx.toml\fR is root\(hyowned server configuration (trusted like
+\fBsshd_config\fR), these tokens are not treated as untrusted input.
+
+The built\(hyin default is tuned for interactive RDP:
+
+.nf
+encoder_args = [
+  "\-c:v", "libx264",
+  "\-bf", "0",
+  "\-preset", "ultrafast",
+  "\-tune", "zerolatency",
+  "\-crf", "18",
+  "\-g", "240",
+  "\-x264\-params", "repeat\-headers=1",
+]
+.fi
+
+\fB\-tune zerolatency\fR disables x264 lookahead, B\(hyframe reordering and
+threaded\(hyframe delay so the child emits one encoded picture per input frame
+instead of withholding several until end\(hyof\(hystream.
+
+Example selecting an NVIDIA hardware encoder (xrdp needs no change to support
+this):
+
+.nf
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+encoder_args = [
+  "\-c:v", "h264_nvenc",
+  "\-preset", "p1",
+  "\-tune", "ll",
+  "\-rc", "constqp",
+  "\-qp", "20",
+]
+.fi
+
+.PP
+Example selecting a VAAPI hardware encoder (Intel/AMD render node). The AVC444
+views arrive as system\(hymemory NV12, so they are uploaded to the GPU with
+\fB\-vf format=nv12,hwupload\fR before \fBh264_vaapi\fR; \fB\-bf 0
+\-async_depth 1\fR keep one encoded picture per input frame. Use
+\fB\-vaapi_device\fR (which is accepted after \fB\-i\fR) rather than the global
+\fB\-hwaccel/\-init_hw_device\fR forms, since \fBencoder_args\fR are inserted
+after the input mapping:
+
+.nf
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+encoder_args = [
+  "\-vaapi_device", "/dev/dri/renderD128",
+  "\-vf", "format=nv12,hwupload",
+  "\-c:v", "h264_vaapi",
+  "\-rc_mode", "CQP",
+  "\-qp", "20",
+  "\-bf", "0",
+  "\-async_depth", "1",
+]
+.fi
+
+.PP
+The \fBffmpeg\fR child is spawned by the xrdp connection process, which in a
+standard install runs as \fBroot\fR, so it can open the render node
+(\fB/dev/dri/renderD128\fR, typically \fBroot:root 0660\fR) with no extra
+setup. If a deployment hardens xrdp to run as a non\(hyroot service user, add
+that user to the render node's group (for example \fBchgrp render
+/dev/dri/renderD128\fR and add the user to the \fBrender\fR group). The child is
+started with a minimal environment (\fBPATH=/usr/bin:/bin\fR only); libva
+normally autodetects the driver from the render node, but a GPU that needs an
+explicit \fBLIBVA_DRIVER_NAME\fR cannot currently be steered through
+\fBgfx.toml\fR.
+
 .SH "CONNECTION TYPES"
 
 \fB[x264]\fR and \fB[OpenH264]\fR section are tables (also known as

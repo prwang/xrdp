@@ -27,6 +27,7 @@
 #define _XRDP_TCONFIG_H_
 
 #include "arch.h"
+#include "xrdp_encoder_ffmpeg.h"
 
 /* The number of connection types in MS-RDPBCGR 2.2.1.3.2 */
 #define NUM_CONNECTION_TYPES 7
@@ -62,7 +63,19 @@ enum xrdp_tconfig_codecs
 enum xrdp_tconfig_h264_encoders
 {
     XTC_H264_X264,
-    XTC_H264_OPENH264
+    XTC_H264_OPENH264,
+    XTC_H264_FFMPEG      /* external stock-ffmpeg AVC444 backend */
+};
+
+/* AVC444-vs-AVC420 selection for the external ffmpeg backend. AUTO prefers
+ * AVC444 and falls back to AVC420; FORCE_420 emits AVC420 to any H.264-capable
+ * client (so mstsc, which always offers AVC444, can be tested on the AVC420
+ * path); FORCE_444 serves AVC444 only. */
+enum xrdp_tconfig_avc_mode
+{
+    XTC_AVC_AUTO = 0,
+    XTC_AVC_FORCE_444,
+    XTC_AVC_FORCE_420
 };
 
 struct xrdp_tconfig_gfx_codec_order
@@ -79,6 +92,11 @@ struct xrdp_tconfig_gfx
     struct xrdp_tconfig_gfx_x264_param x264_param[NUM_CONNECTION_TYPES];
     struct xrdp_tconfig_gfx_openh264_param
         openh264_param[NUM_CONNECTION_TYPES];
+    /* external stock-ffmpeg AVC444 backend (h264_encoder = "ffmpeg") */
+    char avc444_ffmpeg_path[256];
+    struct xrdp_avc444_encoder_args avc444_ffmpeg_encoder_args;
+    int avc444_ffmpeg_chroma_align; /* coded WIDTH alignment: 16 or 32 */
+    enum xrdp_tconfig_avc_mode avc444_ffmpeg_avc_mode; /* AVC444/420 select */
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

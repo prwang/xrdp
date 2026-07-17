@@ -393,8 +393,106 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                 valid_encoder_found = 1;
                 config->h264_encoder = XTC_H264_OPENH264;
             }
+            if (g_strcasecmp(h264_encoder.u.s, "ffmpeg") == 0)
+            {
+                TCLOG(LOG_LEVEL_DEBUG, "[codec] h264_encoder = ffmpeg");
+                valid_encoder_found = 1;
+                config->h264_encoder = XTC_H264_FFMPEG;
+            }
 
             free(h264_encoder.u.s);
+        }
+    }
+
+    /* external stock-ffmpeg AVC444 backend: path plus a verbatim encoder-arg
+     * passthrough (-c:v + tuning). xrdp does not enumerate individual flags;
+     * see struct xrdp_avc444_encoder_args and the gfx.toml man page. */
+    g_strncpy(config->avc444_ffmpeg_path, "/usr/bin/ffmpeg",
+              sizeof(config->avc444_ffmpeg_path) - 1);
+    xrdp_ffmpeg_avc444_default_encoder_args(
+        &config->avc444_ffmpeg_encoder_args);
+    config->avc444_ffmpeg_chroma_align = 32;
+    config->avc444_ffmpeg_avc_mode = XTC_AVC_AUTO;
+    {
+        toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
+        if (avc != NULL)
+        {
+            toml_datum_t path = toml_string_in(avc, "path");
+            toml_array_t *ea = toml_array_in(avc, "encoder_args");
+            toml_datum_t ca = toml_int_in(avc, "chroma_align");
+            toml_datum_t am = toml_string_in(avc, "avc_mode");
+            if (am.ok)
+            {
+                if (g_strcasecmp(am.u.s, "auto") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_AUTO;
+                }
+                else if (g_strcasecmp(am.u.s, "444") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_444;
+                }
+                else if (g_strcasecmp(am.u.s, "420") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_420;
+                }
+                else
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] avc_mode must "
+                          "be \"auto\", \"444\" or \"420\", got \"%s\"; using "
+                          "auto", am.u.s);
+                }
+                free(am.u.s);
+            }
+            if (ca.ok)
+            {
+                if (ca.u.i == 16 || ca.u.i == 32)
+                {
+                    config->avc444_ffmpeg_chroma_align = (int)ca.u.i;
+                }
+                else
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] chroma_align must "
+                          "be 16 or 32, got %lld; using 32",
+                          (long long)ca.u.i);
+                }
+            }
+            if (path.ok)
+            {
+                g_strncpy(config->avc444_ffmpeg_path, path.u.s,
+                          sizeof(config->avc444_ffmpeg_path) - 1);
+                free(path.u.s);
+            }
+            if (ea != NULL)
+            {
+                struct xrdp_avc444_encoder_args *dst =
+                        &config->avc444_ffmpeg_encoder_args;
+                int i;
+                int nelem = toml_array_nelem(ea);
+                memset(dst, 0, sizeof(*dst));
+                for (i = 0; i < nelem &&
+                        dst->count < XRDP_AVC444_MAX_ENC_ARGS; i++)
+                {
+                    toml_datum_t tok = toml_string_at(ea, i);
+                    if (tok.ok)
+                    {
+                        g_strncpy(dst->arg[dst->count], tok.u.s,
+                                  XRDP_AVC444_ENC_ARG_LEN - 1);
+                        dst->count++;
+                        free(tok.u.s);
+                    }
+                }
+                if (i < nelem)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] encoder_args "
+                          "truncated to %d tokens", XRDP_AVC444_MAX_ENC_ARGS);
+                }
+                /* an explicitly empty array would leave no encoder at all;
+                 * fall back to the built-in default in that case */
+                if (dst->count == 0)
+                {
+                    xrdp_ffmpeg_avc444_default_encoder_args(dst);
+                }
+            }
         }
     }
 

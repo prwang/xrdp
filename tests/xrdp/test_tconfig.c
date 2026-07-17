@@ -5,6 +5,7 @@
 #include "xrdp_tconfig.h"
 #include "test_xrdp.h"
 #include "xrdp.h"
+#include "string_calls.h"
 
 #define GFXCONF_STUBDIR XRDP_TOP_SRCDIR "/tests/xrdp/gfx/"
 
@@ -145,6 +146,79 @@ START_TEST(test_tconfig_gfx_missing_h264)
 }
 END_TEST
 
+/* index of the first encoder_args token equal to needle, or -1 */
+static int
+find_enc_arg(const struct xrdp_avc444_encoder_args *a, const char *needle)
+{
+    int i;
+    for (i = 0; i < a->count; i++)
+    {
+        if (g_strcmp(a->arg[i], needle) == 0)
+        {
+            return i;
+        }
+    }
+    return -1;
+}
+
+START_TEST(test_tconfig_gfx_avc444_defaults)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+    const struct xrdp_avc444_encoder_args *a;
+
+    /* the stub gfx.toml has no [avc444_ffmpeg] table, so the built-in default
+     * encoder block applies (reproduces the historic hard-coded argv) */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/usr/bin/ffmpeg");
+    a = &gfxconfig.avc444_ffmpeg_encoder_args;
+    ck_assert_int_gt(a->count, 0);
+    ck_assert_int_ge(find_enc_arg(a, "libx264"), 0);
+    ck_assert_int_ge(find_enc_arg(a, "zerolatency"), 0);
+    /* -crf is immediately followed by its value */
+    {
+        int ci = find_enc_arg(a, "-crf");
+        ck_assert_int_ge(ci, 0);
+        ck_assert_int_lt(ci + 1, a->count);
+        ck_assert_str_eq(a->arg[ci + 1], "18");
+    }
+    ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1"), 0);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_override)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+    const struct xrdp_avc444_encoder_args *a;
+
+    /* an explicit encoder_args list replaces the default block verbatim,
+     * here selecting a hardware encoder xrdp never enumerates */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_ffmpeg.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.h264_encoder, XTC_H264_FFMPEG);
+    ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/opt/custom/ffmpeg");
+    a = &gfxconfig.avc444_ffmpeg_encoder_args;
+    ck_assert_int_eq(a->count, 10);
+    ck_assert_str_eq(a->arg[0], "-c:v");
+    ck_assert_str_eq(a->arg[1], "h264_nvenc");
+    ck_assert_int_ge(find_enc_arg(a, "h264_nvenc"), 0);
+    /* built-in libx264 default must NOT leak through */
+    ck_assert_int_eq(find_enc_arg(a, "libx264"), -1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_empty_args_fallback)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+    const struct xrdp_avc444_encoder_args *a;
+
+    /* an explicitly empty encoder_args array must fall back to the built-in
+     * default rather than leaving the command with no encoder */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_empty_args.toml", &gfxconfig);
+    a = &gfxconfig.avc444_ffmpeg_encoder_args;
+    ck_assert_int_gt(a->count, 0);
+    ck_assert_int_ge(find_enc_arg(a, "libx264"), 0);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -169,6 +243,10 @@ make_suite_tconfig_load_gfx(void)
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_x264);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_undefined);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_invalid);
+    tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_defaults);
+    tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_override);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_empty_args_fallback);
 
     suite_add_tcase(s, tc_tconfig_load_gfx);
 

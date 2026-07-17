@@ -1,0 +1,15 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/opt/custom/ffmpeg"
+# verbatim encoder-arg passthrough (execve tokens, no shell). Replaces the
+# built-in default encoder block entirely.
+encoder_args = [
+  "-c:v", "h264_nvenc",
+  "-preset", "p1",
+  "-tune", "ll",
+  "-rc", "constqp",
+  "-qp", "20",
+]
