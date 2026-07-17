@@ -96,6 +96,11 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Portable, dependency-light helpers (no live session/GPU needed) belong in
   `tools/`, not `PR-demo/`. The CI regression backstop is always an in-tree unit
   test under `tests/`; `PR-demo/` is a visual aid, never a substitute for it.
+- **Smoke-gate every handoff.** Never hand the live box to a human tester
+  without running `PR-demo/tail_flush_ab/smoke.sh` against the exact deployed
+  binary *and* config, as the LAST step after the final install/restart. A
+  test that passed before the last deployment step counts for nothing;
+  environment state (e.g. a wedged GPU encoder) can change between runs.
 - This is our own **dev branch**. The upstream PR against `devel` needs a
   separate clean-room pass — reviewable commit slices plus written rationale —
   and does **not** necessarily carry `PR-demo/` as-is; treat that folder as the
