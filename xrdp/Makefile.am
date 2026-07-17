@@ -91,6 +91,8 @@ xrdp_SOURCES = \
   xrdp_nut.h \
   xrdp_avc444_caps.c \
   xrdp_avc444_caps.h \
+  xrdp_encoder_ffmpeg.c \
+  xrdp_encoder_ffmpeg.h \
   $(XRDP_EXTRA_SOURCES)
 
 xrdp_LDADD = \

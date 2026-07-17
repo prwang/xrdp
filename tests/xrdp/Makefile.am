@@ -51,6 +51,7 @@ test_xrdp_SOURCES = \
     test_avc444_nut.c \
     test_avc444_metablock.c \
     test_avc444_caps.c \
+    test_avc444_ffmpeg.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \
@@ -72,6 +73,7 @@ test_xrdp_LDADD = \
     $(top_builddir)/xrdp/xrdp_wm.o \
     $(top_builddir)/xrdp/xrdp_font.o \
     $(top_builddir)/xrdp/xrdp_egfx.o \
+    $(top_builddir)/xrdp/xrdp_encoder_ffmpeg.o \
     $(top_builddir)/xrdp/xrdp_avc444_caps.o \
     $(top_builddir)/xrdp/xrdp_nut.o \
     $(top_builddir)/xrdp/xrdp_h264_annexb.o \
