@@ -131,12 +131,14 @@ The subprocess boundary does **not** inherently add a frame of latency. Whether
 the child holds a frame is a property of the encoder's **pipeline depth**, not
 the pipe: measured on-box (`tail_flush_ab/ffmpeg_pipeline_depth_probe.py`),
 `libx264 -tune zerolatency` emits every input picture in ~3–9 ms with **zero**
-frames withheld — one-in, one-out — and on the AMD/Mesa dev box `h264_vaapi
--async_depth 1` does too. **Caveat:** the floor is VAAPI-driver dependent; some
-HW stacks (Intel iHD, NVIDIA VAAPI, virtualised passthrough) still hold one frame
-at `-async_depth 1`, in which case software zerolatency or `tail_flush = true`
-recovers it (`tail_flush_ab/diagnose_env.sh` measures a given box). The price of
-the subprocess boundary itself is the copy, not a frame.
+frames withheld — one-in, one-out — and on the dev box `h264_vaapi
+-async_depth 1` does too under an **xfreerdp** end-to-end test. **Open gap:** a
+live **mstsc** deployment on the same GPU still withholds the last frame at
+`-async_depth 1`, so a client/transport-level cause exists that the xfreerdp
+screenshot test cannot observe (an earlier VAAPI-driver explanation was
+speculation, withdrawn). It is under diagnosis with the `XRDP_GFX_TRACE=1`
+per-frame server trace; the verified practical fix is `tail_flush = true`. The
+price of the subprocess boundary itself is still just the copy, not a frame.
 
 **Threats to validity.** memcpy bandwidth is box-specific, but the conclusion
 (copy CPU ≪ encode CPU) holds across any modern host by orders of magnitude.
