@@ -132,10 +132,10 @@ START_TEST(test_ffmpeg_encode_pair)
 }
 END_TEST
 
-/* Single-view AVC420 path: a main_only converter feeds encode_single, and the
- * child returns one encoded picture per frame (one update behind, matching the
- * live path which reaps without flushing). Verify the returned pictures arrive
- * in submit order with the first being the reset keyframe. */
+/* Single-view AVC420 path: a main_only converter feeds encode_single. The
+ * runner is synchronous: every submitted picture must come back READY from
+ * the same call (never an older picture -- that was the content/region
+ * desync bug), in submit order, with the first being the reset keyframe. */
 START_TEST(test_ffmpeg_encode_single)
 {
     struct xrdp_ffmpeg_avc444_config cfg;
@@ -180,20 +180,18 @@ START_TEST(test_ffmpeg_encode_single)
         rc = xrdp_ffmpeg_avc444_encode_single(enc, conv->main_nv12,
                                               conv->nv12_size,
                                               (unsigned long long)i, &pic);
-        ck_assert_int_ne(rc, XRDP_FFMPEG_PAIR_ERROR);
-        if (rc == XRDP_FFMPEG_PAIR_READY)
-        {
-            ck_assert_int_gt(pic.main_len, 0);
-            ck_assert_int_eq(pic.aux_len, 0);
-            ck_assert_ptr_eq((void *)pic.aux_data, NULL);
-            got_seq[ngot] = pic.desktop_sequence;
-            got_key[ngot] = pic.main_keyframe;
-            ngot++;
-        }
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_gt(pic.main_len, 0);
+        ck_assert_int_eq(pic.aux_len, 0);
+        ck_assert_ptr_eq((void *)pic.aux_data, NULL);
+        ck_assert_int_eq((int)pic.desktop_sequence, i);
+        got_seq[ngot] = pic.desktop_sequence;
+        got_key[ngot] = pic.main_keyframe;
+        ngot++;
     }
 
-    /* the pipeline holds the final picture (one-behind), so nsub-1 come back */
-    ck_assert_int_eq(ngot, nsub - 1);
+    /* synchronous runner: every submitted picture returned from its call */
+    ck_assert_int_eq(ngot, nsub);
     for (i = 0; i < ngot; i++)
     {
         ck_assert_int_eq((int)got_seq[i], i);

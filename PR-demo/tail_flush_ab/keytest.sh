@@ -14,6 +14,12 @@ SU=${KEYTEST_USER:-tester}
 SX=/var/run/xrdp/1000/Xauthority
 HOST=${KEYTEST_HOST:-127.0.0.1:3389}
 CLI=${KEYTEST_CLIENT_DISPLAY:-:99}
+# Session size. MUST be exercised at more than one size: a resolution-
+# dependent encoder failure (ffmpeg probesize analysis window) once passed
+# every 1920x1080 run while freezing every 1024x768 (mstsc) login.
+SIZE=${KEYTEST_SIZE:-1920x1080}
+SW=${SIZE%x*}
+SH=${SIZE#*x}
 D=$(cd "$(dirname "$0")" && pwd)
 OUT=/tmp/ab
 mkdir -p "$OUT"
@@ -32,7 +38,7 @@ sudo -u $SU pkill -u $SU -KILL -f 'xfce4-session|Xorg :' 2>/dev/null
 for i in $(seq 1 25); do pgrep -f 'Xorg :1[0-9]' >/dev/null || break; sleep 1; done
 sleep 3
 
-setsid env DISPLAY=$CLI xfreerdp3 /v:"$HOST" /u:$SU /p: /size:1920x1080 \
+setsid env DISPLAY=$CLI xfreerdp3 /v:"$HOST" /u:$SU /p: /size:"$SIZE" \
     /gfx:AVC444 /cert:ignore /log-level:WARN </dev/null >$OUT/keytest_login.log 2>&1 &
 sleep 8
 fw=""
@@ -76,12 +82,13 @@ sleep 3
 
 shot(){ ffmpeg -hide_banner -loglevel error -f x11grab -video_size 1920x1080 \
         -i "$CLI.0" -frames:v 1 -y "$1" 2>/dev/null; }
-classify(){ python3 - "$1" <<'EOF'
+# sample the centre of the SESSION-sized window (top-left of the client
+# display), not of the full client framebuffer
+classify(){ python3 - "$1" "$SW" "$SH" <<'EOF'
 import sys, numpy as np
 from PIL import Image
 im = Image.open(sys.argv[1]).convert('RGB')
-W, H = im.size
-cx, cy = W // 2, H // 2
+cx, cy = int(sys.argv[2]) // 2, int(sys.argv[3]) // 2
 a = np.asarray(im.crop((cx-120, cy-120, cx+120, cy+120))).reshape(-1, 3).mean(0)
 names = {'red': (178, 24, 24), 'green': (24, 178, 24), 'blue': (24, 24, 178),
          'white': (229, 229, 229), 'black': (20, 20, 20)}

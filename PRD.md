@@ -2239,6 +2239,33 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   (`xrdp_mm.c`, `xrdp_encoder.c`); keystroke harness in
   `PR-demo/tail_flush_ab/` (`colorkey.sh`, `MSTSC_TRACE.md`).
 
+  **ADDENDUM (2026-07-17, same day) — second root cause: ffmpeg
+  stream-analysis hold; fix: `-probesize` = one frame.** The synchronous
+  encode, failing loudly as designed, exposed why the pipeline was ever
+  primed behind: with the declared input rate above ~100 fps (`-framerate
+  120`), ffmpeg's `avformat_find_stream_info()` distrusts the timebase and
+  buffers input for rate estimation up to the default 5 MB `probesize` —
+  a **resolution-dependent** number of pictures (≈1.6 at 1920×1088, ≈4.2 at
+  1024×768, hundreds at small sizes) emitted only once the byte window is
+  crossed. Consequences, all reproduced standalone with the exact child
+  argv: at 1920×1088 one AVC444 pair (6.2 MB) crosses the window at once,
+  so every 1920-class test passed; at 1024×768 (mstsc default) a pair is
+  2.4 MB, the first output never comes, the synchronous encode times out
+  per frame and the session is an unusable respawn loop. This startup hold
+  — not encoder pipelining — is what originally primed the pipelined
+  runner behind, arming the content/region desync above. **An earlier
+  "wedged GPU VCN engine" diagnosis is retracted**: the probes that
+  "proved" it replicated the session argv and were measuring this hold
+  (misread as a hung engine); probes with a low declared fps pass on the
+  same GPU. Fix (`build_argv()`): cap `-probesize` at exactly one NV12
+  frame (the declared `-framerate` makes rate estimation unnecessary);
+  first packet then arrives in ~90 ms (VAAPI warmup) at every size tested,
+  320×240 through 2560×1440. Guards: the previously env-gated real-ffmpeg
+  unit tests run on-box (`XRDP_TEST_FFMPEG_PATH`), the stale
+  `encode_single` one-behind expectation now asserts the synchronous
+  contract, and the deploy smoke gate runs at both 1920×1080 and 1024×768
+  (the resolution-dependence is exactly what a single-size gate misses).
+
 ## 26. Related work and differentiation
 
 Written after the fact (the project began without an upstream survey). Provenance:

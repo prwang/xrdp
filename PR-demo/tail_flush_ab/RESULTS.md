@@ -65,11 +65,19 @@ with stdin held open and counting emitted vs. withheld):
    + `desktop_sequence` verification) in `xrdp_encoder_ffmpeg.c`. Verified with
    the keystroke-driven `colorkey.sh` harness: correct colour on every
    keypress, `submitted_seq == returned_seq`, `inflight=0`, no timeouts.
-   Smoke-validated on **both** encoder paths: `h264_vaapi -async_depth 1`
-   (2026-07-17, after a container restart cleared a wedged VCN engine —
-   8/8 keypresses, 0 lag, 0 encoder errors, 4–9 ms/picture) and
-   `libx264 -tune zerolatency`. mstsc (region-strict) confirmation on the
-   VAAPI path is the owner's final gate.
+   **Second root cause (2026-07-17, later the same day):** the sync encode
+   froze 1024×768 (mstsc-size) logins while passing every 1920×1080 run —
+   because with `-framerate 120` (> ~100 fps) ffmpeg's stream analysis
+   buffers input up to the default 5 MB `probesize` before emitting
+   anything: ≈1.6 pictures at 1920×1088 (one pair crosses it) but ≈4.2 at
+   1024×768 (first pair never returns → per-frame timeout loop). This
+   startup hold is also what originally primed the pipelined runner behind.
+   The earlier "wedged GPU VCN" diagnosis is **retracted** — those probes
+   replicated the session argv and measured this hold, not a hung engine.
+   Fix: `-probesize` = one NV12 frame in `build_argv()`. Smoke-validated on
+   `h264_vaapi -async_depth 1` at **both** 1920×1080 and 1024×768 (8/8
+   keypresses, 0 lag, 0 encoder errors each; smoke.sh now gates both sizes).
+   mstsc (region-strict) confirmation is the owner's final gate.
    **Method notes:** config binds at session **login**, not TCP reconnect; and
    a client-side screenshot of a lenient client (xfreerdp) cannot detect
    region-desync — use the seq trace.

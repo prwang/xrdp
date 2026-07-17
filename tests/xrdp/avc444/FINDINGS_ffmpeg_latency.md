@@ -22,6 +22,21 @@ the "one-frame lag", superseding the memory-level note in `BACKLOG.md`.
 > submitted picture + sequence verification). This *relies on* the shallow
 > pipeline documented below — a deep pipeline now errors loudly instead of
 > desyncing. See PRD §25 and `PR-demo/tail_flush_ab/`.
+>
+> **Correction (2026-07-17, later).** The "input side costs ~1 frame, not
+> several" conclusion below holds only for a credible declared framerate.
+> With `-framerate 120` (the live child's setting, > ~100 fps),
+> `avformat_find_stream_info()` treats the timebase as unreliable and
+> buffers input for rate estimation up to the default 5 MB `probesize` — a
+> **resolution-dependent** picture count (≈1.6 at 1920×1088, ≈4.2 at
+> 1024×768, hundreds at small sizes). That startup hold is what primed the
+> pipelined runner behind in the field, and it froze small-resolution
+> sessions outright once the runner became synchronous (first pair < 5 MB
+> ⇒ per-frame timeout loop). Fixed in `build_argv()` by capping
+> `-probesize` at one NV12 frame — safe because `-framerate` is explicit,
+> so no estimation is needed; this is the "one frame's byte count, never
+> 32" guidance from the probesize caveat below. The measurements below
+> used low declared rates, which is why they never showed the hold.
 
 ## Symptom
 

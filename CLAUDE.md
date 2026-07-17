@@ -102,15 +102,17 @@ Concretely:
   or config differs from what the owner believes is deployed, say so first,
   in plain words, before any green result is claimed.
 - **Severe violation example (2026-07-17), do not repeat.** While validating
-  the AVC444 synchronous-encode fix, the GPU VAAPI path wedged and the live
-  rig was switched to software libx264 to obtain a passing smoke run, and an
-  automatic RFX fallback was queued in the backlog — i.e. the failing
-  hardware path was replaced *and* a masking mechanism was proposed while
-  the actual encoder under test remained broken and unproven. Correct
-  handling: keep the failing config in place, report "VAAPI broken, cause
-  unknown, fix not validated", capture forensics, and validate on the real
-  path once recovered. The backlog fallback item was withdrawn
-  (see `BACKLOG.md`).
+  the AVC444 synchronous-encode fix, the GPU VAAPI path started failing and
+  the live rig was switched to software libx264 to obtain a passing smoke
+  run, and an automatic RFX fallback was queued in the backlog — i.e. the
+  failing hardware path was replaced *and* a masking mechanism was proposed
+  while the actual encoder under test remained broken and unproven. The
+  failure was even misdiagnosed as environment ("wedged GPU VCN engine");
+  root-causing it instead of masking it found a real, deterministic code
+  bug (resolution-dependent ffmpeg probesize hold — PRD §25 addendum).
+  Correct handling: keep the failing config in place, report "VAAPI broken,
+  cause unknown, fix not validated", capture forensics, and root-cause on
+  the real path. The backlog fallback item was withdrawn (see `BACKLOG.md`).
 
 ## Demo & reproduction scaffolding
 
@@ -126,8 +128,10 @@ Concretely:
 - **Smoke-gate every handoff.** Never hand the live box to a human tester
   without running `PR-demo/tail_flush_ab/smoke.sh` against the exact deployed
   binary *and* config, as the LAST step after the final install/restart. A
-  test that passed before the last deployment step counts for nothing;
-  environment state (e.g. a wedged GPU encoder) can change between runs.
+  test that passed before the last deployment step counts for nothing, and a
+  single-configuration pass proves only that configuration: the smoke gate
+  runs multiple session sizes because a real encoder bug (ffmpeg probesize
+  hold) passed every 1920×1080 run while freezing every 1024×768 login.
 - This is our own **dev branch**. The upstream PR against `devel` needs a
   separate clean-room pass — reviewable commit slices plus written rationale —
   and does **not** necessarily carry `PR-demo/` as-is; treat that folder as the
