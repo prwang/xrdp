@@ -1472,6 +1472,25 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
     return 0;
 }
 
+/*****************************************************************************/
+/* Diagnostic: set env XRDP_GFX_TRACE=1 (in xrdp's environment) to log a
+ * timestamped line as each GFX frame is SENT to the client and as each client
+ * FRAME_ACK arrives. Lets an on-screen test (mstsc etc.) localise a withheld
+ * tail frame: a "send" line for the last update but no display => client/
+ * transport; no "send" line until the next damage => server/encoder hold. */
+static int
+gfx_trace_on(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char *e = g_getenv("XRDP_GFX_TRACE");
+        cached = (e != NULL && e[0] == '1') ? 1 : 0;
+    }
+    return cached;
+}
+
+/*****************************************************************************/
 static int
 xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
                        int frames_decoded)
@@ -1512,6 +1531,12 @@ xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
     LOG_DEVEL(LOG_LEVEL_TRACE, "xrdp_mm_egfx_frame_ack: "
               "incoming %d, client %d, server %d",
               frame_id, encoder->frame_id_client, encoder->frame_id_server);
+    if (gfx_trace_on())
+    {
+        LOG(LOG_LEVEL_INFO, "GFX_TRACE ack frame_id=%d queue_depth=%u "
+            "decoded=%d id_server=%d ack_off=%d", frame_id, queue_depth,
+            frames_decoded, encoder->frame_id_server, encoder->gfx_ack_off);
+    }
     if (frame_id < 0 || frame_id > encoder->frame_id_server)
     {
         /* if frame_id is negative or bigger then what server last sent
@@ -3872,6 +3897,15 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                                     enc_done->comp_pad_data +
                                     enc_done->pad_bytes,
                                     enc_done->comp_bytes);
+                if (gfx_trace_on())
+                {
+                    LOG(LOG_LEVEL_INFO, "GFX_TRACE send bytes=%d last=%d "
+                        "frame_id=%d id_server=%d id_client=%d fif=%d",
+                        enc_done->comp_bytes, enc_done->last,
+                        enc_done->frame_id, self->encoder->frame_id_server,
+                        self->encoder->frame_id_client,
+                        self->encoder->frames_in_flight);
+                }
             }
             else
             {

@@ -2207,19 +2207,23 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   xrdp→FreeRDP with a *fresh login* (not just reconnect — config binds at login;
   colour sequence ending RED, then idle): `async_depth 2` withholds (client shows
   the prior colour); `tail_flush=true` at `async_depth 2` delivers.
-  **Important driver caveat (corrects an earlier overclaim).** How low
-  `async_depth` can drive the depth is **VAAPI-driver/hardware dependent**. On
-  the dev box (AMD `amdgpu`/Mesa) `-async_depth 1` reaches depth **0** — so we
-  wrongly concluded "async_depth 1 is the universal fix". A deployment on other
-  VAAPI hardware (e.g. Intel iHD, NVIDIA's VAAPI, or a virtualised/passthrough
-  GPU) reproducibly still withholds one frame at `-async_depth 1`, because that
-  driver keeps a frame in flight regardless. There, the practical fixes are
-  **software `libx264 -tune zerolatency`** (no fixed HW latency) or
-  **`tail_flush = true`**. Run `PR-demo/tail_flush_ab/diagnose_env.sh` on the
-  affected box to measure its floor depth. The **33 ms same-frame tail-flush** is
-  **retained as an opt-in fix** for encoders whose depth cannot be driven to zero
-  (which — per the caveat — is the common case for HW VAAPI, not a rare edge),
-  now **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when armed, after a
+  **Open reproducibility gap (2026-07-17) — do not treat "async_depth 1" as
+  settled.** The above A/B used `xfreerdp3`, never `mstsc`. A live **mstsc**
+  deployment on the **same passed-through GPU** still withholds the tail frame at
+  `-async_depth 1`, which the GPU/driver cannot explain (identical hardware).
+  So there is a **second, client/transport-level** cause that the xfreerdp test
+  cannot observe (mstsc and xfreerdp differ in FRAME_ACK cadence, ack
+  suspension, and final-frame presentation). An earlier "VAAPI-driver dependent"
+  explanation here was speculation and is withdrawn. To localise it on the real
+  client, the build carries an env-gated per-frame server trace
+  (`XRDP_GFX_TRACE=1` → `GFX_TRACE send/ack` lines with frame ids and
+  timestamps): a `send last=1` for the last update with no on-screen change
+  points at client/transport; no `send` until the next damage points at a
+  server/encoder hold. Until that trace is read from an mstsc session, the
+  **practical, verified fix is `tail_flush = true`** (it re-emits the last frame
+  and unblocks it regardless of where it is stuck). The **33 ms same-frame
+  tail-flush** is **gated by `[avc444_ffmpeg] tail_flush` (default off)**: when
+  armed, after a
   real frame the worker (`proc_enc_msg`) waits a 33 ms idle timeout then feeds at
   most `XRDP_AVC444_FLUSH_MAX_DRAIN` (=4) duplicate frames to push the withheld
   frame out, emits it once as STARTFRAME+WireToSurface1+ENDFRAME reusing the last
