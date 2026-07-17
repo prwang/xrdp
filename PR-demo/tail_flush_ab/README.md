@@ -14,6 +14,15 @@ update is not delivered while the user pauses. Two independent remedies:
 * **last resort** — `[avc444_ffmpeg] tail_flush = true` (a bounded 33ms
   same-frame drain, off by default).
 
+## Config binds at fresh LOGIN — not reconnect
+
+`[avc444_ffmpeg]` changes in `/etc/xrdp/gfx.toml` take effect at the next
+**fresh login** (logoff → login), not on disconnect/reconnect to a running
+session (on-box observation, 2026-07-17). Any test of a config change against
+a reconnected session is invalid. `keytest.sh` and `smoke.sh` enforce a cold
+login every run; for manual mstsc tests, log the tester session off first —
+see "Rule 0" in `MSTSC_TRACE.md`.
+
 ## Assumptions (this dev box)
 
 * persistent `tester` xfce session on `:10`, `XAUTHORITY=/var/run/xrdp/1000/Xauthority`

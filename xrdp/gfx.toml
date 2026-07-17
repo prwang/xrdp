@@ -19,6 +19,8 @@ h264_encoder = "x264"
 # change. The block below is the software (libx264) default; a hardware (VAAPI)
 # example follows.
 # -----------------------------------------------------------------------------
+# NOTE: changes to this block take effect at the next fresh LOGIN
+# (logoff -> login), not on disconnect/reconnect to an existing session.
 # [avc444_ffmpeg]
 # path = "/usr/bin/ffmpeg"
 # # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
