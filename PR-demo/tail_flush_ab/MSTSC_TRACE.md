@@ -20,6 +20,21 @@ sudo systemctl daemon-reload && sudo systemctl restart xrdp
 
 ## Run the test
 
+**Rule 0 — fresh login, always.** `[avc444_ffmpeg]` config (encoder_args /
+`async_depth` / `tail_flush`) is observed to take effect only at a **fresh
+login** (logoff → login), *not* on disconnect/reconnect to an existing
+session (verified on-box 2026-07-17; earlier reconnect-only A/Bs gave false
+results because of this). Before ANY onscreen test after a config change:
+log off the tester session first —
+
+```sh
+sudo -u tester pkill -u tester -TERM xfce4-session; sleep 3
+pgrep -f 'Xorg :1[0-9]' || echo "session gone — next connect is a cold login"
+```
+
+`keytest.sh`/`smoke.sh` enforce this automatically (they kill the session and
+cold-login every run); manual mstsc runs must do it by hand.
+
 1. `mstsc` into the box (fresh login), open a terminal with the cursor blink off
    if possible.
 2. Type a short burst, then **one** more character and **stop** — the symptom is
