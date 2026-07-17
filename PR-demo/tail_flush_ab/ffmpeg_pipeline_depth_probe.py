@@ -2,7 +2,8 @@
 """Definitive one-behind test for h264_vaapi. Feed N frames holding stdin open,
 count COMPLETE encoded frames (VCL slice NALs; HW encoder = 1 slice/frame) while
 open vs after EOF. open<fed  => genuine tail withhold that only EOF/next flushes."""
-import subprocess, threading, time
+import subprocess, threading, time, os
+RENDER = os.environ.get("XRDP_PROBE_RENDER", "/dev/dri/renderD128")
 W,H=320,240; FRAME=W*H*3//2; NFRAMES=6
 def make_frame(i):
     y=bytes(((i*37+j*3)&0xff) for j in range(W*H))
@@ -45,7 +46,7 @@ def run(label, extra, pair=False):
     stop.set(); time.sleep(0.1); eof_f=count_vcl(out)
     tag = "ONE-BEHIND" if eof_f>open_f else "no withhold"
     print(f"[{label}]  fed={fed}  frames_out(stdin OPEN)={open_f}  after EOF={eof_f}  -> {tag} (+{eof_f-open_f})")
-VA=["-vaapi_device","/dev/dri/renderD128","-vf","format=nv12,hwupload","-c:v","h264_vaapi","-rc_mode","CQP","-qp","20","-bf","0"]
+VA=["-vaapi_device",RENDER,"-vf","format=nv12,hwupload","-c:v","h264_vaapi","-rc_mode","CQP","-qp","20","-bf","0"]
 run("h264_vaapi async_depth 1 (single frames)", VA+["-async_depth","1"])
 run("h264_vaapi async_depth 1 (PAIRS main+aux)", VA+["-async_depth","1"], pair=True)
 run("h264_vaapi async_depth 2", VA+["-async_depth","2"])
