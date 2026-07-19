@@ -686,10 +686,10 @@ process_enc_rfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 }
 #endif
 
-#if defined(XRDP_X264) || defined(XRDP_OPENH264)
-
-/*****************************************************************************/
-static int
+/* Emit an RFX_AVC420_METABLOCK. Kept outside the x264/OpenH264 guard so the
+ * external ffmpeg AVC444 backend can reuse it without a linked H.264 library.
+ * Non-static so it can be unit tested. */
+int
 out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
                          struct stream *s,
                          struct xrdp_egfx_rect *rects,
@@ -740,6 +740,8 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
     s_pop_layer(s, mcs_hdr);
     return 0;
 }
+
+#if defined(XRDP_X264) || defined(XRDP_OPENH264)
 
 /*****************************************************************************/
 /* called from encoder thread */
