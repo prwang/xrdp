@@ -720,6 +720,19 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
     index = 0;
     while (xrdp_region_get_rect(reg, index, &rect) == 0)
     {
+        /* Even-align the rect origin to the chroma sampling grid. Region-strict
+         * H.264 decoders (mstsc/mstscax, RD Client) reconstruct chroma one
+         * region rect at a time, indexing the odd chroma columns/rows relative
+         * to the rect origin (MS-RDPEGFX 3.3.8.3.x); an odd left/top flips
+         * chroma parity and fringes the rect's left/top edge (a magenta/teal
+         * chroma fringe on high-contrast edges of every updated region).
+         * Rounding the origin down to even only grows the already 1px-expanded
+         * rect by <= 1px and never exceeds the surface (left/top >= 0).
+         * right/bottom need no alignment: the decoder covers odd widths via
+         * (width + 1) / 2. This is a client-side correctness fix, so it applies
+         * to every caller of this emitter (linked H.264 and external ffmpeg). */
+        rect.left &= ~1;
+        rect.top &= ~1;
         out_uint16_le(s, rect.left);
         out_uint16_le(s, rect.top);
         out_uint16_le(s, rect.right);
