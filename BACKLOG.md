@@ -41,6 +41,55 @@ in `CLAUDE.md`). A persistently failing encoder must fail loudly (per-frame
 ERROR lines, visible breakage) so the root cause gets fixed — on this project,
 do not re-add any silent codec fallback without explicit owner sign-off.
 
+## macOS Windows App AVC444 validation — TODO (2026-07-22, highest-value test)
+
+The Mac "Windows App" is the stated blocker that killed the prior
+out-of-tree AVC444 rollout (Nexarian: FreeRDP and MSTSC were fine, "But
+Mac OS is important enough that it blocked the rollout"; no screenshot,
+capture, or root cause exists upstream — see
+`PR-demo/UPSTREAM_GAP_ANALYSIS.md` §2a). Our stream lacks the fork's F1
+(pair split across frames — now unit-guarded by the avc444_wire tests) and
+F2 (no caps gating) defects and is mstsc-verified, so this run is decisive
+whichever way it goes.
+
+**Setup:** Mac + Windows App (record app + macOS versions) over the tunnel
+to `127.0.0.1:3389`; `avc_mode = "auto"`; capture regardless of outcome:
+the `xrdp_mm_egfx_caps_advertise` version/flags lines (the capsets the
+Windows App offers — undocumented anywhere), the negotiated-mode log line,
+and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
+
+**Expected outcome matrix — interpretation and action:**
+
+1. **Caps ≥ v10, AVC444 v2 negotiated, render clean** (incl. colorkey
+   drive and an odd-origin high-contrast edge): historical blocker
+   REMOVED. Strongest PR line. Record evidence; done.
+2. **Clean until resize, garbled after**: generation/reset handling on
+   reconnect-resize. Retest at fixed size via fresh login; if it
+   reproduces, treat as OUR bug candidate (reset keyframe / caps redo),
+   trace before blaming the client.
+3. **Immediate full-frame chroma garble on v2** (Nexarian-symptom):
+   client fault isolated (our stream is spec-conformant + mstsc-clean).
+   Retest `avc_mode = "420"` — expected clean. If a v1 (0x000E) trial is
+   wanted, add a small caps-classifier override knob (config-only,
+   follow-up). Ship policy: per-client negotiate-down documented in
+   gfx.toml docs; PR narrative = "fault isolated, contained by caps
+   gating + config".
+4. **Garbled even on AVC420**: NOT a 444 defect — baseline H.264 issue
+   (our stream or Mac decoder). Capture and root-cause before any claim;
+   do not paper over with RFX (honesty rule).
+5. **Client advertises only CAPVERSION_81 or AVC_DISABLED**: classifier
+   already serves AVC420/RFX — confirm session works stock-like; the
+   captured capsets are themselves the deliverable (nobody upstream has
+   them documented).
+6. **No garble but stalls/frozen frames**: pacing/ack issue, not chroma.
+   Dev build + trace; compare `frame_id` ack cadence vs mstsc run.
+7. **Fails before GFX negotiation** (TLS/transport): environment, not
+   codec — fix tunnel/cert first, outcome not attributable to AVC444.
+
+**Acceptance:** verdict + capsets + screenshot recorded in
+`UPSTREAM_GAP_ANALYSIS.md` §2a (required-test #2 closed either way), and
+the PR narrative updated ("blocker removed" or "fault isolated + policy").
+
 ## Port AVC444 wire-layout serializer + test to clean branch — TODO (2026-07-22)
 
 Delivered on dev: the RFX_AVC444_BITMAP_STREAM body serialization was
