@@ -80,6 +80,44 @@ you have a reason to change it. The debs `Conflicts/Replaces` the distro `xrdp`
 /`xorgxrdp`, so they supersede stock cleanly; `/etc/xrdp/*` are `conffiles`
 (admin edits preserved on upgrade).
 
+### 2a. Fresh-box X-server prerequisites (do this BEFORE first login)
+
+The shipped `sesman.ini` launches the X server as `param=Xorg` — the bare name
+resolves to the Debian/Ubuntu **suid wrapper**, whose default policy
+(`allowed_users=console`) refuses non-console users. An RDP login then fails
+with `Can't create session … X server could not be started`. Pick ONE fix:
+
+```sh
+# (a) allow the wrapper for RDP users (needs xserver-xorg-legacy):
+printf 'allowed_users=anybody\nneeds_root_rights=no\n' \
+    | sudo tee /etc/X11/Xwrapper.config
+# (b) or bypass the wrapper: in /etc/xrdp/sesman.ini [Xorg] set
+#     param=/usr/lib/xorg/Xorg        (the non-suid binary; path per distro,
+#     see the comment block in sesman.ini itself)
+sudo systemctl restart xrdp-sesman
+```
+
+The dev box passes only because its `/etc/X11/Xwrapper.config` was hand-set to
+`allowed_users=anybody`; a stock cloud image will not have this.
+
+**Triage order for "X server could not be started"** (`xrdp.log` cannot tell
+you more — the front-end is already past its part when this appears):
+
+1. `sudo tail -50 /var/log/xrdp-sesman.log` and
+   `journalctl -u xrdp-sesman -e` — sesexec prints the Xorg exit reason here.
+   Wrapper refusal shows as *"Only console users are allowed to run the X
+   server"*.
+2. `tail -50 ~<user>/.xorgxrdp.1*.log` — Xorg's own log (`-logfile` is
+   relative, so it lands in the session user's `$HOME`).
+3. **Module ABI mismatch:** the prebuilt `xorgxrdp-dev` deb was compiled on
+   Debian 13 against xserver 21.1.16 (video ABI 25, input ABI 24). If the
+   Xorg log says *"module ABI major version … doesn't match the server"*,
+   rebuild xorgxrdp on the target (§4) — the deb's unversioned
+   `Depends: xserver-xorg-core` cannot catch this.
+4. **GLAMOR/EGL init (Nvidia):** the deb is a GLAMOR build; on Nvidia the
+   proprietary driver needs `nvidia-drm.modeset=1` for GBM/EGL. Look for
+   glamor/EGL errors in the Xorg log.
+
 ---
 
 ## 3. Configure the encoder — `/etc/xrdp/gfx.toml`
@@ -117,6 +155,21 @@ the encoder withholds/reorders. Keep `-bf 0` and a zero-latency knob
 
 Config binds at **fresh login** (logoff→login), not TCP reconnect. Restart after
 editing: `sudo systemctl restart xrdp`.
+
+**Probe-failure signature.** At connect time xrdp test-runs the configured
+encoder. If `xrdp.log` shows
+`probing ffmpeg AVC444 … ffmpeg probe FAILED; removing external AVC candidate`
+followed by `Matched RFX mode`, the session is running **RFX, not AVC444** —
+the args/driver don't work on this box (e.g. VAAPI args on an Nvidia host,
+missing render node, ffmpeg without the encoder). Reproduce by hand and read
+ffmpeg's stderr:
+
+```sh
+ffmpeg -f lavfi -i testsrc2=size=1280x720:rate=5 -frames:v 5 \
+    <your encoder_args here> -f null -
+```
+
+Do not report AVC444 results until the log shows `ffmpeg AVC444 probe OK`.
 
 ---
 
