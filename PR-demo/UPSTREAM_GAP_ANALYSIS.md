@@ -115,13 +115,34 @@ fallback per client), and a working encoder path arrive together, tested.
 
 There was no failed upstream test run to point to — xorgxrdp #255 had zero
 review comments and the 444 code never entered upstream CI. The recorded
-failure is a **field symptom that was never root-caused**. Nexarian
-(discussion #2383, 2025-04-28): *"4:4:4 NVENC doesn't yet work stably on
-XRDP … **The output on the Mac OS client was garbled, and I never figured out
-why.**"* Supporting user reports: the fork's 444 showed *"no major
-difference"* through xfreerdp in one test (tabletseeker — consistent with
-FreeRDP being a lenient decoder that masks 444 defects), and *"the load was
-too high"* (tabletseeker, 2025-08).
+failure is a **field symptom that was never root-caused**, documented only in
+prose — **no screenshot of the garbling was ever posted** (checked all 154
+comments of #2383 and the #3375 thread). The three primary-source statements,
+all by Nexarian:
+
+1. [#2383, 2025-04-28 03:46 UTC](https://github.com/neutrinolabs/xrdp/discussions/2383#discussioncomment-12964900):
+   *"4:4:4 NVENC doesn't yet work stably on XRDP. I had an old branch where I
+   tried it: https://github.com/Nexarian/xrdp/tree/mainline_merge_avc444 —
+   The output on the Mac OS client was garbled, and I never figured out
+   why."*
+2. [#2383, 2025-04-28 16:16 UTC](https://github.com/neutrinolabs/xrdp/discussions/2383#discussioncomment-12972036):
+   *"Microsoft has a bug in their 'Windows App' (I hate that name) on Mac OS
+   that basically doesn't work with this branch. … FreeRDP and MSTSC seemed
+   fine with my 4:4:4 implementation, however. **But Mac OS is important
+   enough that it blocked the rollout of this feature.** I haven't been able
+   to discuss this with Microsoft yet."*
+3. [#3375, 2025-05-04](https://github.com/neutrinolabs/xrdp/issues/3375#issuecomment-2848883434):
+   *"The combination of lack of sponsorship for this and Microsoft's bad
+   implementation for AVC444 on the Mac OS client are going to stall progress
+   here, I'm afraid."*
+
+Quote 2 is the load-bearing one: the Mac Windows App was **the stated blocker
+for the entire AVC444 rollout** — while working on FreeRDP and MSTSC — and
+the "Microsoft bug" attribution was never verified (no packet capture, no
+screenshot, no Microsoft contact). Supporting user reports: the fork's 444
+showed *"no major difference"* through xfreerdp in one test (tabletseeker —
+consistent with FreeRDP being a lenient decoder that masks 444 defects), and
+*"the load was too high"* (tabletseeker, 2025-08).
 
 Reading the fork's source (`Nexarian/xrdp` branch `mainline_merge_avc444`,
 `xrdp/xrdp_encoder.c` + `xrdp_mm.c`, fetched 2026-07-22) identifies four
@@ -170,7 +191,15 @@ Still required:
 2. **Client matrix, live**: mstsc onscreen A/B (planned, region-strict);
    **macOS Windows App** session — the exact client that garbled; without this
    run, claim containment (F2 gating), not resolution. iOS/Android RD Client
-   optional.
+   optional. The Mac run is disproportionately valuable because quote 2 in
+   §2a makes the Mac client *the* stated rollout blocker, and either outcome
+   advances the PR: clean rendering removes the blocker that killed the prior
+   attempt; garbling on our spec-conformant, mstsc-verified stream isolates
+   the fault to the client (turning Nexarian's unverified attribution into an
+   evidenced one) and justifies a documented per-client policy (Mac gets v1
+   or AVC420 via the caps classifier / config) instead of an open mystery.
+   Either way the test also documents empirically which capsets the Windows
+   App advertises — the input our classifier keys on.
 3. **NVENC configuration run** on Nvidia hardware (the fork's unstable combo,
    our untested recipe).
 4. **Latency/load benchmark vs linked x264** (RESULTS.md P3) — answers "load
