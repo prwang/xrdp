@@ -41,6 +41,26 @@ in `CLAUDE.md`). A persistently failing encoder must fail loudly (per-frame
 ERROR lines, visible breakage) so the root cause gets fixed — on this project,
 do not re-add any silent codec fallback without explicit owner sign-off.
 
+## Port AVC444 wire-layout serializer + test to clean branch — TODO (2026-07-22)
+
+Delivered on dev: the RFX_AVC444_BITMAP_STREAM body serialization was
+extracted from `gfx_wiretosurface1_avc444` into an exposed
+`out_RFX_AVC444_BITMAP_STREAM()` (`xrdp_encoder.{c,h}`, no behavior change —
+identical byte sequence, placeholder/backfill included) and unit tested in
+`test_avc444_metablock.c` (`avc444_wire` tcase): ONE PDU, LC=0 in info-word
+bits 30..31, cb == metablock+luma length, chroma sub-stream immediately
+after, both metablocks over the same rects, stream ends after chroma. This
+is the direct regression guard against the prior fork's pair-split-across-
+frames defect (luma LC=1 / chroma LC=2 in separate GFX frames).
+
+- Porting rule: NO separate fix commit — fold the serializer extraction
+  into slice 5 (metablock emission, same file/pattern) or slice 8 if 5
+  stays folded into 8; the `avc444_wire` tests travel with it; the
+  `gfx_wiretosurface1_avc444` call-site change lands in slice 8.
+- Re-run the per-slice bisectability walk for rewritten slices after.
+- Acceptance: clean branch `make check` includes the avc444_wire tests;
+  `git diff` dev-vs-clean for these files stays scaffold-only.
+
 ## Probe must log child stderr — TODO (2026-07-22)
 
 `xrdp_ffmpeg_avc444_probe()` drains and discards the child's stderr, so a

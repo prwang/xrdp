@@ -173,4 +173,14 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
                          struct xrdp_egfx_rect *rects,
                          int num_rects);
 
+/* Serialize an RFX_AVC444_BITMAP_STREAM body: info word (cb bits 0..29,
+ * LC = 0 bits 30..31) + luma and chroma sub-streams in ONE PDU. Exposed for
+ * unit testing the single-PDU/LC=0 wire layout. */
+int
+out_RFX_AVC444_BITMAP_STREAM(struct xrdp_egfx_rect *dst_rect,
+                             struct stream *s,
+                             struct xrdp_egfx_rect *d_rects, int num_rects,
+                             const unsigned char *main_data, int main_len,
+                             const unsigned char *aux_data, int aux_len);
+
 #endif

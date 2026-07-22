@@ -859,6 +859,47 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
     return 0;
 }
 
+/*****************************************************************************/
+/* Serialize an RFX_AVC444_BITMAP_STREAM body (MS-RDPEGFX 2.2.4.5) into s,
+ * which must be a fresh stream (the info word is backfilled at s->data[0]):
+ * one avc420EncodedBitstreamInfo word -- cbAvc420EncodedBitstream1 in bits
+ * 0..29, LC = 0 in bits 30..31, i.e. BOTH the luma and the chroma view
+ * travel in this single PDU (v1 vs v2 is selected by the codec id, not by
+ * LC) -- followed by the two RFX_AVC420_BITMAP_STREAM sub-streams, each a
+ * metablock over the same region rects plus its Annex-B bitstream.
+ * Not static: the single-PDU/LC=0 wire layout is unit tested. */
+int
+out_RFX_AVC444_BITMAP_STREAM(struct xrdp_egfx_rect *dst_rect,
+                             struct stream *s,
+                             struct xrdp_egfx_rect *d_rects, int num_rects,
+                             const unsigned char *main_data, int main_len,
+                             const unsigned char *aux_data, int aux_len)
+{
+    int sub1_len;
+    unsigned int info;
+
+    out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
+    if (out_RFX_AVC420_METABLOCK(dst_rect, s, d_rects, num_rects) != 0)
+    {
+        return 1;
+    }
+    out_uint8a(s, main_data, main_len);
+    sub1_len = (int)(s->p - s->data) - 4;
+    if (out_RFX_AVC420_METABLOCK(dst_rect, s, d_rects, num_rects) != 0)
+    {
+        return 1;
+    }
+    out_uint8a(s, aux_data, aux_len);
+    s_mark_end(s);
+    /* cbAvc420EncodedBitstream1 (bits 0..29), LC = 0 (bits 30..31) */
+    info = (unsigned int)sub1_len & 0x3FFFFFFF;
+    s->data[0] = (char)(info & 0xff);
+    s->data[1] = (char)((info >> 8) & 0xff);
+    s->data[2] = (char)((info >> 16) & 0xff);
+    s->data[3] = (char)((info >> 24) & 0xff);
+    return 0;
+}
+
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
 
 /*****************************************************************************/
@@ -1249,7 +1290,6 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     struct stream *s;
     struct stream *rv;
     int enc_rv;
-    int sub1_len;
     int bitmap_data_length;
     int need;
 
@@ -1425,32 +1465,13 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         return NULL;
     }
     s->p = s->data;
-    out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
-    if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, num_rects_d) != 0)
+    if (out_RFX_AVC444_BITMAP_STREAM(&dst_rect, s, d_rects, num_rects_d,
+                                     pair.main_data, pair.main_len,
+                                     pair.aux_data, pair.aux_len) != 0)
     {
         g_free(s->data);
         g_free(d_rects);
         return NULL;
-    }
-    out_uint8a(s, pair.main_data, pair.main_len);
-    sub1_len = (int)(s->p - s->data) - 4;
-    if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, num_rects_d) != 0)
-    {
-        g_free(s->data);
-        g_free(d_rects);
-        return NULL;
-    }
-    out_uint8a(s, pair.aux_data, pair.aux_len);
-    s_mark_end(s);
-    {
-        /* cbAvc420EncodedBitstream1 (bits 0..29), LC = 0 (bits 30..31). LC
-         * stays 0 for both v1 and v2 (both send luma + chroma sub-streams);
-         * v1 vs v2 is selected by the codec id below, not by LC. */
-        unsigned int info = (unsigned int)sub1_len & 0x3FFFFFFF;
-        s->data[0] = (char)(info & 0xff);
-        s->data[1] = (char)((info >> 8) & 0xff);
-        s->data[2] = (char)((info >> 16) & 0xff);
-        s->data[3] = (char)((info >> 24) & 0xff);
     }
     bitmap_data_length = (int)(s->end - s->data);
     rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
