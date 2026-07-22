@@ -130,6 +130,11 @@ the new base (expected: fine / better; not a risk, just a checkpoint).
 - PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
   AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
 - Every slice builds and `make check` passes on its own (bisectable).
+  Re-verified 2026-07-22 after the dump_extra rewrite for the four
+  rewritten commits (`04e43ee2` → tip `c74a09e7`): per-slice `make` +
+  `make check` green, plus the gated real-ffmpeg suite (64/64) against
+  ffmpeg 7.1 and 8.1 at every slice. Slices 1–6 are untouched by the
+  rewrite (identical hashes).
 - No `XRDP_GFX_TRACE`, no `tail_flush` anywhere in the diff.
 - astyle (pinned 3.4.14) + cppcheck clean; `/* */` comments only.
 
