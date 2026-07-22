@@ -159,9 +159,13 @@ is self-contained. Suggested order:
    `test_avc444_caps.c`. Pure logic: pick v2 / 420 from the client capset.
 7. **External stock-ffmpeg runner (synchronous encode).**
    `xrdp_encoder_ffmpeg.{c,h}` + `test_avc444_ffmpeg.c`. Spawn/argv incl.
-   one-frame `-probesize`, NUT read loop, **synchronous** encode + sequence
+   one-frame `-probesize` and the `dump_extra,h264_mp4toannexb` bsf chain
+   (global-header muxer vs encoders with no in-band SPS/PPS repeat —
+   h264_nvenc; folded in 2026-07-22 after the T4 finding, branch rewritten,
+   slice now `04e43ee2`), NUT read loop, **synchronous** encode + sequence
    verification, resize lifecycle. Built correct from the start (no desync/
-   deadlock to “fix later”); the test carries both regression guards. Depends
+   deadlock to “fix later”); the test carries both regression guards plus
+   the global-header-encoder probe regression. Depends
    on 2–4. **No tail_flush, no trace.**
 8. **Encoder integration / dispatch.** `xrdp_encoder.{c,h}`: select the ffmpeg
    backend, feed converter output, emit metablock + bitstream. Depends on
