@@ -72,10 +72,12 @@ landed:
 - **Nexarian's `mainline_merge_avc444` fork** is the only place AVC444 has ever
   worked. Its xorgxrdp side was PR'd upstream once —
   [xorgxrdp #255](https://github.com/neutrinolabs/xorgxrdp/pull/255) ("Mainline
-  merge avc444") — and **closed the same day, unmerged** (2023-03-31). Users
-  run the fork anyway to get AVC444/GPU encode and hit unsupported territory
+  merge avc444") — and **closed the same day by its author, unmerged**
+  (2023-03-31; withdrawn, not maintainer-rejected). Users run the fork anyway
+  to get AVC444/GPU encode and hit unsupported territory
   ([xrdp #2635](https://github.com/neutrinolabs/xrdp/issues/2635): fork breaks
-  with multi-monitor).
+  with multi-monitor). What "not stable" meant concretely is dissected in §2a
+  below.
 - **The GFX mainline merge deliberately left the 444 code out.** When the egfx
   work was merged to `devel` (PR #2891 / discussion
   [#2383](https://github.com/neutrinolabs/xrdp/discussions/2383)), jsorg71
@@ -108,6 +110,74 @@ landed:
 This PR needs no sponsorship pipeline, no fork, and no new GPU API surface in
 xrdp: the AVC444 assembly, MS color matrix, caps negotiation (v2/v1/AVC420
 fallback per client), and a working encoder path arrive together, tested.
+
+## 2a. Forensics: what exactly was "not stable" in the prior attempt
+
+There was no failed upstream test run to point to — xorgxrdp #255 had zero
+review comments and the 444 code never entered upstream CI. The recorded
+failure is a **field symptom that was never root-caused**. Nexarian
+(discussion #2383, 2025-04-28): *"4:4:4 NVENC doesn't yet work stably on
+XRDP … **The output on the Mac OS client was garbled, and I never figured out
+why.**"* Supporting user reports: the fork's 444 showed *"no major
+difference"* through xfreerdp in one test (tabletseeker — consistent with
+FreeRDP being a lenient decoder that masks 444 defects), and *"the load was
+too high"* (tabletseeker, 2025-08).
+
+Reading the fork's source (`Nexarian/xrdp` branch `mainline_merge_avc444`,
+`xrdp/xrdp_encoder.c` + `xrdp_mm.c`, fetched 2026-07-22) identifies four
+concrete defects consistent with "garbled on a strict client, fine-ish on
+mstsc, invisible on FreeRDP":
+
+| # | Fork defect (file:evidence) | Failure it produces | This PR's counterpart |
+|---|---|---|---|
+| F1 | **AVC444 pair split across two GFX frames** in the NVENC path: luma PDU, then `frame_end` / `frame_id++` / `frame_start`, then the chroma PDU (`xrdp_mm.c`, `xrdp_mm_process_enc_done`). The halves carry `LC=0x01` / `LC=0x02`, each above a literal `// TODO: Specify LC code here` (`xrdp_encoder.c`, 3 sites). | The client may present after the luma-only frame, and frame-level ack pacing/drops can apply chroma to the wrong luma — timing-dependent garbling. Matches "NVENC 444 unstable" + Mac garbling that mstsc's pacing mostly hides. | Both views packed in **one** `RFX_AVC444_BITMAP_STREAM`, `LC=0`, one PDU, one frame — a split pair is structurally impossible (`xrdp/xrdp_encoder.c` LC=0 serializer; PRD §1). Pair integrity further pinned by the synchronous encode + `desktop_sequence` verify (regression-tested, `tests/xrdp/test_avc444_ffmpeg.c`). |
+| F2 | **No AVC444 caps gating**: `#define AVC444 1` compile switch; any client that qualifies for H.264 — including **CAPVERSION 8.1**, whose capset per MS-RDPEGFX supports AVC420 only — is sent `AVC444V2 (0x000F)` unconditionally (`xrdp_mm.c` caps loop + send path). | Sending 0x000F to a capset that never advertised it = undefined client behavior. A then-lagging Mac client negotiating 8.1/10.x-low is a prime garbling candidate. | Per-client classifier `xrdp_avc444_classify_caps` + `xrdp_avc444_caps_supports_v2`: 8.1 → AVC420 only, v10 → v1, v10.1+/10.2–10.7 → v2, `AVC_DISABLED` honored — unit-tested including exactly the 8.1-never-gets-444 case (`tests/xrdp/test_avc444_caps.c`). |
+| F3 | **Metablock region rects emitted raw** — no origin alignment (`build_rfx_avc420_metablock` writes `rrects` verbatim). | Odd region origins flip chroma parity on region-strict decoders (mstsc/mstscax/RD Client family) → edge fringing on every update. | Origin even-alignment in the shared emitter, both linked-x264 and ffmpeg paths — unit-tested (`tests/xrdp/test_avc444_metablock.c`) + 3-level reachability proof (`AVC444_metablock_reachability_PROOF.md`). |
+| F4 | **Software 444 = double encode with no low-latency contract** (pipelined thread + FIFO, the frame-ack-drift design the #2891 merge thread fought as "green banding"). | "Load was too high"; stale/withheld frames under encoder delay. | Synchronous runner with deterministic failure (restart loudly, never serve a stale pair); hardware encode via any ffmpeg encoder by config — VAAPI validated end-to-end on this project's rig. |
+
+Honesty box — what we can and cannot claim:
+
+- **Cannot claim:** "the Mac client now renders 444 correctly." Nobody
+  root-caused the Mac garbling (Nexarian attributes it to a Microsoft client
+  bug; his own code had F1/F2 confounders, so the attribution is unproven).
+  We have not run the macOS Windows App against this branch. What we can
+  claim: the two server-side protocol hazards that could produce it (F1, F2)
+  are structurally eliminated and unit-tested, and a client that does not
+  advertise 444 caps is never sent 444 — worst case it gets working AVC420.
+- **Cannot claim yet:** NVENC stability (his unstable combo) — our NVENC path
+  is config-only and untested on this rig (no Nvidia GPU); and subprocess
+  latency vs linked x264 is unbenchmarked (`PR-demo/RESULTS.md` P3).
+- **Verified live:** AVC444 v2 on mstsc (region-strict) — the v1 chroma fringe
+  drops 50.4% → 0.6% of affected pixels
+  (`tests/xrdp/avc444/FINDINGS_magenta_burr.md`), and the resize-comb
+  chroma-split defect was root-caused and fixed
+  (`tests/xrdp/avc444/repro_mbparity/FINDINGS_mstsc_split.md`).
+
+### Required tests to fully retire the prior-attempt failure surface
+
+Already in tree (each mapped to a fork defect): `test_avc444_caps.c` (F2),
+`test_avc444_metablock.c` (F3), `test_avc444_convert.c` (ChromaV2 U|V split
+geometry — the mstsc comb), `test_avc444_ffmpeg.c` (pair sync + probesize
+regressions, F1/F4 class), `test_avc444_h264.c`/`test_avc444_nut.c` (bitstream
+validity), plus the two-resolution live smoke gate.
+
+Still required:
+
+1. **Wire-layout unit test for the AVC444 PDU** (gap found while auditing the
+   fork): assert one PDU, `LC=0`, `cbAvc420EncodedBitstream1` == metablock +
+   sub-stream-1 length, both views present, single frame — the direct
+   regression guard against F1 ever reappearing. Not yet in tree.
+2. **Client matrix, live**: mstsc onscreen A/B (planned, region-strict);
+   **macOS Windows App** session — the exact client that garbled; without this
+   run, claim containment (F2 gating), not resolution. iOS/Android RD Client
+   optional.
+3. **NVENC configuration run** on Nvidia hardware (the fork's unstable combo,
+   our untested recipe).
+4. **Latency/load benchmark vs linked x264** (RESULTS.md P3) — answers "load
+   too high" quantitatively.
+5. **Soak + resize storm** against the deployed binary (encoder restarts = 0
+   over hours; resize destroys/recreates the child) — extends the current
+   smoke gate's per-login checks.
 
 ## 3. The second gap: encoder coupling breaks users at runtime
 
