@@ -70,7 +70,7 @@ that means membership in the `render` group (owner of `/dev/dri/renderD128`).
 
 ```sh
 sudo apt-get install -y /work/dist/xorgxrdp-dev_0.10.80+gite86bff0+glamor_amd64.deb
-sudo apt-get install -y /work/dist/xrdp-dev_0.10.80+git287423b4a4d9_amd64.deb
+sudo apt-get install -y /work/dist/xrdp-dev_0.10.80+git71179f670fd5_amd64.deb
 sudo systemctl enable --now xrdp xrdp-sesman
 systemctl is-active xrdp xrdp-sesman          # both -> active
 ```
