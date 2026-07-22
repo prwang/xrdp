@@ -147,8 +147,12 @@ on an x86 + T4 box (Ubuntu, ffmpeg 8.0.1, driver 580.159.03): probe OK,
 persistent ffmpeg child during the session, display correct, and `nvidia-smi`
 lists that ffmpeg as a GPU compute process (~200 MiB) — genuine hardware
 encode. Requires an xrdp build with the dump_extra fix (see §0) — nvenc has no
-in-band SPS/PPS repeat option, so older builds fail the probe by design. The
-multi-resolution smoke gate (`PR-demo/tail_flush_ab/smoke.sh`) is
+in-band SPS/PPS repeat option, so older builds fail the probe by design.
+Owner-validated in addition (2026-07-22): **small session sizes work** and
+**no chroma fringe** was observed across multiple small width/height sessions
+on region-strict rendering — validation coverage orthogonal to the dump_extra
+fix (different defect classes: probesize hold, metablock alignment). The
+scripted multi-resolution smoke gate (`PR-demo/tail_flush_ab/smoke.sh`) is
 dev-box-specific and was NOT run on the T4. nvenc uploads the sysmem NV12
 itself, so no `hwupload`/`vaapi_device`:
 ```toml
@@ -230,6 +234,8 @@ Region-strict correctness is confirmed with **mstsc / rdcman / RD Client**: driv
 a high-contrast edge on an odd-origin region and confirm no chroma fringe on the
 region's top/left edge. See `AVC444_metablock_reachability_PROOF.md` for the A/B
 method (before = revert `rect.left/top &= ~1`, after = branch as-is).
+Empirical status 2026-07-22: fringe absent across multiple small width/height
+sessions on the T4 (NVENC, region-strict client, owner-tested).
 
 ---
 
