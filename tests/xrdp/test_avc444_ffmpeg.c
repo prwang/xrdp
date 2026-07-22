@@ -48,6 +48,42 @@ START_TEST(test_ffmpeg_probe)
 }
 END_TEST
 
+/* REGRESSION (found live on an Nvidia T4, 2026-07-22): NUT is a
+ * global-header muxer, so an encoder with no in-band repeat option
+ * (h264_nvenc) emits SPS/PPS in extradata only and the probe's
+ * reset-keyframe check fails. The injected dump_extra bitstream filter
+ * must restore the in-band parameter sets for ANY encoder; model the
+ * no-repeat encoder with libx264 minus repeat-headers=1. */
+START_TEST(test_ffmpeg_probe_global_header_encoder)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    static const char *args[] =
+    {
+        "-c:v", "libx264",
+        "-bf", "0",
+        "-preset", "ultrafast",
+        "-tune", "zerolatency",
+        "-crf", "18",
+        "-g", "240"
+    };
+    int nargs = (int)(sizeof(args) / sizeof(args[0]));
+    int i;
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return; /* skipped: no ffmpeg configured */
+    }
+    memset(&cfg.encoder_args, 0, sizeof(cfg.encoder_args));
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", args[i]);
+    }
+    cfg.encoder_args.count = nargs;
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
+}
+END_TEST
+
 START_TEST(test_ffmpeg_encode_pair)
 {
     struct xrdp_ffmpeg_avc444_config cfg;
@@ -320,6 +356,7 @@ make_suite_avc444_ffmpeg(void)
     tc = tcase_create("avc444_ffmpeg");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ffmpeg_probe);
+    tcase_add_test(tc, test_ffmpeg_probe_global_header_encoder);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);

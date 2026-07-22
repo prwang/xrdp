@@ -16,7 +16,7 @@ Both prebuilt under `/work/dist` (rebuild recipe in §4):
 
 | Package | File | What it is |
 |---|---|---|
-| `xrdp-dev` | `xrdp-dev_0.10.80+git287423b4a4d9_amd64.deb` | Cleanroom xrdp, branch `avc444-ffmpeg-upstream` @ `287423b4`. AVC444/AVC420 ffmpeg GFX encoder + caps negotiation. |
+| `xrdp-dev` | newest `xrdp-dev_0.10.80+git*_amd64.deb` (dev-branch build; exact name pinned below in §2) | xrdp with the AVC444/AVC420 ffmpeg GFX encoder + caps negotiation. **Must carry the dump_extra fix for NVENC/global-header encoders** — cleanroom `287423b4` and earlier fail the probe on nvenc; the fix folds into the clean-room slices at porting time. |
 | `xorgxrdp-dev` | `xorgxrdp-dev_0.10.80+gite86bff0+glamor_amd64.deb` | xorgxrdp `e86bff0`, **`--enable-glamor`**. Full-chroma XRGB8888 capture (`CC_GFX_AVC444`) the encoder depends on. |
 
 The two are version-coupled: the `xrdp-dev` deb declares
@@ -140,8 +140,12 @@ encoder_args = [
 ]
 ```
 
-**NVENC (Nvidia T4 — UNTESTED, starter recipe):** nvenc uploads the sysmem NV12
-itself, so no `hwupload`/`vaapi_device`:
+**NVENC (Nvidia T4):** standalone encode with the exact probe argv and the
+resulting bitstream through the xrdp demuxer/validators were verified
+2026-07-22; a full live session is still pending. Requires an xrdp build with
+the dump_extra fix (see §0) — nvenc has no in-band SPS/PPS repeat option, so
+older builds fail the probe by design. nvenc uploads the sysmem NV12 itself,
+so no `hwupload`/`vaapi_device`:
 ```toml
 encoder_args = [
   "-c:v", "h264_nvenc", "-preset", "p1", "-tune", "ll",
