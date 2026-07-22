@@ -2280,9 +2280,11 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   default args force `repeat-headers=1`; `-flags:v -global_header` cannot
   override a muxer that demands global headers, and a user-supplied
   `-bsf:v` is overridden by the injected one — so no config-only fix
-  exists. Fix (`build_argv()`, this dev branch; ported to the clean branch
-  by folding into clean-room slice 7, never as a separate fix commit):
-  inject `-bsf:v dump_extra,h264_mp4toannexb`, reinserting the extradata
+  exists. Fix (`build_argv()`, this dev branch; ported same day by
+  folding into clean-room slice 7 — never a separate fix commit — with
+  the branch history rewritten: slice 7 is now `04e43ee2`, tip
+  `c74a09e7`, and `git diff` old-tip→new-tip is exactly the two-file
+  fix): inject `-bsf:v dump_extra,h264_mp4toannexb`, reinserting the extradata
   parameter sets ahead of every keyframe for any encoder (duplicates are
   legal/identical when the encoder already repeats). Guard: gated
   real-ffmpeg regression test modelling a global-header-only encoder

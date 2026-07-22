@@ -16,7 +16,7 @@ Both prebuilt under `/work/dist` (rebuild recipe in §4):
 
 | Package | File | What it is |
 |---|---|---|
-| `xrdp-dev` | newest `xrdp-dev_0.10.80+git*_amd64.deb` (dev-branch build; exact name pinned below in §2) | xrdp with the AVC444/AVC420 ffmpeg GFX encoder + caps negotiation. **Must carry the dump_extra fix for NVENC/global-header encoders** — cleanroom `287423b4` and earlier fail the probe on nvenc; the fix folds into the clean-room slices at porting time. |
+| `xrdp-dev` | `xrdp-dev_0.10.80+gitc74a09e7d000_amd64.deb` | Cleanroom xrdp, branch `avc444-ffmpeg-upstream` @ `c74a09e7` (history rewritten 2026-07-22: dump_extra fix folded into slice 7). AVC444/AVC420 ffmpeg GFX encoder + caps negotiation, NVENC/global-header capable. The T4 currently runs the equivalent dev-branch build `71179f67` (same encoder code + inert trace scaffold). |
 | `xorgxrdp-dev` | `xorgxrdp-dev_0.10.80+gite86bff0+glamor_amd64.deb` | xorgxrdp `e86bff0`, **`--enable-glamor`**. Full-chroma XRGB8888 capture (`CC_GFX_AVC444`) the encoder depends on. |
 
 The two are version-coupled: the `xrdp-dev` deb declares
@@ -72,7 +72,7 @@ that means membership in the `render` group (owner of `/dev/dri/renderD128`).
 
 ```sh
 sudo apt-get install -y /work/dist/xorgxrdp-dev_0.10.80+gite86bff0+glamor_amd64.deb
-sudo apt-get install -y /work/dist/xrdp-dev_0.10.80+git71179f670fd5_amd64.deb
+sudo apt-get install -y /work/dist/xrdp-dev_0.10.80+gitc74a09e7d000_amd64.deb
 sudo systemctl enable --now xrdp xrdp-sesman
 systemctl is-active xrdp xrdp-sesman          # both -> active
 ```
