@@ -2296,7 +2296,11 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   encoder child persists for the session, display is correct, and
   `nvidia-smi` lists the session's `/usr/bin/ffmpeg` as a GPU compute
   process (~200 MiB) — first confirmed NVENC hardware-encode session;
-  backend swap from VAAPI was config-only as designed.
+  backend swap from VAAPI was config-only as designed. Additional owner
+  coverage (same day, orthogonal to this fix): small session sizes OK,
+  and chroma fringe empirically absent across multiple small
+  width/height sessions on region-strict rendering (the probesize-hold
+  and metablock-alignment defect classes, respectively).
 
 ## 26. Related work and differentiation
 
