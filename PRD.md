@@ -2289,7 +2289,12 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   (libx264 minus `repeat-headers=1`), red without the fix, green with it,
   on both ffmpeg 7.1 and 8.1. Follow-up in `BACKLOG.md`: the probe
   discards child stderr — log it (`log_child_line`) so the next such
-  failure names itself.
+  failure names itself. **Validated live same day (owner-confirmed):**
+  with the fixed build the T4 login negotiates the ffmpeg path, the
+  encoder child persists for the session, display is correct, and
+  `nvidia-smi` lists the session's `/usr/bin/ffmpeg` as a GPU compute
+  process (~200 MiB) — first confirmed NVENC hardware-encode session;
+  backend swap from VAAPI was config-only as designed.
 
 ## 26. Related work and differentiation
 
