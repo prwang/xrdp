@@ -1,0 +1,212 @@
+# Upstream gap analysis — the case for AVC444 via stock ffmpeg
+
+**What this document is.** Evidence from the upstream trackers that the problem
+this PR solves is real, user-reported, maintainer-acknowledged, and unfilled.
+It replaces the old PRD §26 "related work" survey.
+
+**Method / provenance.** All issues, PRs and discussions below were fetched
+directly from the GitHub REST API for `neutrinolabs/xrdp` and
+`neutrinolabs/xorgxrdp` on **2026-07-22** (search sweeps over
+AVC444/YUV444/chroma/blurry/H.264/GFX/ffmpeg/vaapi/nvenc/hardware-encoding plus
+full comment threads for the load-bearing items). Quotes are verbatim from the
+fetched JSON. Raw captures: `/tmp/upsurvey/*.json` (box-local, regenerable).
+
+**The gap in one sentence.** Upstream xrdp's H.264 GFX path is AVC420-only —
+users have reported the resulting chroma-subsampled ("fuzzy red text")
+rendering for over a year, the maintainer has said three times that YUV444 is
+the fix, and every attempt to land AVC444 or a flexible encoder backend has
+stalled out of tree — this PR ships both.
+
+---
+
+## 1. The user-visible problem: chroma-subsampled text (xrdp #3375, open)
+
+["Bad quality visuals when using x264"](https://github.com/neutrinolabs/xrdp/issues/3375)
+(opened 2025-01, **still open**, 22 comments, multiple independent reporters
+with screenshots) is the flagship demand thread:
+
+- Reporter (sshaikh): *"'Fuzzy' rendering of graphics, particularly fonts. Most
+  seen with red writing on black"*; green text shows *"a fringe"*.
+- Diagnosis (pnowack, gnome-remote-desktop developer): *"What you experience
+  here is the result of subsampling, as the H.264 encoded stream uses a YUV420
+  surface for the source frame."* Thin red-on-black / red-on-blue text is the
+  canonical reproducer — chroma is decimated on 2×2 grids.
+- It worsens under motion (Varbin): scrolling a terminal is *"sometimes leading
+  to completely unreadable text"*.
+- Corroborating reports: ThelloD (*"The only issue is red text, particularly
+  bold red text"*), tsz8899 (at 1920×1080 *"text and icon edges feel blurred …
+  especially in specific colors like red"*).
+
+The maintainer's position, stated **three separate times** in that thread
+(metalefty): *"Also we need to support YUV444 mode for the fundamental quality
+enhancement"* (2025-01-06); *"YUV444 is needed for further quality I'm afraid"*
+(2025-01-08); *"As I mentioned just above, we need YUV444"* (2025-01-23).
+
+What users do today, absent AVC444 — every option is bad:
+
+1. **Fall back to RFX** — maintainer-documented workaround, at the cost of
+   *"huge bandwidth (100 Mbps or more)"* (metalefty, 2025-04-02); and RFX has
+   its own ceiling ([xorgxrdp #392](https://github.com/neutrinolabs/xorgxrdp/issues/392),
+   open: "RFX can't sustain 60FPS", whose reporter is on AVC420 *despite* the
+   quality because RFX can't keep up). See also
+   [xrdp #3489](https://github.com/neutrinolabs/xrdp/issues/3489): "H.264 more
+   slaggish and blurry than RFX".
+2. **Hand-patch the color matrix** — late in #3375, users patch
+   `rdpCapture.c` with AI-generated BT.601-limited conversion code (needing
+   `--without-simd` to even take effect) to blunt the fringe; a follow-up
+   tester found it *"demolishes color accuracy"*. Users are trading color
+   fidelity for legibility because the real fix (4:4:4) isn't available.
+3. **Run an out-of-tree fork** (next section).
+
+Direct evidence AVC444 fixes it — an A/B posted *in the issue* (tsz8899,
+2025-04-23), upstream AVC420 vs the Nexarian AVC444 fork: *"When using Nexarian
+mainline_merge_avc444, the clarity of red text is acceptable. **Is it possible
+to integrate the avc444 feature of Nexarian?**"* — to which the maintainer
+replied: *"Yes, sure! Securing sponsors would help us speed things up."*
+
+## 2. Why the gap is still open: every AVC444/encoder-flexibility attempt stalled
+
+The demand is old and the code has existed out of tree for years; none of it
+landed:
+
+- **Nexarian's `mainline_merge_avc444` fork** is the only place AVC444 has ever
+  worked. Its xorgxrdp side was PR'd upstream once —
+  [xorgxrdp #255](https://github.com/neutrinolabs/xorgxrdp/pull/255) ("Mainline
+  merge avc444") — and **closed the same day, unmerged** (2023-03-31). Users
+  run the fork anyway to get AVC444/GPU encode and hit unsupported territory
+  ([xrdp #2635](https://github.com/neutrinolabs/xrdp/issues/2635): fork breaks
+  with multi-monitor).
+- **The GFX mainline merge deliberately left the 444 code out.** When the egfx
+  work was merged to `devel` (PR #2891 / discussion
+  [#2383](https://github.com/neutrinolabs/xrdp/discussions/2383)), jsorg71
+  listed what was dropped: *"yuv 444 bits because, like Nex said, not stable
+  yet"*; Nexarian: *"4:4:4 NVENC doesn't yet work stably on XRDP."* The merged
+  [openh264 PR #3311](https://github.com/neutrinolabs/xrdp/pull/3311) was
+  *"taken from … mainline_merge_avc444 and modified"* — i.e. reduced to AVC420.
+  The `XRDP_yuv444_v1/v2_stream` capture constants sit unused in `devel` today;
+  there is **no AVC444 encoder anywhere in upstream `devel`** (verified against
+  the source at base `8812646d`).
+- **Progress is sponsorship-bound.** Nexarian (2025-05-04, #3375): *"The
+  combination of lack of sponsorship for this and Microsoft's bad
+  implementation for AVC444 on the Mac OS client are going to stall progress
+  here."* Same pattern on next-gen codecs
+  ([xrdp #3769](https://github.com/neutrinolabs/xrdp/issues/3769), AV1):
+  *"we had a sponsor, but unfortunately the sponsorship was canceled. The
+  priority is no longer high"* (metalefty, 2026-03).
+- **The closest active encoder PR is stalled and is AVC420-only anyway.**
+  [xrdp #3774](https://github.com/neutrinolabs/xrdp/pull/3774) (FlyGoat,
+  open 2026-03) links `libavcodec` in-process for VAAPI/Vulkan AVC420. After
+  jsorg71 explained the constraints (keep GPU APIs in `xrdp_accel_assist`; and
+  the two hard problems: *"MS uses a non standard color conversion matrix"*
+  and *"the YUV444 algorithm in GFX that for sure needs custom GPU code"*),
+  the author withdrew the approach: *"I'll give up FFMpeg given that it's
+  indeed a source of headache, but I'd like to keep Vulkan and DMA-BUF."*
+  Neither #3774 nor its accel_assist successor addresses AVC444 or the color
+  matrix — the two things jsorg71 named, and the two things this PR implements
+  (in tested CPU code, not "custom GPU code").
+
+This PR needs no sponsorship pipeline, no fork, and no new GPU API surface in
+xrdp: the AVC444 assembly, MS color matrix, caps negotiation (v2/v1/AVC420
+fallback per client), and a working encoder path arrive together, tested.
+
+## 3. The second gap: encoder coupling breaks users at runtime
+
+Upstream's H.264 backends are compile-time-linked (`--enable-x264` /
+`--enable-openh264` / NVENC via accel_assist), which pushes codec problems onto
+distros and end users:
+
+- [xrdp #3711](https://github.com/neutrinolabs/xrdp/issues/3711) ("RHEL: xrdp
+  not working with H.264 codec", 26 comments, 2026-01): RHEL 9 ships a
+  `noopenh264` **stub** and a different openh264 version than EPEL built xrdp
+  against, so H.264 silently dies with *"OpenH264 Codec is not installed
+  correctly. H.264 will not be used"*. Maintainer (matt335672): *"xrdp is part
+  of EPEL however, xrdp will be built against the version of openh264 which
+  ships with EPEL"* — the linked-library ABI contract is exactly what broke.
+  Resolution for the user: give up on H.264 (reorder gfx.toml to Xorg/RFX).
+- Same family of pain: [xrdp #3141](https://github.com/neutrinolabs/xrdp/issues/3141)
+  ("x264 not working", self-built `--enable-x264`),
+  [xrdp #3405](https://github.com/neutrinolabs/xrdp/issues/3405) (AlmaLinux
+  H.264 vs 32-bpp client).
+
+The subprocess design sidesteps this class: xrdp execs the distro's own
+`ffmpeg` binary at arm's length — no encoder ABI compiled into xrdp, no
+version-matched codec RPM, and the encoder library legal/patent question stays
+where distros already solved it (their ffmpeg packaging). The linked x264 /
+OpenH264 backends remain untouched as alternatives.
+
+## 4. The third gap: hardware-encode demand vs narrow coverage
+
+Hardware H.264 encoding is one of the longest-running asks
+([#1422](https://github.com/neutrinolabs/xrdp/issues/1422) GFX epic, 205
+comments; discussion [#2383](https://github.com/neutrinolabs/xrdp/discussions/2383),
+154 comments of users chasing GPU-accelerated setups; jsorg71: *"NVidia is
+90%+ of what people want to use xrdp with hardware acceleration"*). Current
+coverage:
+
+- Upstream `devel` hardware encode = **NVENC only**, via `xrdp_accel_assist`
+  ([PR #3320](https://github.com/neutrinolabs/xrdp/pull/3320)), with its own
+  driver constraints; users still ask whether Nvidia accel is even supported
+  ([xorgxrdp discussions #317](https://github.com/neutrinolabs/xorgxrdp/discussions/317),
+  [#361](https://github.com/neutrinolabs/xorgxrdp/discussions/361)).
+- VA-API requests remain open ([xrdp #3119](https://github.com/neutrinolabs/xrdp/issues/3119):
+  VA-API for WSL2 GPU-PV), and #3774 (VAAPI/Vulkan) was redirected (§2).
+
+Through a stock ffmpeg child, this PR reaches **every encoder the installed
+ffmpeg has** — `h264_vaapi` (validated end-to-end on this project's rig),
+`h264_nvenc`, `h264_qsv`, `libx264` software fallback — selected by config
+(`gfx.toml encoder_args`), not by rebuilding xrdp. AVC444 rides on all of them.
+
+## 5. Issue-to-deliverable map
+
+| Upstream evidence | Status | What this PR delivers |
+|---|---|---|
+| #3375 fuzzy/fringed text on x264; metalefty: "we need YUV444" ×3 | open | AVC444 v2 (0x000F) + v1 (0x000E) server encode; the #3375 A/B already showed 444 fixes it |
+| #3375 users hand-patching color matrices, losing color accuracy | open | MS-RDPEGFX full-range BT.709 converter, unit-tested — the "non standard color conversion matrix" jsorg71 named in #3774 |
+| xorgxrdp #255 closed unmerged; #2383 "444 bits … not stable yet"; fork-only AVC444 (#2635) | never landed | In-tree, bisectable slices; caps-gated per client (v2 → v1 → AVC420 fallback); deterministic-failure runner, no fork needed |
+| #3711 / #3141 / #3405 linked-codec + packaging breakage | recurring | Encoder as arm's-length subprocess of the distro's ffmpeg; zero codec ABI in xrdp; linked backends untouched |
+| #3119 VA-API ask; #3774 VAAPI stalled; #3320 NVENC-only accel | open/partial | Any ffmpeg HW encoder by config: VAAPI validated, NVENC/QSV reachable, same AVC444 on all |
+| #3769 codec evolution (AV1) sponsor-stalled | open | Encoder-agnostic pipe/NUT plumbing: future codecs become mostly config + caps once the protocol side exists |
+
+## 6. Anticipated objections (from the same threads), answered
+
+- **"GPU work belongs in `xrdp_accel_assist`"** (jsorg71, #3774). Agreed — and
+  this PR adds **no** GL/Vulkan/CUDA/OpenCL API surface to xrdp at all. GPU
+  specifics live inside the ffmpeg child. It is complementary to accel_assist,
+  not a competitor for that role; a future accel_assist/Vulkan encoder can feed
+  the same AVC444 assembly, which is codec-source-agnostic.
+- **"FFmpeg was already tried and dropped in #3774."** What was dropped was
+  **linking `libavcodec` in-process** — FlyGoat's *"source of headache"* is the
+  library ABI/API churn, the same coupling problem as §3. This PR deliberately
+  uses the opposite arrangement: the stock `ffmpeg` **CLI** over pipes, no
+  libav headers, no link-time dependency. The failure mode that killed #3774
+  does not apply; the two hard problems jsorg71 cited there (MS color matrix,
+  YUV444 algorithm) are precisely what this PR implements.
+- **"The GFX 444 method is ugly; AV1 will have real YUV444"** (jsorg71, #3769).
+  True — and AV1-over-RDP is an experimental FreeRDP-side draft with no
+  Microsoft client support, explicitly deprioritized upstream after a
+  sponsorship fell through. AVC444 is what every deployed mstsc speaks today;
+  #3375's users are waiting now.
+- **"Microsoft's Mac client has a broken AVC444 implementation"** (Nexarian,
+  #3375). This is why the PR's caps classifier negotiates per client and falls
+  back v2 → v1 → AVC420: a broken client that doesn't advertise the caps never
+  gets 444, and behavior without the feature is unchanged (upstream coding
+  rule: no functional regression when disabled).
+- **"Only nit-picky devs care about 4:4:4"** (Nexarian, #2383). The sustained
+  multi-reporter thread with screenshots (#3375), the "completely unreadable
+  text" scrolling report, and the maintainer's own thrice-stated "we need
+  YUV444" say otherwise — text-heavy remote development is xrdp's core use.
+- **Real costs, stated plainly:** one raw-frame copy over a pipe per update
+  (no dma-buf zero-copy — measured ~0.09 ms/frame on this rig, see
+  `PR-demo/RESULTS.md` §E5) and one long-lived child process per session.
+  Latency vs the linked x264 backend is not yet benchmarked (RESULTS.md P3).
+
+## 7. Open items to raise during PR review
+
+- **Enable the real-ffmpeg regression tests in upstream CI.** The guards for
+  the two field bugs (content/region desync; low-resolution probesize
+  deadlock) are gated on `XRDP_TEST_FFMPEG_PATH` and skip without it. CI would
+  need an ffmpeg install + env var in `.github/workflows/build.yml` —
+  maintainers' call; propose, don't pre-commit.
+- Benchmark subprocess vs linked-x264 latency before claiming parity.
+- Re-check #3774 / #3769 / accel_assist status at PR time (this survey is a
+  2026-07-22 snapshot; metalefty's stated next focus is Wayland).
