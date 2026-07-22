@@ -52,17 +52,19 @@ ffmpeg -hide_banner -encoders | grep -E 'h264_vaapi|h264_nvenc|h264_qsv|libx264'
 |---|---|---|---|
 | **VAAPI** (this box) | Intel iGPU | `intel-media-va-driver va-driver-all libva2 vainfo` | `/dev/dri/renderD128`; `vainfo` lists `VAEntrypointEncSlice` |
 | VAAPI | AMD | `mesa-va-drivers libva2 vainfo` | `/dev/dri/renderD128` |
-| **NVENC** | Nvidia (e.g. T4) | vendor `nvidia-driver-###` (ships `libnvidia-encode`) | `nvidia-smi`; T4 = unlimited NVENC sessions |
+| **NVENC** (tested: T4) | Nvidia (e.g. T4) | vendor `nvidia-driver-###` (ships `libnvidia-encode`) | `nvidia-smi`; T4 = unlimited NVENC sessions |
 | QSV | Intel | `intel-media-va-driver libmfx-gen1.2` | `/dev/dri/renderD128` |
 | CPU | any | none (libx264 built into ffmpeg) | fallback / no-GPU boxes |
 
 For VAAPI/QSV/NVENC the xrdp service user must reach the render node — on Intel/AMD
 that means membership in the `render` group (owner of `/dev/dri/renderD128`).
 
-> **NVENC portability caveat:** moving Intel→Nvidia needs **no** new deb — only a
-> `gfx.toml` `encoder_args` edit (§3). But the NVENC arg recipe below is
-> **untested in this project** (this box has no Nvidia GPU); validate it before
-> relying on it.
+> **NVENC portability:** moving Intel→Nvidia needs **no** new deb — only a
+> `gfx.toml` `encoder_args` edit (§3). Validated live 2026-07-22 on an x86 +
+> Tesla T4 (driver 580.159.03, CUDA 13.0, Ubuntu ffmpeg 8.0.1): session up,
+> display correct, and `nvidia-smi` shows the session's `/usr/bin/ffmpeg` as
+> a compute process (~200 MiB) — i.e. real GPU encode, not a CPU fallback.
+> Requires the dump_extra fix (§0/§3).
 
 ---
 
@@ -140,12 +142,15 @@ encoder_args = [
 ]
 ```
 
-**NVENC (Nvidia T4):** standalone encode with the exact probe argv and the
-resulting bitstream through the xrdp demuxer/validators were verified
-2026-07-22; a full live session is still pending. Requires an xrdp build with
-the dump_extra fix (see §0) — nvenc has no in-band SPS/PPS repeat option, so
-older builds fail the probe by design. nvenc uploads the sysmem NV12 itself,
-so no `hwupload`/`vaapi_device`:
+**NVENC (Nvidia T4 — TESTED 2026-07-22):** live session validated by the owner
+on an x86 + T4 box (Ubuntu, ffmpeg 8.0.1, driver 580.159.03): probe OK,
+persistent ffmpeg child during the session, display correct, and `nvidia-smi`
+lists that ffmpeg as a GPU compute process (~200 MiB) — genuine hardware
+encode. Requires an xrdp build with the dump_extra fix (see §0) — nvenc has no
+in-band SPS/PPS repeat option, so older builds fail the probe by design. The
+multi-resolution smoke gate (`PR-demo/tail_flush_ab/smoke.sh`) is
+dev-box-specific and was NOT run on the T4. nvenc uploads the sysmem NV12
+itself, so no `hwupload`/`vaapi_device`:
 ```toml
 encoder_args = [
   "-c:v", "h264_nvenc", "-preset", "p1", "-tune", "ll",
