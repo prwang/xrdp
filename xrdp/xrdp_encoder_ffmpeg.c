@@ -325,8 +325,13 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
             ADD(cfg->encoder_args.arg[i]);
         }
     }
+    /* NUT is a global-header muxer: encoders with no in-band repeat knob
+     * (h264_nvenc and others) put SPS/PPS in extradata only, which fails
+     * the probe's reset-keyframe check and would ship an undecodable
+     * stream. dump_extra reinserts the parameter sets ahead of each
+     * keyframe for any encoder; duplicates are legal and identical. */
     ADD("-bsf:v");
-    ADD("h264_mp4toannexb");
+    ADD("dump_extra,h264_mp4toannexb");
     ADD("-flush_packets");
     ADD("1");
     ADD("-write_index");

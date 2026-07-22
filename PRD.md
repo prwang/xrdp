@@ -2266,6 +2266,31 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   contract, and the deploy smoke gate runs at both 1920×1080 and 1024×768
   (the resolution-dependence is exactly what a single-size gate misses).
 
+- **2026-07-22 — NVENC/global-header probe failure on Nvidia T4; fix:
+  chain `dump_extra` into the injected bitstream filter.** First deploy on
+  a foreign box (x86 + T4, Ubuntu, ffmpeg 8.0.1): every login fell back to
+  RFX with `ffmpeg probe FAILED`, while the identical argv run by hand
+  encoded 4/4 frames cleanly. Forensics (an argv+stderr-logging shim at
+  the `gfx.toml` `path`, plus feeding the box's captured NUT bytes through
+  the real demuxer and validators off-box): the NUT muxer is
+  global-header, so `h264_nvenc` — which has **no** in-band repeat option
+  — emitted SPS/PPS in extradata only; the probe's reset-keyframe check
+  (`main_reset_ok`: SPS+PPS+IDR in-band) correctly rejected a stream real
+  clients could not have decoded. libx264 only ever passed because the
+  default args force `repeat-headers=1`; `-flags:v -global_header` cannot
+  override a muxer that demands global headers, and a user-supplied
+  `-bsf:v` is overridden by the injected one — so no config-only fix
+  exists. Fix (`build_argv()`, this dev branch; ported to the clean branch
+  by folding into clean-room slice 7, never as a separate fix commit):
+  inject `-bsf:v dump_extra,h264_mp4toannexb`, reinserting the extradata
+  parameter sets ahead of every keyframe for any encoder (duplicates are
+  legal/identical when the encoder already repeats). Guard: gated
+  real-ffmpeg regression test modelling a global-header-only encoder
+  (libx264 minus `repeat-headers=1`), red without the fix, green with it,
+  on both ffmpeg 7.1 and 8.1. Follow-up in `BACKLOG.md`: the probe
+  discards child stderr — log it (`log_child_line`) so the next such
+  failure names itself.
+
 ## 26. Related work and differentiation
 
 Moved to `PR-demo/UPSTREAM_GAP_ANALYSIS.md` — a rewritten, evidence-first

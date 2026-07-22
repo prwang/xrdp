@@ -41,6 +41,25 @@ in `CLAUDE.md`). A persistently failing encoder must fail loudly (per-frame
 ERROR lines, visible breakage) so the root cause gets fixed — on this project,
 do not re-add any silent codec fallback without explicit owner sign-off.
 
+## Probe must log child stderr — TODO (2026-07-22)
+
+`xrdp_ffmpeg_avc444_probe()` drains and discards the child's stderr, so a
+probe failure logs only `ffmpeg probe FAILED` with no reason. The T4/NVENC
+global-header failure (PRD §25, 2026-07-22) took a live shim + off-box NUT
+replay to diagnose; child stderr in the log would not have named this
+particular cause (the child was silent) but eliminates the largest suspect
+class (bad args / missing device / missing encoder) in one glance.
+
+- Scope: probe loop only — feed `err_fd` reads through the existing
+  `log_child_line()` (as the runtime path does) instead of discarding.
+- Also log WHICH internal check failed (timeout / EOF / NUT error /
+  non-monotonic pts / reset-keyframe validation) at WARNING.
+- Acceptance: a probe failure line is followed by the child's stderr (if
+  any) and the failing-check name; unit tests unaffected.
+- Lands on the dev branch first; ports to the clean branch only by folding
+  into slice 7 (same rule as the dump_extra fix — no separate fix commits
+  on the clean branch).
+
 ## Upstream clean-room preparation — TODO (2026-07-17)
 
 Transition from the dev branch to a reviewable upstream PR against `devel`.
