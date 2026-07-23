@@ -206,9 +206,8 @@ Still required:
    **First Windows App data point (Android, SM-S936U, 2026-07-23, live):**
    the client advertised `AVC_DISABLED` (0x20) on every v10 capset it
    offered (10.0/10.2/10.3/10.4, flags 0x22/0x20), no `AVC420_ENABLED` on
-   8.1 (flags 0x02), plus the undocumented `0x000B0101`/`0x000B0300`
-   capsets with flags `0x1a2` (i.e. `AVC_DISABLED` again + unknown bits
-   `0x180`). Our classifier honored it and the session correctly ran RFX
+   8.1 (flags 0x02), plus `0x000B0101`/`0x000B0300` capsets with flags
+   `0x1a2`. Our classifier honored it and the session correctly ran RFX
    with zero H.264 negotiation — exactly the F2 guard working (the fork
    would have sent 0x000F unconditionally to this client). Implication
    for the Mac run: the macOS Windows App may likewise advertise
@@ -216,6 +215,22 @@ Still required:
    garble unreproducible on current clients and the captured capsets the
    deliverable; check for a client-side H.264/hardware-decode setting
    before concluding.
+   **Flags `0x1a2` decoded (researched 2026-07-23):** `SMALL_CACHE`
+   (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
+   MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
+   mapping unsupported) | `0x100` — absent from the spec; FreeRDP master
+   (`rdpgfx.h`, "11.0+, undocumented, Azure only", PR #12871) and
+   Wireshark both name it `RDPGFX_CAPS_FLAG_SCP_DISABLE`, almost
+   certainly Screen Capture Protection (Microsoft's own "SCP"; pairs
+   with the undocumented Azure EGFX commands `PROTECT_SURFACE` 0x0019 /
+   `WATERMARK` 0x001A), exact semantics unpublished. The `0x000B*`
+   capset versions are acknowledged in MS-RDPEGFX v20260511 only in
+   Appendix A note <5>: on OS builds *without* KB5089573/KB5089570 they
+   behave exactly as VERSION107 (0x000B0300 recognized only by Win11
+   26H1); what they gate *with* those KBs is unspecified — FreeRDP
+   maintainers suspect HEVC/H.265 (issue #12846). No 0x000B capset is
+   normatively defined; our classifier's conservative skip-unknown
+   behavior is correct.
 3. **NVENC configuration run** on Nvidia hardware (the fork's unstable
    combo). **DONE 2026-07-22** (owner-validated, Tesla T4, ffmpeg 8.0.1,
    driver 580.159.03): probe OK, persistent encoder child, correct
