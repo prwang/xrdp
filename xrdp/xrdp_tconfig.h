@@ -70,12 +70,16 @@ enum xrdp_tconfig_h264_encoders
 /* AVC444-vs-AVC420 selection for the external ffmpeg backend. AUTO prefers
  * AVC444 and falls back to AVC420; FORCE_420 emits AVC420 to any H.264-capable
  * client (so mstsc, which always offers AVC444, can be tested on the AVC420
- * path); FORCE_444 serves AVC444 only. */
+ * path); FORCE_444 serves AVC444 only. FORCE_444V1 serves AVC444 but pins
+ * codec id 0x000E (v1) even when the client supports v2 (ChromaV2) — a
+ * per-client diagnostic/compatibility knob (e.g. the macOS Windows App
+ * mis-renders v2; v1 isolates the aux-view packing). */
 enum xrdp_tconfig_avc_mode
 {
     XTC_AVC_AUTO = 0,
     XTC_AVC_FORCE_444,
-    XTC_AVC_FORCE_420
+    XTC_AVC_FORCE_420,
+    XTC_AVC_FORCE_444V1
 };
 
 struct xrdp_tconfig_gfx_codec_order

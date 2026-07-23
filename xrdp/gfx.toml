@@ -24,7 +24,10 @@ h264_encoder = "x264"
 # [avc444_ffmpeg]
 # path = "/usr/bin/ffmpeg"
 # # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
-# # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
+# # e.g. to exercise 420 on mstsc, which always advertises AVC444) | "444v1"
+# # (AVC444 with codec id 0x000E even for v2-capable clients -- per-client
+# # compatibility knob; e.g. the macOS Windows App mis-renders v2/ChromaV2).
+# # Default auto.
 # avc_mode = "auto"
 # # tail_flush: legacy backstop, off by default and normally unnecessary. The
 # # historical "last frame withheld until next input" lag was a runner bug

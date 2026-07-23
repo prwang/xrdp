@@ -441,11 +441,15 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                 {
                     config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_420;
                 }
+                else if (g_strcasecmp(am.u.s, "444v1") == 0)
+                {
+                    config->avc444_ffmpeg_avc_mode = XTC_AVC_FORCE_444V1;
+                }
                 else
                 {
                     TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] avc_mode must "
-                          "be \"auto\", \"444\" or \"420\", got \"%s\"; using "
-                          "auto", am.u.s);
+                          "be \"auto\", \"444\", \"444v1\" or \"420\", got "
+                          "\"%s\"; using auto", am.u.s);
                 }
                 free(am.u.s);
             }
