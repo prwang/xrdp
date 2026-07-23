@@ -246,7 +246,19 @@ Still required:
    FreeRDP PR #12872). The accretion-per-version reading (11.2→0x400,
    11.3→0x800, 11.5→0x2000, desktop-set = positive capability bits) is
    ours alone.
-   **Flags `0x1a2` decoded (researched 2026-07-23):** `SMALL_CACHE`
+   **Third Windows App data point (macOS, iMac, 2026-07-23, live):** the
+   Mac variant — THE historical blocker client — connected and ran our
+   external-ffmpeg **AVC420** GFX stream, including three client-driven
+   dynamic resizes (~20 ms each, fresh encoder generation per resize, no
+   errors). AVC420 was forced by server config (`avc_mode = "420"`), not
+   by caps: the Mac advertised a third distinct flags profile —
+   `AVC_DISABLED` on 10.0/10.2/10.3 but CLEAR on 10.4 (`0x02`) and 10.7
+   (`0x82` = SMALL_CACHE|SCALEDMAP_DISABLE) — so the classifier rated it
+   AVC444-capable (10.7 confirmed). Like Android it offered only
+   `0x000B0101`+`0x000B0300` (no 0200, no 0500), flags `0x82`. The
+   decisive AVC444 run (same client, `avc_mode = "auto"`) is pending a
+   config flip; rendering-correctness confirmation of this AVC420
+   session pending owner sign-off.
    (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
    MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
    mapping unsupported) | `0x100` — absent from the spec; FreeRDP master
