@@ -32,6 +32,15 @@ Microsoft clients with the HEVC Video Extension + capable GPU. Revisit only if
 those values get documented or captured; the spec-grounded, interoperable
 ceiling for xrdp remains AVC444/AVC444v2 (shipped).
 
+*Update 2026-07-23 (revisit-trigger watch):* MS-RDPEGFX v20260511 Appendix A
+note <5> now acknowledges capsets `0x000B0101/0200/0300` — behaving as
+VERSION107 only on builds *without* KB5089573 (24H2/25H2) / KB5089570 (26H1),
+i.e. real v11 features ship behind those KBs; FreeRDP maintainers suspect
+HEVC (FreeRDP#12846, nightly probes Azure hosts). We captured `0x000B0101`/
+`0x000B0300` flags `0x1a2` live from the Android Windows App (gap analysis
+§2a). Still no public codecId/capset semantics — item stays BLOCKED; the
+watch condition is those KB-gated semantics or a FreeRDP decode landing.
+
 ## ~~Graceful degradation on persistent encoder failure~~ — WITHDRAWN (2026-07-17)
 
 Withdrawn by explicit owner decision: an automatic RFX fallback would *mask*
