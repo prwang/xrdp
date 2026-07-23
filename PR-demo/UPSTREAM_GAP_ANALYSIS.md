@@ -225,11 +225,27 @@ Still required:
    flags `0x0`, `0x000B0200` flags `0x400`, `0x000B0300` flags `0xc00`,
    and **`0x000B0500` flags `0x2c00`** — a capset version and flag bits
    (`0x400`/`0x800`/`0x2000`, one new bit per v11.x step) that appear in
-   NO public source as of this capture (FreeRDP master stops at
-   `0x000B0300`; the spec's Appendix A likewise). Cross-client
-   comparison also validates the `_DISABLE` polarity of bits
-   `0x80`/`0x100`: set by the mobile client (features it lacks), clear
-   on desktop.
+   NO public source as of this capture. Cross-client comparison also
+   validates the `_DISABLE` polarity of bits `0x80`/`0x100`: set by the
+   mobile client (features it lacks), clear on desktop.
+   **Verified publicly unidentified (exhaustive sweep 2026-07-23):**
+   `0x000B0500` (and any `0x000B0400`) and flag bits
+   `0x400`/`0x800`/`0x2000` are absent from FreeRDP master (enum ends at
+   `RDPGFX_CAPVERSION_113 = 0x000b0300`, added June 2026 PR #12871
+   "Azure undocumented stuff"; no later gfx PR through #13077 touches
+   capsets), Wireshark master (version table ends at "11.3"), IronRDP
+   (stops at 10.7), MS-RDPEGFX (latest revision remains v20260511;
+   errata unchanged since 2023), Sourcegraph global code search and
+   GitHub issue/PR search (zero hits for `0x000B0500` /
+   `RDPGFX_CAPVERSION_115` in any RDP context) — **this capture appears
+   to be the first public record.** Feature candidates for the bits
+   (INFERRED, no public mapping): HEVC decode (AVD GA'd HEVC June 2025,
+   Windows App >= 2.0.503.0; FreeRDP maintainers suspect 11.x gates it,
+   issue #12846) and screen-capture-protection/watermark rendering (the
+   Azure-only `PROTECT_SURFACE 0x0019` / `WATERMARK 0x001A` commands,
+   FreeRDP PR #12872). The accretion-per-version reading (11.2→0x400,
+   11.3→0x800, 11.5→0x2000, desktop-set = positive capability bits) is
+   ours alone.
    **Flags `0x1a2` decoded (researched 2026-07-23):** `SMALL_CACHE`
    (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
    MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
