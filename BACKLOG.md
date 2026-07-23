@@ -199,19 +199,21 @@ spec-conformant implementation → strong evidence of a real Mac-client
 AVC444 defect, but NOT yet isolated from an xrdp-shared wire assumption.
 Two cheap discriminators to close it:
 
-- **(a) FREE — Microsoft Windows client renders our clean v2?** Point the
-  single-monitor *Windows* "Windows App" (or mstsc) at this box on
-  `avc_mode = "auto"`, fresh login. Re-verify because the old
-  "mstsc-verified" claims predate the dump_extra fix (may have been the
-  doubled-header stream). Renders → our v2 wire is good for a Windows MS
-  client, fault leans Mac-specific. Blacks → our wire is the problem
-  (huge — turns it into a fixable bug, feeds the `avc444_wire` test).
+- **(a) DONE 2026-07-23 — RESOLVED, fault isolated to the Mac.** Three
+  Microsoft Windows clients (UWP Windows App, mstsc.exe, RDCMan)
+  negotiated AVC444 v2 (0x000F) and rendered clean on the pristine
+  post-fix stream. mstsc = Microsoft's reference decoder → our ChromaV2
+  wire is spec-conformant. Our 444 renders on every client tried EXCEPT
+  the macOS Windows App (blacks v1 and v2, renders 420/RFX). Genuine
+  Mac-client AVC444 defect, independently reproducing Nexarian 2025.
 - **(b) ground-truth capture (separate item below).**
 
 Acceptance: verdict recorded in `UPSTREAM_GAP_ANALYSIS.md` §2a; if our
 wire is implicated, a concrete byte-diff + `avc444_wire` assertion.
+STATUS: (a) done and negative for our wire; only (b) below remains, and
+it is now a final-nail nicety, not load-bearing.
 
-## Ground-truth capture: intercept a real MS RDP server's AVC444 wire — TODO (2026-07-23)
+## Ground-truth capture: intercept a real MS RDP server's AVC444 wire — TODO (2026-07-23, OPTIONAL final nail)
 
 We have never compared our AVC444/AVC420 GFX bytes against a genuine
 Microsoft RDP server — all "frame sequence" comparisons to date were (a)
