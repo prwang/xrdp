@@ -239,6 +239,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->gfx = 1;
         self->avc444_ffmpeg = 1;
         self->avc444_v2 = mm->avc444_v2;
+        self->avc444_dump_extra = mm->avc444_dump_extra;
         LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: AVC444 %s",
             self->avc444_v2 ? "v2 (ChromaV2, 0x000F)" : "v1 (0x000E)");
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
@@ -262,6 +263,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         client_info->capture_format = XRDP_a8r8g8b8;
         self->gfx = 1;
         self->avc420_ffmpeg = 1;
+        self->avc444_dump_extra = mm->avc444_dump_extra;
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
                   sizeof(self->avc444_path) - 1);
         self->avc444_encoder_args =
@@ -1167,6 +1169,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         struct xrdp_ffmpeg_avc444_config cfg;
         xrdp_ffmpeg_avc444_config_default(&cfg);
         cfg.chroma_align = self->avc444_chroma_align;
+        cfg.use_dump_extra = self->avc444_dump_extra;
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
         cfg.encoder_args = self->avc444_encoder_args;
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
@@ -1392,6 +1395,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         struct xrdp_ffmpeg_avc444_config cfg;
         xrdp_ffmpeg_avc444_config_default(&cfg);
         cfg.chroma_align = self->avc444_chroma_align;
+        cfg.use_dump_extra = self->avc444_dump_extra;
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
         cfg.encoder_args = self->avc444_encoder_args;
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);

@@ -48,15 +48,12 @@ START_TEST(test_ffmpeg_probe)
 }
 END_TEST
 
-/* REGRESSION (found live on an Nvidia T4, 2026-07-22): NUT is a
- * global-header muxer, so an encoder with no in-band repeat option
- * (h264_nvenc) emits SPS/PPS in extradata only and the probe's
- * reset-keyframe check fails. The injected dump_extra bitstream filter
- * must restore the in-band parameter sets for ANY encoder; model the
- * no-repeat encoder with libx264 minus repeat-headers=1. */
-START_TEST(test_ffmpeg_probe_global_header_encoder)
+/* set up libx264 WITHOUT repeat-headers=1: parameter sets land in
+ * extradata only, modelling h264_nvenc (found live on a Tesla T4,
+ * 2026-07-22) */
+static void
+set_global_header_only_args(struct xrdp_ffmpeg_avc444_config *cfg)
 {
-    struct xrdp_ffmpeg_avc444_config cfg;
     static const char *args[] =
     {
         "-c:v", "libx264",
@@ -69,18 +66,112 @@ START_TEST(test_ffmpeg_probe_global_header_encoder)
     int nargs = (int)(sizeof(args) / sizeof(args[0]));
     int i;
 
+    memset(&cfg->encoder_args, 0, sizeof(cfg->encoder_args));
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg->encoder_args.arg[i], sizeof(cfg->encoder_args.arg[i]),
+                 "%s", args[i]);
+    }
+    cfg->encoder_args.count = nargs;
+}
+
+/* count SPS NALs (type 7) in an Annex-B buffer */
+static int
+count_sps(const unsigned char *d, int len)
+{
+    int i;
+    int n = 0;
+
+    for (i = 0; i + 3 < len; i++)
+    {
+        if (d[i] == 0 && d[i + 1] == 0 && d[i + 2] == 1)
+        {
+            if ((d[i + 3] & 0x1f) == 7)
+            {
+                n++;
+            }
+            i += 3;
+        }
+    }
+    return n;
+}
+
+/* REGRESSION pair (both proven live):
+ * - Tesla T4 2026-07-22: extradata-only encoders (h264_nvenc) fail the
+ *   pristine probe; the dump_extra retry must succeed.
+ * - macOS Windows App 2026-07-23: chaining dump_extra unconditionally
+ *   DUPLICATED the parameter sets on in-band encoders and strict
+ *   decoders rendered black; the pristine probe must fail first
+ *   (use_dump_extra=0) before dump_extra may be enabled. */
+START_TEST(test_ffmpeg_probe_global_header_encoder)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+
     if (!have_ffmpeg(&cfg))
     {
         return; /* skipped: no ffmpeg configured */
     }
-    memset(&cfg.encoder_args, 0, sizeof(cfg.encoder_args));
-    for (i = 0; i < nargs; i++)
-    {
-        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
-                 "%s", args[i]);
-    }
-    cfg.encoder_args.count = nargs;
+    set_global_header_only_args(&cfg);
+    /* pristine probe refuses the headerless stream ... */
+    cfg.use_dump_extra = 0;
+    ck_assert_int_ne(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
+    /* ... and the dump_extra retry accepts it (the mm ladder) */
+    cfg.use_dump_extra = 1;
     ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
+}
+END_TEST
+
+/* exactly ONE SPS per keyframe on the wire, in BOTH adaptive branches */
+START_TEST(test_ffmpeg_single_sps_per_keyframe)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair;
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int branch;
+    int rc;
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    xrgb = (unsigned char *)malloc(w * 4 * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    memset(xrgb, 0x55, w * 4 * h);
+    for (branch = 0; branch < 2; branch++)
+    {
+        if (!have_ffmpeg(&cfg))
+        {
+            break;
+        }
+        if (branch == 0)
+        {
+            /* in-band encoder (default args, repeat-headers), pristine */
+            cfg.use_dump_extra = 0;
+        }
+        else
+        {
+            /* extradata-only encoder, dump_extra reinsertion */
+            set_global_header_only_args(&cfg);
+            cfg.use_dump_extra = 1;
+        }
+        conv = xrdp_avc444_conv_create(w, h, 16);
+        ck_assert_ptr_ne(conv, NULL);
+        enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+        ck_assert_ptr_ne(enc, NULL);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w * 4, w, h), 0);
+        rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
+                                            conv->aux_nv12, conv->nv12_size,
+                                            0ULL, &pair);
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_eq(count_sps(pair.main_data, pair.main_len), 1);
+        xrdp_ffmpeg_avc444_delete(enc);
+        xrdp_avc444_conv_delete(conv);
+    }
+    free(xrgb);
 }
 END_TEST
 
@@ -357,6 +448,7 @@ make_suite_avc444_ffmpeg(void)
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ffmpeg_probe);
     tcase_add_test(tc, test_ffmpeg_probe_global_header_encoder);
+    tcase_add_test(tc, test_ffmpeg_single_sps_per_keyframe);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);

@@ -174,6 +174,8 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     memset(cfg, 0, sizeof(*cfg));
     xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
+    cfg->use_dump_extra = 0;  /* enabled by the probe only when the encoder
+                               * emits no in-band parameter sets */
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
@@ -328,10 +330,16 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
     /* NUT is a global-header muxer: encoders with no in-band repeat knob
      * (h264_nvenc and others) put SPS/PPS in extradata only, which fails
      * the probe's reset-keyframe check and would ship an undecodable
-     * stream. dump_extra reinserts the parameter sets ahead of each
-     * keyframe for any encoder; duplicates are legal and identical. */
+     * stream. dump_extra reinserts the extradata parameter sets ahead of
+     * each keyframe -- but ONLY when the probe proved them missing:
+     * chaining it unconditionally DUPLICATED the parameter sets on
+     * encoders that already repeat in-band (libx264 repeat-headers,
+     * h264_vaapi packed headers), and strict decoders refuse to present
+     * such keyframes (macOS Windows App rendered black; bisected live
+     * 2026-07-23). Exactly one SPS/PPS copy per keyframe either way. */
     ADD("-bsf:v");
-    ADD("dump_extra,h264_mp4toannexb");
+    ADD(cfg->use_dump_extra ? "dump_extra,h264_mp4toannexb"
+        : "h264_mp4toannexb");
     ADD("-flush_packets");
     ADD("1");
     ADD("-write_index");
