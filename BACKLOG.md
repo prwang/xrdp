@@ -199,21 +199,65 @@ spec-conformant implementation → strong evidence of a real Mac-client
 AVC444 defect, but NOT yet isolated from an xrdp-shared wire assumption.
 Two cheap discriminators to close it:
 
-- **(a) DONE 2026-07-23 — RESOLVED, fault isolated to the Mac.** Three
-  Microsoft Windows clients (UWP Windows App, mstsc.exe, RDCMan)
-  negotiated AVC444 v2 (0x000F) and rendered clean on the pristine
-  post-fix stream. mstsc = Microsoft's reference decoder → our ChromaV2
-  wire is spec-conformant. Our 444 renders on every client tried EXCEPT
-  the macOS Windows App (blacks v1 and v2, renders 420/RFX). Genuine
-  Mac-client AVC444 defect, independently reproducing Nexarian 2025.
-- **(b) ground-truth capture (separate item below).**
+- **(a) DONE 2026-07-23 — Windows clients render ours (necessary, NOT
+  sufficient).** Three Microsoft Windows clients (UWP Windows App,
+  mstsc.exe, RDCMan) negotiated AVC444 v2 (0x000F) and rendered clean on
+  the pristine post-fix stream. mstsc = Microsoft's reference decoder →
+  our ChromaV2 wire parses on Windows. But these clients tolerate our
+  stream; they do not prove a *strict* decoder accepts it.
+- **(b) DONE 2026-07-24 — GROUND TRUTH FLIPS THE VERDICT (see item
+  below).** A local stock Windows Server 2025 (own KVM VM, no infringe)
+  emits AVC 4:4:4 that the macOS Windows App **negotiates AND renders**
+  fine. So the Mac 4:4:4 decoder is NOT categorically broken — it works
+  against Microsoft's wire. The Mac blacks ONLY on *our* stream. This
+  isolates the fault to a **real wire-format delta between our AVC444 and
+  Microsoft's** that the Mac's stricter decoder rejects while
+  xfreerdp/mstsc tolerate.
 
-Acceptance: verdict recorded in `UPSTREAM_GAP_ANALYSIS.md` §2a; if our
-wire is implicated, a concrete byte-diff + `avc444_wire` assertion.
-STATUS: (a) done and negative for our wire; only (b) below remains, and
-it is now a final-nail nicety, not load-bearing.
+Acceptance: verdict recorded in `UPSTREAM_GAP_ANALYSIS.md` §2a; the wire
+delta hunt gets a concrete byte-diff + `avc444_wire` assertion.
+STATUS: SUPERSEDED. The prior "genuine Mac-client AVC444 defect, our wire
+exonerated" conclusion is WITHDRAWN — it rested on lenient decoders only.
+Ground truth (b) shows the Mac renders Microsoft's 444, so the defect is
+(at least partly) in our stream. New load-bearing item: "Find the AVC444
+wire-format delta vs Microsoft" below.
 
-## Ground-truth capture: intercept a real MS RDP server's AVC444 wire — TODO (2026-07-23, OPTIONAL final nail)
+## Ground-truth capture: stock MS AVC444 vs the macOS Windows App — DONE (2026-07-24, VERDICT FLIPPED)
+
+RESULT (load-bearing, not a nicety): a self-owned stock **Windows Server
+2025 Datacenter Eval** (build 26100) running locally under KVM on this box
+emits AVC 4:4:4 that the **macOS Windows App negotiates AND renders**. The
+Mac's 4:4:4 decode path therefore WORKS against Microsoft's wire — it is
+not categorically broken. Since the same Mac client blacks on our xrdp
+AVC444 (v1 and v2) but renders 420/RFX, the fault is a **real wire-format
+gap in our stream** that the Mac's stricter decoder rejects. This WITHDRAWS
+the earlier "genuine Mac-client defect / our wire spec-conformant"
+conclusion (which rested only on lenient clients: xfreerdp, mstsc, RDCMan).
+
+Confirmed **without tapping TLS** — we own the server, so its own graphics
+stack logs the negotiated profile per connection:
+- Rig: `/work/vm/` — `win2025.raw` (VHDX→raw, unattend.xml injected offline
+  via ntfs-3g for headless OOBE), `run_vm.sh` (q35+OVMF, 8 GiB/4 vCPU, AHCI
+  disk + e1000e NIC, user-net hostfwd 13389→3389 / 12222→22, filter-dump
+  `rdp.pcap`), creds in `/root/.testvm_cred`. GPO `AVC444ModePreferred=1`,
+  `AVCHardwareEncodePreferred=0` (software 444 — GPU-not-required verified).
+- Per-connection proof = RdpCoreTS/Operational **Event 162** at the client's
+  connect time (from `qwinsta`), attributed to the client via **Event 169**
+  `client operating system type`:
+  - macOS Windows App: OS type **(6,0)=OSX**, gfx ver `0xB0101`,
+    **AVC available: 1, Initial profile: 2048 (0x800 = AVC 4:4:4)** — renders.
+  - xfreerdp `/gfx:AVC444`: OS (4,7)=UNIX, `0xA0701`, avail 1, profile 2048.
+  - xfreerdp `/gfx:AVC420`: OS (4,7), `0x80105`, avail 0, profile 2 (control).
+  QEMU NAT rewrites all sources to 10.0.2.2, so IP can't distinguish clients;
+  the OS-type + gfx-version fingerprint does. Client-side corroboration:
+  34 `rdpgfx_read_h264_metablock` H264_METABLOCKs in an 8 s xfreerdp capture.
+- CAVEAT: Event 162 = negotiated/initial profile, not a per-frame chroma
+  guarantee. To prove full 4:4:4 pixels actually land on the Mac, next run a
+  chroma test pattern (fine red/blue edges that only survive 4:4:4) on the
+  server and confirm sharp on the iMac. This is one build (26100).
+
+Historical context (superseded plan) below; we did NOT need TLS MITM
+because owning both endpoints makes FreeRDP the decrypted tap.
 
 We have never compared our AVC444/AVC420 GFX bytes against a genuine
 Microsoft RDP server — all "frame sequence" comparisons to date were (a)
@@ -262,6 +306,39 @@ a client bug or something our stream does differently from a real server.
   vs ours at the same resolution; feed any delta back into the encoder /
   wire serializer and the `avc444_wire` unit test.
 - Authorization: owner-run on owner-controlled hosts only; document scope.
+
+## Find the AVC444 wire-format delta vs Microsoft — TODO (2026-07-24, LOAD-BEARING)
+
+Now the highest-value open item. Ground truth (above) proved the macOS
+Windows App renders Microsoft's AVC 4:4:4 but blacks ours → there is a
+concrete difference in our RFX_AVC444_BITMAP_STREAM / H.264 bytes that a
+strict decoder rejects. Goal: capture both wires at the same resolution
+and byte-diff until the rejected element is found; encode the fix as an
+`avc444_wire` unit assertion.
+
+- Capture MS side (decrypted, no TLS MITM needed — we own the server):
+  patch/point a FreeRDP recorder at the local Win2025 VM (build with
+  `WITH_GFX_FRAME_DUMP=ON`, or a small WLog/hook at
+  `rdpgfx_recv_wire_to_surface_1_pdu` to dump `codecId` + raw
+  `bitmapData`). The Debian `xfreerdp3` build has `WITH_DEBUG_RDPGFX=OFF`,
+  so codecId isn't logged — either rebuild FreeRDP with the debug/dump
+  options or add the hook. Capture a keyframe at a fixed size (e.g.
+  1024×768 and 1920×1080).
+- Capture our side: same client, same sizes, against xrdp with
+  `avc_mode=444`; reuse the metablock trace already wired up.
+- Diff candidates to inspect first (most-likely strict-decoder trip
+  points): the AVC444 info word (cbAvc420EncodedBitstream1 length + LC
+  bits 30–31), luma/chroma metablock region-rect coverage and count,
+  regionRect vs surface bounds, quantQualityVals presence/qp, the H.264
+  bitstream framing itself (SPS/PPS in-band vs extradata — our resolved
+  dump_extra history), NAL/annexb vs avcc, and the ChromaV2 aux packing
+  (0x000F) vs Microsoft's.
+- Deliverable: named byte-level delta + a fix in the encoder / wire
+  serializer + an `avc444_wire` assertion that pins it; then re-verify the
+  macOS Windows App renders our stream.
+- Also worth: the chroma test-pattern confirmation (fine red/blue edges)
+  to prove MS 4:4:4 pixels actually reach the Mac, closing the Event-162
+  "negotiated ≠ per-frame" caveat before deep byte-diffing.
 
 ## macOS dump_extra branch mis-render (headerless x264) — WON'T CHASE (2026-07-23)
 
