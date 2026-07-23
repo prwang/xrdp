@@ -92,9 +92,13 @@ and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
    them documented). **OBSERVED on the Android Windows App (SM-S936U,
    2026-07-23):** `AVC_DISABLED` on all v10 capsets, no `AVC420_ENABLED`
    on 8.1, undocumented `0x000B0101`/`0x000B0300` flags `0x1a2`; session
-   correctly ran RFX (capture in `UPSTREAM_GAP_ANALYSIS.md` §2a). The Mac
-   variant may behave the same — check the app for an H.264/hardware
-   decode client setting before concluding outcome 5 there.
+   correctly ran RFX (capture in `UPSTREAM_GAP_ANALYSIS.md` §2a).
+   **Counter-observation (Windows desktop Windows App, 2026-07-23):** the
+   desktop variant advertises NO `AVC_DISABLED` (flags 0x0 through 10.7)
+   — so the Mac variant plausibly allows AVC too, making outcomes 1/3
+   more likely than 5. Reminder: run the Mac test SINGLE-monitor, or the
+   multimon gate skips H.264 before any negotiation (as happened in the
+   dual-monitor Windows session).
 6. **No garble but stalls/frozen frames**: pacing/ack issue, not chroma.
    Dev build + trace; compare `frame_id` ack cadence vs mstsc run.
 7. **Fails before GFX negotiation** (TLS/transport): environment, not
@@ -137,6 +141,10 @@ class (bad args / missing device / missing encoder) in one glance.
   `log_child_line()` (as the runtime path does) instead of discarding.
 - Also log WHICH internal check failed (timeout / EOF / NUT error /
   non-monotonic pts / reset-keyframe validation) at WARNING.
+- Also log WHY the H264 candidate was skipped when no probe runs at all
+  (client caps refusal vs multimon gate vs config) — the 2026-07-23
+  dual-monitor Windows App session matched RFX with no probe line and
+  the reason was only inferable from code reading.
 - Acceptance: a probe failure line is followed by the child's stderr (if
   any) and the failing-check name; unit tests unaffected.
 - Lands on the dev branch first; ports to the clean branch only by folding

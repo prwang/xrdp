@@ -215,6 +215,21 @@ Still required:
    garble unreproducible on current clients and the captured capsets the
    deliverable; check for a client-side H.264/hardware-decode setting
    before concluding.
+   **Second Windows App data point (Windows desktop/UWP, dual monitor,
+   2026-07-23, live):** the DESKTOP variant advertised the full ladder
+   8.0–10.7 with flags `0x0` — i.e. **no `AVC_DISABLED`**: caps-wise this
+   client is AVC444v2-eligible, unlike its Android sibling. H.264 was
+   skipped in this session only by our documented single-monitor
+   eligibility gate (`monitorCount == 2`; no probe attempted — distinct
+   log signature from a caps refusal). It also advertised `0x000B0101`
+   flags `0x0`, `0x000B0200` flags `0x400`, `0x000B0300` flags `0xc00`,
+   and **`0x000B0500` flags `0x2c00`** — a capset version and flag bits
+   (`0x400`/`0x800`/`0x2000`, one new bit per v11.x step) that appear in
+   NO public source as of this capture (FreeRDP master stops at
+   `0x000B0300`; the spec's Appendix A likewise). Cross-client
+   comparison also validates the `_DISABLE` polarity of bits
+   `0x80`/`0x100`: set by the mobile client (features it lacks), clear
+   on desktop.
    **Flags `0x1a2` decoded (researched 2026-07-23):** `SMALL_CACHE`
    (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
    MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
