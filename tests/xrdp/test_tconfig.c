@@ -170,6 +170,7 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
      * encoder block applies (reproduces the historic hard-coded argv) */
     tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
     ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/usr/bin/ffmpeg");
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_avc_mode, XTC_AVC_AUTO);
     a = &gfxconfig.avc444_ffmpeg_encoder_args;
     ck_assert_int_gt(a->count, 0);
     ck_assert_int_ge(find_enc_arg(a, "libx264"), 0);
@@ -195,6 +196,8 @@ START_TEST(test_tconfig_gfx_avc444_override)
     tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_ffmpeg.toml", &gfxconfig);
     ck_assert_int_eq(gfxconfig.h264_encoder, XTC_H264_FFMPEG);
     ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/opt/custom/ffmpeg");
+    /* "444v1": AVC444 with codec id 0x000E pinned (v2/ChromaV2 suppressed) */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_avc_mode, XTC_AVC_FORCE_444V1);
     a = &gfxconfig.avc444_ffmpeg_encoder_args;
     ck_assert_int_eq(a->count, 10);
     ck_assert_str_eq(a->arg[0], "-c:v");

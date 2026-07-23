@@ -1288,7 +1288,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
         {
             want_420 = 1;
         }
-        else if (cfgmode == XTC_AVC_FORCE_444)
+        else if (cfgmode == XTC_AVC_FORCE_444 ||
+                 cfgmode == XTC_AVC_FORCE_444V1)
         {
             want_420 = 0;
         }
@@ -1341,7 +1342,12 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
         {
             if (avc444_ffmpeg_ok && best_h264_index >= 0)
             {
-                self->avc444_v2 = avc444_v2_capable;
+                /* 444v1 pins codec id 0x000E even for v2-capable clients
+                 * (per-client compatibility/diagnostic, e.g. macOS Windows
+                 * App mis-rendering ChromaV2) */
+                self->avc444_v2 = avc444_v2_capable &&
+                                  (self->wm->gfx_config->avc444_ffmpeg_avc_mode
+                                   != XTC_AVC_FORCE_444V1);
                 /* when emitting v2 (codec id 0x000F) confirm a v2-capable
                  * capset (v10.1+) so strict clients (e.g. mstsc) accept the
                  * v2 frames; otherwise confirm the best AVC (v1) capset */

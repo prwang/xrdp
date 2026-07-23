@@ -83,9 +83,17 @@ and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
    follow-up). Ship policy: per-client negotiate-down documented in
    gfx.toml docs; PR narrative = "fault isolated, contained by caps
    gating + config".
+   **OBSERVED 2026-07-23 (black-screen variant):** iMac negotiated v2
+   and rendered near-black + top-edge noise strip + faint ghosts
+   (evidence in `PR-demo/mac_windows_app/`); session alive (resize 8 s
+   in); AVC420 rendered on the same client earlier. The `444v1` knob is
+   implemented (`avc_mode = "444v1"`, pins 0x000E) — v1 trial pending.
 4. **Garbled even on AVC420**: NOT a 444 defect — baseline H.264 issue
    (our stream or Mac decoder). Capture and root-cause before any claim;
    do not paper over with RFX (honesty rule).
+   **EXCLUDED 2026-07-23:** AVC420 on the iMac is owner-verified fully
+   functional — first connect and dynamic resize both render correctly.
+   The v2 black-screen defect (outcome 3) is isolated to the 444 layer.
 5. **Client advertises only CAPVERSION_81 or AVC_DISABLED**: classifier
    already serves AVC420/RFX — confirm session works stock-like; the
    captured capsets are themselves the deliverable (nobody upstream has
