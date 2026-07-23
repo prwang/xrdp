@@ -187,7 +187,10 @@ Still required:
 1. **Wire-layout unit test for the AVC444 PDU** (gap found while auditing the
    fork): assert one PDU, `LC=0`, `cbAvc420EncodedBitstream1` == metablock +
    sub-stream-1 length, both views present, single frame — the direct
-   regression guard against F1 ever reappearing. Not yet in tree.
+   regression guard against F1 ever reappearing. **DONE 2026-07-22** (dev
+   branch): `out_RFX_AVC444_BITMAP_STREAM` extracted and unit tested
+   (`test_avc444_metablock.c`, `avc444_wire` tcase); clean-branch port
+   folds into the slices per `BACKLOG.md` (no separate fix commit).
 2. **Client matrix, live**: mstsc onscreen A/B (planned, region-strict);
    **macOS Windows App** session — the exact client that garbled; without this
    run, claim containment (F2 gating), not resolution. iOS/Android RD Client
@@ -200,8 +203,27 @@ Still required:
    or AVC420 via the caps classifier / config) instead of an open mystery.
    Either way the test also documents empirically which capsets the Windows
    App advertises — the input our classifier keys on.
-3. **NVENC configuration run** on Nvidia hardware (the fork's unstable combo,
-   our untested recipe).
+   **First Windows App data point (Android, SM-S936U, 2026-07-23, live):**
+   the client advertised `AVC_DISABLED` (0x20) on every v10 capset it
+   offered (10.0/10.2/10.3/10.4, flags 0x22/0x20), no `AVC420_ENABLED` on
+   8.1 (flags 0x02), plus the undocumented `0x000B0101`/`0x000B0300`
+   capsets with flags `0x1a2` (i.e. `AVC_DISABLED` again + unknown bits
+   `0x180`). Our classifier honored it and the session correctly ran RFX
+   with zero H.264 negotiation — exactly the F2 guard working (the fork
+   would have sent 0x000F unconditionally to this client). Implication
+   for the Mac run: the macOS Windows App may likewise advertise
+   `AVC_DISABLED` toward non-AVD servers, which would make the historical
+   garble unreproducible on current clients and the captured capsets the
+   deliverable; check for a client-side H.264/hardware-decode setting
+   before concluding.
+3. **NVENC configuration run** on Nvidia hardware (the fork's unstable
+   combo). **DONE 2026-07-22** (owner-validated, Tesla T4, ffmpeg 8.0.1,
+   driver 580.159.03): probe OK, persistent encoder child, correct
+   display, `nvidia-smi` shows the session ffmpeg as a GPU compute
+   process; small sizes OK, no chroma fringe (region-strict client).
+   Surfaced and fixed a real portability defect in the process (NUT
+   global-header mode vs encoders without in-band SPS/PPS repeat —
+   dump_extra now chained in `build_argv`, regression-tested).
 4. **Latency/load benchmark vs linked x264** (RESULTS.md P3) — answers "load
    too high" quantitatively.
 5. **Soak + resize storm** against the deployed binary (encoder restarts = 0

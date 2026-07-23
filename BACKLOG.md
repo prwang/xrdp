@@ -80,7 +80,12 @@ and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
 5. **Client advertises only CAPVERSION_81 or AVC_DISABLED**: classifier
    already serves AVC420/RFX — confirm session works stock-like; the
    captured capsets are themselves the deliverable (nobody upstream has
-   them documented).
+   them documented). **OBSERVED on the Android Windows App (SM-S936U,
+   2026-07-23):** `AVC_DISABLED` on all v10 capsets, no `AVC420_ENABLED`
+   on 8.1, undocumented `0x000B0101`/`0x000B0300` flags `0x1a2`; session
+   correctly ran RFX (capture in `UPSTREAM_GAP_ANALYSIS.md` §2a). The Mac
+   variant may behave the same — check the app for an H.264/hardware
+   decode client setting before concluding outcome 5 there.
 6. **No garble but stalls/frozen frames**: pacing/ack issue, not chroma.
    Dev build + trace; compare `frame_id` ack cadence vs mstsc run.
 7. **Fails before GFX negotiation** (TLS/transport): environment, not
