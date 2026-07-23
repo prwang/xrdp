@@ -261,23 +261,24 @@ Still required:
    functional (2026-07-23): first connect and dynamic resize both
    render correctly** — matrix outcome 4 (baseline H.264 broken) is
    excluded; the defect below is isolated to the 444 layer.
-   **AVC444 v2 result (same iMac, avc_mode=auto, 2026-07-23): REPRODUCED
-   the historical Mac failure on our spec-conformant stream.** The
-   client negotiated AVC444 v2 (0x000F, capset 10.7 confirmed) and then
-   rendered near-black frames with a garbled color-noise strip along
-   the top edge and faint ghost structure in the field (evidence:
-   `PR-demo/mac_windows_app/avc444v2_blackout_2026-07-23.png`). The
-   session stayed alive (client-driven dynamic resize 8 s in), so
-   transport/decode-init are fine — the client decodes and composes the
-   dual view wrongly. Fault isolation: the SAME v2 stream renders on
-   mstsc (region-strict) and xfreerdp, AVC420 renders on this SAME Mac,
-   and our wire layout is unit-asserted (single PDU, LC=0) — i.e.
-   Nexarian's unverified "Microsoft has a bug in their Windows App on
-   Mac OS" attribution is now EVIDENCED, minus his F1/F2 confounders.
-   Discriminator: `avc_mode = "444v1"` knob added (pin codec id 0x000E,
-   suppress ChromaV2) to determine whether the defect is
-   v2-aux-packing-specific or all-AVC444; either result yields a
-   shippable per-client policy via config.
+   **All Mac AVC444 codec-defect observations are VOID pending
+   disciplined reruns (owner ruling, 2026-07-23).** What was observed:
+   v2 negotiated (0x000F, capset 10.7 confirmed) then near-black frames
+   with a top-edge noise strip (screenshot preserved:
+   `PR-demo/mac_windows_app/avc444v2_blackout_2026-07-23.png`); a
+   `444v1` (0x000E) run was also black. But the rig was then proven
+   contaminated: after cycling v2 → 444v1 → 420 on the same backend
+   session, even the KNOWN-GOOD AVC420 baseline rendered black on
+   reconnect — restarting xrdp does not reset the persistent Xorg
+   session, and reconnect-after-codec-switch is itself broken (tracked
+   as a suspected real bug in `BACKLOG.md`). Nothing observed on that
+   session chain is attributable to any codec. Standing discipline for
+   ALL codec trials (`PR-demo/tail_flush_ab/reset_420.sh`): every trial
+   is a FRESH LOGIN (backend session killed first) and must be
+   bracketed by green AVC420 baselines — a black 420 bracket voids the
+   trial. Facts that survive: AVC420 fully functional on the Mac on
+   fresh logins (owner-verified, connect + resize), the capset
+   fingerprints, and the `444v1` knob itself.
    (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
    MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
    mapping unsupported) | `0x100` — absent from the spec; FreeRDP master
