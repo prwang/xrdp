@@ -83,11 +83,18 @@ and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
    follow-up). Ship policy: per-client negotiate-down documented in
    gfx.toml docs; PR narrative = "fault isolated, contained by caps
    gating + config".
-   **OBSERVED 2026-07-23 (black-screen variant):** iMac negotiated v2
-   and rendered near-black + top-edge noise strip + faint ghosts
-   (evidence in `PR-demo/mac_windows_app/`); session alive (resize 8 s
-   in); AVC420 rendered on the same client earlier. The `444v1` knob is
-   implemented (`avc_mode = "444v1"`, pins 0x000E) — v1 trial pending.
+   **2026-07-23: observations VOIDED, rerun required.** v2 black and
+   `444v1` black were observed, but on a contaminated rig: after
+   cycling codecs on one backend session, the known-good AVC420
+   baseline ALSO went black on reconnect — xrdp restart does not reset
+   the Xorg session, so none of those runs count (screenshot kept in
+   `PR-demo/mac_windows_app/` as an observation only). NEW MANDATORY
+   DISCIPLINE for every codec trial: use
+   `PR-demo/tail_flush_ab/reset_420.sh` — fresh login per trial
+   (backend session killed; sesadmin kill is unimplemented, TERM to the
+   sesexec pid == session id works) and every trial bracketed by green
+   AVC420 baselines; a black 420 bracket voids the trial. The `444v1`
+   knob remains available for the disciplined rerun.
 4. **Garbled even on AVC420**: NOT a 444 defect — baseline H.264 issue
    (our stream or Mac decoder). Capture and root-cause before any claim;
    do not paper over with RFX (honesty rule).
@@ -115,6 +122,28 @@ and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
 **Acceptance:** verdict + capsets + screenshot recorded in
 `UPSTREAM_GAP_ANALYSIS.md` §2a (required-test #2 closed either way), and
 the PR narrative updated ("blocker removed" or "fault isolated + policy").
+
+## Reconnect after codec switch renders black — suspected real bug, TODO (2026-07-23)
+
+Observed live on the dev box (VAAPI): one backend Xorg session, serial
+reconnects negotiating v2 → 444v1 → 420; the final reconnect on the
+KNOWN-GOOD AVC420 path rendered black. A codec change across
+disconnect/reconnect to a persistent session must work — clients
+legitimately reconnect with different caps (and admins flip gfx.toml).
+Suspects, in order: (1) xorgxrdp capture-mode renegotiation — the session
+was created with full-chroma AVC444 capture (`CC_GFX_AVC444`) and the
+reconnect renegotiates a different capture/codec combination; (2) stale
+per-monitor encoder/converter state in xrdp_encoder across module
+reconnect; (3) egfx surface re-create vs xorgxrdp shmem framing mismatch.
+- Repro recipe is deterministic and cheap on this box (no Mac needed):
+  connect xfreerdp on 420-fresh session (confirm renders), flip avc_mode,
+  reconnect, flip back to 420, reconnect → black?
+- First forensic: XRDP_GFX_TRACE=1 (dev build) on the black reconnect —
+  are frames encoded+acked (client shows black content) or is the
+  encoder/capture idle (no damage delivered)?
+- Out of upstream-PR scope unless the disciplined rerun shows it affects
+  single-codec operation; document as a known limitation if PR#1 ships
+  before the fix.
 
 ## Port AVC444 wire-layout serializer + test to clean branch — TODO (2026-07-22)
 
