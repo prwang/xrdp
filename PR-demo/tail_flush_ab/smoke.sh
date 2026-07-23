@@ -6,7 +6,10 @@
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 mkdir -p /tmp/ab
-MARK=$(date '+%H:%M:%S')
+# Full date+time mark: a time-of-day-only mark matched OLD log lines from
+# prior days whose clock time was later than the mark (false FAIL observed
+# 2026-07-23 against errors logged 2026-07-17).
+MARK=$(date '+%Y-%m-%dT%H:%M:%S')
 # Two session sizes, both mandatory: an encoder startup failure once keyed on
 # resolution (ffmpeg probesize window) — green at 1920x1080, frozen at the
 # mstsc default 1024x768.
@@ -15,7 +18,8 @@ for size in 1920x1080 1024x768; do
     KEYTEST_SIZE=$size bash "$D/keytest.sh" >/tmp/ab/smoke_$size.out 2>&1
     ok=$(grep -c "  ok$" /tmp/ab/smoke_$size.out)
     lag=$(grep -c "LAG" /tmp/ab/smoke_$size.out)
-    errs=$(awk -F'T' -v m="$MARK" '$2 >= m' /var/log/xrdp.log 2>/dev/null \
+    errs=$(awk -v m="[$MARK" 'substr($1, 1, length(m)) >= m' \
+               /var/log/xrdp.log 2>/dev/null \
            | grep -cE "restarting encoder|sequence mismatch")
     echo "smoke[$size]: ok=$ok lag=$lag encoder_errors=$errs"
     if [ "$ok" -lt 8 ] || [ "$lag" -ne 0 ] || [ "$errs" -ne 0 ]; then
