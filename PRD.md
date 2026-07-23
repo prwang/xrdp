@@ -2302,6 +2302,54 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   width/height sessions on region-strict rendering (the probesize-hold
   and metablock-alignment defect classes, respectively).
 
+- **2026-07-23 — the unconditional `dump_extra` was itself a regression;
+  fix: adaptive (probe pristine first, retry only on missing headers).**
+  The 2026-07-22 fix chained `dump_extra` for *every* encoder. That
+  DUPLICATES the parameter sets on encoders that already repeat them
+  in-band (libx264 `repeat-headers=1`, h264_vaapi packed headers): the
+  first keyframe packet then carries SPS=2/PPS=2. Lenient decoders
+  (xfreerdp, mstsc) tolerate it; the **macOS Windows App renders a black
+  screen** (near-black + top-edge noise). Found because the Mac blacked
+  every H.264 config while RFX rendered, then **bisected on identical
+  hardware/config/ffmpeg/client**: `ff5890aa` (last build before the
+  fix) renders on the Mac, `71179f67` (the dump_extra commit) is black.
+  The earlier "no-op on in-band encoders" clearance was **measured
+  through the raw `-f h264` muxer, not the live NUT flow** — wrong
+  instrument, false acquittal; the duplication only appears in the NUT
+  path the server actually uses. Fix: the connect-time probe runs
+  pristine (no `dump_extra`) first and only retries with it when the
+  reset-keyframe check fails (extradata-only encoders, e.g. h264_nvenc);
+  the decision rides into the session child. Exactly one SPS/PPS copy
+  per keyframe in both branches. Guard: the global-header test now
+  asserts the full ladder (pristine probe FAILS on the headerless
+  stream, dump_extra retry passes) plus a new test asserting SPS count
+  == 1 in the first packet for BOTH branches (67/67, ffmpeg 7.1 + 8.1).
+  Live-validated on the dev box (VAAPI + libx264 in-band both render on
+  the Mac under fresh-login bracket discipline; the T4/NVENC dump_extra
+  path was already owner-verified rendering). **Process lessons
+  recorded:** (1) validate encoder wire changes through the *shipped*
+  muxer, never a stand-in; (2) codec A/B on a live client requires
+  fresh-login brackets — a persistent Xorg session survives xrdp
+  restart and a black baseline voids everything measured after it
+  (`PR-demo/tail_flush_ab/reset_420.sh`). **Clean-branch caveat:** the
+  clean branch still carries the *blanket* dump_extra (slice 7,
+  `c74a09e7`); the slice-7 fold must be re-done with the adaptive form
+  before any upstream push — tracked in `BACKLOG.md`.
+
+- **2026-07-23 — known limitation (not chased): the `dump_extra` branch
+  itself mis-renders on the macOS Windows App when the source encoder is
+  libx264-without-repeat-headers.** Under bracket discipline, a
+  fresh-login run of that config (single SPS/PPS per keyframe, ladder
+  correctly engaged) still blacked the Mac — while the same dump_extra
+  branch renders from NVENC on the T4, and this exact config never
+  worked on ANY prior build (old builds failed the probe → RFX). So
+  this is a gap in a corner of the *new* capability, not a regression,
+  and its only real-world occupant (NVENC) is validated. Deliberately
+  not chased: no shipped default or runbook recipe uses a
+  headerless-x264 encoder; the probe now logs a WARNING steering configs
+  toward in-band-header encoders. Structural suspect for the follow-up:
+  x264 zerolatency emits 2 IDR slices vs NVENC's 1 (BACKLOG).
+
 ## 26. Related work and differentiation
 
 Moved to `PR-demo/UPSTREAM_GAP_ANALYSIS.md` — a rewritten, evidence-first
