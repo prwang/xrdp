@@ -188,6 +188,29 @@ the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
 - Upstream scope recommendation: keep PR#1 single-monitor as certified;
   multimon = follow-up PR (changes eligibility surface, own review).
 
+## Isolate the macOS Windows App AVC444 black screen — our-wire vs client-bug — TODO (2026-07-23)
+
+DISCIPLINED RESULT: the macOS Windows App blacks BOTH AVC444 v2 AND v1
+(different aux packing, identical failure → chroma math exonerated) while
+rendering AVC420 + RFX. Common factor = the AVC444 dual-view wrapper
+(RFX_AVC444_BITMAP_STREAM info word + aux sub-stream). Independently
+reproduces Nexarian's 2025 Mac report on our defect-free, unit-tested,
+spec-conformant implementation → strong evidence of a real Mac-client
+AVC444 defect, but NOT yet isolated from an xrdp-shared wire assumption.
+Two cheap discriminators to close it:
+
+- **(a) FREE — Microsoft Windows client renders our clean v2?** Point the
+  single-monitor *Windows* "Windows App" (or mstsc) at this box on
+  `avc_mode = "auto"`, fresh login. Re-verify because the old
+  "mstsc-verified" claims predate the dump_extra fix (may have been the
+  doubled-header stream). Renders → our v2 wire is good for a Windows MS
+  client, fault leans Mac-specific. Blacks → our wire is the problem
+  (huge — turns it into a fixable bug, feeds the `avc444_wire` test).
+- **(b) ground-truth capture (separate item below).**
+
+Acceptance: verdict recorded in `UPSTREAM_GAP_ANALYSIS.md` §2a; if our
+wire is implicated, a concrete byte-diff + `avc444_wire` assertion.
+
 ## Ground-truth capture: intercept a real MS RDP server's AVC444 wire — TODO (2026-07-23)
 
 We have never compared our AVC444/AVC420 GFX bytes against a genuine
