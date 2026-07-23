@@ -261,24 +261,49 @@ Still required:
    functional (2026-07-23): first connect and dynamic resize both
    render correctly** — matrix outcome 4 (baseline H.264 broken) is
    excluded; the defect below is isolated to the 444 layer.
-   **All Mac AVC444 codec-defect observations are VOID pending
-   disciplined reruns (owner ruling, 2026-07-23).** What was observed:
-   v2 negotiated (0x000F, capset 10.7 confirmed) then near-black frames
-   with a top-edge noise strip (screenshot preserved:
-   `PR-demo/mac_windows_app/avc444v2_blackout_2026-07-23.png`); a
-   `444v1` (0x000E) run was also black. But the rig was then proven
-   contaminated: after cycling v2 → 444v1 → 420 on the same backend
-   session, even the KNOWN-GOOD AVC420 baseline rendered black on
-   reconnect — restarting xrdp does not reset the persistent Xorg
-   session, and reconnect-after-codec-switch is itself broken (tracked
-   as a suspected real bug in `BACKLOG.md`). Nothing observed on that
-   session chain is attributable to any codec. Standing discipline for
-   ALL codec trials (`PR-demo/tail_flush_ab/reset_420.sh`): every trial
-   is a FRESH LOGIN (backend session killed first) and must be
-   bracketed by green AVC420 baselines — a black 420 bracket voids the
-   trial. Facts that survive: AVC420 fully functional on the Mac on
-   fresh logins (owner-verified, connect + resize), the capset
-   fingerprints, and the `444v1` knob itself.
+   **DISCIPLINED VERDICT (2026-07-23, after voiding the first pass):**
+   the macOS Windows App blacks BOTH AVC444 v2 (0x000F) and AVC444 v1
+   (0x000E) on our spec-conformant stream, while rendering AVC420
+   (0x000B) and RFX perfectly on the same client. Every run below was a
+   FRESH LOGIN bracketed by a green AVC420 baseline (a black baseline
+   voids the run — the first pass was thrown out for exactly that; see
+   the contamination note and `PR-demo/tail_flush_ab/reset_420.sh`), on
+   the post-regression build (adaptive dump_extra, single SPS/PPS per
+   keyframe verified in-log), VAAPI hardware, pristine branch:
+   - 420 baseline → renders (bracket)
+   - AVC444 v2 (ChromaV2) → black (screenshot
+     `PR-demo/mac_windows_app/avc444v2_blackout_2026-07-23.png`)
+   - 420 → renders (bracket)
+   - AVC444 v1 → black
+   - 420 → renders (bracket)
+   Because v1 and v2 use entirely different aux-chroma packing
+   (`fill_aux` vs `fill_aux_v2`) yet fail identically, the chroma math
+   is EXONERATED. The only thing separating both failures from the
+   working 420 is the **AVC444 dual-view wrapper** itself
+   (RFX_AVC444_BITMAP_STREAM: the LC/cb info word + the second,
+   auxiliary, H.264 sub-stream). This **independently reproduces
+   Nexarian's 2025 report** ("output on the Mac OS client was garbled …
+   FreeRDP and MSTSC seemed fine") on a completely different,
+   defect-free implementation — no F1/F2/F3/F4, unit-tested wire
+   (single PDU, LC=0, cb length, both views), spec-correct ChromaV2
+   (inverse of FreeRDP `general_ChromaV2ToYUV444`). That his fork and
+   ours — two independent xrdp-side implementations — fail the same
+   client the same way is strong evidence of a **genuine AVC444 defect
+   in the macOS Windows App**, not a fork-specific bug.
+   **NOT YET fully isolated (our-wire vs MS-client-bug):** both failing
+   implementations are xrdp-derived and could share a wire assumption
+   that differs from a real Microsoft server. Two cheap discriminators
+   remain (BACKLOG): (a) does a Microsoft *Windows* client render our
+   clean pristine v2 — re-verify, since the old "mstsc-verified" claims
+   predate the dump_extra fix and may have been on the doubled-header
+   stream; (b) does the same Mac render a *real MS server's* AVC444
+   (ground-truth capture). If (a) renders and (b) blacks, the client is
+   convicted; if (b) renders, we have a concrete wire-diff bug to fix.
+   **Shipping policy (unchanged, now evidence-backed):** serve the macOS
+   Windows App AVC420 (owner-verified fully functional, connect +
+   resize), full AVC444 for mstsc / Windows / FreeRDP. Exposure is
+   contained by config today; a capset-fingerprint auto-downgrade is a
+   possible follow-up (needs owner sign-off — not spec-grounded).
    (0x2) | `AVC_DISABLED` (0x20) | `SCALEDMAP_DISABLE` (0x80 — public,
    MS-RDPEGFX v20260511 §2.2.3.10: scaled-output/scaled-window surface
    mapping unsupported) | `0x100` — absent from the spec; FreeRDP master
