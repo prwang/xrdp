@@ -224,13 +224,32 @@ packing), the MS non-standard color-conversion matrix (jsorg71's named
 hard problem), and whether the macOS Windows App's AVC444 black-screen is
 a client bug or something our stream does differently from a real server.
 
-- Setup: stock Windows Server / Win11 host with "Prefer AVC 444 graphics
-  mode" GPO enabled + a GPU; connect the SAME macOS Windows App to it.
-  If the Mac renders 444 from a real MS server, the client is exonerated
-  and the fault is our wire (huge — turns the Mac result into a concrete
-  wire-diff bug). If the Mac ALSO blacks from a real MS server, the
-  client itself is broken for 444-on-Mac and our AVC420-for-Mac policy is
-  vindicated.
+- Setup (NO GPU NEEDED — verified against MS first-party docs 2026-07-23):
+  a **Windows 11 Pro or Enterprise** VM, no GPU/vGPU. AVC444 has a
+  documented SOFTWARE encoder path; a GPU only accelerates it and is
+  mandatory only for HEVC. GPO under Computer Config > Admin Templates >
+  Windows Components > Remote Desktop Services > RD Session Host > Remote
+  Session Environment: ENABLE "Prioritize H.264/AVC 444 graphics mode for
+  Remote Desktop connections"; leave "Configure H.264/AVC hardware
+  encoding" Disabled/Not Configured (forces software encode — desired,
+  there is no GPU). Not Server-only; the two GPOs are independent (444 =
+  codec/mode select, hw-encode = GPU-vs-CPU). Sources: learn.microsoft.com
+  graphics-enable-gpu-acceleration ("enable AVC/H.264 even without GPU
+  acceleration"; "if you disable or don't configure [hw-encode], we will
+  always use software encoding") and graphics-chroma-value-increase-4-4-4
+  ("You don't need to use GPU acceleration to change the chroma value").
+  VERIFY the server is actually emitting 444-in-software before trusting
+  the capture: event log Applications and Services Logs > Microsoft >
+  Windows > RemoteDesktopServices-RdpCoreTs > Operational, **Event ID 162
+  text = Avc444FullScreenProfile** (444 active; HevcProfile = HEVC
+  instead) and **Event ID 170 = AVC hardware encoder 0/absent** (software).
+  Then connect the SAME macOS Windows App. If the Mac renders 444 from a
+  real MS server, the client is exonerated and the fault is our wire
+  (huge — concrete wire-diff bug). If the Mac ALSO blacks from a real MS
+  server, the client is broken for 444-on-Mac and our AVC420-for-Mac
+  policy is vindicated. Cheapest sanity check before any capture work:
+  the ~15-min GPU-less VM + Event-162 read settles the GPU question
+  itself.
 - Interception: install a trusted root CA on the iMac, MITM the RDP TLS
   (RDP uses TLS/CredSSP; a proxy with the trusted cert can terminate and
   re-originate) and capture the decrypted GFX PDUs; OR run the MS server
