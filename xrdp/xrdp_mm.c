@@ -1321,8 +1321,11 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 cfg.use_dump_extra = 1;
                 if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
                 {
-                    LOG(LOG_LEVEL_INFO, "  ffmpeg probe: no in-band "
-                        "SPS/PPS from this encoder; enabling dump_extra");
+                    LOG(LOG_LEVEL_WARNING, "  ffmpeg probe: encoder emits no "
+                        "in-band SPS/PPS; enabling dump_extra. Prefer an "
+                        "encoder that repeats headers in-band (libx264 "
+                        "repeat-headers=1, h264_vaapi, h264_nvenc): some "
+                        "strict decoders mis-render the dump_extra path.");
                 }
                 else
                 {

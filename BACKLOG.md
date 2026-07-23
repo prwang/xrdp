@@ -188,6 +188,63 @@ the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
 - Upstream scope recommendation: keep PR#1 single-monitor as certified;
   multimon = follow-up PR (changes eligibility surface, own review).
 
+## Ground-truth capture: intercept a real MS RDP server's AVC444 wire — TODO (2026-07-23)
+
+We have never compared our AVC444/AVC420 GFX bytes against a genuine
+Microsoft RDP server — all "frame sequence" comparisons to date were (a)
+our own encoder output diffed across ffmpeg versions/encoders/branches and
+(b) reading the Nexarian fork *source*. The MS-RDPEGFX spec is the only
+"reference" we've checked our wire against, by reading. A real capture
+would be ground truth for: the exact RFX_AVC444_BITMAP_STREAM layout a
+Windows client actually expects (LC field, metablock rects, dual-view
+packing), the MS non-standard color-conversion matrix (jsorg71's named
+hard problem), and whether the macOS Windows App's AVC444 black-screen is
+a client bug or something our stream does differently from a real server.
+
+- Setup: stock Windows Server / Win11 host with "Prefer AVC 444 graphics
+  mode" GPO enabled + a GPU; connect the SAME macOS Windows App to it.
+  If the Mac renders 444 from a real MS server, the client is exonerated
+  and the fault is our wire (huge — turns the Mac result into a concrete
+  wire-diff bug). If the Mac ALSO blacks from a real MS server, the
+  client itself is broken for 444-on-Mac and our AVC420-for-Mac policy is
+  vindicated.
+- Interception: install a trusted root CA on the iMac, MITM the RDP TLS
+  (RDP uses TLS/CredSSP; a proxy with the trusted cert can terminate and
+  re-originate) and capture the decrypted GFX PDUs; OR run the MS server
+  in a VM and packet-capture with the server's private key / a patched
+  FreeRDP shim as the recorder. Wireshark's rdpegfx dissector decodes the
+  caps + wire-to-surface PDUs once decrypted.
+- Deliverable: a byte-level diff of a real server's AVC444 keyframe PDU
+  vs ours at the same resolution; feed any delta back into the encoder /
+  wire serializer and the `avc444_wire` unit test.
+- Authorization: owner-run on owner-controlled hosts only; document scope.
+
+## macOS dump_extra branch mis-render (headerless x264) — WON'T CHASE (2026-07-23)
+
+Under bracket discipline, a fresh-login run of libx264-without-repeat-
+headers (ladder correctly engaged: pristine probe fails → dump_extra on,
+single SPS/PPS per keyframe verified) still blacks the macOS Windows App,
+while the SAME dump_extra branch renders from NVENC on the T4. Not a
+regression: this config never worked on any prior build (probe fail →
+RFX), and its only real-world occupant (NVENC) is validated. Decision:
+do not chase — no shipped default/runbook recipe uses a headerless-x264
+encoder, and the probe now logs a WARNING steering toward in-band-header
+encoders. If revisited, the structural suspect is slice count (x264
+`-tune zerolatency` emits 2 IDR slices; NVENC 1) — testable by pinning
+`-x264-params slices=1` and one disciplined Mac run. Cheapest to fold
+into the batched T4 hour alongside the NVENC 444 rerun.
+
+## Re-fold slice 7 on the clean branch with the ADAPTIVE dump_extra — TODO (2026-07-23)
+
+The clean branch `avc444-ffmpeg-upstream` @ `c74a09e7` carries the
+BLANKET dump_extra (slice 7 `04e43ee2`), which is the regression fixed on
+dev by `7927efa7`. Before any upstream push the slice-7 fold must be
+redone with the adaptive form (probe pristine first, retry on missing
+headers; the `use_dump_extra` plumbing through cfg/mm/encoder). Same
+no-separate-fix-commit rule; re-run the bisectability walk after. The
+`c74a09e7` cleanroom deb and any artifact built from it are POISONED for
+the macOS client — do not hand out.
+
 ## Probe must log child stderr — TODO (2026-07-22)
 
 `xrdp_ffmpeg_avc444_probe()` drains and discards the child's stderr, so a
