@@ -290,15 +290,27 @@ Still required:
    ours — two independent xrdp-side implementations — fail the same
    client the same way is strong evidence of a **genuine AVC444 defect
    in the macOS Windows App**, not a fork-specific bug.
-   **NOT YET fully isolated (our-wire vs MS-client-bug):** both failing
-   implementations are xrdp-derived and could share a wire assumption
-   that differs from a real Microsoft server. Two cheap discriminators
-   remain (BACKLOG): (a) does a Microsoft *Windows* client render our
-   clean pristine v2 — re-verify, since the old "mstsc-verified" claims
-   predate the dump_extra fix and may have been on the doubled-header
-   stream; (b) does the same Mac render a *real MS server's* AVC444
-   (ground-truth capture). If (a) renders and (b) blacks, the client is
-   convicted; if (b) renders, we have a concrete wire-diff bug to fix.
+   **Discriminator (a) RESOLVED 2026-07-23 — fault isolated to the macOS
+   client.** On the SAME box, SAME clean pristine build, `avc_mode =
+   "auto"`, THREE Microsoft Windows clients negotiated AVC444 v2 (0x000F)
+   and rendered perfectly: the UWP **Windows App**, **mstsc.exe**, and
+   Sysinternals **RDCMan**. mstsc is decisive — it is Microsoft's
+   reference RDP client implementing the real MS-RDPEGFX ChromaV2ToYUV444
+   reconstruction; if our ChromaV2 aux packing were non-conformant mstsc
+   would garble it. It renders clean, and this is the CLEAN
+   single-parameter-set stream (the pre-dump_extra-fix "mstsc-verified"
+   claims are hereby re-verified on the correct wire). So our AVC444
+   wire — both v1 and v2 — is confirmed correct against Microsoft's own
+   Windows decoder, xfreerdp, and (per Nexarian) FreeRDP; the ONLY client
+   that blacks it is the macOS Windows App, on BOTH variants. Two
+   independent xrdp-side implementations (Nexarian's and ours) fail only
+   this one client, which also renders our AVC420 and RFX fine — the
+   fault is a genuine AVC444 defect in the macOS Windows App.
+   **Sole residual (theoretical):** the Mac could expect something a real
+   MS *server* sends that even mstsc-the-client tolerates in ours; the
+   ground-truth capture (BACKLOG, now a cheap GPU-less Win11-Pro VM)
+   would be the final nail, but the burden of proof has shifted
+   decisively — our wire is spec-correct to Microsoft's reference client.
    **Shipping policy (unchanged, now evidence-backed):** serve the macOS
    Windows App AVC420 (owner-verified fully functional, connect +
    resize), full AVC444 for mstsc / Windows / FreeRDP. Exposure is
