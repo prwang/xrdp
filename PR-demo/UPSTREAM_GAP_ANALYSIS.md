@@ -306,11 +306,23 @@ Still required:
    independent xrdp-side implementations (Nexarian's and ours) fail only
    this one client, which also renders our AVC420 and RFX fine — the
    fault is a genuine AVC444 defect in the macOS Windows App.
-   **Sole residual (theoretical):** the Mac could expect something a real
+   **UPDATE 2026-07-24 — the "sole residual" is now CONFIRMED, verdict
+   FLIPS.** The residual below was not theoretical. A self-owned stock
+   **Windows Server 2025** VM (local KVM, GPO `AVC444ModePreferred=1`,
+   software encode) emits AVC 4:4:4 that the **macOS Windows App
+   negotiates AND renders** — confirmed without TLS tapping via the
+   server's own RdpCoreTS **Event 162** (`AVC available: 1, profile 2048
+   = 4:4:4`) attributed to the Mac by **Event 169** `client OS type
+   (6,0)=OSX`, gfx ver `0xB0101`. So the Mac's 4:4:4 decoder WORKS against
+   Microsoft's wire and blacks ONLY on ours. The "genuine Mac-client
+   defect / our wire spec-conformant" conclusion is **WITHDRAWN**: mstsc
+   and friends merely *tolerate* our stream; the strict Mac decoder
+   exposes a **real wire-format delta between our AVC444 and Microsoft's**.
+   Next: byte-diff the two wires (BACKLOG "Find the AVC444 wire-format
+   delta vs Microsoft"). The prior residual note, preserved:
+   the Mac could expect something a real
    MS *server* sends that even mstsc-the-client tolerates in ours; the
-   ground-truth capture (BACKLOG, now a cheap GPU-less Win11-Pro VM)
-   would be the final nail, but the burden of proof has shifted
-   decisively — our wire is spec-correct to Microsoft's reference client.
+   ground-truth capture (BACKLOG) is now DONE and positive for a wire gap.
    **Shipping policy (unchanged, now evidence-backed):** serve the macOS
    Windows App AVC420 (owner-verified fully functional, connect +
    resize), full AVC444 for mstsc / Windows / FreeRDP. Exposure is
