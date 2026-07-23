@@ -439,6 +439,7 @@ struct xrdp_mm
     int avc444_ffmpeg; /* external stock-ffmpeg AVC444 backend selected */
     int avc420_ffmpeg; /* external ffmpeg backend, plain AVC420 (0x000B) */
     int avc444_v2;     /* client supports AVC444 v2 (ChromaV2, 0x000F)   */
+    int avc444_dump_extra; /* probe decision: encoder needs dump_extra    */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.

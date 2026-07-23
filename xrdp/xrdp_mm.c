@@ -1310,7 +1310,27 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
                 "%s %s at %dx%d", want_420 ? "AVC420" : "AVC444", cfg.path,
                 cw, ch);
-            if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
+            /* adaptive dump_extra: probe the pristine bitstream first;
+             * only an encoder with extradata-only parameter sets (e.g.
+             * h264_nvenc) fails the reset-keyframe check and gets the
+             * dump_extra retry. Never both in-band and extradata copies
+             * on the wire (strict decoders black out on duplicates). */
+            cfg.use_dump_extra = 0;
+            if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) != 0)
+            {
+                cfg.use_dump_extra = 1;
+                if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
+                {
+                    LOG(LOG_LEVEL_INFO, "  ffmpeg probe: no in-band "
+                        "SPS/PPS from this encoder; enabling dump_extra");
+                }
+                else
+                {
+                    cfg.use_dump_extra = -1; /* both probes failed */
+                }
+            }
+            self->avc444_dump_extra = (cfg.use_dump_extra == 1);
+            if (cfg.use_dump_extra >= 0)
             {
                 if (want_420)
                 {

@@ -73,6 +73,15 @@ struct xrdp_ffmpeg_avc444_config
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
                                     /* match the converter's width_align     */
+    int use_dump_extra;             /* chain the dump_extra bsf: ONLY for    */
+                                    /* encoders with no in-band SPS/PPS      */
+                                    /* (extradata only, e.g. h264_nvenc).    */
+                                    /* Unconditional use duplicates the      */
+                                    /* parameter sets on encoders that DO    */
+                                    /* repeat in-band (libx264/h264_vaapi)   */
+                                    /* and strict decoders then refuse to    */
+                                    /* present (macOS Windows App: black).   */
+                                    /* Decided by the connect-time probe.    */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;
