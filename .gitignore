@@ -67,3 +67,6 @@ xrdp_accel_assist/xrdp-accel-assist
 # developer .deb output (scripts/build_dev_deb.sh)
 /dist/
 *.deb
+
+# local test-VM harness (contains credentials + large binary dumps) — never commit
+vm/

@@ -143,8 +143,23 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
      *                       avc444/FINDINGS_ffmpeg_latency.md).
      *   repeat-headers=1    emit SPS/PPS before every IDR so the client can
      *                       always decode.
-     * This reproduces the historic hard-coded argv exactly; tuning is the
-     * administrator's job via gfx.toml [avc444_ffmpeg] encoder_args.
+     *   aud=1               emit an Access Unit Delimiter (NAL unit type 9)
+     *                       at the start of every access unit, matching stock
+     *                       Microsoft RDP (whose AVC444 stream carries an AUD
+     *                       on every frame -- confirmed by wire capture of a
+     *                       real Windows Server 2022 + NVIDIA host). AUDs are
+     *                       inert to the decoders that already worked, so this
+     *                       is a backward-compatible superset kept for wire
+     *                       conformance. NOTE: this is NOT the fix for the
+     *                       macOS Windows App black screen -- adding the AUD was
+     *                       tested live and did not change the black (mstsc/UWP
+     *                       rendered without it too). Root cause is the AVC444
+     *                       LC framing (we emit same-region LC=0 every frame;
+     *                       real Windows bootstraps luma-only LC=1 and defers
+     *                       chroma via LC=2). See docs/avc444_lc_reframe_design.md.
+     * This reproduces the historic hard-coded argv (plus the AUD delimiter);
+     * tuning is the administrator's job via gfx.toml [avc444_ffmpeg]
+     * encoder_args.
      */
     static const char *const def[] =
     {
@@ -154,7 +169,7 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
         "-tune", "zerolatency",
         "-crf", "18",
         "-g", "240",
-        "-x264-params", "repeat-headers=1"
+        "-x264-params", "repeat-headers=1:aud=1"
     };
     int i;
     int count = (int)(sizeof(def) / sizeof(def[0]));

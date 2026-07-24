@@ -11,6 +11,137 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## macOS Windows App AVC444 black screen — H2 CONFIRMED (our stream is malformed), FIX = Windows-like emission (2026-07-24)
+
+**DECISIVE RESULT (owner, onscreen):** the macOS Windows App (iMac) **rendered
+the real Windows host `43.98.187.122` cleanly for 2 min** — a live AVC444v2
+session carrying LC=1 + frequent LC=2 aux chroma (~7%) + rare LC=0. This
+**refutes H1** (the Mac fully supports AVC444v2 aux/`LC=0` reconstruction) and
+**confirms H2**: xrdp's own `LC=0` stream is malformed / non-Windows-like, and
+that is why the Mac blacks *our* stream while rendering Windows'. The client is
+fine; the defect is in xrdp's AVC444 emission.
+
+**FIX DIRECTION (evidence-backed):** make xrdp emit Windows-like AVC444v2 —
+luma-first `LC=1` IDR bootstrap, one shared decode context, aux only as P-slices
+on an established reference chain, `LC=2` deferred chroma catch-up as the normal
+path, disjoint-region `LC=0`, codec `0x000F`. This is the rewrite (implements the
+`LC=1`/`LC=2` deferral PRD NG-6 omits). Next concrete step: byte-compare our own
+AVC444v2 aux construction against the Windows reference to pin the minimal defect
+before committing to the full deferral rewrite.
+
+### Prior status (kept for history) — ground truth captured
+
+**UNBLOCKED.** Owner provided a real Windows host that emits real `LC=0` AND
+`LC=2`: `43.98.187.122`, **Windows Server 2022** (build 20348), **NVIDIA A10-4Q**
+vGPU (hardware NVENC). GPO set by us: `AVC444ModePreferred=1`,
+`AVCHardwareEncodePreferred=1`. Captured 803 AVC444 frames with the patched
+FreeRDP dumper across two chroma-rich payloads (ChromaAnim isoluminant hue
+rotation; ChromaScroll scrolling saturated bars + colored text). Full analysis:
+`/work/vm/GROUND_TRUTH_win2022_avc444.md`.
+
+**What real Windows actually emits (measured, 803 frames):**
+- codec **`0x000F` (AVC444v2) exclusively** — never v1 `0x000E`.
+- **Bootstraps luma-only:** first frame is **`LC=1` IDR** (`[AUD,SPS,PPS,IDR×3]`),
+  no aux. The chroma/aux view is NOT initialized at connect.
+- **Cadence `LC=1` ~93%**, `LC=2` ~7% (56/803), **`LC=0` ~0.25% (2/803)**.
+- **Aux is ALWAYS `[AUD,P,P,P]`** — 58/58 aux instances; **never** carries its own
+  IDR/SPS. Exactly one IDR/SPS/PPS in the whole session (seq0 luma). One shared
+  H.264 decode context; the aux "view" is temporally interleaved as ordinary
+  P-frames, routed to main-vs-aux by the `LC` field.
+- **`LC=0` streams tile DISJOINT, non-overlapping rects** (main=new-content tile,
+  aux=complementary catch-up tiles). Windows **never** emits a same-region
+  full-surface `LC=0`.
+
+**What xrdp emits (our dumps `gfxdump_444v1`, `gfxdump_aud`):**
+- codec `0x000E` (v1) in 444v1 mode.
+- **First AVC frame = `LC=0` dual-stream**, both streams the **same full surface**,
+  s1=IDR + s2=**bare P-slice** in one PDU.
+- **`LC=0` every frame**, same-region. **Never** emits `LC=1`/`LC=2` (PRD NG-6:
+  deferral not implemented).
+
+**Candidate root cause (H2), now with a concrete mechanism:** xrdp bootstraps
+AVC444 with a **same-region dual-stream `LC=0` whose aux is a P-slice**, and
+repeats `LC=0` every frame — a construction **real Windows never produces**. Real
+Windows bootstraps luma-only (`LC=1` IDR), keeps one shared decode context, sends
+aux **only as P-slices on an established reference chain**, uses **`LC=2`
+deferral** as the normal chroma path, uses **disjoint** regions on the rare
+`LC=0`, and uses **v2**. mstsc/UWP (lenient DXVA) accept xrdp's form; Apple
+VideoToolbox (stricter) evidently rejects it → black.
+
+**H1 vs H2 update:**
+- **H1** (Mac categorically can't do inline `LC=0`): **weakened** — real Windows
+  DOES emit `LC=0`. Refuted outright if the Mac renders this host.
+- **H2** (our `LC=0` is malformed / non-Windows-like): **strongly supported** by
+  the structural deltas above.
+
+**DECISIVE TEST REMAINING (onscreen, owner):** point the **macOS Windows App
+directly at `43.98.187.122`** (ordinary RDP host).
+- renders ⇒ Mac's AVC444v2/`LC=0` path works ⇒ **H2 confirmed** ⇒ fix xrdp to
+  emit Windows-like: **luma-first `LC=1` IDR bootstrap + deferred `LC=2` chroma
+  catch-up, v2 `0x000F`, disjoint-region `LC=0`.** This is the rewrite direction
+  (implements the `LC=1`/`LC=2` deferral PRD NG-6 currently omits).
+- blacks ⇒ problem is broader than stream construction (negotiation / caps /
+  VideoToolbox init); re-open H1.
+
+**INTERIM (workaround, NOT a fix):** `avc_mode = "420"` deployed in
+`/etc/xrdp/gfx.toml`; renders on all clients but is symptom suppression.
+
+Artifacts: real-Windows dumps `/work/vm/gfxwin_anim`, `/work/vm/gfxwin_scroll`
+(raw `.bin` + `manifest.txt`); our dumps `/work/vm/gfxdump{,_desk,_aud,_420,_444v1}/`;
+parsers `/work/vm/parse444.py`, `/work/vm/scan444.py`; instrumented FreeRDP
+`/work/vm/frdbuild` + `/work/vm/pfreerdp.sh` (`RDPGFX_DUMP_DIR`); payload sources
+`/work/vm/ChromaAnim.cs`, `/work/vm/ChromaScroll.cs`. AUD change (harmless
+superset, disproven as the fix but kept — real Windows does emit AUD on every AU)
+in `xrdp/xrdp_encoder_ffmpeg.c` default + gfx.toml `-aud 1`.
+
+### (superseded) AUD fix investigation — kept for history
+
+Ground truth captured by instrumenting a FreeRDP client with a per-frame RDPGFX
+wire dumper (patch in `rdpgfx_recv_wire_to_surface_1_pdu`: raw bitstream + AVC444
+header parse; build under `/work/vm/frdbuild`, runner `/work/vm/pfreerdp.sh`,
+`RDPGFX_DUMP_DIR=<dir>`). Compared stock **Windows Server 2025** (local KVM VM,
+`127.0.0.1:13389`) against **our xrdp** (`127.0.0.1:3389`), both negotiating
+AVC444v2 (`0x000F`). To force the true 444 video path (not the static PLANAR
+`0x000A` fallback) used a self-animating GDI payload / scrolling terminal.
+
+Wire-proven format deltas (ours vs MS), highest-suspicion first for the macOS
+Windows App black screen:
+
+1. **AUD (NAL unit type 9).** MS emits an Access Unit Delimiter on **every**
+   access unit (172/172 frames; keyframe `[9,7,8,6,6,5,5,5]`). Our xrdp emitted
+   **none** (0/77; keyframe `[7,8,6,5]`). Apple VideoToolbox (behind the macOS
+   Windows App) relies on AUDs to delimit access units where ffmpeg/mstsc are
+   lenient — leading candidate for the black screen.
+2. **Profile/level.** MS = Main@3.2 (`0x4d`/`0x20`); ours = High@4.2
+   (`0x64`/`0x2a`). Secondary candidate.
+3. **LC field.** MS sent `LC=1` (luma-only, no chroma aux) for our smooth test
+   content; ours `LC=0` (full dual-stream 444). Under investigation: which
+   payloads make MS emit `LC=0` (background research task; see
+   `/work/vm/LC_payload_findings.md`). Hypothesis: MS may only exercise the
+   dual-stream path on certain content, so the Mac never hits its 444-recon path
+   with MS but does with us.
+
+**AUD fix (this item):** emit an AUD on every access unit, matching MS. AUDs are
+inert to the decoders that already worked (ffmpeg/FreeRDP, mstsc render MS's
+AUD stream), so this is a backward-compatible superset — no functional
+regression (rule #2).
+- Code default (`xrdp/xrdp_encoder_ffmpeg.c` libx264 path): `-x264-params
+  repeat-headers=1:aud=1`.
+- **Active deployed path is `h264_vaapi`** (gfx.toml `[avc444_ffmpeg]`
+  encoder_args), so the live knob is `-aud 1` added there. Verified standalone
+  (`-aud 1` -> NAL 9 present, `-aud 0` -> absent) and on the wire: after restart,
+  **126/126** AVC444 frames carry the AUD; keyframe now `[9,7,8,6,5]`, P-frames
+  `[9,1]`. Stock `xfreerdp3` connects and renders the desktop correctly (no
+  black, no decode error) -> FreeRDP compatibility preserved.
+- STATUS: awaiting on-screen A/B on the real **macOS Windows App + UWP client**
+  (owner-driven). If AUD alone does not fix it, test forcing Main profile and
+  `LC=1` next.
+- FOLLOW-UP (clean PR): AUD is currently per-encoder-backend (vaapi `-aud 1`,
+  libx264 `aud=1`); openh264/native-x264 backends
+  (`xrdp_encoder_openh264.c`/`xrdp_encoder_x264.c`) are not covered. A robust
+  fix guarantees the AUD in xrdp's Annex-B output regardless of encoder (inject
+  the NAL, or an `h264_metadata=aud=insert` output bsf).
+
 ## H.265 / HEVC via ffmpeg — OUT OF SCOPE / BLOCKED (2026-07-14)
 
 **Decision: not pursued.** The encode side is nearly free (`-c:v libx265` /
