@@ -1092,6 +1092,47 @@ cmpverfunc (const void *a, const void *b)
 }
 
 /******************************************************************************/
+/* See the prototype in xrdp.h for the rationale. */
+void
+xrdp_mm_avc444_probe_dims(const struct display_size_description *display_sizes,
+                          int screen_width, int screen_height,
+                          int *coded_width, int *coded_height)
+{
+    int pw;
+    int ph;
+    int count;
+    int index;
+    const struct monitor_info *mip;
+
+    pw = screen_width;
+    ph = screen_height;
+    count = (display_sizes != NULL) ? (int)display_sizes->monitorCount : 0;
+    if (count >= 1)
+    {
+        pw = 0;
+        ph = 0;
+        for (index = 0; index < count; index++)
+        {
+            int mw;
+            int mh;
+            mip = display_sizes->minfo_wm + index;
+            mw = mip->right - mip->left + 1;
+            mh = mip->bottom - mip->top + 1;
+            if (mw > pw)
+            {
+                pw = mw;
+            }
+            if (mh > ph)
+            {
+                ph = mh;
+            }
+        }
+    }
+    *coded_width = (pw + 15) & ~15;
+    *coded_height = (ph + 15) & ~15;
+}
+
+/******************************************************************************/
 static int
 xrdp_mm_egfx_create_surfaces(struct xrdp_mm *self)
 {
@@ -1268,15 +1309,15 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
     int avc444_ffmpeg_ok = 0;
     int avc420_ffmpeg_ok = 0;
 
-    /* external stock-ffmpeg backend eligibility (FR-CAP / FR-PROBE): single
-     * monitor, and only after a successful behavioral probe at the session
-     * geometry. avc_mode (gfx.toml) selects AVC444 vs plain AVC420: AUTO
+    /* external stock-ffmpeg backend eligibility (FR-CAP / FR-PROBE): only
+     * after a successful behavioral probe at the largest single-monitor coded
+     * size (each monitor is served by its own ffmpeg child; see the probe
+     * block below). avc_mode (gfx.toml) selects AVC444 vs plain AVC420: AUTO
      * prefers AVC444 and falls back to AVC420; "420" forces AVC420 for any
      * H.264-capable client (so mstsc, which always offers AVC444, can be
      * tested on the AVC420 path); "444" serves AVC444 only. */
     if (self->wm->gfx_config->h264_encoder == XTC_H264_FFMPEG &&
-            best_h264_index >= 0 &&
-            self->wm->client_info->display_sizes.monitorCount <= 1)
+            best_h264_index >= 0)
     {
         enum xrdp_tconfig_avc_mode cfgmode =
             self->wm->gfx_config->avc444_ffmpeg_avc_mode;
@@ -1300,8 +1341,16 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
         if (want_420 || m == XRDP_GFX_AVC444)
         {
             struct xrdp_ffmpeg_avc444_config cfg;
-            int cw = (screen->width + 15) & ~15;
-            int ch = (screen->height + 15) & ~15;
+            int cw;
+            int ch;
+            /* Probe at the LARGEST single monitor's coded size, not the
+             * virtual-desktop size: each monitor is encoded by its own ffmpeg
+             * child (one encoder session per surface), and the virtual desktop
+             * can exceed a backend's per-session limit (e.g. NVENC 4096x4096)
+             * and would wrongly fail an otherwise-encodable candidate. */
+            xrdp_mm_avc444_probe_dims(&self->wm->client_info->display_sizes,
+                                      screen->width, screen->height,
+                                      &cw, &ch);
             xrdp_ffmpeg_avc444_config_default(&cfg);
             g_strncpy(cfg.path, self->wm->gfx_config->avc444_ffmpeg_path,
                       sizeof(cfg.path) - 1);

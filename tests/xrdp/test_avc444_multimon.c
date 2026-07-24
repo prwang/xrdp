@@ -1,0 +1,119 @@
+#if defined(HAVE_CONFIG_H)
+#include "config_ac.h"
+#endif
+
+#include "xrdp.h"
+#include "xrdp_client_info.h"
+#include "test_xrdp.h"
+
+/* Exercises xrdp_mm_avc444_probe_dims(): the external ffmpeg AVC backend is
+ * probed at the LARGEST single-monitor coded size (one ffmpeg child per
+ * monitor), NOT the virtual-desktop bounding box. Origins are inclusive
+ * (width = right - left + 1); the result is rounded up to a 16-pixel multiple.
+ */
+
+static void
+set_monitor(struct display_size_description *d, int i,
+            int left, int top, int right, int bottom)
+{
+    d->minfo_wm[i].left = left;
+    d->minfo_wm[i].top = top;
+    d->minfo_wm[i].right = right;
+    d->minfo_wm[i].bottom = bottom;
+}
+
+START_TEST(test_probe_dims_no_monitors_uses_screen)
+{
+    struct display_size_description d;
+    int cw = -1;
+    int ch = -1;
+
+    g_memset(&d, 0, sizeof(d));
+    d.monitorCount = 0;
+    /* 1920x1080 already 16-aligned in width, 1080 -> 1088 */
+    xrdp_mm_avc444_probe_dims(&d, 1920, 1080, &cw, &ch);
+    ck_assert_int_eq(cw, 1920);
+    ck_assert_int_eq(ch, 1088);
+}
+END_TEST
+
+START_TEST(test_probe_dims_null_uses_screen)
+{
+    int cw = -1;
+    int ch = -1;
+
+    xrdp_mm_avc444_probe_dims(NULL, 1024, 768, &cw, &ch);
+    ck_assert_int_eq(cw, 1024);
+    ck_assert_int_eq(ch, 768);
+}
+END_TEST
+
+START_TEST(test_probe_dims_dual_equal_1024x768)
+{
+    struct display_size_description d;
+    int cw = -1;
+    int ch = -1;
+
+    /* two side-by-side 1024x768 monitors: virtual desktop is 2048x768 but the
+     * probe size must be a single 1024x768 monitor (both 16-aligned) */
+    g_memset(&d, 0, sizeof(d));
+    d.monitorCount = 2;
+    set_monitor(&d, 0, 0, 0, 1023, 767);
+    set_monitor(&d, 1, 1024, 0, 2047, 767);
+    xrdp_mm_avc444_probe_dims(&d, 2048, 768, &cw, &ch);
+    ck_assert_int_eq(cw, 1024);
+    ck_assert_int_eq(ch, 768);
+}
+END_TEST
+
+START_TEST(test_probe_dims_takes_max_per_axis)
+{
+    struct display_size_description d;
+    int cw = -1;
+    int ch = -1;
+
+    /* mixed sizes: widest is monitor 1 (1920), tallest is monitor 0 (1200);
+     * the probe takes the per-axis maximum across monitors, 16-aligned */
+    g_memset(&d, 0, sizeof(d));
+    d.monitorCount = 2;
+    set_monitor(&d, 0, 0, 0, 1599, 1199);      /* 1600x1200 */
+    set_monitor(&d, 1, 1600, 0, 3519, 1079);   /* 1920x1080 */
+    xrdp_mm_avc444_probe_dims(&d, 3520, 1200, &cw, &ch);
+    ck_assert_int_eq(cw, 1920);   /* max width, already aligned */
+    ck_assert_int_eq(ch, 1200);   /* max height, already aligned */
+}
+END_TEST
+
+START_TEST(test_probe_dims_alignment_round_up)
+{
+    struct display_size_description d;
+    int cw = -1;
+    int ch = -1;
+
+    /* odd single-monitor size rounds each axis up to the next 16 multiple */
+    g_memset(&d, 0, sizeof(d));
+    d.monitorCount = 1;
+    set_monitor(&d, 0, 0, 0, 1365, 767);   /* 1366x768 */
+    xrdp_mm_avc444_probe_dims(&d, 1366, 768, &cw, &ch);
+    ck_assert_int_eq(cw, 1376);   /* 1366 -> 1376 */
+    ck_assert_int_eq(ch, 768);    /* already aligned */
+}
+END_TEST
+
+/******************************************************************************/
+Suite *
+make_suite_avc444_multimon(void)
+{
+    Suite *s;
+    TCase *tc;
+
+    s = suite_create("Avc444Multimon");
+    tc = tcase_create("avc444_multimon");
+    tcase_add_test(tc, test_probe_dims_no_monitors_uses_screen);
+    tcase_add_test(tc, test_probe_dims_null_uses_screen);
+    tcase_add_test(tc, test_probe_dims_dual_equal_1024x768);
+    tcase_add_test(tc, test_probe_dims_takes_max_per_axis);
+    tcase_add_test(tc, test_probe_dims_alignment_round_up);
+    suite_add_tcase(s, tc);
+    return s;
+}

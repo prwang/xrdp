@@ -341,7 +341,7 @@ frames defect (luma LC=1 / chroma LC=2 in separate GFX frames).
 - Acceptance: clean branch `make check` includes the avc444_wire tests;
   `git diff` dev-vs-clean for these files stays scaffold-only.
 
-## Multimonitor AVC444 (one ffmpeg child per monitor) — TODO, pending owner scope decision (2026-07-23)
+## Multimonitor AVC444 (one ffmpeg child per monitor) — IN PROGRESS (2026-07-24)
 
 **GATES the AVC444 upstream port** (owner, 2026-07-24): must be done before the
 `LC=1`/`LC=2` reframe is ported to `avc444-ffmpeg-upstream`. See
@@ -354,17 +354,27 @@ lazy per-surface create at per-surface dims, per-surface resize/teardown),
 and GFX/xorgxrdp already run one surface per monitor (RFX multimon uses
 the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
 
-- Change: drop `monitorCount <= 1` in `xrdp_mm.c` caps eligibility; probe
-  at the LARGEST single monitor's coded size, NOT the virtual-desktop
-  size (3840x3840 observed; virtual desktop can exceed encoder limits —
-  T4 NVENC max 4096x4096 — and would wrongly fail the candidate).
+- DONE — code: dropped `monitorCount <= 1` from the ffmpeg-AVC eligibility
+  gate in `xrdp_mm_egfx_caps_advertise`; the probe coded size now comes from
+  `xrdp_mm_avc444_probe_dims()` = LARGEST single monitor (per-axis max over
+  `minfo_wm`, 16-aligned), NOT the virtual-desktop bounding box (which can
+  exceed a backend's per-session limit — T4 NVENC 4096x4096 — and would
+  wrongly fail the candidate). One ffmpeg child still encodes one monitor's
+  surface, so probing one monitor is representative.
+- DONE — test: `tests/xrdp/test_avc444_multimon.c` unit-tests the
+  probe-dims geometry (no-monitor→screen, dual 1024x768→single 1024x768,
+  per-axis max on mixed sizes, 16-align round-up, NULL guard). `make check`
+  green (73/73).
+- TODO — offline validation: dual-Xvfb / `xfreerdp /multimon` 2×1024×768
+  harness so the multimon path is exercised without a live GPU session
+  (see PR-demo/multimon_offline). Then dual-monitor live matrix
+  (per-monitor resize, layout change, mixed sizes) on the Windows App
+  client; extend smoke gate.
 - Docs: per-backend encoder-session limits (consumer GeForce ~8 NVENC
   sessions; T4/VAAPI effectively unbounded); N children = N sessions.
 - Latency note: encoder thread encodes surfaces sequentially per frame
   (~3-9 ms each observed); acceptable 2-3 monitors, parallelize only if
   proven needed.
-- Validation: dual-monitor live matrix (per-monitor resize, layout
-  change, mixed sizes) on the Windows App client; extend smoke gate.
 - Upstream scope recommendation: keep PR#1 single-monitor as certified;
   multimon = follow-up PR (changes eligibility surface, own review).
 

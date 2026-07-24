@@ -574,6 +574,18 @@ xrdp_mm_egfx_send_planar_bitmap(struct xrdp_mm *self,
                                 struct xrdp_rect *rect,
                                 int surface_id, int x, int y);
 
+struct display_size_description;
+/* Compute the 16-aligned coded size to probe the external ffmpeg AVC
+ * backend at. One ffmpeg child encodes ONE monitor's surface, so the probe
+ * must reflect the LARGEST single monitor (not the virtual-desktop bounding
+ * box, which can exceed a backend's per-session limit). With no monitor
+ * layout (monitorCount < 1) the whole screen is one surface. Exposed for
+ * unit testing. */
+void
+xrdp_mm_avc444_probe_dims(const struct display_size_description *display_sizes,
+                          int screen_width, int screen_height,
+                          int *coded_width, int *coded_height);
+
 /* xrdp_mm_cpp.c */
 
 /* Callback registered for sesman communication replies over CCP */
