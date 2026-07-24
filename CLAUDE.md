@@ -136,3 +136,18 @@ Concretely:
   separate clean-room pass — reviewable commit slices plus written rationale —
   and does **not** necessarily carry `PR-demo/` as-is; treat that folder as the
   reproducibility scaffold, not part of the final slicing.
+
+## Deployment
+
+- **Deploy from clean dev `.deb`s, never by hand-copying binaries.** Even on
+  this dev box, the installed server must come from a package built from the
+  committed branch (`dpkg-buildpackage`/`make deb`-style flow → `apt install`
+  / `dpkg -i` the resulting `.deb`), not from copying `xrdp/.libs/xrdp` or any
+  other build-tree artifact over `/usr/sbin`. Manual copies have already caused
+  real incidents (a libtool wrapper shipped in place of the real ELF; a binary
+  that drifted from the committed source), and they leave no record of *what*
+  is deployed. A package pins the exact commit, installs every component
+  consistently, and is what the owner will `apt install` to test onscreen.
+- The smoke gate (above) still runs as the LAST step, against the package-
+  installed binary + config — a package that was never smoke-gated post-install
+  counts for nothing.
