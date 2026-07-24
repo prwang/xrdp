@@ -47,11 +47,32 @@ emits. All 68 xrdp unit tests pass; astyle clean.
 binary fails 1920x1080 with the identical signature (ok=6 lag=2), `encoder_errors=0`
 on both — a keytest/encoder pacing artifact at high res, independent of LC framing.
 
-**REMAINING (decisive, owner onscreen):** connect the macOS Windows App to OUR
-xrdp (`avc_mode=444`, now emitting `LC=1`/`LC=2`) and confirm it renders (no
-black). Renders ⇒ black screen fixed, branch ready for the clean-room upstream
-slice. Still blacks ⇒ residual defect is inside the per-view H.264 sub-bitstreams
-(ChromaV2 aux packing), not the LC framing.
+**OUTCOME (owner onscreen, 2026-07-24): FIXED.** The macOS Windows App renders
+our reframed `LC=1`/`LC=2` stream — no black, no functional regression, no server
+reconfiguration. mstsc/UWP unaffected. Residual: on the macOS HiDPI display the
+isoluminant **1px**-chroma stripes render softened/blended (mstsc/UWP show crisp
+grid+checkerboard = true 4:4:4 on the wire). That softening is a client-side
+artifact of the macOS Windows App's opaque HiDPI/DSP path (likely a 4:2:2
+downscale or Nyquist attenuation at non-1:1 scaling), not reachable from the
+server. Accepted as-is.
+
+**AUD IS A RED HERRING — PROVEN (owner onscreen, 2026-07-24).** To confirm the
+interleave alone is the fix (and to match the aud-less upstream PR), `-aud 1` was
+stripped from `/etc/xrdp/gfx.toml` `[avc444_ffmpeg]` encoder_args. Wire verified
+aud-less: `LC=1 [SPS,PPS,SEI,IDR]` → `LC=2 [P]`, no NAL 9; smoke identical to
+baseline (1024x768 clean; pre-existing 1920x1080 white-lag, `encoder_errors=0`).
+**Both the macOS Windows App AND UWP render clean with NO AUD** — the `LC=1`/`LC=2`
+interleave is the entire fix; AUD is confirmed unnecessary and stays out of the
+upstream PR. Port gate 1 is now GREEN.
+
+**UPSTREAM PORT — PLANNED, GATED (do not execute yet).** Plan:
+`docs/avc444_upstream_port_plan.md`. Owner decisions: FOLD the reframe into clean
+slice `239d8d0e` (serializer born as `LC=1`/`LC=2`, no separate fix commit);
+**AUD excluded** from the PR (upstream default stays `repeat-headers=1`). Port is
+gated on: (1) macOS confirms the aud-less interleave; (2) **NVENC-on-Linux test
+regression** fixed — ties to the clean branch's BLANKET-`dump_extra` slice-7
+regression (the `c74a09e7` cleanroom artifacts are POISONED for macOS; see
+"Re-fold slice 7…"); (3) **multi-monitor** done (see "Multimonitor AVC444…").
 
 ### Prior status (kept for history) — ground truth captured
 
@@ -322,6 +343,10 @@ frames defect (luma LC=1 / chroma LC=2 in separate GFX frames).
 
 ## Multimonitor AVC444 (one ffmpeg child per monitor) — TODO, pending owner scope decision (2026-07-23)
 
+**GATES the AVC444 upstream port** (owner, 2026-07-24): must be done before the
+`LC=1`/`LC=2` reframe is ported to `avc444-ffmpeg-upstream`. See
+`docs/avc444_upstream_port_plan.md` gate 3.
+
 The single-monitor MVP limit is one eligibility condition, not
 architecture: the encoder data path is per-monitor already
 (`avc444_conv[16]` / `avc444_ffmpeg_handle[16]` keyed by `mon_index`,
@@ -511,6 +536,11 @@ encoders. If revisited, the structural suspect is slice count (x264
 into the batched T4 hour alongside the NVENC 444 rerun.
 
 ## Re-fold slice 7 on the clean branch with the ADAPTIVE dump_extra — TODO (2026-07-23)
+
+**GATES the AVC444 upstream port** (owner, 2026-07-24: "NVENC Linux test
+regressed"): the NVENC-on-Linux path must be green — the blanket-`dump_extra`
+regression below poisons the cleanroom for macOS — before the `LC=1`/`LC=2`
+reframe is ported. See `docs/avc444_upstream_port_plan.md` gate 2.
 
 The clean branch `avc444-ffmpeg-upstream` @ `c74a09e7` carries the
 BLANKET dump_extra (slice 7 `04e43ee2`), which is the regression fixed on
