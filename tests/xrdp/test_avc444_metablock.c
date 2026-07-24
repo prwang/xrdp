@@ -118,14 +118,18 @@ START_TEST(test_metablock_mixed_and_edges_origin_even)
 END_TEST
 
 /*
- * RFX_AVC444_BITMAP_STREAM wire layout (out_RFX_AVC444_BITMAP_STREAM).
+ * RFX_AVC444_BITMAP_STREAM wire layout (out_RFX_AVC444_BITMAP_STREAM_view).
  *
- * The prior out-of-tree AVC444 attempt split the pair across two GFX frames
- * (luma PDU with LC=1, then frame end/start, then a chroma PDU with LC=2);
- * region-strict clients render each frame as presented and showed the
- * luma-only intermediate. The serializer must emit ONE PDU: info word with
- * LC=0 (bits 30..31) and cbAvc420EncodedBitstream1 (bits 0..29), then the
- * luma sub-stream (metablock + bitstream), then the chroma sub-stream.
+ * Ground-truth wire capture of a real Windows Server 2022 + NVIDIA AVC444v2
+ * host shows: the stream bootstraps luma-first with an LC=1 PDU (the IDR lives
+ * in the luma view) and delivers the auxiliary chroma as a separate LC=2 PDU
+ * (cbAvc420EncodedBitstream1 == 0, only bitstream2 present). xrdp emits the
+ * pair as an LC=1 luma PDU followed by an LC=2 chroma PDU INSIDE ONE GFX frame,
+ * so the wire is Windows-conforming (Apple VideoToolbox behind the macOS
+ * Windows App accepts it) yet still atomic per frame -- a region-strict client
+ * applies both before the ENDFRAME present, so it never shows a luma-only
+ * intermediate (the failure mode of the earlier two-GFX-frame split). The
+ * serializer here emits ONE view per call; these tests pin each view's layout.
  */
 
 /* parse one RFX_AVC420_BITMAP_STREAM metablock at s->p; returns its size */
@@ -141,17 +145,17 @@ parse_metablock(struct stream *s)
     return 4 + count * 10;
 }
 
-START_TEST(test_avc444_wire_single_pdu_lc0)
+START_TEST(test_avc444_wire_luma_lc1)
 {
+    /* LC=1 luma view: info word carries LC=1 and cb = metablock+bitstream len;
+     * exactly one sub-stream (the main YUV420 view) follows, nothing after. */
     struct xrdp_egfx_rect dst = {0, 0, 1024, 768};
     struct xrdp_egfx_rect rects[2];
     unsigned char main_data[733];
-    unsigned char aux_data[517];
     struct stream *s;
     unsigned int info;
-    int sub1_len;
-    int mb1_len;
-    int mb2_len;
+    int cb;
+    int mb_len;
     int total;
     int i;
 
@@ -167,34 +171,68 @@ START_TEST(test_avc444_wire_single_pdu_lc0)
     {
         main_data[i] = (unsigned char)(0xA5 + i);
     }
+    make_stream(s);
+    init_stream(s, 16384);
+    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM_view(&dst, s, rects, 2,
+                     main_data, sizeof(main_data), 1), 0);
+    total = (int)(s->end - s->data);
+    s->p = s->data;
+    in_uint32_le(s, info);
+    ck_assert_uint_eq(info >> 30, 1); /* LC == 1 (luma only) */
+    cb = (int)(info & 0x3FFFFFFF);
+    mb_len = parse_metablock(s);
+    /* cb spans the whole (and only) sub-stream: metablock + luma bitstream */
+    ck_assert_int_eq(cb, mb_len + (int)sizeof(main_data));
+    ck_assert_int_eq(g_memcmp(s->p, main_data, sizeof(main_data)), 0);
+    in_uint8s(s, sizeof(main_data));
+    /* nothing after the luma view */
+    ck_assert_int_eq(total, 4 + cb);
+    ck_assert_ptr_eq(s->p, s->end);
+    free_stream(s);
+}
+END_TEST
+
+START_TEST(test_avc444_wire_chroma_lc2)
+{
+    /* LC=2 chroma view: info word carries LC=2 and cb == 0 (bitstream1 absent);
+     * only bitstream2 (the aux chroma view) follows. */
+    struct xrdp_egfx_rect dst = {0, 0, 1024, 768};
+    struct xrdp_egfx_rect rects[2];
+    unsigned char aux_data[517];
+    struct stream *s;
+    unsigned int info;
+    int cb;
+    int mb_len;
+    int total;
+    int i;
+
+    rects[0].x1 = 33;
+    rects[0].y1 = 17;
+    rects[0].x2 = 211;
+    rects[0].y2 = 143;
+    rects[1].x1 = 400;
+    rects[1].y1 = 300;
+    rects[1].x2 = 640;
+    rects[1].y2 = 480;
     for (i = 0; i < (int)sizeof(aux_data); i++)
     {
         aux_data[i] = (unsigned char)(0x5A + i * 3);
     }
     make_stream(s);
     init_stream(s, 16384);
-    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM(&dst, s, rects, 2,
-                     main_data, sizeof(main_data),
-                     aux_data, sizeof(aux_data)), 0);
+    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM_view(&dst, s, rects, 2,
+                     aux_data, sizeof(aux_data), 2), 0);
     total = (int)(s->end - s->data);
     s->p = s->data;
     in_uint32_le(s, info);
-    /* LC (bits 30..31) == 0: BOTH views travel in this one PDU */
-    ck_assert_uint_eq(info >> 30, 0);
-    sub1_len = (int)(info & 0x3FFFFFFF);
-    /* sub-stream 1 = metablock + luma bitstream, exactly cb bytes */
-    mb1_len = parse_metablock(s);
-    ck_assert_int_eq(sub1_len, mb1_len + (int)sizeof(main_data));
-    ck_assert_int_eq(g_memcmp(s->p, main_data, sizeof(main_data)), 0);
-    in_uint8s(s, sizeof(main_data));
-    /* sub-stream 2 starts immediately after cb bytes: metablock + chroma */
-    ck_assert_int_eq((int)(s->p - s->data), 4 + sub1_len);
-    mb2_len = parse_metablock(s);
-    ck_assert_int_eq(mb2_len, mb1_len); /* same region rects both views */
+    ck_assert_uint_eq(info >> 30, 2); /* LC == 2 (chroma only) */
+    cb = (int)(info & 0x3FFFFFFF);
+    ck_assert_int_eq(cb, 0); /* bitstream1 (luma) absent */
+    mb_len = parse_metablock(s);
     ck_assert_int_eq(g_memcmp(s->p, aux_data, sizeof(aux_data)), 0);
     in_uint8s(s, sizeof(aux_data));
-    /* nothing after the chroma view: the pair is complete in one PDU */
-    ck_assert_int_eq(total, 4 + sub1_len + mb2_len + (int)sizeof(aux_data));
+    /* the aux sub-stream is the whole payload after the info word */
+    ck_assert_int_eq(total, 4 + mb_len + (int)sizeof(aux_data));
     ck_assert_ptr_eq(s->p, s->end);
     free_stream(s);
 }
@@ -202,15 +240,15 @@ END_TEST
 
 START_TEST(test_avc444_wire_single_rect)
 {
-    /* minimal case: one rect, tiny payloads, layout invariants hold */
+    /* minimal case: one rect, tiny payloads; LC=1 and LC=2 layout invariants */
     struct xrdp_egfx_rect dst = {0, 0, 640, 480};
     struct xrdp_egfx_rect rects[1];
     unsigned char main_data[5] = {1, 2, 3, 4, 5};
     unsigned char aux_data[3] = {9, 8, 7};
     struct stream *s;
     unsigned int info;
-    int sub1_len;
-    int mb1_len;
+    int cb;
+    int mb_len;
 
     rects[0].x1 = 0;
     rects[0].y1 = 0;
@@ -218,16 +256,25 @@ START_TEST(test_avc444_wire_single_rect)
     rects[0].y2 = 64;
     make_stream(s);
     init_stream(s, 8192);
-    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM(&dst, s, rects, 1,
-                     main_data, sizeof(main_data),
-                     aux_data, sizeof(aux_data)), 0);
+    /* luma LC=1 */
+    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM_view(&dst, s, rects, 1,
+                     main_data, sizeof(main_data), 1), 0);
     s->p = s->data;
     in_uint32_le(s, info);
-    ck_assert_uint_eq(info >> 30, 0);
-    sub1_len = (int)(info & 0x3FFFFFFF);
-    mb1_len = parse_metablock(s);
-    ck_assert_int_eq(sub1_len, mb1_len + (int)sizeof(main_data));
-    in_uint8s(s, sizeof(main_data));
+    ck_assert_uint_eq(info >> 30, 1);
+    cb = (int)(info & 0x3FFFFFFF);
+    mb_len = parse_metablock(s);
+    ck_assert_int_eq(cb, mb_len + (int)sizeof(main_data));
+    ck_assert_int_eq(g_memcmp(s->p, main_data, sizeof(main_data)), 0);
+    /* chroma LC=2 (reuse the same buffer) */
+    s->p = s->data;
+    s->end = s->data;
+    ck_assert_int_eq(out_RFX_AVC444_BITMAP_STREAM_view(&dst, s, rects, 1,
+                     aux_data, sizeof(aux_data), 2), 0);
+    s->p = s->data;
+    in_uint32_le(s, info);
+    ck_assert_uint_eq(info >> 30, 2);
+    ck_assert_uint_eq(info & 0x3FFFFFFF, 0);
     parse_metablock(s);
     ck_assert_int_eq(g_memcmp(s->p, aux_data, sizeof(aux_data)), 0);
     free_stream(s);
@@ -248,7 +295,8 @@ make_suite_avc444_metablock(void)
     tcase_add_test(tc, test_metablock_mixed_and_edges_origin_even);
     suite_add_tcase(s, tc);
     tc = tcase_create("avc444_wire");
-    tcase_add_test(tc, test_avc444_wire_single_pdu_lc0);
+    tcase_add_test(tc, test_avc444_wire_luma_lc1);
+    tcase_add_test(tc, test_avc444_wire_chroma_lc2);
     tcase_add_test(tc, test_avc444_wire_single_rect);
     suite_add_tcase(s, tc);
     return s;

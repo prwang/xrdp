@@ -182,7 +182,10 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
         ck_assert_int_lt(ci + 1, a->count);
         ck_assert_str_eq(a->arg[ci + 1], "18");
     }
-    ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1"), 0);
+    /* the x264-params token carries repeat-headers plus the AUD delimiter
+     * (aud=1) that matches a real Windows AVC444 stream; see
+     * xrdp_ffmpeg_avc444_default_encoder_args */
+    ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1:aud=1"), 0);
 }
 END_TEST
 
