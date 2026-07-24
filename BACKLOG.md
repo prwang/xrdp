@@ -25,9 +25,33 @@ fine; the defect is in xrdp's AVC444 emission.
 luma-first `LC=1` IDR bootstrap, one shared decode context, aux only as P-slices
 on an established reference chain, `LC=2` deferred chroma catch-up as the normal
 path, disjoint-region `LC=0`, codec `0x000F`. This is the rewrite (implements the
-`LC=1`/`LC=2` deferral PRD NG-6 omits). Next concrete step: byte-compare our own
-AVC444v2 aux construction against the Windows reference to pin the minimal defect
-before committing to the full deferral rewrite.
+`LC=1`/`LC=2` deferral PRD NG-6 omits).
+
+**IMPLEMENTED + DEPLOYED + SELF-VERIFIED (branch `dev/avc444_lc1lc2_reframe`,
+commit `aa894917`).** Reframe (owner's design): keep chroma dense, only change
+the semantic dependence — serialize the existing main+aux H.264 pair as an `LC=1`
+luma PDU then an `LC=2` chroma PDU inside ONE gfx frame, instead of one
+same-region `LC=0` PDU. Same H.264 bytes, same traffic; only the wire framing
+changes. `out_RFX_AVC444_BITMAP_STREAM_view` serializes one view; the live path
+queues the `LC=1` PDU inline (non-last enc_done) and returns the `LC=2` PDU, so
+both land between the surrounding STARTFRAME/ENDFRAME (atomic — avoids the
+luma-only-intermediate that killed the earlier two-GFX-frame split). Wire capture
+of the DEPLOYED binary (`avc_mode=444`) confirms: `seq0 LC=1
+[AUD,SPS,PPS,SEI,IDR]` (luma-first IDR bootstrap) → `LC=2 [AUD,P]` (deferred
+chroma) → `LC=1 → LC=2`, **zero `LC=0`** — byte-structurally what real Windows
+emits. All 68 xrdp unit tests pass; astyle clean.
+
+**Smoke gate note (honest):** `PR-demo/tail_flush_ab/smoke.sh` passes clean at
+1024x768 but shows a deterministic 2-keypress "white shows previous frame" lag at
+1920x1080. This is **pre-existing, NOT a regression**: the pre-reframe `LC=0`
+binary fails 1920x1080 with the identical signature (ok=6 lag=2), `encoder_errors=0`
+on both — a keytest/encoder pacing artifact at high res, independent of LC framing.
+
+**REMAINING (decisive, owner onscreen):** connect the macOS Windows App to OUR
+xrdp (`avc_mode=444`, now emitting `LC=1`/`LC=2`) and confirm it renders (no
+black). Renders ⇒ black screen fixed, branch ready for the clean-room upstream
+slice. Still blacks ⇒ residual defect is inside the per-view H.264 sub-bitstreams
+(ChromaV2 aux packing), not the LC framing.
 
 ### Prior status (kept for history) — ground truth captured
 
