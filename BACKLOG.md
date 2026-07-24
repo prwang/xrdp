@@ -365,11 +365,20 @@ the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
   probe-dims geometry (no-monitor→screen, dual 1024x768→single 1024x768,
   per-axis max on mixed sizes, 16-align round-up, NULL guard). `make check`
   green (73/73).
-- TODO — offline validation: dual-Xvfb / `xfreerdp /multimon` 2×1024×768
-  harness so the multimon path is exercised without a live GPU session
-  (see PR-demo/multimon_offline). Then dual-monitor live matrix
-  (per-monitor resize, layout change, mixed sizes) on the Windows App
-  client; extend smoke gate.
+- DONE — harness: `PR-demo/multimon_offline/` drives a real 2×1024×768
+  `xfreerdp /multimon` (client X = xf86-video-dummy, 2 outputs) and asserts
+  the server path: `monitorCount 2`, ONE ffmpeg probe at `1024x768` (NOT the
+  2048×768 virtual desktop), `Matched H264/AVC444 (ffmpeg)`, and two mapped
+  surfaces — no encoder fallback.
+- BLOCKED (env) — live run NOT executed in the dev container: its process
+  guard reaps background X servers/clients at tool-call boundaries (dummy
+  `Xorg :95` reaped, exit 144; same guard that killed `chroma_strip_anim`).
+  A persistent client X + `xfreerdp` + xrdp across the handshake can't be
+  held here. HONEST STATUS: multimon geometry is proven by the unit test
+  (deterministic, in CI); the live 2-monitor render is pending a run on an
+  unguarded host (owner rig / dev box directly) — do NOT claim it green
+  until that run passes. Then dual-monitor live matrix (per-monitor resize,
+  layout change, mixed sizes) on the Windows App client; extend smoke gate.
 - Docs: per-backend encoder-session limits (consumer GeForce ~8 NVENC
   sessions; T4/VAAPI effectively unbounded); N children = N sessions.
 - Latency note: encoder thread encodes surfaces sequentially per frame
