@@ -862,22 +862,28 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
 }
 
 /*****************************************************************************/
-/* Serialize an RFX_AVC444_BITMAP_STREAM body (MS-RDPEGFX 2.2.4.5) into s,
- * which must be a fresh stream (the info word is backfilled at s->data[0]):
- * one avc420EncodedBitstreamInfo word -- cbAvc420EncodedBitstream1 in bits
- * 0..29, LC = 0 in bits 30..31, i.e. BOTH the luma and the chroma view
- * travel in this single PDU (v1 vs v2 is selected by the codec id, not by
- * LC) -- followed by the two RFX_AVC420_BITMAP_STREAM sub-streams, each a
- * metablock over the same region rects plus its Annex-B bitstream.
- * Not static: the single-PDU/LC=0 wire layout is unit tested. */
+/* Serialize ONE view of an RFX_AVC444_BITMAP_STREAM body (MS-RDPEGFX 2.2.4.5)
+ * into s, which must be a fresh stream (the info word is backfilled at
+ * s->data[0]): one avc420EncodedBitstreamInfo word -- cbAvc420EncodedBitstream1
+ * in bits 0..29, LC in bits 30..31 -- followed by a single
+ * RFX_AVC420_BITMAP_STREAM (metablock over the region rects + Annex-B bitstream)
+ * for that view.
+ *   lc == 1 (luma):   cb = len(metablock + bitstream) of the main view; only
+ *                     bitstream1 (main YUV420) follows.
+ *   lc == 2 (chroma): cb = 0 (bitstream1 absent); only bitstream2 (aux chroma)
+ *                     follows.
+ * The AVC444 emitter pairs an LC=1 luma PDU with an LC=2 chroma PDU inside one
+ * GFX frame, so the wire matches a real Windows AVC444v2 server (luma-first
+ * bootstrap; chroma always deferred as an LC=2 P-slice) while staying atomic per
+ * frame. v1 vs v2 is selected by the codec id, not by LC. Unit tested. */
 int
-out_RFX_AVC444_BITMAP_STREAM(struct xrdp_egfx_rect *dst_rect,
-                             struct stream *s,
-                             struct xrdp_egfx_rect *d_rects, int num_rects,
-                             const unsigned char *main_data, int main_len,
-                             const unsigned char *aux_data, int aux_len)
+out_RFX_AVC444_BITMAP_STREAM_view(struct xrdp_egfx_rect *dst_rect,
+                                  struct stream *s,
+                                  struct xrdp_egfx_rect *d_rects, int num_rects,
+                                  const unsigned char *view_data, int view_len,
+                                  int lc)
 {
-    int sub1_len;
+    int cb;
     unsigned int info;
 
     out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
@@ -885,16 +891,13 @@ out_RFX_AVC444_BITMAP_STREAM(struct xrdp_egfx_rect *dst_rect,
     {
         return 1;
     }
-    out_uint8a(s, main_data, main_len);
-    sub1_len = (int)(s->p - s->data) - 4;
-    if (out_RFX_AVC420_METABLOCK(dst_rect, s, d_rects, num_rects) != 0)
-    {
-        return 1;
-    }
-    out_uint8a(s, aux_data, aux_len);
+    out_uint8a(s, view_data, view_len);
     s_mark_end(s);
-    /* cbAvc420EncodedBitstream1 (bits 0..29), LC = 0 (bits 30..31) */
-    info = (unsigned int)sub1_len & 0x3FFFFFFF;
+    /* cbAvc420EncodedBitstream1 (bits 0..29): for LC=1 the length of the luma
+     * sub-stream (metablock + bitstream) carried here; for LC=2 the luma
+     * sub-stream is absent, so cb = 0 and this payload is bitstream2. */
+    cb = (lc == 1) ? (int)(s->p - s->data) - 4 : 0;
+    info = ((unsigned int)cb & 0x3FFFFFFF) | ((unsigned int)(lc & 0x3) << 30);
     s->data[0] = (char)(info & 0xff);
     s->data[1] = (char)((info >> 8) & 0xff);
     s->data[2] = (char)((info >> 16) & 0xff);
@@ -1468,22 +1471,61 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
+    codec_id = self->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2
+               : XR_RDPGFX_CODECID_AVC444;
+    /* Emit the pair as two PDUs within THIS gfx frame: an LC=1 luma view
+     * followed by an LC=2 chroma view. On a keyframe the LC=1 PDU carries the
+     * IDR (+ SPS/PPS), bootstrapping the client's decoder luma-first exactly as
+     * a real Windows AVC444v2 server does (which Apple VideoToolbox behind the
+     * macOS Windows App accepts, unlike our former same-region LC=0 pair); on
+     * inter frames it is a luma P-slice and the LC=2 PDU the deferred chroma
+     * P-slice. Both land between the surrounding STARTFRAME/ENDFRAME, so the
+     * update stays atomic and region-strict clients never present a luma-only
+     * intermediate. Same H.264 bytes and same total traffic as the old LC=0
+     * pair -- only the wire framing changes. The LC=1 PDU is queued inline as a
+     * non-last enc_done; the LC=2 PDU is returned for the dispatch loop. */
     s->p = s->data;
-    if (out_RFX_AVC444_BITMAP_STREAM(&dst_rect, s, d_rects, num_rects_d,
-                                     pair.main_data, pair.main_len,
-                                     pair.aux_data, pair.aux_len) != 0)
+    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, num_rects_d,
+                                          pair.main_data, pair.main_len,
+                                          1) != 0)
     {
         g_free(s->data);
         g_free(d_rects);
         return NULL;
     }
     bitmap_data_length = (int)(s->end - s->data);
-    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
-                                    self->avc444_v2
-                                    ? XR_RDPGFX_CODECID_AVC444V2
-                                    : XR_RDPGFX_CODECID_AVC444,
-                                    pixel_format, &dst_rect,
-                                    s->data, bitmap_data_length);
+    {
+        struct stream *s_luma =
+            xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id, pixel_format,
+                                       &dst_rect, s->data, bitmap_data_length);
+        if (s_luma == NULL)
+        {
+            g_free(s->data);
+            g_free(d_rects);
+            return NULL;
+        }
+        if (gfx_send_done(self, enc, (int)(s_luma->end - s_luma->data), 0,
+                          s_luma->data, 0, 0, 0) != 0)
+        {
+            free_stream(s_luma);
+            g_free(s->data);
+            g_free(d_rects);
+            return NULL;
+        }
+        g_free(s_luma); /* ->data now owned by the queued enc_done */
+    }
+    s->p = s->data;
+    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, num_rects_d,
+                                          pair.aux_data, pair.aux_len,
+                                          2) != 0)
+    {
+        g_free(s->data);
+        g_free(d_rects);
+        return NULL;
+    }
+    bitmap_data_length = (int)(s->end - s->data);
+    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id, pixel_format,
+                                    &dst_rect, s->data, bitmap_data_length);
     g_free(s->data);
     g_free(d_rects);
     return rv;
@@ -2215,11 +2257,16 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 #define XRDP_AVC444_FLUSH_MS 33          /* ~one frame at the 30fps floor  */
 #define XRDP_AVC444_FLUSH_MAX_DRAIN 4    /* >= plausible pipeline depth    */
 
-/* Build the WireToSurface1 PDU for a flushed frame. Mirrors the emit tail of
- * gfx_wiretosurface1_avc444/avc420 for a single full-surface region. */
+/* Build the WireToSurface1 PDU(s) for a flushed frame. Mirrors the emit tail of
+ * gfx_wiretosurface1_avc444/avc420 for a single full-surface region. Returns the
+ * primary PDU (AVC420 for is420, else the AVC444 LC=1 luma PDU) and, for AVC444,
+ * the deferred LC=2 chroma PDU via *chroma_out (NULL for AVC420); the caller
+ * sends both inside one GFX frame. Returns NULL and leaves *chroma_out NULL on
+ * error. */
 static struct stream *
 avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
-                        struct xrdp_avc444_encoded_pair *pair)
+                        struct xrdp_avc444_encoded_pair *pair,
+                        struct stream **chroma_out)
 {
     struct xrdp_avc444_conv *conv =
         (struct xrdp_avc444_conv *)self->avc444_conv[mon];
@@ -2229,11 +2276,12 @@ avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
     struct stream ls;
     struct stream *s = &ls;
     struct stream *rv;
-    int sub1_len;
+    int codec_id;
     int bitmap_data_length;
     int surface_id = self->avc444_flush_surface_id[mon];
     int pixel_format = self->avc444_flush_pixel_format[mon];
 
+    *chroma_out = NULL;
     dst_rect.x1 = 0;
     dst_rect.y1 = 0;
     dst_rect.x2 = conv->actual_width;
@@ -2262,40 +2310,46 @@ avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
                                         XR_RDPGFX_CODECID_AVC420,
                                         pixel_format, &dst_rect,
                                         s->data, bitmap_data_length);
+        g_free(s->data);
+        return rv;
     }
-    else
+    /* AVC444: LC=1 luma PDU + LC=2 chroma PDU, same framing as the live path */
+    codec_id = self->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2
+               : XR_RDPGFX_CODECID_AVC444;
+    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, 1,
+                                          pair->main_data, pair->main_len,
+                                          1) != 0)
     {
-        out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
-        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
-        {
-            g_free(s->data);
-            return NULL;
-        }
-        out_uint8a(s, pair->main_data, pair->main_len);
-        sub1_len = (int)(s->p - s->data) - 4;
-        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
-        {
-            g_free(s->data);
-            return NULL;
-        }
-        out_uint8a(s, pair->aux_data, pair->aux_len);
-        s_mark_end(s);
-        {
-            unsigned int info = (unsigned int)sub1_len & 0x3FFFFFFF;
-            s->data[0] = (char)(info & 0xff);
-            s->data[1] = (char)((info >> 8) & 0xff);
-            s->data[2] = (char)((info >> 16) & 0xff);
-            s->data[3] = (char)((info >> 24) & 0xff);
-        }
-        bitmap_data_length = (int)(s->end - s->data);
-        rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
-                                        self->avc444_v2
-                                        ? XR_RDPGFX_CODECID_AVC444V2
-                                        : XR_RDPGFX_CODECID_AVC444,
-                                        pixel_format, &dst_rect,
-                                        s->data, bitmap_data_length);
+        g_free(s->data);
+        return NULL;
     }
+    bitmap_data_length = (int)(s->end - s->data);
+    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id, pixel_format,
+                                    &dst_rect, s->data, bitmap_data_length);
+    if (rv == NULL)
+    {
+        g_free(s->data);
+        return NULL;
+    }
+    s->p = s->data;
+    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, 1,
+                                          pair->aux_data, pair->aux_len,
+                                          2) != 0)
+    {
+        free_stream(rv);
+        g_free(s->data);
+        return NULL;
+    }
+    bitmap_data_length = (int)(s->end - s->data);
+    *chroma_out = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id,
+                                             pixel_format, &dst_rect,
+                                             s->data, bitmap_data_length);
     g_free(s->data);
+    if (*chroma_out == NULL)
+    {
+        free_stream(rv);
+        return NULL;
+    }
     return rv;
 }
 
@@ -2309,6 +2363,7 @@ avc444_flush_tail(struct xrdp_encoder *self)
     struct xrdp_avc444_encoded_pair pair;
     struct stream *s_start;
     struct stream *s_wts1;
+    struct stream *s_wts1_chroma;
     struct stream *s_end;
     XRDP_ENC_DATA *fenc;
     int fid = self->avc444_flush_frame_id;
@@ -2367,7 +2422,7 @@ avc444_flush_tail(struct xrdp_encoder *self)
 
     /* emit STARTFRAME + WireToSurface1 + ENDFRAME, reusing the last frame id so
      * frame-ack flow control (frame_id_server/frame_id_client) is unchanged */
-    s_wts1 = avc444_flush_build_wts1(self, mon, is420, &pair);
+    s_wts1 = avc444_flush_build_wts1(self, mon, is420, &pair, &s_wts1_chroma);
     if (s_wts1 == NULL)
     {
         return;
@@ -2379,21 +2434,30 @@ avc444_flush_tail(struct xrdp_encoder *self)
     {
         free_stream(s_start);
         free_stream(s_wts1);
+        free_stream(s_wts1_chroma);
         free_stream(s_end);
         g_free(fenc);
         return;
     }
     /* synthesized enc: GFX bit set, cmd/shmem NULL so the main thread frees it
-     * cleanly on the last (ENDFRAME) enc_done */
+     * cleanly on the last (ENDFRAME) enc_done. For AVC444 the LC=1 luma and
+     * LC=2 chroma PDUs both go inside this one frame (atomic), matching the
+     * live path; s_wts1_chroma is NULL for AVC420. */
     ENC_SET_BIT(fenc->flags, ENC_FLAGS_GFX_BIT);
     gfx_send_done(self, fenc, (int)(s_start->end - s_start->data), 0,
                   s_start->data, 0, 0, 0);
     gfx_send_done(self, fenc, (int)(s_wts1->end - s_wts1->data), 0,
                   s_wts1->data, 0, 0, 0);
+    if (s_wts1_chroma != NULL)
+    {
+        gfx_send_done(self, fenc, (int)(s_wts1_chroma->end - s_wts1_chroma->data),
+                      0, s_wts1_chroma->data, 0, 0, 0);
+    }
     gfx_send_done(self, fenc, (int)(s_end->end - s_end->data), 0,
                   s_end->data, 1, fid, 1);
     g_free(s_start); /* main thread owns/free the ->data via comp_pad_data */
     g_free(s_wts1);
+    g_free(s_wts1_chroma);
     g_free(s_end);
     LOG_DEVEL(LOG_LEVEL_DEBUG, "avc444_flush_tail: flushed seq %llu after "
               "%d dup(s)", (unsigned long long)self->avc444_flush_seq, i + 1);
