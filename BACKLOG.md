@@ -11,7 +11,32 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
-## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — TODO (2026-07-25)
+## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
+
+**IMPLEMENTED + DEPLOYED.** The RGB->YUV matrix moved off xrdp's encoder
+thread to xorgxrdp's capture (autovectorized C, no hand-asm, no new dep).
+- xorgxrdp `feat/avc444-yuv444-capture` (branched clean from upstream 49bf2dd,
+  NOT on the old ARGB commit): `a8r8g8b8_to_yuv444_709fr` emits three planar
+  YUV444 planes; `rdpYuvVectorize.h` gives portable `optimize O3 + tree-
+  vectorize` + x86 `target_clones(default,avx2)` (verified: 16- and 32-byte
+  vectors + ifunc AVX2 clone at -O2). Commit 76d1433.
+- xrdp `dev` (linear): `capture_format = XRDP_yuv444_709fr`; `xrdp_avc444_conv`
+  now reads Y/U/V planes and only subsamples (main) + repacks (aux) - no
+  matrix. Byte-identical output (same 709fr coeffs) - unit tests 73/73 green.
+  Commit 63c37688.
+- **Profiled (tools/avc444_convert_bench.c), 3840x2400 + 2560x1440:** xrdp
+  encoder-thread convert **167 ms -> 15.9 ms (6 -> 62 fps ceiling), 10.5x**;
+  the matrix now runs capture-side at ~2-6 ms on another thread. GPU was
+  already idle, so 4K dual-monitor should hit real-time.
+- Both dev debs built + installed (gfx.toml preserved); smoke gate: 1024x768
+  clean, colours correct on r/g/b/w end-to-end (proves the YUV444 capture ->
+  repack path is colour-correct); 1920x1080 shows only the pre-existing white-
+  frame-lag (encoder_errors=0), unchanged by this work.
+- GATE: owner onscreen dual-monitor 4K perf test (the container guard blocks a
+  live xfreerdp run here). The clean work-PR port is studied later, gated on
+  that perf PASS.
+
+## (historical) AVC444 CPU conversion bottleneck — root cause (2026-07-25)
 
 **Symptom:** dual-monitor GFX (mon0 3840×2400, mon1 2560×1440), AVC444 v2,
 renders <1 fps. **Live capture:** GPU (amdgpu 1002:1586) 0% busy, VAAPI
