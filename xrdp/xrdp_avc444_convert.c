@@ -92,23 +92,23 @@ xrdp_avc444_rgb_to_yuv709fr(int r, int g, int b, int *y, int *u, int *v)
 }
 
 /*****************************************************************************/
-/* fetch the source pixel at (sx,sy) with edge replication, decode YUV     */
+/* fetch the source sample at (sx,sy) with edge replication. The source is
+ * three planar full-chroma YUV444 planes (Y, U, V) produced capture-side by
+ * xorgxrdp (a8r8g8b8_to_yuv444_709fr), so no colour matrix runs here - xrdp
+ * only reads Y/U/V and subsamples/repacks. pstride is the plane row stride. */
 static void
-sample_yuv(const unsigned char *xrgb, int stride, int w, int h,
+sample_yuv(const unsigned char *yplane, const unsigned char *uplane,
+           const unsigned char *vplane, int pstride, int w, int h,
            int sx, int sy, int *y, int *u, int *v)
 {
-    unsigned int pixel;
-    int r;
-    int g;
-    int b;
+    size_t off;
 
     sx = clampi(sx, 0, w - 1);
     sy = clampi(sy, 0, h - 1);
-    memcpy(&pixel, xrgb + (size_t)sy * stride + (size_t)sx * 4, 4);
-    r = (int)((pixel >> 16) & 0xff);
-    g = (int)((pixel >> 8) & 0xff);
-    b = (int)(pixel & 0xff);
-    xrdp_avc444_rgb_to_yuv709fr(r, g, b, y, u, v);
+    off = (size_t)sy * pstride + (size_t)sx;
+    *y = yplane[off];
+    *u = uplane[off];
+    *v = vplane[off];
 }
 
 /*****************************************************************************/
@@ -183,7 +183,8 @@ xrdp_avc444_conv_delete(struct xrdp_avc444_conv *self)
 /*****************************************************************************/
 /* average the 2x2 chroma block whose top-left source pixel is (2cx,2cy)    */
 static void
-sample_chroma_avg(const unsigned char *xrgb, int stride, int w, int h,
+sample_chroma_avg(const unsigned char *yp, const unsigned char *up,
+                  const unsigned char *vp, int pstride, int w, int h,
                   int cx, int cy, int *u, int *v)
 {
     int y0;
@@ -196,10 +197,10 @@ sample_chroma_avg(const unsigned char *xrgb, int stride, int w, int h,
     int u3;
     int v3;
 
-    sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy, &y0, &u0, &v0);
-    sample_yuv(xrgb, stride, w, h, 2 * cx + 1, 2 * cy, &y0, &u1, &v1);
-    sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy + 1, &y0, &u2, &v2);
-    sample_yuv(xrgb, stride, w, h, 2 * cx + 1, 2 * cy + 1, &y0, &u3, &v3);
+    sample_yuv(yp, up, vp, pstride, w, h, 2 * cx, 2 * cy, &y0, &u0, &v0);
+    sample_yuv(yp, up, vp, pstride, w, h, 2 * cx + 1, 2 * cy, &y0, &u1, &v1);
+    sample_yuv(yp, up, vp, pstride, w, h, 2 * cx, 2 * cy + 1, &y0, &u2, &v2);
+    sample_yuv(yp, up, vp, pstride, w, h, 2 * cx + 1, 2 * cy + 1, &y0, &u3, &v3);
     *u = (u0 + u1 + u2 + u3 + 2) / 4;
     *v = (v0 + v1 + v2 + v3 + 2) / 4;
 }
@@ -210,7 +211,8 @@ sample_chroma_avg(const unsigned char *xrgb, int stride, int w, int h,
 /* block average (no U/V swap). */
 static void
 fill_main(struct xrdp_avc444_conv *self,
-          const unsigned char *xrgb, int stride, int w, int h)
+          const unsigned char *sy_p, const unsigned char *su_p,
+          const unsigned char *sv_p, int pstride, int w, int h)
 {
     const int cw = self->coded_width;
     const int ch = self->coded_height;
@@ -228,7 +230,7 @@ fill_main(struct xrdp_avc444_conv *self,
     {
         for (x = 0; x < cw; x++)
         {
-            sample_yuv(xrgb, stride, w, h, x, y, &yy, &uu, &vv);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h, x, y, &yy, &uu, &vv);
             yp[y * cw + x] = (unsigned char)yy;
         }
     }
@@ -238,11 +240,13 @@ fill_main(struct xrdp_avc444_conv *self,
         {
             if (self->chroma_v2 || self->main_only)
             {
-                sample_chroma_avg(xrgb, stride, w, h, cx, cy, &uu, &vv);
+                sample_chroma_avg(sy_p, su_p, sv_p, pstride, w, h,
+                                  cx, cy, &uu, &vv);
             }
             else
             {
-                sample_yuv(xrgb, stride, w, h, 2 * cx, 2 * cy, &yy, &uu, &vv);
+                sample_yuv(sy_p, su_p, sv_p, pstride, w, h,
+                           2 * cx, 2 * cy, &yy, &uu, &vv);
             }
             uvp[cy * cw + 2 * cx] = (unsigned char)uu;
             uvp[cy * cw + 2 * cx + 1] = (unsigned char)vv;
@@ -255,7 +259,8 @@ fill_main(struct xrdp_avc444_conv *self,
 /* B6/B7 odd-col/even-row chroma into the aux chroma plane                 */
 static void
 fill_aux(struct xrdp_avc444_conv *self,
-         const unsigned char *xrgb, int stride, int w, int h)
+         const unsigned char *sy_p, const unsigned char *su_p,
+         const unsigned char *sv_p, int pstride, int w, int h)
 {
     const int cw = self->coded_width;
     const int ch = self->coded_height;
@@ -303,7 +308,7 @@ fill_aux(struct xrdp_avc444_conv *self,
         }
         for (x = 0; x < cw; x++)
         {
-            sample_yuv(xrgb, stride, w, h, x, pos, &yy, &uu, &vv);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h, x, pos, &yy, &uu, &vv);
             yp[y * cw + x] = (unsigned char)(use_u ? uu : vv);
         }
     }
@@ -312,7 +317,8 @@ fill_aux(struct xrdp_avc444_conv *self,
     {
         for (cx = 0; cx < cw / 2; cx++)
         {
-            sample_yuv(xrgb, stride, w, h, 2 * cx + 1, 2 * cy, &yy, &uu, &vv);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h,
+                       2 * cx + 1, 2 * cy, &yy, &uu, &vv);
             uvp[cy * cw + 2 * cx] = (unsigned char)uu;
             uvp[cy * cw + 2 * cx + 1] = (unsigned char)vv;
         }
@@ -326,7 +332,8 @@ fill_aux(struct xrdp_avc444_conv *self,
 /* exact inverse of FreeRDP general_ChromaV2ToYUV444 (MS-RDPEGFX 3.3.8.3.3). */
 static void
 fill_aux_v2(struct xrdp_avc444_conv *self,
-            const unsigned char *xrgb, int stride, int w, int h)
+            const unsigned char *sy_p, const unsigned char *su_p,
+            const unsigned char *sv_p, int pstride, int w, int h)
 {
     const int cw = self->coded_width;
     const int ch = self->coded_height;
@@ -348,7 +355,8 @@ fill_aux_v2(struct xrdp_avc444_conv *self,
     {
         for (cx = 0; cx < cw / 2; cx++)
         {
-            sample_yuv(xrgb, stride, w, h, 2 * cx + 1, y, &yy, &ua, &va);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h,
+                       2 * cx + 1, y, &yy, &ua, &va);
             yp[y * cw + cx] = (unsigned char)ua;
             yp[y * cw + cw / 2 + cx] = (unsigned char)va;
         }
@@ -361,8 +369,10 @@ fill_aux_v2(struct xrdp_avc444_conv *self,
         row = 2 * cy + 1;
         for (x = 0; x < cw / 4; x++)
         {
-            sample_yuv(xrgb, stride, w, h, 4 * x, row, &yy, &ua, &va);
-            sample_yuv(xrgb, stride, w, h, 4 * x + 2, row, &yy, &ub, &vb);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h,
+                       4 * x, row, &yy, &ua, &va);
+            sample_yuv(sy_p, su_p, sv_p, pstride, w, h,
+                       4 * x + 2, row, &yy, &ub, &vb);
             uvp[cy * cw + 2 * x] = (unsigned char)ua;
             uvp[cy * cw + 2 * x + 1] = (unsigned char)ub;
             uvp[cy * cw + 2 * (cw / 4 + x)] = (unsigned char)va;
@@ -374,10 +384,15 @@ fill_aux_v2(struct xrdp_avc444_conv *self,
 /*****************************************************************************/
 int
 xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
-                        const unsigned char *xrgb, int stride,
+                        const unsigned char *yuv, int pstride,
                         int width, int height)
 {
-    if (self == NULL || xrgb == NULL)
+    const unsigned char *yp;
+    const unsigned char *up;
+    const unsigned char *vp;
+    size_t area;
+
+    if (self == NULL || yuv == NULL)
     {
         return 1;
     }
@@ -385,22 +400,30 @@ xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
     {
         return 1;
     }
-    if (stride < width * 4)
+    /* yuv is three contiguous planar planes (Y, U, V), each pstride bytes/row
+     * at the capture's coded dimensions. The coded HEIGHT matches ours (both
+     * round up to 16); the plane size uses pstride (the capture's coded width,
+     * which may be 16-aligned while our output coded width is 32-aligned). */
+    if (pstride < width)
     {
         return 1;
     }
-    fill_main(self, xrgb, stride, width, height);
+    area = (size_t)pstride * self->coded_height;
+    yp = yuv;
+    up = yuv + area;
+    vp = yuv + 2 * area;
+    fill_main(self, yp, up, vp, pstride, width, height);
     if (self->main_only)
     {
         /* plain AVC420: no auxiliary chroma view */
     }
     else if (self->chroma_v2)
     {
-        fill_aux_v2(self, xrgb, stride, width, height);
+        fill_aux_v2(self, yp, up, vp, pstride, width, height);
     }
     else
     {
-        fill_aux(self, xrgb, stride, width, height);
+        fill_aux(self, yp, up, vp, pstride, width, height);
     }
     return 0;
 }

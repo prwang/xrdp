@@ -189,6 +189,68 @@ build_source(unsigned char *xrgb, int stride, int w, int h)
     }
 }
 
+/* Build the planar YUV444 source that xorgxrdp now delivers (Y, U, V planes,
+ * each pstride*ch16 bytes) from the XRGB test vector, using the SAME 709fr
+ * coefficients. conv_update reads these planes instead of doing the matrix, so
+ * its output must stay byte-identical to the old XRGB path. Returns pstride. */
+static int
+build_yuv444(const unsigned char *xrgb, int stride, int w, int h,
+             unsigned char *yuv)
+{
+    int pstride = (w + 15) & ~15;
+    int ch16 = (h + 15) & ~15;
+    int area = pstride * ch16;
+    int x;
+    int y;
+
+    memset(yuv, 0, (size_t)area * 3);
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            unsigned int px;
+            int r;
+            int g;
+            int b;
+            int yy;
+            int uu;
+            int vv;
+            memcpy(&px, xrgb + (size_t)y * stride + (size_t)x * 4, 4);
+            r = (int)((px >> 16) & 0xff);
+            g = (int)((px >> 8) & 0xff);
+            b = (int)(px & 0xff);
+            xrdp_avc444_rgb_to_yuv709fr(r, g, b, &yy, &uu, &vv);
+            yuv[(size_t)y * pstride + x] = (unsigned char)yy;
+            yuv[area + (size_t)y * pstride + x] = (unsigned char)uu;
+            yuv[2 * area + (size_t)y * pstride + x] = (unsigned char)vv;
+        }
+    }
+    return pstride;
+}
+
+/* Test shim: drive the converter from an XRGB vector exactly as the
+ * pre-YUV444 tests did, by first building the planar YUV444 source xorgxrdp
+ * now delivers. Keeps every existing assertion valid and byte-for-byte. */
+static int
+conv_update_rgb(struct xrdp_avc444_conv *c, const unsigned char *xrgb,
+                int stride, int w, int h)
+{
+    int cw16 = (w + 15) & ~15;
+    int ch16 = (h + 15) & ~15;
+    unsigned char *yuv = (unsigned char *)malloc((size_t)cw16 * ch16 * 3);
+    int ps;
+    int rc;
+
+    if (yuv == NULL)
+    {
+        return -1;
+    }
+    ps = build_yuv444(xrgb, stride, w, h, yuv);
+    rc = xrdp_avc444_conv_update(c, yuv, ps, w, h);
+    free(yuv);
+    return rc;
+}
+
 /* prove the split is a lossless permutation of the YUV444 chroma */
 START_TEST(test_avc444_roundtrip_exact)
 {
@@ -208,7 +270,7 @@ START_TEST(test_avc444_roundtrip_exact)
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->coded_width, 32);
     ck_assert_int_eq(c->coded_height, 32);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
 
     memset(Ud, 0xAA, sizeof(Ud));
     memset(Vd, 0x55, sizeof(Vd));
@@ -288,7 +350,7 @@ START_TEST(test_avc444_v2_packing)
     c->chroma_v2 = 1;
     ck_assert_int_eq(c->coded_width, 16);
     ck_assert_int_eq(c->coded_height, 16);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
     cw = c->coded_width;
     ch = c->coded_height;
     yp = c->aux_nv12;
@@ -407,7 +469,7 @@ START_TEST(test_avc444_main_only_420)
     c->main_only = 1;
     /* poison the aux view to prove main_only leaves it untouched */
     memset(c->aux_nv12, 0xAB, c->nv12_size);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
     cw = c->coded_width;
     ch = c->coded_height;
 
@@ -495,7 +557,7 @@ START_TEST(test_avc420_isoluminant_chroma_loss)
     c = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(c, NULL);
     c->main_only = 1;
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
     {
         unsigned char u = main_u(c, 0, 0);
         unsigned char v = main_v(c, 0, 0);
@@ -515,7 +577,7 @@ START_TEST(test_avc420_isoluminant_chroma_loss)
     c = xrdp_avc444_conv_create(w, h, 16);
     ck_assert_ptr_ne(c, NULL);
     c->chroma_v2 = 1;
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
     aux_min = 255;
     aux_max = 0;
     for (i = 0; i < c->nv12_size; i++)
@@ -560,8 +622,8 @@ START_TEST(test_avc444_dims_and_padding)
     }
     c = xrdp_avc444_conv_create(8, 4, 16);
     ck_assert_ptr_ne(c, NULL);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, 8 * 4, 7, 4), 1);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, 8 * 4, 8, 4), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, 8 * 4, 7, 4), 1);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, 8 * 4, 8, 4), 0);
     /* padding columns/rows are initialized (edge replicated), never left
      * uninitialized: a solid-black source yields Y=0 everywhere in Y plane */
     for (i = 0; i < c->coded_width * c->coded_height; i++)
@@ -654,7 +716,7 @@ START_TEST(test_avc444_odd_padding_edge_replicated)
     ck_assert_ptr_ne(c, NULL);
     ck_assert_int_eq(c->coded_width, 1296);
     ck_assert_int_eq(c->coded_height, 736);
-    ck_assert_int_eq(xrdp_avc444_conv_update(c, xrgb, stride, w, h), 0);
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
 
     /* padding columns of each real row replicate the last real column */
     for (y = 0; y < h; y++)

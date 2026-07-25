@@ -18,6 +18,23 @@
  * libx264 to exercise the full converter -> ffmpeg -> NUT -> H.264 path.
  */
 
+/* Fill a planar YUV444 buffer (Y, U, V planes, stride w, w/h 16-aligned) with
+ * deterministic per-iteration-varying content - the format xorgxrdp now
+ * delivers. Only the frame-to-frame variation matters to these pipeline tests. */
+static void
+fill_yuv444_seed(unsigned char *yuv, int w, int h, int i)
+{
+    int area = w * h;
+    int j;
+
+    for (j = 0; j < area; j++)
+    {
+        yuv[j]            = (unsigned char)((j * 7 + i * 20) & 0xff);
+        yuv[area + j]     = (unsigned char)((j * 13 + i) & 0xff);
+        yuv[2 * area + j] = (unsigned char)((j * 5) & 0xff);
+    }
+}
+
 static int
 have_ffmpeg(struct xrdp_ffmpeg_avc444_config *cfg)
 {
@@ -138,9 +155,11 @@ START_TEST(test_ffmpeg_single_sps_per_keyframe)
     {
         return;
     }
-    xrgb = (unsigned char *)malloc(w * 4 * h);
+    /* planar YUV444 source (Y, U, V), the format xorgxrdp now delivers; w,h
+     * are 16-aligned so the plane stride equals w */
+    xrgb = (unsigned char *)malloc(3 * w * h);
     ck_assert_ptr_ne(xrgb, NULL);
-    memset(xrgb, 0x55, w * 4 * h);
+    memset(xrgb, 0x80, 3 * w * h);
     for (branch = 0; branch < 2; branch++)
     {
         if (!have_ffmpeg(&cfg))
@@ -162,7 +181,7 @@ START_TEST(test_ffmpeg_single_sps_per_keyframe)
         ck_assert_ptr_ne(conv, NULL);
         enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
         ck_assert_ptr_ne(enc, NULL);
-        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w * 4, w, h), 0);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
         rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             0ULL, &pair);
@@ -216,16 +235,8 @@ START_TEST(test_ffmpeg_encode_pair)
      *   times these calls out and fails the suite. */
     for (i = 0; i < nsub; i++)
     {
-        int j;
-        for (j = 0; j < w * h; j++)
-        {
-            unsigned int r = (j * 7 + i * 20) & 0xff;
-            unsigned int g = (j * 13 + i) & 0xff;
-            unsigned int b = (j * 5) & 0xff;
-            unsigned int px = (r << 16) | (g << 8) | b;
-            memcpy(xrgb + j * 4, &px, 4);
-        }
-        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, stride, w, h), 0);
+        fill_yuv444_seed(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
         rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             (unsigned long long)i, &pair);
@@ -290,16 +301,8 @@ START_TEST(test_ffmpeg_encode_single)
 
     for (i = 0; i < nsub; i++)
     {
-        int j;
-        for (j = 0; j < w * h; j++)
-        {
-            unsigned int r = (j * 7 + i * 20) & 0xff;
-            unsigned int g = (j * 13 + i) & 0xff;
-            unsigned int b = (j * 5) & 0xff;
-            unsigned int px = (r << 16) | (g << 8) | b;
-            memcpy(xrgb + j * 4, &px, 4);
-        }
-        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, stride, w, h), 0);
+        fill_yuv444_seed(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
         rc = xrdp_ffmpeg_avc444_encode_single(enc, conv->main_nv12,
                                               conv->nv12_size,
                                               (unsigned long long)i, &pic);
@@ -368,16 +371,8 @@ run_one_generation(struct xrdp_ffmpeg_avc444_config *cfg, int w, int h)
 
     for (i = 0; i < nsub; i++)
     {
-        int j;
-        for (j = 0; j < w * h; j++)
-        {
-            unsigned int r = (unsigned int)((j * 7 + i * 20) & 0xff);
-            unsigned int g = (unsigned int)((j * 13 + i) & 0xff);
-            unsigned int b = (unsigned int)((j * 5) & 0xff);
-            unsigned int px = (r << 16) | (g << 8) | b;
-            memcpy(xrgb + j * 4, &px, 4);
-        }
-        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, stride, w, h), 0);
+        fill_yuv444_seed(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
         rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
                                             conv->aux_nv12, conv->nv12_size,
                                             (unsigned long long)i, &pair);
