@@ -26,8 +26,12 @@ mkdir -p "$OUT"
 chmod 1777 "$OUT"   # colorkey.sh (running as tester) appends keylog.txt here
 
 # client-side X server for xfreerdp
-if ! DISPLAY=$CLI xdotool getdisplaygeometry >/dev/null 2>&1; then
-    setsid Xvfb "$CLI" -screen 0 1920x1080x24 </dev/null >/dev/null 2>&1 &
+# Client framebuffer size; must be >= the session size. Overridable so a
+# large non-16-aligned session (e.g. a 4K window resize) can be reproduced.
+CLIENT_SIZE=${KEYTEST_CLIENT_SIZE:-1920x1080}
+if ! DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null | grep -q "^${CLIENT_SIZE%x*} ${CLIENT_SIZE#*x}$"; then
+    pkill -9 -f "Xvfb $CLI" 2>/dev/null; sleep 1
+    setsid Xvfb "$CLI" -screen 0 "${CLIENT_SIZE}x24" </dev/null >/dev/null 2>&1 &
     sleep 2
 fi
 
@@ -80,7 +84,7 @@ sess xdotool windowactivate --sync "$qw" >/dev/null 2>&1
 sess xdotool key --window "$qw" F11 >/dev/null 2>&1
 sleep 3
 
-shot(){ ffmpeg -hide_banner -loglevel error -f x11grab -video_size 1920x1080 \
+shot(){ ffmpeg -hide_banner -loglevel error -f x11grab -video_size "$CLIENT_SIZE" \
         -i "$CLI.0" -frames:v 1 -y "$1" 2>/dev/null; }
 # sample the centre of the SESSION-sized window (top-left of the client
 # display), not of the full client framebuffer
