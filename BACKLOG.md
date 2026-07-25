@@ -11,6 +11,42 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 resize-to-black regression (non-16-aligned surface) — FIX DONE (2026-07-25)
+
+**Symptom (owner, single 4K monitor):** resize from fullscreen to a smaller
+window -> ffmpeg dies, client (UWP mstsc) shows black.
+
+**Root cause (regression from the YUV444 offload above):** cross-component
+stride contract mismatch. xrdp reads the capture's YUV444 planes with a
+16-aligned stride `pstride=(w+15)&~15`, plane size `pstride*align16(h)`, and its
+GFX encoder guard (`xrdp_encoder.c:1360`) requires `3*align16(w)*align16(h) <=
+data_bytes`. But xorgxrdp allocated/strided the buffer at the UNALIGNED surface
+size (`rdpClientCon.c:914` `w*h*3`; `rdpCapture.c` `dst_stride=id->width`,
+plane offset `id->width*id->height`). A 16-aligned surface (3840x2400) gives
+provided==required and works; a non-16-aligned resize (3814x2233) under-runs
+the guard, so xrdp drops every frame silently (return NULL) -> ffmpeg never
+respawns -> permanent black. Live log confirms: xorgxrdp shmem `bytes 25549986`
+(=3814*2233*3) vs guard need `25697280` (=3*3824*2240).
+
+**Repro (offline, deterministic):** `tools/avc444_resize_repro.c` models both
+allocation formulas vs the guard requirement and drives the real
+`xrdp_avc444_conv_update` on a contract-sized buffer. Pre-fix: 4 non-aligned
+sizes report BLACK (provided<required), exit 1. `-DXORGXRDP_ALIGNED`: all OK.
+
+**Fix:** align the capture allocation and plane stride/offset to
+XRDP_H264_ALIGN (xorgxrdp commit aa08c63). Matches xrdp's read contract and the
+size already reported by `rdpSendMemoryAllocationComplete`. Only the visible
+w x h is written; xrdp edge-clamps and never samples the pad.
+
+**Regression test (CI backstop):** `test_avc444_resize_nonaligned_stride_
+contract` (tests/xrdp) drives conv_update at non-16-aligned dims on an
+EXACTLY contract-sized buffer with a sentinel in the pad, asserting the Y/U/V
+planes are read at the correct aligned stride/offset (a skew or short buffer
+reads the sentinel or wrong plane). 74/74 green.
+
+GATE: live xvfb/freerdp exercise of the resize path with the fixed debs, then
+owner onscreen retest.
+
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
 **IMPLEMENTED + DEPLOYED.** The RGB->YUV matrix moved off xrdp's encoder
