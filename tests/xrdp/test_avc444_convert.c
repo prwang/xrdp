@@ -769,6 +769,71 @@ START_TEST(test_avc444_width_align)
 }
 END_TEST
 
+/* Regression (resize-to-black): a non-16-aligned surface must be read from a
+ * buffer strided at the 16-aligned coded dimensions. The capture side
+ * (xorgxrdp) delivers exactly 3 * align16(w) * align16(h) bytes, three planes
+ * each align16(w) bytes/row and align16(h) rows; xrdp's GFX guard requires the
+ * same. Previously xorgxrdp allocated/strided at the UNALIGNED width, which is
+ * smaller for any non-16-aligned window: the guard tripped and every frame was
+ * dropped (black screen). This drives conv_update on an EXACTLY contract-sized
+ * buffer, with a sentinel filling the alignment pad, and checks the Y/U/V
+ * planes are read at the correct aligned stride and plane offset (a skew or a
+ * short buffer would read the sentinel or the wrong plane). */
+START_TEST(test_avc444_resize_nonaligned_stride_contract)
+{
+    /* non-16-aligned in both axes (align16 -> 48 x 32); use chroma_align 32
+     * (mstsc) so the output coded width (64) differs from the read pstride */
+    const int w = 47;
+    const int h = 30;
+    const int pstride = (w + 15) & ~15;     /* 48: xorgxrdp/xrdp read stride  */
+    const int ch16 = (h + 15) & ~15;        /* 32                             */
+    const size_t area = (size_t)pstride * ch16;
+    const unsigned char SENT = 0xAB;        /* fills the alignment pad        */
+    const unsigned char YV = 100;
+    const unsigned char UV = 110;
+    const unsigned char VV = 120;
+    unsigned char *yuv;
+    struct xrdp_avc444_conv *c;
+    int x;
+    int y;
+    int cy_off;
+
+    /* buffer is EXACTLY the contract size the fixed xorgxrdp allocates */
+    yuv = (unsigned char *)malloc(area * 3);
+    ck_assert_ptr_ne(yuv, NULL);
+    memset(yuv, SENT, area * 3);             /* pad = sentinel everywhere     */
+    for (y = 0; y < h; y++)                   /* visible w x h = flat colour   */
+    {
+        for (x = 0; x < w; x++)
+        {
+            yuv[(size_t)y * pstride + x] = YV;
+            yuv[area + (size_t)y * pstride + x] = UV;
+            yuv[2 * area + (size_t)y * pstride + x] = VV;
+        }
+    }
+
+    c = xrdp_avc444_conv_create(w, h, 32);
+    ck_assert_ptr_ne(c, NULL);
+    ck_assert_int_eq(c->coded_width, 64);     /* round_up_32(47) != pstride    */
+    ck_assert_int_eq(c->coded_height, ch16);
+    c->chroma_v2 = 1;
+
+    /* must succeed reading within the exactly-sized buffer */
+    ck_assert_int_eq(xrdp_avc444_conv_update(c, yuv, pstride, w, h), 0);
+
+    /* interior main-view luma == YV (Y plane read at the right stride) */
+    ck_assert_uint_eq(c->main_nv12[(size_t)5 * c->coded_width + 5], YV);
+    /* interior main-view chroma == UV/VV, NOT the sentinel: proves the U and V
+     * planes were located at area and 2*area (a wrong offset reads SENT) */
+    cy_off = c->coded_width * c->coded_height;
+    ck_assert_uint_eq(c->main_nv12[cy_off + 2 * c->coded_width + 2 * 2], UV);
+    ck_assert_uint_eq(c->main_nv12[cy_off + 2 * c->coded_width + 2 * 2 + 1], VV);
+
+    xrdp_avc444_conv_delete(c);
+    free(yuv);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_convert(void)
@@ -788,6 +853,7 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);
     tcase_add_test(tc, test_avc444_width_align);
+    tcase_add_test(tc, test_avc444_resize_nonaligned_stride_contract);
     suite_add_tcase(s, tc);
     return s;
 }
