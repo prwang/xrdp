@@ -85,18 +85,22 @@ void
 xrdp_avc444_conv_delete(struct xrdp_avc444_conv *self);
 
 /**
- * Reconstruct both complete views from the full XRGB surface.
+ * Reconstruct both complete views from a full-chroma YUV444 source.
  *
- * xrgb    - host-order a8r8g8b8 pixels; each pixel read as a native 32-bit
- *           value, R=(p>>16)&0xff, G=(p>>8)&0xff, B=p&0xff (alpha ignored).
- * stride  - bytes per source row (>= actual_width * 4).
+ * yuv     - three contiguous planar 8-bit planes (Y, then U, then V), produced
+ *           capture-side by xorgxrdp (a8r8g8b8_to_yuv444_709fr, BT.709 full
+ *           range). No colour matrix runs here: xrdp only subsamples (main)
+ *           and repacks (aux). Each plane is pstride bytes/row; the U and V
+ *           planes start at pstride * coded_height and 2 * that.
+ * pstride  - bytes (== pixels) per source plane row (>= actual_width); the
+ *            capture's coded width (16-aligned).
  * width/height - must equal the converter's actual dimensions.
  *
  * Returns 0 on success, non-zero on argument mismatch.
  */
 int
 xrdp_avc444_conv_update(struct xrdp_avc444_conv *self,
-                        const unsigned char *xrgb, int stride,
+                        const unsigned char *yuv, int pstride,
                         int width, int height);
 
 #endif /* _XRDP_AVC444_CONVERT_H */

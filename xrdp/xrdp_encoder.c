@@ -235,7 +235,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             "xrdp_encoder_create: starting ffmpeg AVC444 gfx session");
         self->in_codec_mode = 1;
         client_info->capture_code = CC_GFX_AVC444;
-        client_info->capture_format = XRDP_a8r8g8b8;
+        client_info->capture_format = XRDP_yuv444_709fr;
         self->gfx = 1;
         self->avc444_ffmpeg = 1;
         self->avc444_v2 = mm->avc444_v2;
@@ -260,7 +260,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             "xrdp_encoder_create: starting ffmpeg AVC420 gfx session");
         self->in_codec_mode = 1;
         client_info->capture_code = CC_GFX_AVC444;
-        client_info->capture_format = XRDP_a8r8g8b8;
+        client_info->capture_format = XRDP_yuv444_709fr;
         self->gfx = 1;
         self->avc420_ffmpeg = 1;
         self->avc444_dump_extra = mm->avc444_dump_extra;
@@ -1132,7 +1132,8 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     dst_rect.y2 = height;
 
     if (twidth < 1 || theight < 1 ||
-            twidth * theight * 4 > enc_gfx_cmd->data_bytes)
+            3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
+            enc_gfx_cmd->data_bytes)
     {
         g_free(d_rects);
         return NULL;
@@ -1185,7 +1186,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     }
 
     if (xrdp_avc444_conv_update(conv, (const unsigned char *)enc_gfx_cmd->data,
-                                twidth * 4, twidth, theight) != 0)
+                                (twidth + 15) & ~15, twidth, theight) != 0)
     {
         g_free(d_rects);
         return NULL;
@@ -1357,7 +1358,8 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     dst_rect.y2 = height;
 
     if (twidth < 1 || theight < 1 ||
-            twidth * theight * 4 > enc_gfx_cmd->data_bytes)
+            3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
+            enc_gfx_cmd->data_bytes)
     {
         g_free(d_rects);
         return NULL;
@@ -1411,7 +1413,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     }
 
     if (xrdp_avc444_conv_update(conv, (const unsigned char *)enc_gfx_cmd->data,
-                                twidth * 4, twidth, theight) != 0)
+                                (twidth + 15) & ~15, twidth, theight) != 0)
     {
         g_free(d_rects);
         return NULL;
@@ -1866,10 +1868,10 @@ gfx_wiretosurface2(struct xrdp_encoder *self,
     if (self->codec_handle_prfx_gfx[mon_index] == NULL)
     {
         self->codec_handle_prfx_gfx[mon_index] = rfxcodec_encode_create(
-                width,
-                height,
-                RFX_FORMAT_YUV,
-                RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
+                    width,
+                    height,
+                    RFX_FORMAT_YUV,
+                    RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
         if (self->codec_handle_prfx_gfx[mon_index] == NULL)
         {
             g_free(tiles);
@@ -2342,8 +2344,8 @@ avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
     }
     bitmap_data_length = (int)(s->end - s->data);
     *chroma_out = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id,
-                                             pixel_format, &dst_rect,
-                                             s->data, bitmap_data_length);
+                  pixel_format, &dst_rect,
+                  s->data, bitmap_data_length);
     g_free(s->data);
     if (*chroma_out == NULL)
     {
