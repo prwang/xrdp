@@ -32,13 +32,38 @@ conversion alone** (before capture/pipe/encode/ACK). Matches the observed
 <1 fps. Not a multimon regression — the same convert runs single-monitor; 4K
 just makes its cost dominate.
 
-**Fix directions (GPU idle → headroom):** (1) vectorize the convert
-(SSE2/AVX2, read pixels as u32, drop per-pixel memcpy) — 4–8× on the hot
-loop; (2) parallelize across the idle cores (tile rows; run the two monitors
-concurrently, not sequentially); (3) single-pass main+aux (sample each RGB
-pixel once, write both views); (4) longer term, do RGB→NV12 + 4:4:4 packing
-on the GPU. Add a perf-regression guard around the bench. Full writeup:
-`vm/perf_capture/ROOT_CAUSE_4k_dualmon_slow.md`.
+**Status quo / scope (why this path alone pays it):** the NATIVE H.264 GFX
+path already sets `capture_format = XRDP_nv12_709fr` — xorgxrdp (the capture
+side) delivers NV12, so xrdp does NO per-pixel convert there. The ffmpeg
+444/420 path is the only one that sets `capture_format = XRDP_a8r8g8b8`
+(full-chroma RGB) and converts in-process, specifically to build the aux
+view. Measured cost split @3840×2400:
+  - AVC420 main-only (RGB→YUV matrix + luma + 2×2 chroma avg) = **87.9 ms**
+  - AVC444 full (main + aux repack)                          = **119.8 ms**
+  - ⇒ the RDP-specific AVC444 aux chroma repack alone        ≈ **~32 ms**
+So ~88 ms of the ~120 ms is the GENERIC colour conversion that libraries
+already do fast; only ~32 ms is the irreducible RDP-specific shuffle.
+
+**ffmpeg already does the generic part fast** (its own maintained SIMD, and
+it is ALREADY our subprocess — no new dep): `swscale` BGRA→NV12 @3840×2400 =
+**~3.6 ms wall (threaded) / ~28 ms single-thread** vs xrdp's 87.9 ms.
+
+**Fix directions — delegate the matrix, keep only the shuffle (NO
+hand-vectorized math to maintain, NO new deps):**
+1. **AVC420-ffmpeg:** feed ffmpeg raw RGB (`-pixel_format bgra`,
+   `-vf format=nv12,hwupload` or `scale_vaapi` on the idle GPU) and dumb-copy
+   the XRGB surface; delete `fill_main`. ~88 ms → ~4 ms. Isolated, low risk.
+2. **AVC444-ffmpeg:** move the RGB→YUV matrix off xrdp too. Preferred:
+   capture a full-chroma YUV from xorgxrdp (mirror the native NV12 capture,
+   e.g. a new `XRDP_ayuv`/`yuv444` `capture_format`) so xrdp receives YUV and
+   only does the cheap integer 4:2:0-average (main) + aux repack — no matrix,
+   no SIMD to maintain. Alt: two ffmpeg inputs (ffmpeg emits main from RGB;
+   xrdp packs aux only). The aux repack stays simple C (it is the one thing
+   no library provides), and can be threaded across the idle cores if needed.
+3. GPU is 0% busy → any remaining convert (or the whole RGB→NV12) can run on
+   VAAPI (`scale_vaapi`), which is already open.
+Add a perf-regression guard around `tools/avc444_convert_bench.c`. Full
+writeup: `vm/perf_capture/ROOT_CAUSE_4k_dualmon_slow.md`.
 
 
 ## macOS Windows App AVC444 black screen — H2 CONFIRMED (our stream is malformed), FIX = Windows-like emission (2026-07-24)
