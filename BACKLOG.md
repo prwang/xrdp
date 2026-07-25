@@ -11,6 +11,36 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — TODO (2026-07-25)
+
+**Symptom:** dual-monitor GFX (mon0 3840×2400, mon1 2560×1440), AVC444 v2,
+renders <1 fps. **Live capture:** GPU (amdgpu 1002:1586) 0% busy, VAAPI
+starved; ONE xrdp encoder thread pinned on a single core (32 cores idle);
+both ffmpeg children ~1–3%. So the cap is single-threaded CPU, not the GPU
+encode.
+
+**Root cause:** `xrdp_avc444_conv_update` (`fill_main` + `fill_aux` in
+`xrdp/xrdp_avc444_convert.c`) is a scalar per-pixel RGB→YUV709 convert — a
+function call + a 4-byte `memcpy` per pixel — walking the full surface TWICE
+(main, then aux, each re-reading all RGB), for every surface every frame,
+sequentially across monitors on one thread.
+
+**Reproducible offline (no X/GPU/client):** `tools/avc444_convert_bench.c`
+times the convert on a synthetic frame. Measured here: 3840×2400 = 119.8 ms,
+2560×1440 = 47.5 ms, **dual sequential = 167 ms/frame → 6 fps ceiling from
+conversion alone** (before capture/pipe/encode/ACK). Matches the observed
+<1 fps. Not a multimon regression — the same convert runs single-monitor; 4K
+just makes its cost dominate.
+
+**Fix directions (GPU idle → headroom):** (1) vectorize the convert
+(SSE2/AVX2, read pixels as u32, drop per-pixel memcpy) — 4–8× on the hot
+loop; (2) parallelize across the idle cores (tile rows; run the two monitors
+concurrently, not sequentially); (3) single-pass main+aux (sample each RGB
+pixel once, write both views); (4) longer term, do RGB→NV12 + 4:4:4 packing
+on the GPU. Add a perf-regression guard around the bench. Full writeup:
+`vm/perf_capture/ROOT_CAUSE_4k_dualmon_slow.md`.
+
+
 ## macOS Windows App AVC444 black screen — H2 CONFIRMED (our stream is malformed), FIX = Windows-like emission (2026-07-24)
 
 **DECISIVE RESULT (owner, onscreen):** the macOS Windows App (iMac) **rendered
