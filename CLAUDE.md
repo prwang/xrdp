@@ -126,7 +126,7 @@ Concretely:
   `tools/`, not `PR-demo/`. The CI regression backstop is always an in-tree unit
   test under `tests/`; `PR-demo/` is a visual aid, never a substitute for it.
 - **Smoke-gate every handoff.** Never hand the live box to a human tester
-  without running `PR-demo/tail_flush_ab/smoke.sh` against the exact deployed
+  without running `PR-demo/smoke_gate/smoke.sh` against the exact deployed
   binary *and* config, as the LAST step after the final install/restart. A
   test that passed before the last deployment step counts for nothing, and a
   single-configuration pass proves only that configuration: the smoke gate

@@ -47,6 +47,53 @@ reads the sentinel or wrong plane). 74/74 green.
 GATE: live xvfb/freerdp exercise of the resize path with the fixed debs, then
 owner onscreen retest.
 
+## AVC444 dual-monitor drag "burr"/ghost residual — REPRODUCED, root cause IN PROGRESS (2026-07-25)
+
+**Symptom (owner):** dragging a window on the 4K subscreen in DUAL-monitor
+mode leaves 1-2px residual/burr lines. NOT present in single-monitor mode.
+Screenshot `regression_ghost_edge_2026-07-25 114541.png` (untracked).
+
+**REPRODUCED end-to-end** (owner visually confirmed same failure class):
+`PR-demo/multimon_burr/multimon_burr_repro.sh` — real Xorg(dummy) client at
+the owner's exact layout (canvas 3840x3840, primary 2560x1440 on top at
++594, 4K below at +0+1440; layout asserted by black-pixel count 1843200),
+xfreerdp3 /multimon /gfx:AVC444, self-driven qterminal drags. Oracle =
+client framebuffer vs session framebuffer after 2.5s settle, baseline-masked
+(pre-drag pair subtracts static codec noise — two earlier heuristic
+detectors false-positived; do not trust colour heuristics here).
+Result on deployed debs (xrdp 2f216a20 + xorgxrdp aa08c63): persistent 1px
+solid, 2px/3px dashed ghost lines along the drag paths, full-height dashed
+columns on the primary (never dragged on), and 2px dashed vertical ghosts
+STRIKING THROUGH both screens at the seam-crossing drag columns
+(x 786/1286/2286). MODE=single: clean. Artifacts: burr2_*.png.
+
+**Retracted hypothesis (for the record):** an earlier "global rect_id gating
+throttles the 4K surface -> drag lag" theory was wrong — residuals persist
+at idle, which latency cannot explain. Retracted before any code change.
+
+**Current evidence-backed candidate (NOT yet proven):**
+1. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827, ours per git -L blame,
+   commit b583a8d5) expands every damage rect by 1px and rounds the origin
+   down to even — the client therefore blits a 1-2px fringe BEYOND what the
+   capture freshly wrote. Measured ghost coords sit exactly on that fringe
+   (row 1856 = damage y2; col 2810 = damage x2 + shadow at that burst).
+2. Single-monitor is safe by induction: un-recaptured plane bytes always
+   equal what the client already shows, so the fringe blit is a no-op.
+3. Dual-monitor breaks the invariant: BOTH monitors write their YUV444
+   planes at OFFSET 0 of the SAME shared shmem with different geometry
+   (stride 3840 vs 2560, plane size 3840*2400 vs 2560*1440), so every
+   primary-monitor frame (panel clock etc.) corrupts the 4K monitor's
+   persistent plane content (B's U-plane offsets land inside A's Y plane,
+   arithmetic checks out) and vice versa. The fringe blit then paints that
+   corruption -> thin stale/garbage lines.
+
+**Next (root cause confirmation, no fix yet):** causal A/B with zero code
+change — idle the primary completely (kill panel/clock) => ghosts should
+vanish; re-enable => return. Plus XRDP_GFX_TRACE damage-rect logging to pin
+the fringe geometry. Candidate fixes (per-monitor shmem offsets so planes
+never overlap — id->shmem_offset plumbing already exists; and/or capture the
+fringe the metablock blits) to be scoped only after confirmation.
+
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
 **IMPLEMENTED + DEPLOYED.** The RGB->YUV matrix moved off xrdp's encoder
@@ -157,7 +204,7 @@ of the DEPLOYED binary (`avc_mode=444`) confirms: `seq0 LC=1
 chroma) → `LC=1 → LC=2`, **zero `LC=0`** — byte-structurally what real Windows
 emits. All 68 xrdp unit tests pass; astyle clean.
 
-**Smoke gate note (honest):** `PR-demo/tail_flush_ab/smoke.sh` passes clean at
+**Smoke gate note (honest):** `PR-demo/smoke_gate/smoke.sh` passes clean at
 1024x768 but shows a deterministic 2-keypress "white shows previous frame" lag at
 1920x1080. This is **pre-existing, NOT a regression**: the pre-reframe `LC=0`
 binary fails 1920x1080 with the identical signature (ok=6 lag=2), `encoder_errors=0`
