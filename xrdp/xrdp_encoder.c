@@ -1073,6 +1073,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     int enc_rv;
     int bitmap_data_length;
     int need;
+    int shmem_offset;
 
     if (!s_check_rem(in_s, 11))
     {
@@ -1124,6 +1125,13 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     in_uint16_le(in_s, top);
     in_uint16_le(in_s, width);
     in_uint16_le(in_s, height);
+    /* per-monitor capture shmem offset (multimon plane split); the field
+     * is bounded by this command's cmd_bytes, absent means base 0 */
+    shmem_offset = 0;
+    if (s_check_rem(in_s, 4))
+    {
+        in_uint32_le(in_s, shmem_offset);
+    }
     twidth = width;
     theight = height;
     dst_rect.x1 = 0;
@@ -1132,8 +1140,9 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     dst_rect.y2 = height;
 
     if (twidth < 1 || theight < 1 ||
+            shmem_offset < 0 || shmem_offset > enc_gfx_cmd->data_bytes ||
             3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
-            enc_gfx_cmd->data_bytes)
+            enc_gfx_cmd->data_bytes - shmem_offset)
     {
         g_free(d_rects);
         return NULL;
@@ -1185,7 +1194,9 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         self->avc444_ffmpeg_handle[mon_index] = ff;
     }
 
-    if (xrdp_avc444_conv_update(conv, (const unsigned char *)enc_gfx_cmd->data,
+    if (xrdp_avc444_conv_update(conv,
+                                (const unsigned char *)enc_gfx_cmd->data
+                                + shmem_offset,
                                 (twidth + 15) & ~15, twidth, theight) != 0)
     {
         g_free(d_rects);
@@ -1299,6 +1310,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     int enc_rv;
     int bitmap_data_length;
     int need;
+    int shmem_offset;
 
     if (!s_check_rem(in_s, 11))
     {
@@ -1350,6 +1362,13 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     in_uint16_le(in_s, top);
     in_uint16_le(in_s, width);
     in_uint16_le(in_s, height);
+    /* per-monitor capture shmem offset (multimon plane split); the field
+     * is bounded by this command's cmd_bytes, absent means base 0 */
+    shmem_offset = 0;
+    if (s_check_rem(in_s, 4))
+    {
+        in_uint32_le(in_s, shmem_offset);
+    }
     twidth = width;
     theight = height;
     dst_rect.x1 = 0;
@@ -1358,8 +1377,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     dst_rect.y2 = height;
 
     if (twidth < 1 || theight < 1 ||
+            shmem_offset < 0 || shmem_offset > enc_gfx_cmd->data_bytes ||
             3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
-            enc_gfx_cmd->data_bytes)
+            enc_gfx_cmd->data_bytes - shmem_offset)
     {
         g_free(d_rects);
         return NULL;
@@ -1412,7 +1432,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         self->avc444_ffmpeg_handle[mon_index] = ff;
     }
 
-    if (xrdp_avc444_conv_update(conv, (const unsigned char *)enc_gfx_cmd->data,
+    if (xrdp_avc444_conv_update(conv,
+                                (const unsigned char *)enc_gfx_cmd->data
+                                + shmem_offset,
                                 (twidth + 15) & ~15, twidth, theight) != 0)
     {
         g_free(d_rects);
@@ -1573,6 +1595,7 @@ gfx_wiretosurface1(struct xrdp_encoder *self,
     struct xrdp_enc_gfx_cmd *enc_gfx_cmd = &(enc->u.gfx);
     int mon_index;
     int connection_type;
+    int shmem_offset;
 
     connection_type = self->mm->wm->client_info->mcs_connection_type;
 
@@ -1673,6 +1696,13 @@ gfx_wiretosurface1(struct xrdp_encoder *self,
     in_uint16_le(in_s, top);
     in_uint16_le(in_s, width);
     in_uint16_le(in_s, height);
+    /* per-monitor capture shmem offset (multimon plane split); the field
+     * is bounded by this command's cmd_bytes, absent means base 0 */
+    shmem_offset = 0;
+    if (s_check_rem(in_s, 4))
+    {
+        in_uint32_le(in_s, shmem_offset);
+    }
     twidth = width;
     theight = height;
     dst_rect.x1 = 0;
@@ -1704,7 +1734,9 @@ gfx_wiretosurface1(struct xrdp_encoder *self,
     else
     {
         /* assume NV12 format */
-        if (twidth * theight * 3 / 2 > enc_gfx_cmd->data_bytes)
+        if (shmem_offset < 0 || shmem_offset > enc_gfx_cmd->data_bytes ||
+                twidth * theight * 3 / 2 >
+                enc_gfx_cmd->data_bytes - shmem_offset)
         {
             g_free(s->data);
             g_free(crects);
@@ -1726,7 +1758,7 @@ gfx_wiretosurface1(struct xrdp_encoder *self,
                     self->codec_handle_h264_gfx[mon_index], 0,
                     0, 0,
                     width, height, twidth, theight, 0,
-                    enc_gfx_cmd->data,
+                    enc_gfx_cmd->data + shmem_offset,
                     crects, num_rects_c,
                     s->p, &bitmap_data_length,
                     connection_type, NULL);
