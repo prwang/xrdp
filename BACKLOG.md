@@ -83,9 +83,13 @@ blit. The full chain, each link verified with data:
 2. xrdp feeds the full plane extent to ffmpeg each frame, so the encoded
    picture carries that corruption everywhere outside the freshly captured
    damage rects.
-3. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827, ours, commit
-   b583a8d5) expands each damage rect by 1px and even-rounds the origin, so
-   the client blits a 1-2px fringe BEYOND the freshly captured area —
+3. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827) expands each damage
+   rect by 1px — UPSTREAM code (b583a8d5, Jay Sorg, May 2024, x264 GFX
+   path; an earlier note here misattributed it to us — corrected). Our
+   contribution on those lines is only the even-origin rounding (`&= ~1`,
+   the mstsc chroma-parity fix), which can widen the left/top fringe by 1px
+   more but did not create the expansion. The client therefore blits a
+   1-2px fringe BEYOND the freshly captured area —
    painting the corrupted stale bytes -> 1-2px solid/dashed ghost lines at
    damage-rect boundaries. Dashes = the periodic visibility pattern of the
    different-stride overwrite; seam strike-through = both surfaces ghosting
@@ -110,16 +114,33 @@ drag with per-frame dumps). Box restored after forensics: xorgxrdp
 aa08c63 reinstalled, dump env removed, smoke gate PASS (1920x1080 and
 1024x768: ok=8 lag=0 encoder_errors=0).
 
+**Ownership:** BOTH ingredients are upstream — the shared-shmem overlap
+(upstream `rdpCaptureGfxA2` NV12 multimon writes every monitor's planes at
+offset 0 with per-monitor stride, identical hazard) and the metablock 1px
+expansion (b583a8d5, upstream x264 path). The bug is LATENT upstream:
+upstream AVC420 GFX multimon should show the same 1-2px ghost class
+(prediction, not yet demonstrated — our gfx.toml negotiates RFX for
+/gfx:AVC420 clients, so untested here). Our AVC444 work did not create it
+but surfaced it: it is the multimon H.264 mode actually deployed, and
+YUV444 planes are 2x the NV12 footprint (3 vs 1.5 B/px), doubling the
+overlap. Worth an upstream issue/PR note alongside our fix.
+
 **Fix (TODO, needs owner approval; per strict-honesty rule the real fix,
 not a mask):** give each monitor a DISJOINT region of the capture shmem
-(per-monitor plane offset; `id->shmem_offset` plumbing already exists in
-the paint message — verify xrdp honors it in the enc data path). Sizing
-fits: sum of per-monitor plane sizes (27.6M + 11.1M) < current session-size
-allocation (44.2M). NOT chosen: capturing the 1px fringe (masks the
-overlap for the fringe blit but leaves poisoned planes in every encoded
-frame). Regression scope: multimon capture only; single-monitor path
-untouched; gate = multimon_burr harness clean + smoke gate + owner
-onscreen.
+(per-monitor plane offset). This is an INTERNAL xorgxrdp<->xrdp contract
+change, never visible to RDP clients. The GFX msg-62 path today carries NO
+offset (xup.c `process_server_egfx_shmfd` maps fd and reads from base 0;
+only the legacy paint paths carry `shmem_offset`), so the offset must be
+added to the 62 message (or derived from a shared deterministic rule).
+Mixed-version safety per coding rule #2: scope to CC_GFX_AVC444 (stock
+xrdp/xorgxrdp never negotiate it -> distro interop unaffected); our deb
+pair-guard (Breaks: xorgxrdp << 1:0.10.80~) enforces matched halves on
+this box, and the upstream PR lands both sides together. Sizing fits:
+27.6M + 11.1M < current 44.2M session-size allocation. NOT chosen:
+capturing the 1px fringe (masks the fringe blit but leaves poisoned planes
+in every encoded frame). Regression scope: multimon capture only;
+single-monitor path untouched; gate = multimon_burr harness clean + smoke
+gate + owner onscreen.
 
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
