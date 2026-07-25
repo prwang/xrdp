@@ -19,7 +19,9 @@ update is not delivered while the user pauses. Two independent remedies:
 `[avc444_ffmpeg]` changes in `/etc/xrdp/gfx.toml` take effect at the next
 **fresh login** (logoff → login), not on disconnect/reconnect to a running
 session (on-box observation, 2026-07-17). Any test of a config change against
-a reconnected session is invalid. `keytest.sh` and `smoke.sh` enforce a cold
+a reconnected session is invalid. `../smoke_gate/keytest.sh` and
+`../smoke_gate/smoke.sh` (moved there — they are the general deploy gate,
+not tail-flush-specific) enforce a cold
 login every run; for manual mstsc tests, log the tester session off first —
 see "Rule 0" in `MSTSC_TRACE.md`.
 
