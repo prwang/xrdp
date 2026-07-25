@@ -71,28 +71,55 @@ STRIKING THROUGH both screens at the seam-crossing drag columns
 throttles the 4K surface -> drag lag" theory was wrong — residuals persist
 at idle, which latency cannot explain. Retracted before any code change.
 
-**Current evidence-backed candidate (NOT yet proven):**
-1. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827, ours per git -L blame,
-   commit b583a8d5) expands every damage rect by 1px and rounds the origin
-   down to even — the client therefore blits a 1-2px fringe BEYOND what the
-   capture freshly wrote. Measured ghost coords sit exactly on that fringe
-   (row 1856 = damage y2; col 2810 = damage x2 + shadow at that burst).
-2. Single-monitor is safe by induction: un-recaptured plane bytes always
-   equal what the client already shows, so the fringe blit is a no-op.
-3. Dual-monitor breaks the invariant: BOTH monitors write their YUV444
-   planes at OFFSET 0 of the SAME shared shmem with different geometry
-   (stride 3840 vs 2560, plane size 3840*2400 vs 2560*1440), so every
-   primary-monitor frame (panel clock etc.) corrupts the 4K monitor's
-   persistent plane content (B's U-plane offsets land inside A's Y plane,
-   arithmetic checks out) and vice versa. The fringe blit then paints that
-   corruption -> thin stale/garbage lines.
+**ROOT CAUSE — PROVEN (2026-07-25, per-frame dump forensics):**
+Cross-monitor shared-shmem plane overwrite exposed by the metablock fringe
+blit. The full chain, each link verified with data:
+1. xorgxrdp multimon: ALL monitors write their planar YUV444 planes at
+   OFFSET 0 of the ONE shared capture shmem, each with its own geometry
+   (4K: stride 3840, planes 3840*2400; primary: stride 2560, planes
+   2560*1440). Every primary frame therefore overwrites the 4K monitor's
+   persistent plane bytes (primary's 3 planes span offsets 0..11.06M =
+   rows 0..2879 of the 4K Y plane) and vice versa.
+2. xrdp feeds the full plane extent to ffmpeg each frame, so the encoded
+   picture carries that corruption everywhere outside the freshly captured
+   damage rects.
+3. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827, ours, commit
+   b583a8d5) expands each damage rect by 1px and even-rounds the origin, so
+   the client blits a 1-2px fringe BEYOND the freshly captured area —
+   painting the corrupted stale bytes -> 1-2px solid/dashed ghost lines at
+   damage-rect boundaries. Dashes = the periodic visibility pattern of the
+   different-stride overwrite; seam strike-through = both surfaces ghosting
+   at the same client x.
+4. Single monitor: one writer only -> un-recaptured plane bytes always equal
+   current client content -> fringe blit is a no-op -> clean.
+**Proof artifacts** (XRDP_AVC444_DUMP per-frame dumps + instrumented
+xorgxrdp diag/dirty-trace build, both reverted after): drag frame seq23
+(rect 188,490,1842,1256) vs pre-drag full frame seq21 — conv Y planes
+differ in 6,467,271 bytes OUTSIDE the captured rect (all 2400 rows),
+written by the interleaved primary frame seq22; the client ghost lines of
+that run sit EXACTLY on seq23's metablock fringe (col 187 = x1-1, row 489 =
+y1-1, row 1256 = y2), corrupted in the dumped conv input (1654/1024/690
+bytes). Note: an earlier "refuting" causal A/B was an experimental
+artifact — x11grab on the session root provokes an xfwm compositor slab
+repaint (full-region DIRTYADD) = a primary frame, injecting the very
+corruption the variant meant to exclude (caught by the dirty-trace log).
 
-**Next (root cause confirmation, no fix yet):** causal A/B with zero code
-change — idle the primary completely (kill panel/clock) => ghosts should
-vanish; re-enable => return. Plus XRDP_GFX_TRACE damage-rect logging to pin
-the fringe geometry. Candidate fixes (per-monitor shmem offsets so planes
-never overlap — id->shmem_offset plumbing already exists; and/or capture the
-fringe the metablock blits) to be scoped only after confirmation.
+**Harness:** `PR-demo/multimon_burr/` — `multimon_burr_repro.sh` (visual
+repro + oracle), `causal_ab.sh` (variant A/B), `forensic_run.sh` (short
+drag with per-frame dumps). Box restored after forensics: xorgxrdp
+aa08c63 reinstalled, dump env removed, smoke gate PASS (1920x1080 and
+1024x768: ok=8 lag=0 encoder_errors=0).
+
+**Fix (TODO, needs owner approval; per strict-honesty rule the real fix,
+not a mask):** give each monitor a DISJOINT region of the capture shmem
+(per-monitor plane offset; `id->shmem_offset` plumbing already exists in
+the paint message — verify xrdp honors it in the enc data path). Sizing
+fits: sum of per-monitor plane sizes (27.6M + 11.1M) < current session-size
+allocation (44.2M). NOT chosen: capturing the 1px fringe (masks the
+overlap for the fringe blit but leaves poisoned planes in every encoded
+frame). Regression scope: multimon capture only; single-monitor path
+untouched; gate = multimon_burr harness clean + smoke gate + owner
+onscreen.
 
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
