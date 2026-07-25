@@ -47,7 +47,7 @@ reads the sentinel or wrong plane). 74/74 green.
 GATE: live xvfb/freerdp exercise of the resize path with the fixed debs, then
 owner onscreen retest.
 
-## AVC444 dual-monitor drag "burr"/ghost residual — REPRODUCED, root cause IN PROGRESS (2026-07-25)
+## AVC444 dual-monitor drag "burr"/ghost residual — ROOT-CAUSED, fix IN PROGRESS (2026-07-25)
 
 **Symptom (owner):** dragging a window on the 4K subscreen in DUAL-monitor
 mode leaves 1-2px residual/burr lines. NOT present in single-monitor mode.
@@ -125,22 +125,45 @@ but surfaced it: it is the multimon H.264 mode actually deployed, and
 YUV444 planes are 2x the NV12 footprint (3 vs 1.5 B/px), doubling the
 overlap. Worth an upstream issue/PR note alongside our fix.
 
-**Fix (TODO, needs owner approval; per strict-honesty rule the real fix,
-not a mask):** give each monitor a DISJOINT region of the capture shmem
-(per-monitor plane offset). This is an INTERNAL xorgxrdp<->xrdp contract
-change, never visible to RDP clients. The GFX msg-62 path today carries NO
-offset (xup.c `process_server_egfx_shmfd` maps fd and reads from base 0;
-only the legacy paint paths carry `shmem_offset`), so the offset must be
-added to the 62 message (or derived from a shared deterministic rule).
-Mixed-version safety per coding rule #2: scope to CC_GFX_AVC444 (stock
-xrdp/xorgxrdp never negotiate it -> distro interop unaffected); our deb
-pair-guard (Breaks: xorgxrdp << 1:0.10.80~) enforces matched halves on
-this box, and the upstream PR lands both sides together. Sizing fits:
-27.6M + 11.1M < current 44.2M session-size allocation. NOT chosen:
-capturing the 1px fringe (masks the fringe blit but leaves poisoned planes
-in every encoded frame). Regression scope: multimon capture only;
-single-monitor path untouched; gate = multimon_burr harness clean + smoke
-gate + owner onscreen.
+**Fix (IN PROGRESS, owner-approved 2026-07-25; per strict-honesty rule the
+real fix, not a mask):** give each monitor a DISJOINT region of the capture
+shmem (per-monitor plane offset). Internal xorgxrdp<->xrdp contract change,
+never visible to RDP clients.
+
+*Scope = the real blast radius (owner directive: do not artificially narrow
+to AVC444).* Affected: the GFX H.264 capture family — `CC_GFX_A2` (NV12,
+upstream AVC420/x264 GFX) and `CC_GFX_AVC444` — both write per-monitor
+planes at offset 0 of the shared shmem AND their encoder consumes the full
+plane every frame (persistence assumption). Verified-NOT-affected, left
+untouched: legacy `CC_SUF_A2` (session-canvas NV12 layout — no per-monitor
+translate, UV plane at session `cap_w*cap_h`, monitors land disjoint by
+construction) and `CC_GFX_PRO`/`CC_SUF_RFX` (every RFX tile the encoder
+reads is fully rewritten within the same capture call — rgnPART fills the
+whole tile first; CRC-skipped tiles are never read — so nothing depends on
+shmem persistence).
+
+*Mechanism:*
+- Shared pure helper in `common/xup_client_info.h` (the file that IS the
+  daemon contract) computes the per-monitor offset table + total allocation
+  from `display_size_description` + capture code; xorgxrdp uses it for
+  allocation and plane placement; unit-tested in `tests/xrdp`.
+- The offset each frame rides the msg-62 WIRETOSURFACE_1 payload as a new
+  trailing field after left/top/width/height (per-command `cmd_bytes`
+  bounds the parse, so the field is cleanly optional); xrdp validates
+  bounds and reads planes at `shmem base + offset`. Field absent -> 0 ->
+  exact current behavior.
+- Mixed-version safety: `XUP_CLIENT_INFO_CURRENT_VERSION` bumped 20250528
+  -> 20260725; both daemons already FatalError/refuse on mismatch at
+  connect, so a mixed pair fails LOUDLY instead of silently corrupting.
+  Deb pair-guard stays; both sides land together upstream (the same
+  lockstep the socket-naming change used).
+
+Sizing: sum of per-monitor regions replaces the session-size formula
+(owner layout: 27.6M + 11.1M = 38.7M vs 44.2M today). NOT chosen: capturing
+the 1px fringe (masks the fringe blit but leaves poisoned planes in every
+encoded frame). Single-monitor: offset stays 0, allocation formula
+unchanged in behavior. Gate = multimon_burr harness clean in MODE=dual +
+MODE=single + `make check` + smoke gate LAST + owner onscreen.
 
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
@@ -953,3 +976,19 @@ trailing commit, or intermediate commits won’t build). The synchronous-encode
 dev branch’s desync/deadlock/fix archaeology is intentionally not replayed;
 its rationale belongs in the PR description, with `PRD.md` §25 as the
 long-form reference.
+
+### Slice-order amendment: latent upstream multimon fix FIRST (2026-07-25, owner directive)
+
+BOTH repos' clean-room slicing must put the **GFX H.264 multimon shmem-split
+fix first** (the per-monitor shmem offset fix for the latent UPSTREAM
+cross-monitor plane-overwrite bug — see "dual-monitor drag burr" item), and
+**rebase the real AVC444 feature work on top of it**, so the merged history
+attributes scope and ownership cleanly: the bugfix slice touches only
+upstream-reachable code paths (`CC_GFX_A2`/NV12 + the msg-62 offset field +
+`XUP_CLIENT_INFO_CURRENT_VERSION` bump) and stands alone as an upstreamable
+fix for the pre-existing AVC420-x264 GFX multimon hazard; the AVC444 slices
+then inherit the corrected layout instead of appearing to introduce/fix the
+bug themselves. Applies to xrdp (slices above renumber after it) AND
+xorgxrdp (`feat/avc444-yuv444-capture` rebases onto its fix slice). Keep the
+fix slice scoped to the real blast radius (GFX H.264 family), not narrowed
+to AVC444. Status: TODO, after the fix lands + owner onscreen PASS.

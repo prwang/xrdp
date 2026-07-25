@@ -72,7 +72,102 @@ struct xup_client_info
     int normal_frame_interval;
 };
 
-/* yyyymmdd of last incompatible change to xup_client_info */
-#define XUP_CLIENT_INFO_CURRENT_VERSION 20250528
+/* yyyymmdd of last incompatible change to xup_client_info OR to the
+ * xup wire protocol / shared-memory capture contract.
+ * 20260725: GFX H.264 multimon shmem split — WIRETOSURFACE_1 (msg 62)
+ * gained a trailing per-monitor capture shmem offset field, and the
+ * capture shmem is laid out per xup_cap_h264_shmem_layout() below. */
+#define XUP_CLIENT_INFO_CURRENT_VERSION 20260725
+
+/*
+ * Shared-memory layout for the GFX H.264 capture family
+ * (CC_GFX_A2 NV12, CC_GFX_AVC444 planar YUV444).
+ *
+ * In a multimon session every monitor historically wrote its capture
+ * planes at offset 0 of the one shared shmem, each with its own
+ * geometry. The H.264 encoders consume the full plane every frame and
+ * rely on the bytes outside the current damage rects persisting from
+ * that monitor's previous frames, so each monitor's frame corrupted the
+ * other monitors' plane bytes (1-2px ghost lines at damage-rect
+ * boundaries once the client blits the metablock fringe). Both daemons
+ * therefore agree on one DISJOINT per-monitor layout: xorgxrdp sizes
+ * the shmem and places each monitor's planes with this helper, and
+ * additionally sends the frame's offset in the WIRETOSURFACE_1 message
+ * (authoritative for xrdp). Modes whose reader never depends on shmem
+ * persistence (RFX tile capture, legacy session-canvas CC_SUF_A2) keep
+ * the whole-shmem layout and offset 0.
+ */
+
+/* each per-monitor region starts cache-line aligned (even, so NV12
+   UV-pair alignment is preserved) */
+#define XUP_CAP_REGION_ALIGN 64
+
+/* capture plane bytes one monitor needs; dims are 16-aligned to the
+ * H.264 coded size. CC_GFX_AVC444: three planar YUV444 planes.
+ * CC_GFX_A2: NV12 needs 1.5 B/px; 2 B/px is kept for slack, matching
+ * the historical session-level formula. */
+static inline int
+xup_cap_h264_mon_bytes(enum xrdp_capture_code capture_code,
+                       int width, int height)
+{
+    int awidth;
+    int aheight;
+
+    if (width < 1 || height < 1)
+    {
+        return 0;
+    }
+    awidth = (width + 15) & ~15;
+    aheight = (height + 15) & ~15;
+    return awidth * aheight * ((capture_code == CC_GFX_AVC444) ? 3 : 2);
+}
+
+/* Fill offsets[] with each monitor's capture region offset and return
+ * the total shmem bytes required. With no monitors (single screen) the
+ * session dimensions get one region at offset 0. */
+static inline int
+xup_cap_h264_shmem_layout(const struct display_size_description *displays,
+                          enum xrdp_capture_code capture_code,
+                          int session_width, int session_height,
+                          int offsets[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS])
+{
+    int index;
+    int count;
+    int total;
+    int mwidth;
+    int mheight;
+
+    for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++index)
+    {
+        offsets[index] = 0;
+    }
+    count = 0;
+    if (displays != NULL)
+    {
+        count = (int)displays->monitorCount;
+        if (count > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+        {
+            count = CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+        }
+    }
+    if (count < 1)
+    {
+        return xup_cap_h264_mon_bytes(capture_code,
+                                      session_width, session_height);
+    }
+    total = 0;
+    for (index = 0; index < count; ++index)
+    {
+        offsets[index] = total;
+        mwidth = displays->minfo[index].right
+                 - displays->minfo[index].left + 1;
+        mheight = displays->minfo[index].bottom
+                  - displays->minfo[index].top + 1;
+        total += (xup_cap_h264_mon_bytes(capture_code, mwidth, mheight)
+                  + (XUP_CAP_REGION_ALIGN - 1))
+                 & ~(XUP_CAP_REGION_ALIGN - 1);
+    }
+    return total;
+}
 
 #endif // XUP_CLIENT_INFO_H
