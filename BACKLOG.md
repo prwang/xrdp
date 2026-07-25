@@ -47,7 +47,7 @@ reads the sentinel or wrong plane). 74/74 green.
 GATE: live xvfb/freerdp exercise of the resize path with the fixed debs, then
 owner onscreen retest.
 
-## AVC444 dual-monitor drag "burr"/ghost residual — ROOT-CAUSED, fix IN PROGRESS (2026-07-25)
+## AVC444 dual-monitor drag "burr"/ghost residual — DONE (fix verified onscreen 2026-07-25)
 
 **Symptom (owner):** dragging a window on the 4K subscreen in DUAL-monitor
 mode leaves 1-2px residual/burr lines. NOT present in single-monitor mode.
@@ -164,6 +164,38 @@ the 1px fringe (masks the fringe blit but leaves poisoned planes in every
 encoded frame). Single-monitor: offset stays 0, allocation formula
 unchanged in behavior. Gate = multimon_burr harness clean in MODE=dual +
 MODE=single + `make check` + smoke gate LAST + owner onscreen.
+
+*Validation (2026-07-25, deployed xrdp-dev 0.10.80+git0070ceb514be +
+xorgxrdp-dev 1:0.10.80+gitdd431cc156fd, both from committed branches):*
+- `make check` 81/81 (6 new layout-contract tests).
+- **Mechanism kill PROVEN at byte level:** forensic re-run reproduced the
+  exact pre-fix critical frame pattern (full 4K seq37 -> interleaved full
+  primary seq38 -> 4K drag seq39, same rect 188,490,1842,1256); the 4K
+  conv Y planes now differ in **0 bytes** outside the damage rect
+  (pre-fix: 6,467,271). Cross-monitor plane overwrite is dead.
+- **multimon_burr MODE=dual and MODE=single: NO residual** (all passes,
+  both screens; residual hot px are scattered unstructured codec noise,
+  no lines, no strike-through). The pre-fix signatures (1px trail lines,
+  2px/3px dashed, cross-seam strike-through, multi-position trails) are
+  gone.
+- Two ORACLE false-positive classes were found and fixed in the harness
+  along the way (documented in its README, not masked): (a) the mover
+  window's LIVE lossy edges flag wherever it stands in an after-grab —
+  the pre-fix single-mode "clean" was threshold luck; now the window is
+  parked inside the baseline and returned there before every grab, plus a
+  printed, geometry-scoped parked-window exclusion; (b) end-of-drag
+  PIPELINE LAG: one run showed a full stale window image ~3.5s after the
+  last move that self-corrected before the next pass — the verdict now
+  uses a second settled grab (+8.5s) and first-grab-only findings are
+  reported as LAG, keeping that latency signal visible without conflating
+  it with persistence. The drag trail itself is never excluded.
+- Smoke gate LAST on the deployed pair: 1920x1080 and 1024x768, ok=8
+  lag=0 encoder_errors=0 — SMOKE PASS.
+- **Owner onscreen: PASS (2026-07-25, dual-monitor mstsc drag on the 4K
+  subscreen — burr gone). Item closed.** Follow-ups tracked separately:
+  clean-room slice-order amendment (fix-first, both repos), upstream
+  issue/PR for the latent AVC420 multimon hazard, and the end-of-drag
+  pipeline-lag observation (perf, reported as LAG by the harness).
 
 ## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
 
