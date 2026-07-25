@@ -379,6 +379,27 @@ the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
   unguarded host (owner rig / dev box directly) — do NOT claim it green
   until that run passes. Then dual-monitor live matrix (per-monitor resize,
   layout change, mixed sizes) on the Windows App client; extend smoke gate.
+- DONE — deployed via clean dev deb (2026-07-25): built
+  `dist/xrdp-dev_0.10.80+gitf852e3b3375b_amd64.deb` with
+  `scripts/build_dev_deb.sh` (per the new CLAUDE.md "Deployment" rule — no
+  hand-copied binary), backed up + preserved the box's `avc_mode=444`/VAAPI
+  `gfx.toml` (dpkg confold kept it; sha verified), `apt install`ed,
+  `daemon-reload` + restarted xrdp/sesman. Verified: `/usr/sbin/xrdp` is the
+  multimon build (`xrdp_mm_avc444_probe_dims` present), services active,
+  `:3389` listening, no startup errors. Pre-install binary backed up at
+  `/root/xrdp.premultimon.*.bak`.
+- SMOKE (single-monitor, new binary, 2026-07-25): 1024x768 CLEAN (ok=8
+  lag=0); 1920x1080 RED (ok=6 lag=2) — the WHITE keypress shows the previous
+  (blue) frame, `encoder_errors=0`. This is the DOCUMENTED PRE-EXISTING
+  1920x1080 white-frame-lag artifact (already A/B-proven pre-existing on
+  `ec0598f9`), NOT a multimon regression: the multimon change is
+  behavior-identical for single monitor (monitorCount=1 →
+  `xrdp_mm_avc444_probe_dims` returns `minfo_wm[0]` = the same 1920x1088 the
+  old `screen->width/height` code produced) and touches nothing in the
+  encode/delivery path. Per the strict-honesty rule this handoff is NOT
+  declared "smoke-clean" — the smoke gate is RED at 1920x1080. The
+  multimon-specific validation is the owner's onscreen 2-monitor test +
+  the offline harness on an unguarded host.
 - Docs: per-backend encoder-session limits (consumer GeForce ~8 NVENC
   sessions; T4/VAAPI effectively unbounded); N children = N sessions.
 - Latency note: encoder thread encodes surfaces sequentially per frame
