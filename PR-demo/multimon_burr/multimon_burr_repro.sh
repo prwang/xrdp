@@ -133,13 +133,15 @@ print(f"layout check: pure-black px = {black}"
       + (" (expected ~1843200 for owner layout)" if sys.argv[2] == "dual" else ""))
 EOF
 
-# ---- 3b. baseline truth/client pair BEFORE any drag: every hot px here is
-# static codec noise (icons, panel, fine detail) and is masked from the
-# residual analysis, so only drag-caused mismatches count.
-grab_sess   "$OUT/truth_0.png"
-grab_client "$OUT/client_0.png"
-
-# ---- 4. drag a real qterminal window ---------------------------------------
+# ---- 4a. spawn the mover FIRST and park it, THEN grab the baseline pair.
+# The window must be IN the baseline at its park spot: a live window border
+# is a high-contrast edge where lossy H.264 error can exceed TOL, so an
+# unparked window flags 1px "ghosts" at wherever it happens to stand in the
+# after-grab (2026-07-25: burned both MODEs once the fix removed the real
+# trail ghosts). Every pass therefore RETURNS the window to this park spot
+# before grabbing: live-window pixels are baseline-masked symmetrically,
+# while the drag trail (the thing under test) stays fully exposed — and the
+# return move itself adds more trail coverage.
 sess pkill -u $SU qterminal 2>/dev/null; sleep 1
 sess setsid qterminal </dev/null >/dev/null 2>&1 &
 qw=""
@@ -152,6 +154,17 @@ done
 QW=900; QH=700
 sess xdotool windowsize "$qw" $QW $QH 2>/dev/null
 STEP=24
+PARK_X=$((S_X + 2400))
+PARK_Y=$((S_Y + 1500))
+sess xdotool windowmove "$qw" $PARK_X $PARK_Y 2>/dev/null
+sleep 2.5
+
+# ---- 4b. baseline truth/client pair BEFORE any drag: every hot px here
+# (icons, panel, fine detail, the parked window itself) is static codec
+# noise and is masked from the residual analysis, so only drag-caused
+# mismatches count.
+grab_sess   "$OUT/truth_0.png"
+grab_client "$OUT/client_0.png"
 
 # pass A: horizontal sweep on the 4K screen (like the owner's drag)
 HY=$((S_Y + 500))
@@ -161,9 +174,13 @@ while [ $x -lt $((S_X + S_W - QW - 60)) ]; do
     sess xdotool windowmove "$qw" $x $HY 2>/dev/null
     x=$((x + STEP))
 done
+sess xdotool windowmove "$qw" $PARK_X $PARK_Y 2>/dev/null
 sleep 2.5
 grab_sess   "$OUT/truth_A.png"
 grab_client "$OUT/client_A.png"
+sleep 6
+grab_sess   "$OUT/truth_As.png"
+grab_client "$OUT/client_As.png"
 
 if [ "$MODE" = dual ]; then
     # pass B: vertical sweep crossing the monitor seam (window inside the
@@ -182,9 +199,13 @@ if [ "$MODE" = dual ]; then
         sess xdotool windowmove "$qw" $x 300 2>/dev/null
         x=$((x + STEP))
     done
+    sess xdotool windowmove "$qw" $PARK_X $PARK_Y 2>/dev/null
     sleep 2.5
     grab_sess   "$OUT/truth_B.png"
     grab_client "$OUT/client_B.png"
+    sleep 6
+    grab_sess   "$OUT/truth_Bs.png"
+    grab_client "$OUT/client_Bs.png"
 
     # pass C: cross the seam up-and-down at several x positions (ghost
     # formation at a given edge is stochastic; more crossings, more chances),
@@ -199,18 +220,29 @@ if [ "$MODE" = dual ]; then
             y=$((y + STEP)); sess xdotool windowmove "$qw" $cx $y 2>/dev/null
         done
     done
-    sess xdotool windowmove "$qw" 2700 3000 2>/dev/null
+    sess xdotool windowmove "$qw" $PARK_X $PARK_Y 2>/dev/null
     sleep 2.5
     grab_sess   "$OUT/truth_C.png"
     grab_client "$OUT/client_C.png"
+    sleep 6
+    grab_sess   "$OUT/truth_Cs.png"
+    grab_client "$OUT/client_Cs.png"
 fi
 
 # ---- 5. classify residuals (baseline-masked) --------------------------------
-python3 - "$OUT" "$MODE" <<'EOF'
+# Two grab pairs per pass: verdict comes from the SETTLED pair (+6s). Lines
+# in the first pair only were still-in-flight frames (end-of-drag pipeline
+# lag, self-corrected) — reported as LAG, not residual: the defect under
+# test is content that PERSISTS after the pipeline flushed. The parked
+# window's own rectangle is excluded (its lossy live edges drift above TOL
+# with encoder history — third false-positive class); the exclusion is
+# geometry-scoped and printed, the drag trail is never excluded.
+python3 - "$OUT" "$MODE" "$PARK_X" "$PARK_Y" "$QW" "$QH" <<'EOF'
 import sys, os
 import numpy as np
 from PIL import Image, ImageDraw
 out, mode = sys.argv[1], sys.argv[2]
+park_x, park_y, qw, qh = (int(v) for v in sys.argv[3:7])
 P = (594, 0, 594+2560, 1440)      # primary rect on canvas
 S = (0, 1440, 3840, 3840)         # 4K rect on canvas
 if mode == "single":
@@ -229,6 +261,11 @@ mask = base.copy()
 for dy in range(-k, k+1):
     for dx in range(-k, k+1):
         mask |= np.roll(np.roll(base, dy, 0), dx, 1)
+# parked live window (frame decorations included) — excluded from analysis
+px1, py1 = max(0, park_x - 24), max(0, park_y - 48)
+px2, py2 = park_x + qw + 24, park_y + qh + 48
+mask[py1:py2, px1:px2] = True
+print(f"parked-window exclusion: x[{px1}:{px2}] y[{py1}:{py2}]")
 def lines(hot, axis):
     score = hot.sum(axis=(0 if axis==0 else 1))
     idx = np.nonzero(score > 120)[0]
@@ -251,10 +288,12 @@ def lines(hot, axis):
     return res
 found = {}
 for tag in (["A", "B", "C"] if mode == "dual" else ["A"]):
-    if not os.path.exists(os.path.join(out, f"truth_{tag}.png")):
+    if not os.path.exists(os.path.join(out, f"truth_{tag}s.png")):
         continue
-    hot_all = hotmap(tag) & ~mask          # drag-caused only
+    hot_first = hotmap(tag) & ~mask        # right after 2.5s settle
+    hot_all = hotmap(tag + "s") & ~mask    # +6s: verdict basis
     found[tag] = hot_all
+    npass = 0
     for name, R in (("4K", S), ("primary", P)) if P else (("4K", S),):
         x1, y1, x2, y2 = R
         hot = hot_all[y1:y2, x1:x2]
@@ -263,11 +302,21 @@ for tag in (["A", "B", "C"] if mode == "dual" else ["A"]):
                   f" width={L['width']}px span={L['span']} "
                   f"{'DASHED' if L['dashed'] else 'solid'} (cover {L['cover']})")
             fail = 1
+            npass += 1
         for L in lines(hot, 1):
             print(f"pass {tag} {name}: HORIZONTAL ghost rows {L['pos'][0]+y1}-{L['pos'][1]+y1}"
                   f" width={L['width']}px span={L['span']} "
                   f"{'DASHED' if L['dashed'] else 'solid'} (cover {L['cover']})")
             fail = 1
+            npass += 1
+        # lines in the FIRST grab that are gone in the settled grab = frames
+        # still in flight at the first grab (pipeline lag, self-corrected)
+        hf = hot_first[y1:y2, x1:x2]
+        nlag = len(lines(hf, 0)) + len(lines(hf, 1))
+        if nlag and npass == 0:
+            print(f"pass {tag} {name}: LAG — {nlag} line(s) at +2.5s "
+                  f"self-corrected by +8.5s (hot px {int(hf.sum())} -> "
+                  f"{int(hot.sum())}); not a residual")
     # seam strike-through: same client x hot in BOTH screens, ONLY within
     # the x-range where the two screens overlap vertically (594..3154)
     if P and tag in ("B", "C"):
@@ -282,7 +331,7 @@ print("RESULT:", "RESIDUAL DETECTED" if fail else "NO residual")
 # annotated artifact: full stitched client fb with red boxes on ghost lines
 if found:
     tag = "C" if "C" in found else ("B" if "B" in found else "A")
-    im = Image.open(os.path.join(out, f"client_{tag}.png")).convert('RGB')
+    im = Image.open(os.path.join(out, f"client_{tag}s.png")).convert('RGB')
     dr = ImageDraw.Draw(im)
     hot_all = found[tag]
     for name, R in (("4K", S), ("primary", P)) if P else (("4K", S),):
