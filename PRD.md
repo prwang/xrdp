@@ -815,6 +815,31 @@ threshold, NO "is the user active" policy anywhere in the pipeline.
    fifo, aux N lands one encode later (~15 ms) — full 4:4:4 fidelity
    within one frame time, deterministically. The smoke gate gains a
    color-edge fidelity check after settle to pin this.
+9. **Slow-client amendment (2026-07-26, measured).** The clause-1
+   trigger (fifo pop empty/non-empty) is server-centric and provably
+   blind to a client-bound pipeline: on the T4 offscreen rig the
+   encoder idled (admission turnaround 18 ms) while the CLIENT was the
+   bottleneck — xfreerdp's software 4:4:4 reconstruction + colour
+   convert costs ~65 ms/frame at the owner layout (stack-sampled:
+   ~66% `yuv444_context_decode`, ~20% `YUV444ToRGB`; VAAPI hw decode
+   changed nothing because H264 decode was never the dominant term),
+   capping end-to-end at ~15 fps while an AVC420 (mains-only) stream
+   ran 27 fps on the same rig. As designed, pop-empty would fire every
+   frame and ship aux to a client that cannot merge it in time.
+   Therefore aux N additionally requires **spare egfx ack credit**:
+   send `LC=2` only when `frame_id_server - frame_id_client <
+   frames_in_flight`; a saturated window defers aux exactly as if
+   preempted (it lands through the existing paths when credit frees —
+   at idle the acks catch up by construction). This is NOT an idle
+   heuristic: the credit state is client-declared flow control the
+   server already maintains, and the only parameter is the existing
+   upstream `frames_in_flight` knob. Recorded conflation, accepted:
+   window saturation cannot distinguish slow-decode from deep-WAN —
+   both correctly mean extra chroma bytes will not be consumed in
+   time. Fast clients keep today's every-frame aux cadence; slow
+   clients get the mains-only rate (measured 27 vs 14.5 fps) with
+   chroma convergence on settle, still pinned by the smoke-gate
+   edge-fidelity check.
 
 Expected effect, composed with FR-CAPTURE-8: steady-motion period
 ~16–18 ms (~55–60 fps) at half the wire bytes, with full-chroma
