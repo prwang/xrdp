@@ -361,15 +361,15 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
      * such keyframes (macOS Windows App rendered black; bisected live
      * 2026-07-23). Exactly one SPS/PPS copy per keyframe either way. */
     ADD("-bsf:v");
-    /* strip_sei removes buffering_period(0)/pic_timing(1) SEI NALs:
+    /* strip_sei removes ALL SEI NALs (NAL unit type 6):
      * the macOS Windows App's RDP H264 path blacks on the HRD SEI
      * class (bisected 2026-07-26 on the dev box; QuickTime plays the
      * same bytes, so this is App-path-specific). */
     if (cfg->strip_sei)
     {
         ADD(cfg->use_dump_extra
-            ? "dump_extra,filter_units=remove_types=0|1,h264_mp4toannexb"
-            : "filter_units=remove_types=0|1,h264_mp4toannexb");
+            ? "dump_extra,filter_units=remove_types=6,h264_mp4toannexb"
+            : "filter_units=remove_types=6,h264_mp4toannexb");
     }
     else
     {
