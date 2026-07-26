@@ -92,6 +92,10 @@ owner reference load above; harness:
 **Owner-decided order (2026-07-26): implement Lever 1 FIRST, then
 Lever 2.** (Recorded: with this order lever 1 realizes its full
 10-12pp immediately; lever 2 then subsumes the aux share.)
+**Order updated (2026-07-26, after the frame accounting + design
+review): Lever 1 DONE -> Lever 4B -> Lever 2 (preemptive-aux form).**
+4B became a hard prerequisite: Lever 2's preemption signal only
+exists once capture overlaps encode (PRD FR-PROC-7 §2).
 
 ## Lever 1: vectorize the AVC444 pack loops — DONE (owner-load profile confirms; 2026-07-26)
 
@@ -151,17 +155,16 @@ and the xup ack that frees capture fires only at encode return.
 fif=2 send-time module ack verified working — it is not the limiter.
 "Feels <10fps": p90 period 61ms + 2-3 mouse steps coalesced per frame.
 
-Consequences for lever order (owner-approved order unchanged, value
-sharpened):
-- **Lever 2 (LC aux skip) is the fps lever, not just a cpu lever**:
-  dropping the aux encode during motion halves the dominant 30ms term
-  -> period ~28-33ms -> ~30-35fps expected.
-- **New candidate lever 4: pipeline capture with encode** (double- or
-  ring-buffered capture shmem so xorgxrdp captures frame N+1 while
-  ffmpeg consumes N). Removes the serial 5.4+5.3ms and hides
-  capture under encode -> period ~= encode duration. Combined with
-  lever 2: period ~16-18ms -> 55-60fps. Touches the capture contract
-  (per-view buffer slots + slot-tagged acks); design before code.
+Consequences for lever order (updated after design review — final
+order: 4B then 2):
+- **Lever 2 (preemptive aux) is the fps lever, not just a cpu lever**:
+  skipping the aux encode during motion halves the dominant 30ms term.
+  Its preemptive form (PRD FR-PROC-7, no idle heuristic) requires 4B
+  first — see the dedicated items below.
+- **Lever 4B: two-slot pipelined capture** — design analysis DONE,
+  grounded in code; see the dedicated item below and PRD FR-CAPTURE-8.
+  (Supersedes the earlier loose "lever 4" sketch: no slot-tagged acks,
+  no ack-protocol change, zero xrdp code change.)
 - Also worth a look inside the 30ms: nvenc 2x4K should be ~16ms; the
   remainder is pipe transport + ffmpeg demux framing. Profile the
   ffmpeg side before assuming nvenc is saturated.
@@ -175,16 +178,95 @@ sharpened):
   single decoder = P-reference desync garbage, plus duplicate SPS
   (the Mac-black class the exactly-one-SPS bound exists to prevent).
 
-## Lever 2: LC=1/LC=2 motion-time aux skip — TODO (after Lever 1)
+## Lever 2: preemptive aux (LC=1/LC=2, no idle heuristic) — TODO, ORDERED AFTER Lever 4B (owner decision 2026-07-26)
 
-Luma-only frames during motion (LC=1), deferred chroma catch-up
-(LC=2), per `docs/avc444_lc_reframe_design.md` — ~22-26pp saving across
-Xorg/ffmpeg/xrdp under the owner load, halves wire bandwidth, macOS
-Windows App prerequisite. Per the frame accounting above, ALSO the
-direct fps lever: halves the 30ms synchronous encode term, expected
-~20 -> ~30-35fps. Touches the capture contract again (aux pack
-skip flag or per-frame view selection) — pairs with the existing LC
-reframe / Mac items below; consolidate scopes when picked up.
+Contract: PRD FR-PROC-7 (supersedes NG-6's deferral; replaces the
+earlier "aux skip + idle-timer catch-up" sketch — owner rejected any
+baked-in idle heuristic). During motion, frames go out `LC=1`
+(main only); aux chroma is scheduled by **preemption**: after main N,
+the encoder thread's existing fifo pop either finds main N+1 (aux N
+preempted — N+1's aux is fresher) or finds nothing (aux N encodes NOW
+from the already-captured slot, sent as `LC=2`). Aux always eventually
+lands; the only thing that can displace it is a newer main.
+
+**Why after 4B (hard prerequisite, not preference):** the preemption
+signal is "successor present in the fifo at pop time", which only
+exists when capture overlaps encode (two slots). On the serial
+pipeline the producer is ack-gated behind the encoder, the fifo is
+always empty at pop time, and any workaround is an ack-RTT wait — an
+idle timer in disguise (PRD FR-PROC-7 §2 forbids it).
+
+**Scope shrunk to xrdp-only:** capture contract UNCHANGED — xorgxrdp
+keeps packing both views (post-lever-1 aux pack share ~1pp, noise);
+the win is the aux ENCODE (~half the 30ms term) + aux WIRE bytes
+(~half). Plus the 4B interaction: rect N's xup ack defers until aux N
+sent-or-preempted (slot holds aux pixels until the decision).
+
+Effect: with 4B, steady-motion period ~16-18ms (~55-60fps) at half
+the wire bytes; full 4:4:4 converges one encode (~15ms) after any
+damage gap — deterministic, no policy. Recorded tradeoff (FR-PROC-7
+§7): sustained gap-free motion rides at 4:2:0 (= AVC420 quality, =
+Windows' 93% LC=1 cadence); periodic override deliberately excluded.
+Wire framing per `docs/avc444_lc_reframe_design.md` (LC=1/LC=2 PDUs,
+v2); macOS Windows App prerequisite. Acceptance: smoke gate gains a
+color-edge fidelity-after-settle check (FR-PROC-7 §8); Mac validation
+rides this item. Consolidate with the LC reframe / Mac items below
+when picked up.
+
+## Lever 4B: two-slot pipelined capture — TODO, ORDERED FIRST (owner decision 2026-07-26; prerequisite of Lever 2 preemptive aux)
+
+Contract: PRD FR-CAPTURE-8. Capture frame N+1 into the second shmem
+slot while ffmpeg consumes slot N; period drops from the serial sum
+(~50ms) to ~encode duration (~31-36ms, ~28-32fps); composed with
+Lever 2's halved encode -> ~16-18ms, ~55-60fps.
+
+**Scope (grounded, exact touch points):**
+- xorgxrdp `rdpClientCon.c:909/:946` — double the per-monitor region in
+  the `xup_cap_h264_shmem_layout()` sizing; two slot offsets per monitor.
+- xorgxrdp `rdpClientCon.c:3420` — slot select: `cap_offsets[...]` gains
+  the `rect_id`-parity slot term (offset already rides the existing
+  paint message, `:3107/:3254`).
+- xorgxrdp `rdpDeferredUpdateCallback:3368` + monitor-loop recheck
+  `:3397` — gate `rect_id > rect_id_ack` -> `> rect_id_ack + 1`,
+  **conditioned on the AVC444 capture code** (the callback is shared by
+  all capture modes; others keep 1 slot).
+- `common/xup_client_info.h` — contract version bump (mismatch already
+  refuses loudly).
+- **xrdp: zero code change** (verified: `xup.c:1187` reads per-frame
+  `shmem_offset`, maps whole segment; encoder guards
+  `xrdp_encoder.c:1159/:1371` are offset-relative vs `data_bytes`).
+
+**Properties preserved (per the frame-accounting review):**
+(1) N+1 drains with no successor damage: capture==send in `rdpCapRect`
+(`:3285`), `proc_enc_msg` drains the whole fifo per wakeup
+(`xrdp_encoder.c:2266`), `process_enc_done` sends unconditionally —
+the fif gate withholds only msg 106, never the client send.
+(2) Bounded inventory: worst case 2 raw slots + 2 compressed in flight
+(+1 raw vs today); on client-ack stall msg 106 stops -> source freezes
+after <=2 frames -> damage coalesces in `dirtyRegion` (drop stays
+pre-encode; P-chain forbids post-encode drops anyway).
+
+**Acceptance:**
+- frame_accounting.sh: period ~= encode duration; capture overlaps
+  encode in the event timeline.
+- smoke gate r/g/b/w incl. tail frame; multi-size.
+- NEW ack-leak test: kill ffmpeg mid-encode with a queued successor
+  frame; both rect_ids must still ack and capture must resume (budget
+  leak = silent half-speed at 1, freeze at 2).
+- Loud assertions shipped with the change: outstanding <= 2, encoder
+  fifo queued depth <= 1 (bound is enforced by the remote producer
+  gate — assert it locally so future edits fail noisily).
+- Dual-monitor: budget accounting must not let one monitor's stall
+  starve the other (today's single global rect_id/ack already
+  serializes across monitors — verify, don't regress).
+- Slot count is FIXED at 2 in the versioned contract (anti-ratchet: a
+  third slot is a contract change requiring owner sign-off, not a
+  tuning knob).
+
+**Known tradeoff (recorded):** eager capture means up to one
+encode-time of content age under saturation (~15-30ms) — throughput
+bought with staleness; the r/g/b/w single-event latency path is
+unchanged (slots empty -> capture -> encode -> send, byte-identical).
 
 **Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
 (xup contract v20260726, both daemons refuse loudly on mismatch). Unit:

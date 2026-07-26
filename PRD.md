@@ -148,6 +148,10 @@ The first milestone targets AVC444 codec ID `0x000E`. AVC444v2 codec ID `0x000F`
 
 The first milestone always uses `LC=0`: main and auxiliary views are sent together. `LC=1`/`LC=2` scheduling is deferred.
 
+**SUPERSEDED in design (2026-07-26).** `LC=1`/`LC=2` scheduling is now
+specified as FR-PROC-7 (preemptive aux — no idle heuristic), ordered
+after FR-CAPTURE-8, which is its structural prerequisite.
+
 ### NG-7: Zero-copy process transport
 
 Complete reconstructed subframes are serialized to FFmpeg. The extra process-boundary copies are an accepted portability tradeoff.
@@ -548,6 +552,71 @@ during 4K drags with cost proportional to damage size:
 xrdp then re-walked every pixel again, full-frame, regardless of damage.
 The row-decode fix is the whole pipeline's pixel work, damage-limited.)
 
+### FR-CAPTURE-8: Two-slot pipelined capture (designed 2026-07-26; ordered FIRST — structural prerequisite of FR-PROC-7 preemptive aux)
+
+**Motivation (measured, `PR-demo/t4_profile/frame_accounting.sh`).** The
+delivered frame rate is capped at ~20 fps by a fully serial cycle: the
+capture stage refuses to run while the previous rect is unacked
+(`rect_id > rect_id_ack`), and the ack arrives only at encode return —
+so the ~30 ms synchronous main+aux encode serializes with the ~10 ms
+capture/handoff even though the network runs at <10% utilization and
+the client decode queue is empty on every ack.
+
+Contract, when implemented:
+
+1. The FR-CAPTURE-6 per-monitor region is doubled into exactly **two
+   slots** (each the full `[main NV12][aux NV12]` layout, page-aligned).
+   The slot count is FIXED at 2 in the versioned contract: a third slot
+   is a contract change requiring owner sign-off, never a tuning knob —
+   each extra slot adds one frame of raw inventory and one frame of
+   backpressure lag (see 5).
+2. Slot selection is `rect_id` parity, carried in the **existing**
+   per-frame `shmem_offset` field of the paint message. The ack
+   message (106) and its semantics are UNCHANGED: ack of rect N means
+   xrdp is done with N's slot (its borrowed pages are proven consumed
+   at encode return by the FR-PROC-6 `in_iov_pending` check).
+3. The capture gate relaxes from one outstanding rect to two
+   (`rect_id > rect_id_ack + 1`), **conditioned on the AVC444 capture
+   code** — the deferred-update callback is shared by all capture
+   modes, and modes with single-slot layouts keep today's gate.
+4. **No third capture.** With both slots outstanding, damage
+   accumulates only in the dirty region (union + extents collapse), as
+   today. Frames are dropped before they exist — the only legal drop
+   point, since the single H.264 reference chain (§6.5) forbids
+   discarding an encoded frame.
+5. Bounded inventory and backpressure (explicit): worst case is 2 raw
+   slots + 2 compressed frames in flight (+1 raw frame vs the serial
+   design). On a client-ack stall the module ack is withheld, the
+   source freezes after at most the slot budget, and coverage merges.
+   The encoder input fifo's ≤1 queued depth is enforced remotely by
+   the producer gate — implementations MUST assert it (and the
+   ≤2-outstanding budget) locally and loudly.
+6. Frame N+1 must drain with **no successor damage**: this rides
+   existing paths (capture==send in `rdpCapRect`; the encoder thread
+   drains its whole fifo per wakeup; enc_done sends are unconditional)
+   and MUST NOT acquire a dependency on timers armed by new damage.
+   Error paths must preserve ack accounting: an encoder failure/child
+   restart with a queued successor still acks every outstanding
+   rect_id (a leaked ack is silent half-speed at one, capture freeze
+   at two). This is a required test.
+7. xrdp requires **no hot-path change** (the per-frame offset is
+   already read and bounds-checked offset-relative against the mapped
+   size); the xup client-info version bumps and both daemons refuse
+   loudly on mismatch.
+8. Recorded tradeoff: eager capture carries up to one encode-time of
+   content age under saturation (~15–30 ms) — throughput bought with
+   staleness. The single-event (r/g/b/w responsivity) path is
+   byte-identical to the serial design: with idle slots, capture,
+   encode and send happen immediately and nothing waits for a
+   successor.
+
+Expected effect: period drops from the serial sum (~50 ms) to ~the
+encode duration (~31–36 ms); composed with FR-PROC-7 preemptive aux
+(halved encode during motion) → ~16–18 ms, i.e. ~55–60 fps. Note the
+FR-PROC-7 interaction: once preemptive aux lands, the ack for rect N
+defers until aux N is sent or preempted (the slot holds the aux
+pixels until that decision).
+
 ### Integration seams
 
 - `xrdp_encoder_create()` in `xrdp/xrdp_encoder.c`
@@ -685,6 +754,62 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
 5. Page-aligned segments take the kernel's reference path (true zero-copy);
    unaligned tails fall back to an in-kernel copy — still never a
    user-space copy.
+
+### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
+
+Supersedes NG-6's deferral. During motion, frames are sent luma-first
+(`LC=1`, main view only); the auxiliary chroma is scheduled by
+**preemption, not by idle detection**. There is NO timer, NO idle
+threshold, NO "is the user active" policy anywhere in the pipeline.
+
+1. After encoding and sending main N (`LC=1`), the encoder thread's
+   existing fifo pop is the decision point:
+   - pop returns frame N+1 → aux N is **preempted** (superseded — N+1's
+     aux is fresher) and main N+1 encodes immediately;
+   - pop returns empty → aux N encodes NOW from the already-captured
+     slot and is sent as `LC=2`.
+   The aux therefore always eventually lands: the only thing that can
+   displace it is a newer main, by construction.
+2. **FR-CAPTURE-8 is a hard prerequisite.** The preemption signal is
+   "successor physically present in the fifo at pop time", which exists
+   only when capture overlaps encode (two slots). In the serial
+   single-slot pipeline the producer is ack-gated behind the encoder,
+   the fifo is always empty at pop time, and any workaround degenerates
+   into waiting one ack round-trip — an idle timer in disguise. Do not
+   implement FR-PROC-7 on the serial pipeline.
+3. The capture contract is UNCHANGED: xorgxrdp keeps packing both views
+   every frame (post-FR-CAPTURE-7 the aux pack share is ~1pp — noise).
+   The skip saves the aux **encode** (~half the dominant per-frame
+   encode term) and the aux **wire bytes** (~half), not the pack.
+   FR-PROC-7 is therefore xrdp-only.
+4. Slot-ack timing (FR-CAPTURE-8 interaction): the xup ack for rect N
+   is deferred until aux N is **sent or preempted** — its slot holds
+   the aux pixels until that decision. Worst case one extra aux-encode
+   of slot hold; the two-slot budget still clears at full rate.
+5. Stream construction stays within §6.5 and the measured ground truth:
+   one encoder, one reference chain, monotonic interleave; `LC=2`
+   aux frames are P-slices on the established chain (never their own
+   IDR/SPS); the exactly-one-SPS session bound is unchanged. This is
+   the Windows-shaped LC=1 (~93%) / LC=2 cadence and the macOS
+   prerequisite.
+6. A damage burst arriving while aux N encodes queues normally and
+   waits at most one aux encode (~15 ms) — bounded, self-correcting,
+   and that frame's aux is again preemptible.
+7. Recorded tradeoff: under sustained motion with no damage gap, aux
+   starves and chroma rides at 4:2:0 — i.e. AVC420 quality, which is
+   what motion gets from every shipping codec today, and consistent
+   with real Windows' 93% `LC=1` cadence. A periodic aux override is
+   explicitly NOT included; adding one later is a policy change
+   requiring owner sign-off and demonstrated visual evidence.
+8. Responsivity contract (the r/g/b/w gate): a single event produces
+   main N immediately (colors present at 4:2:0) and, with an empty
+   fifo, aux N lands one encode later (~15 ms) — full 4:4:4 fidelity
+   within one frame time, deterministically. The smoke gate gains a
+   color-edge fidelity check after settle to pin this.
+
+Expected effect, composed with FR-CAPTURE-8: steady-motion period
+~16–18 ms (~55–60 fps) at half the wire bytes, with full-chroma
+convergence one frame after any damage gap.
 
 ### FR-PROC-5: MVP FFmpeg command
 
