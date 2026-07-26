@@ -93,7 +93,18 @@ owner reference load above; harness:
 Lever 2.** (Recorded: with this order lever 1 realizes its full
 10-12pp immediately; lever 2 then subsumes the aux share.)
 
-## Lever 1: vectorize the AVC444 pack loops — TODO (next up, owner-ordered 2026-07-26)
+## Lever 1: vectorize the AVC444 pack loops — DEPLOYED to T4 (2026-07-26), awaiting owner acceptance run
+
+**Result (xorgxrdp `ee1ec01`).** Clamps hoisted into replicated
+row-buffer tails, aux pack split into single-output-stream flat loops,
+RDP_VECTORIZE on the fused function. Bench: T4 full-4K conversion
+19.24 -> 8.74 ms/frame (pure-decode floor 6.70), 2000x1000 drag rect
+4.27 -> 1.64 ms — beats the 10-12pp estimate (~15pp of a core under
+the owner load, projected). Gates: dev-box burr single+dual NO
+residual (bit-parity oracle), SMOKE PASS; deb sha256 9a7f0b6a…
+installed on T4. Acceptance = owner onscreen drag +
+`PR-demo/t4_profile/profile_owner_load.sh` re-run with the owner
+attached (expect Xorg ~46 -> ~30pp).
 
 Restructure the pack half of `a8r8g8b8_to_avc444_box` (xorgxrdp) into
 branchless/SIMD-friendly shuffle loops per PRD FR-CAPTURE-7, targeting
