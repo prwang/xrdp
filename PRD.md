@@ -1199,7 +1199,10 @@ The probe must verify:
 5. PTS/order is monotonic and input-order preserving;
 6. no picture is duplicated or dropped;
 7. packet payloads are Annex B;
-8. first packet has NUT key flag plus SPS, PPS, and IDR;
+8. first packet has NUT key flag plus SPS, PPS, and IDR — with **exactly
+   one SPS** (a duplicated parameter set blacks out strict decoders such
+   as the macOS Windows App VideoToolbox path; amended 2026-07-26,
+   FR-PROBE-6);
 9. second packet contains VCL data and follows in the same stream;
 10. four packets complete before the configured deadlines; and
 11. the child terminates and is reaped without fd leaks.
@@ -1213,6 +1216,37 @@ Within one established connection, the client capability and server selection ar
 ### FR-PROBE-5: Failure
 
 Probe failure removes only the configured `ffmpeg` H.264 candidate. It does not fail the xrdp service. Existing codec order then proceeds to the next entry, normally RFX. A separately configured linked H.264 backend remains a different administrator-selected mode rather than an implicit fallback.
+
+### FR-PROBE-6: Verify-only contract and outcome observability (2026-07-26)
+
+The probe is a **verifier of administrator-declared policy, never a policy
+discoverer**. The in-band parameter-set policy (`[avc444_ffmpeg]
+dump_extra` in `gfx.toml`) is static per-deployment configuration, exactly
+like `encoder_args`; the probe runs **once** per capability decision with
+the declared value and either confirms it or removes the AVC candidate.
+
+1. **No adaptation, no cascade.** A probe failure must never change the
+   wire policy or re-run the probe with a different command line. Only a
+   CONTENT reject (a parsed first packet that violates the declared header
+   contract) is deterministic evidence about the encoder; a timeout, spawn
+   failure or stream error is environmental. Rationale (T4, 2026-07-26):
+   the earlier adaptive ladder ("probe pristine, retry with dump_extra on
+   failure") could not distinguish the two, so a cold-GPU timeout on the
+   pristine attempt followed by a warm retry would have enabled
+   `dump_extra` on an in-band encoder — duplicated SPS/PPS, the exact
+   strict-decoder black-screen class the ladder was built to prevent.
+2. **Exactly-once parameter sets.** The first packet must carry exactly
+   one SPS. `dump_extra = true` on an encoder that already repeats headers
+   in-band is refused (CONTENT reject: duplicates); `dump_extra = false`
+   on an extradata-only encoder is refused (CONTENT reject: missing). The
+   runtime first-packet validator enforces the same bound.
+3. **Observable verdicts.** Every probe outcome is classified and logged:
+   `OK / BAD_CONFIG / SPAWN_FAIL / TIMEOUT / STREAM_ERROR /
+   CONTENT_REJECT`, with the failing-check description, packet count,
+   elapsed time, the child's stderr (bounded, sanitized) and the child's
+   exit status. A probe failure must be diagnosable from the log alone —
+   no live-box shim or off-box replay required (observability debt from
+   the 2026-07-22 and 2026-07-26 T4 incidents).
 
 ---
 
@@ -2349,6 +2383,37 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   headerless-x264 encoder; the probe now logs a WARNING steering configs
   toward in-band-header encoders. Structural suspect for the follow-up:
   x264 zerolatency emits 2 IDR slices vs NVENC's 1 (BACKLOG).
+
+- **2026-07-26 — the adaptive dump_extra ladder was replaced by static
+  gfx.toml configuration + a verify-once probe (FR-PROBE-6), after a T4
+  cold-boot heisenbug.** First connections after the T4 instance booted
+  fell back to RFX: both ladder attempts burned the full 4 s probe
+  deadline (GPU up 01:07, failures 01:15/01:18). Forensics: a warm probe
+  at 01:39 passed in 2.2 s through the same daemon, and an offline replay
+  of the captured nvenc bytes through the real NUT parser + validators
+  passed every check — the failure was cold CUDA/NVENC first-init
+  latency, not content. Root design flaw: the probe returned one bit, so
+  the ladder treated TIMEOUT as if it were CONTENT evidence and flipped
+  `use_dump_extra` on either; the latent wrong-bit hazard (cold pristine
+  timeout + warm dump_extra retry ⇒ duplicated SPS/PPS ⇒ strict-decoder
+  black) was the same failure class `7927efa7` had been built to prevent.
+  Owner directive: header policy is per-box admin configuration (like
+  `encoder_args`) — `[avc444_ffmpeg] dump_extra = true|false`; the probe
+  verifies the declaration (exactly-one-SPS, bidirectional: missing AND
+  duplicated headers are both CONTENT rejects with actionable messages)
+  and never adapts. Observability debt paid in the same change: outcome
+  classes, child stderr, child exit status, elapsed time all logged
+  (2026-07-22 item "probe must log child stderr" folded in). Forensics
+  during diagnosis also disproved environment suspects measured live:
+  ffmpeg+nvenc passed in ~1.4 s as the xrdp user under the unit's
+  `SystemCallFilter=@system-service` seccomp sandbox, ruling out
+  permissions/sandbox and leaving cold-init timing as the only
+  consistent cause. The probe deadline itself was NOT widened (per the
+  strict-honesty rule that widening timeouts masks symptoms): a cold
+  boot now degrades one connection with a self-explaining TIMEOUT log
+  line and recovers on reconnect, and the policy bit cannot be
+  mis-learned. Tested NVENC block recorded in `xrdp/gfx.toml` and
+  `man 5 gfx.toml` (Tesla T4, driver 580.159.03, Ubuntu ffmpeg 8.0.1).
 
 ## 26. Related work and differentiation
 

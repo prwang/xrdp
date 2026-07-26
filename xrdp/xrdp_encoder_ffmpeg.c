@@ -189,8 +189,10 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     memset(cfg, 0, sizeof(*cfg));
     xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
-    cfg->use_dump_extra = 0;  /* enabled by the probe only when the encoder
-                               * emits no in-band parameter sets */
+    cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
+                               * [avc444_ffmpeg] dump_extra); verified --
+                               * never changed -- by the probe
+                               * (PRD FR-PROBE-6) */
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
@@ -479,24 +481,29 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
 }
 
 /*****************************************************************************/
-static void
+/* returns the child's waitpid status, or -1 when it could not be collected */
+static int
 reap_child(int pid, int grace_ms)
 {
     long long deadline;
-    int status;
+    int status = -1;
 
     if (pid <= 0)
     {
-        return;
+        return -1;
     }
     kill(pid, SIGTERM);
     deadline = now_ms() + (grace_ms > 0 ? grace_ms : 250);
     for (;;)
     {
         pid_t r = waitpid(pid, &status, WNOHANG);
-        if (r == pid || (r < 0 && errno == ECHILD))
+        if (r == pid)
         {
-            return;
+            return status;
+        }
+        if (r < 0 && errno == ECHILD)
+        {
+            return -1;
         }
         if (now_ms() >= deadline)
         {
@@ -505,7 +512,11 @@ reap_child(int pid, int grace_ms)
         usleep(5000);
     }
     kill(pid, SIGKILL);
-    waitpid(pid, &status, 0);
+    if (waitpid(pid, &status, 0) == pid)
+    {
+        return status;
+    }
+    return -1;
 }
 
 /*****************************************************************************/
@@ -788,10 +799,21 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
 
     if (self->pairs_returned == 0)
     {
-        if (!xrdp_h264_main_reset_ok(self->main_buf, self->main_len))
+        struct xrdp_h264_nal_summary sum;
+
+        if (xrdp_h264_scan_annexb(self->main_buf, self->main_len,
+                                  &sum) != 0 ||
+                !sum.has_sps || !sum.has_pps || !sum.has_idr)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: reset main packet lacks "
                 "SPS/PPS/IDR");
+            return 1;
+        }
+        if (sum.sps_count != 1)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: reset main packet carries "
+                "%d SPS (must be exactly 1; strict decoders black out on "
+                "duplicated parameter sets)", sum.sps_count);
             return 1;
         }
     }
@@ -842,10 +864,21 @@ pop_single(struct xrdp_ffmpeg_avc444 *self,
 
     if (self->pairs_returned == 0)
     {
-        if (!xrdp_h264_main_reset_ok(self->main_buf, self->main_len))
+        struct xrdp_h264_nal_summary sum;
+
+        if (xrdp_h264_scan_annexb(self->main_buf, self->main_len,
+                                  &sum) != 0 ||
+                !sum.has_sps || !sum.has_pps || !sum.has_idr)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: reset packet lacks "
                 "SPS/PPS/IDR");
+            return 1;
+        }
+        if (sum.sps_count != 1)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: reset packet carries %d SPS "
+                "(must be exactly 1; strict decoders black out on "
+                "duplicated parameter sets)", sum.sps_count);
             return 1;
         }
     }
@@ -1239,7 +1272,81 @@ make_probe_frame(unsigned char *buf, int nv12_size, int cw, int ch, int idx)
 }
 
 /*****************************************************************************/
-int
+const char *
+xrdp_ffmpeg_probe_result_str(enum xrdp_ffmpeg_probe_result res)
+{
+    switch (res)
+    {
+        case XRDP_FFMPEG_PROBE_OK:
+            return "OK";
+        case XRDP_FFMPEG_PROBE_BAD_CONFIG:
+            return "BAD_CONFIG";
+        case XRDP_FFMPEG_PROBE_SPAWN_FAIL:
+            return "SPAWN_FAIL";
+        case XRDP_FFMPEG_PROBE_TIMEOUT:
+            return "TIMEOUT";
+        case XRDP_FFMPEG_PROBE_STREAM_ERROR:
+            return "STREAM_ERROR";
+        case XRDP_FFMPEG_PROBE_CONTENT_REJECT:
+            return "CONTENT_REJECT";
+    }
+    return "UNKNOWN";
+}
+
+#define FF_PROBE_ERRLINE 512
+
+/*****************************************************************************/
+/* split probe child stderr into bounded lines and log each one (the        */
+/* runtime path does the same via drain_stderr; the probe has no handle to  */
+/* hold the line buffer, so the caller keeps one on its stack)              */
+static void
+probe_log_stderr(char *line, int *line_len, const char *tmp, int n)
+{
+    int i;
+
+    for (i = 0; i < n; i++)
+    {
+        if (tmp[i] == '\n' || *line_len >= FF_PROBE_ERRLINE - 1)
+        {
+            if (*line_len > 0)
+            {
+                log_stderr_line(line, *line_len);
+            }
+            *line_len = 0;
+            if (tmp[i] == '\n')
+            {
+                continue;
+            }
+        }
+        line[(*line_len)++] = tmp[i];
+    }
+}
+
+/*****************************************************************************/
+/* render a waitpid status for the probe log                                */
+static void
+describe_child_status(int status, char *out, int out_size)
+{
+    if (status < 0)
+    {
+        snprintf(out, out_size, "not reaped");
+    }
+    else if (WIFEXITED(status))
+    {
+        snprintf(out, out_size, "exited %d", WEXITSTATUS(status));
+    }
+    else if (WIFSIGNALED(status))
+    {
+        snprintf(out, out_size, "killed by signal %d", WTERMSIG(status));
+    }
+    else
+    {
+        snprintf(out, out_size, "status 0x%x", status);
+    }
+}
+
+/*****************************************************************************/
+enum xrdp_ffmpeg_probe_result
 xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
                          int coded_width, int coded_height)
 {
@@ -1254,23 +1361,33 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     int off = 0;
     int total;
     int got = 0;
+    long long start;
     long long deadline;
-    int ok = 0;
     int fail = 0;
     int closed = 0;
     long long last_pts = -1;
+    enum xrdp_ffmpeg_probe_result res = XRDP_FFMPEG_PROBE_OK;
+    const char *why = "";
+    char errline[FF_PROBE_ERRLINE];
+    int errline_len = 0;
+    int child_status = -1;
+    char status_str[64];
 
     if (cfg == NULL || cfg->path[0] != '/' || coded_width < 16 ||
             coded_height < 16)
     {
-        return 1;
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: probe BAD_CONFIG: path not "
+            "absolute or coded size below 16");
+        return XRDP_FFMPEG_PROBE_BAD_CONFIG;
     }
     nv12_size = coded_width * coded_height + coded_width * (coded_height / 2);
     total = 4 * nv12_size;
     blob = (unsigned char *)malloc(total);
     if (blob == NULL)
     {
-        return 1;
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: probe SPAWN_FAIL: out of "
+            "memory");
+        return XRDP_FFMPEG_PROBE_SPAWN_FAIL;
     }
     for (i = 0; i < 4; i++)
     {
@@ -1283,17 +1400,22 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     if (nut == NULL)
     {
         free(blob);
-        return 1;
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: probe SPAWN_FAIL: out of "
+            "memory");
+        return XRDP_FFMPEG_PROBE_SPAWN_FAIL;
     }
+    start = now_ms();
     if (spawn_child(cfg, coded_width, coded_height, &in_fd, &out_fd,
                     &err_fd, &pid) != 0)
     {
         xrdp_nut_delete(nut);
         free(blob);
-        return 1;
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: probe SPAWN_FAIL: cannot "
+            "spawn %s", cfg->path);
+        return XRDP_FFMPEG_PROBE_SPAWN_FAIL;
     }
-    deadline = now_ms() + (cfg->stream_ready_timeout_ms > 0 ?
-                           cfg->stream_ready_timeout_ms * 2 : 4000);
+    deadline = start + (cfg->stream_ready_timeout_ms > 0 ?
+                        cfg->stream_ready_timeout_ms * 2 : 4000);
     while (!fail && got < 4)
     {
         struct pollfd pfd[3];
@@ -1306,6 +1428,9 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
 
         if (now_ms() >= deadline)
         {
+            res = XRDP_FFMPEG_PROBE_TIMEOUT;
+            why = "no verdict within the deadline (cold encoder/device "
+            "init? child still starting?)";
             fail = 1;
             break;
         }
@@ -1330,6 +1455,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
             {
                 continue;
             }
+            res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+            why = "poll failed";
             fail = 1;
             break;
         }
@@ -1343,6 +1470,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
             else if (w < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
                      errno != EINTR)
             {
+                res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                why = "write to the child's input pipe failed";
                 fail = 1;
                 break;
             }
@@ -1356,11 +1485,14 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
         }
         while ((n = (int)read(err_fd, tmp, sizeof(tmp))) > 0)
         {
+            probe_log_stderr(errline, &errline_len, tmp, n);
         }
         while ((n = (int)read(out_fd, tmp, sizeof(tmp))) > 0)
         {
             if (xrdp_nut_feed(nut, (unsigned char *)tmp, n) != 0)
             {
+                res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                why = "NUT feed rejected (buffer limit exceeded)";
                 fail = 1;
                 break;
             }
@@ -1378,26 +1510,52 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
                 }
                 if (ev == XRDP_NUT_ERROR)
                 {
+                    res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                    why = "NUT parse error";
                     fail = 1;
                     break;
                 }
                 if (pkt.pts <= last_pts && got > 0)
                 {
+                    res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                    why = "non-monotonic pts";
                     fail = 1;
                     break;
                 }
                 last_pts = pkt.pts;
                 if (got == 0)
                 {
-                    if (!pkt.keyframe ||
-                            !xrdp_h264_main_reset_ok(pkt.data, pkt.len))
+                    struct xrdp_h264_nal_summary sum;
+                    int scan_ok =
+                        (xrdp_h264_scan_annexb(pkt.data, pkt.len,
+                                               &sum) == 0);
+                    if (!pkt.keyframe || !scan_ok || !sum.has_sps ||
+                            !sum.has_pps || !sum.has_idr)
                     {
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "first packet lacks keyframe flag or in-band "
+                              "SPS/PPS/IDR (extradata-only encoder such as "
+                              "h264_nvenc? set [avc444_ffmpeg] "
+                              "dump_extra = true in gfx.toml)";
+                        fail = 1;
+                        break;
+                    }
+                    if (sum.sps_count != 1)
+                    {
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "duplicated in-band SPS in the first packet "
+                              "(the encoder already repeats headers; set "
+                              "[avc444_ffmpeg] dump_extra = false -- "
+                              "strict decoders black out on duplicated "
+                              "parameter sets)";
                         fail = 1;
                         break;
                     }
                 }
                 else if (!xrdp_h264_aux_ok(pkt.data, pkt.len))
                 {
+                    res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                    why = "follow-up packet lacks a VCL NAL";
                     fail = 1;
                     break;
                 }
@@ -1414,17 +1572,25 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
         }
         if (n == 0 && got < 4)
         {
-            fail = 1; /* stdout EOF before four packets */
+            res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+            why = "child closed stdout before four packets";
+            fail = 1;
             break;
         }
     }
-    ok = (!fail && got == 4) ? 1 : 0;
+    if (!fail && got < 4)
+    {
+        /* defensive: loop left without a verdict */
+        res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+        why = "incomplete";
+        fail = 1;
+    }
     if (in_fd >= 0)
     {
         close(in_fd);
         in_fd = -1;
     }
-    reap_child(pid, cfg->terminate_grace_ms);
+    child_status = reap_child(pid, cfg->terminate_grace_ms);
     if (out_fd >= 0)
     {
         close(out_fd);
@@ -1433,7 +1599,23 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     {
         close(err_fd);
     }
+    if (errline_len > 0)
+    {
+        log_stderr_line(errline, errline_len);
+    }
     xrdp_nut_delete(nut);
     free(blob);
-    return ok ? 0 : 1;
+    if (!fail)
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: probe OK (dump_extra=%d) at "
+            "%dx%d in %lld ms", cfg->use_dump_extra, coded_width,
+            coded_height, now_ms() - start);
+        return XRDP_FFMPEG_PROBE_OK;
+    }
+    describe_child_status(child_status, status_str, sizeof(status_str));
+    LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: probe %s: %s (dump_extra=%d, "
+        "%dx%d, packets=%d, elapsed=%lld ms, child %s)",
+        xrdp_ffmpeg_probe_result_str(res), why, cfg->use_dump_extra,
+        coded_width, coded_height, got, now_ms() - start, status_str);
+    return res;
 }

@@ -72,16 +72,19 @@ struct xrdp_ffmpeg_avc444_config
     char path[256];                 /* absolute ffmpeg path                */
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
-                                    /* match the converter's width_align     */
+    /* match the converter's width_align     */
     int use_dump_extra;             /* chain the dump_extra bsf: ONLY for    */
-                                    /* encoders with no in-band SPS/PPS      */
-                                    /* (extradata only, e.g. h264_nvenc).    */
-                                    /* Unconditional use duplicates the      */
-                                    /* parameter sets on encoders that DO    */
-                                    /* repeat in-band (libx264/h264_vaapi)   */
-                                    /* and strict decoders then refuse to    */
-                                    /* present (macOS Windows App: black).   */
-                                    /* Decided by the connect-time probe.    */
+    /* encoders with no in-band SPS/PPS      */
+    /* (extradata only, e.g. h264_nvenc).    */
+    /* Unconditional use duplicates the      */
+    /* parameter sets on encoders that DO    */
+    /* repeat in-band (libx264/h264_vaapi)   */
+    /* and strict decoders then refuse to    */
+    /* present (macOS Windows App: black).   */
+    /* STATIC administrator policy (gfx.toml */
+    /* [avc444_ffmpeg] dump_extra), verified */
+    /* -- never changed -- by the probe      */
+    /* (PRD FR-PROBE-6).                     */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;
@@ -127,13 +130,37 @@ struct xrdp_avc444_encoded_pair
 
 struct xrdp_ffmpeg_avc444;
 
+/* Probe outcome classes (PRD FR-PROBE-6). Only CONTENT_REJECT is
+ * deterministic evidence about the encoder's bitstream; every other
+ * failure is environmental (cold GPU init, missing binary, broken driver)
+ * and MUST NOT be used to change the header policy. */
+enum xrdp_ffmpeg_probe_result
+{
+    XRDP_FFMPEG_PROBE_OK = 0,
+    XRDP_FFMPEG_PROBE_BAD_CONFIG,     /* invalid cfg/dims (caller error)   */
+    XRDP_FFMPEG_PROBE_SPAWN_FAIL,     /* fork/pipe failure                 */
+    XRDP_FFMPEG_PROBE_TIMEOUT,        /* no verdict within the deadline    */
+    XRDP_FFMPEG_PROBE_STREAM_ERROR,   /* early EOF, NUT parse error,       */
+    /*                                   non-monotonic pts, write failure  */
+    XRDP_FFMPEG_PROBE_CONTENT_REJECT  /* bitstream violates the declared   */
+    /*                                   header policy (missing or         */
+    /*                                   duplicated in-band SPS/PPS)       */
+};
+
+/** Short stable name for a probe result, for logging. */
+const char *
+xrdp_ffmpeg_probe_result_str(enum xrdp_ffmpeg_probe_result res);
+
 /**
- * Bounded behavioral probe (PRD FR-PROBE): spawn the exact command at the
- * given coded dimensions, submit four distinguishable NV12 pictures in
- * main/aux order, verify one ordered Annex-B packet per picture with
- * SPS/PPS/IDR in the first, then terminate and reap. Returns 0 on success.
+ * Bounded behavioral verification (PRD FR-PROBE): spawn the exact command
+ * at the given coded dimensions, submit four distinguishable NV12 pictures
+ * in main/aux order, verify one ordered Annex-B packet per picture with
+ * exactly one in-band SPS (plus PPS and IDR) in the first, then terminate
+ * and reap. Verifies the cfg->use_dump_extra the CALLER declared; never
+ * retries with a different policy. Logs the outcome class, packet count,
+ * elapsed time, child stderr and child exit status.
  */
-int
+enum xrdp_ffmpeg_probe_result
 xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
                          int coded_width, int coded_height);
 

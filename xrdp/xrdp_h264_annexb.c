@@ -90,9 +90,11 @@ xrdp_h264_scan_annexb(const unsigned char *data, int len,
         {
             case 7:
                 out->has_sps = 1;
+                out->sps_count++;
                 break;
             case 8:
                 out->has_pps = 1;
+                out->pps_count++;
                 break;
             case 5:
                 out->has_idr = 1;

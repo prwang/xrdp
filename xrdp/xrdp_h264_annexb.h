@@ -35,6 +35,9 @@ struct xrdp_h264_nal_summary
     int has_idr;    /* nal_unit_type 5 (IDR VCL)                           */
     int has_vcl;    /* nal_unit_type 1 or 5                                */
     int forbidden_bit_set; /* any NAL with forbidden_zero_bit == 1         */
+    int sps_count;  /* reset packets must carry EXACTLY ONE SPS: strict    */
+    int pps_count;  /* decoders (macOS VideoToolbox) black out on          */
+    /*                 duplicated parameter sets (PRD FR-PROBE-6)          */
 };
 
 /**
