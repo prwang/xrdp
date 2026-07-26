@@ -2334,6 +2334,10 @@ proc_enc_msg(void *arg)
             /* get first msg */
             tc_mutex_lock(mutex);
             enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
+            if (enc != 0)
+            {
+                self->fifo_to_proc_depth--;
+            }
             tc_mutex_unlock(mutex);
             while (enc != 0)
             {
@@ -2342,6 +2346,10 @@ proc_enc_msg(void *arg)
                 /* get next msg */
                 tc_mutex_lock(mutex);
                 enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
+                if (enc != 0)
+                {
+                    self->fifo_to_proc_depth--;
+                }
                 tc_mutex_unlock(mutex);
             }
         }

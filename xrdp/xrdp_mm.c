@@ -4618,6 +4618,7 @@ server_paint_rects_ex(struct xrdp_mod *mod,
         /* insert into fifo for encoder thread to process */
         tc_mutex_lock(mm->encoder->mutex);
         fifo_add_item(mm->encoder->fifo_to_proc, (void *) enc_data);
+        mm->encoder->fifo_to_proc_depth++;
         tc_mutex_unlock(mm->encoder->mutex);
 
         /* signal xrdp_encoder thread */
@@ -4735,6 +4736,17 @@ server_egfx_cmd(struct xrdp_mod *mod,
     /* insert into fifo for encoder thread to process */
     tc_mutex_lock(mm->encoder->mutex);
     fifo_add_item(mm->encoder->fifo_to_proc, enc);
+    mm->encoder->fifo_to_proc_depth++;
+    /* FR-CAPTURE-8: the two-slot producer gate bounds the queue to the
+       outstanding-rect budget; more means a leaked ack or a broken
+       gate on the xorgxrdp side (loud, mandated local assertion) */
+    if (mm->encoder->avc444_ffmpeg &&
+            mm->encoder->fifo_to_proc_depth > 2)
+    {
+        LOG(LOG_LEVEL_ERROR, "server_egfx_cmd: encoder input fifo depth "
+            "%d exceeds the two-slot outstanding budget",
+            mm->encoder->fifo_to_proc_depth);
+    }
     tc_mutex_unlock(mm->encoder->mutex);
     /* signal xrdp_encoder thread */
     g_set_wait_obj(mm->encoder->xrdp_encoder_event_to_proc);
