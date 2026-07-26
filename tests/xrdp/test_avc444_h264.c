@@ -31,6 +31,34 @@ START_TEST(test_h264_main_reset_sps_pps_idr)
     ck_assert_int_eq(s.has_idr, 1);
     ck_assert_int_eq(s.has_vcl, 1);
     ck_assert_int_eq(s.nal_count, 4);
+    ck_assert_int_eq(s.sps_count, 1);
+    ck_assert_int_eq(s.pps_count, 1);
+    ck_assert_int_eq(xrdp_h264_main_reset_ok(au, sizeof(au)), 1);
+}
+END_TEST
+
+START_TEST(test_h264_duplicate_sps_counted)
+{
+    /* the Mac-black wire shape: dump_extra chained onto an in-band
+     * encoder duplicates the parameter sets (2 SPS / 2 PPS observed live,
+     * 2026-07-23). The counts let probe and runtime enforce the
+     * exactly-one-SPS reset bound (PRD FR-PROBE-6). */
+    unsigned char au[] =
+    {
+        0, 0, 0, 1, NAL_SPS, 0x42, 0xc0, 0x0a,
+        0, 0, 1, NAL_PPS, 0xce,
+        0, 0, 0, 1, NAL_SPS, 0x42, 0xc0, 0x0a,
+        0, 0, 1, NAL_PPS, 0xce,
+        0, 0, 0, 1, NAL_IDR, 0x88, 0x99
+    };
+    struct xrdp_h264_nal_summary s;
+
+    ck_assert_int_eq(xrdp_h264_scan_annexb(au, sizeof(au), &s), 0);
+    ck_assert_int_eq(s.valid, 1);
+    ck_assert_int_eq(s.sps_count, 2);
+    ck_assert_int_eq(s.pps_count, 2);
+    /* presence-only check still passes -- the duplicate bound is the
+     * caller's (probe/pop_pair) responsibility via sps_count */
     ck_assert_int_eq(xrdp_h264_main_reset_ok(au, sizeof(au)), 1);
 }
 END_TEST
@@ -93,6 +121,7 @@ make_suite_avc444_h264(void)
     s = suite_create("Avc444H264");
     tc = tcase_create("avc444_h264");
     tcase_add_test(tc, test_h264_main_reset_sps_pps_idr);
+    tcase_add_test(tc, test_h264_duplicate_sps_counted);
     tcase_add_test(tc, test_h264_main_reset_missing_pps);
     tcase_add_test(tc, test_h264_aux_vcl);
     tcase_add_test(tc, test_h264_malformed);

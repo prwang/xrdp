@@ -1341,6 +1341,7 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
         if (want_420 || m == XRDP_GFX_AVC444)
         {
             struct xrdp_ffmpeg_avc444_config cfg;
+            enum xrdp_ffmpeg_probe_result pres;
             int cw;
             int ch;
             /* Probe at the LARGEST single monitor's coded size, not the
@@ -1356,33 +1357,24 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                       sizeof(cfg.path) - 1);
             cfg.encoder_args =
                 self->wm->gfx_config->avc444_ffmpeg_encoder_args;
-            LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: probing ffmpeg "
-                "%s %s at %dx%d", want_420 ? "AVC420" : "AVC444", cfg.path,
-                cw, ch);
-            /* adaptive dump_extra: probe the pristine bitstream first;
-             * only an encoder with extradata-only parameter sets (e.g.
-             * h264_nvenc) fails the reset-keyframe check and gets the
-             * dump_extra retry. Never both in-band and extradata copies
-             * on the wire (strict decoders black out on duplicates). */
-            cfg.use_dump_extra = 0;
-            if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) != 0)
-            {
-                cfg.use_dump_extra = 1;
-                if (xrdp_ffmpeg_avc444_probe(&cfg, cw, ch) == 0)
-                {
-                    LOG(LOG_LEVEL_WARNING, "  ffmpeg probe: encoder emits no "
-                        "in-band SPS/PPS; enabling dump_extra. Prefer an "
-                        "encoder that repeats headers in-band (libx264 "
-                        "repeat-headers=1, h264_vaapi, h264_nvenc): some "
-                        "strict decoders mis-render the dump_extra path.");
-                }
-                else
-                {
-                    cfg.use_dump_extra = -1; /* both probes failed */
-                }
-            }
-            self->avc444_dump_extra = (cfg.use_dump_extra == 1);
-            if (cfg.use_dump_extra >= 0)
+            /* In-band header policy is STATIC administrator configuration
+             * ([avc444_ffmpeg] dump_extra in gfx.toml). One verification
+             * run against the declared policy; the result is never adapted
+             * at runtime -- an environmental failure (cold-GPU timeout,
+             * spawn failure, stream error) must not cascade into a
+             * different wire policy (PRD FR-PROBE-6; a cold pristine
+             * timeout followed by a warm dump_extra retry would put
+             * duplicated SPS/PPS on the wire, the Mac-black class). */
+            cfg.use_dump_extra =
+                self->wm->gfx_config->avc444_ffmpeg_dump_extra;
+            LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: verifying "
+                "ffmpeg %s %s at %dx%d (gfx.toml dump_extra=%d)",
+                want_420 ? "AVC420" : "AVC444", cfg.path, cw, ch,
+                cfg.use_dump_extra);
+            pres = xrdp_ffmpeg_avc444_probe(&cfg, cw, ch);
+            self->avc444_dump_extra =
+                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.use_dump_extra;
+            if (pres == XRDP_FFMPEG_PROBE_OK)
             {
                 if (want_420)
                 {
@@ -1392,13 +1384,20 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 {
                     avc444_ffmpeg_ok = 1;
                 }
-                LOG(LOG_LEVEL_INFO, "  ffmpeg %s probe OK",
-                    want_420 ? "AVC420" : "AVC444");
+                LOG(LOG_LEVEL_INFO, "  ffmpeg %s verified OK "
+                    "(dump_extra=%d)", want_420 ? "AVC420" : "AVC444",
+                    cfg.use_dump_extra);
             }
             else
             {
-                LOG(LOG_LEVEL_WARNING, "  ffmpeg probe FAILED; removing "
-                    "external AVC candidate");
+                LOG(LOG_LEVEL_WARNING, "  ffmpeg verification FAILED (%s); "
+                    "removing external AVC candidate. dump_extra is static "
+                    "gfx.toml policy and is never adapted at runtime; on "
+                    "CONTENT_REJECT fix [avc444_ffmpeg] dump_extra "
+                    "(in-band encoders such as libx264 repeat-headers=1 / "
+                    "h264_vaapi: false; extradata-only encoders such as "
+                    "h264_nvenc: true)",
+                    xrdp_ffmpeg_probe_result_str(pres));
             }
         }
     }

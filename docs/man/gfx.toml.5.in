@@ -207,6 +207,29 @@ edges look softer; it is provided mainly for compatibility and A/B comparison.
 The same \fBencoder_args\fR (including hardware encoders) apply to both.
 
 .TP
+\fBdump_extra\fR = \fI<boolean>\fR
+Static in\(hyband parameter\(hyset policy; set it to match the encoder chosen
+in \fBencoder_args\fR. Default: \fBfalse\fR.
+
+.RS
+.IP \(bu 3
+\fBfalse\fR \(em the encoder itself repeats SPS/PPS in\(hyband on every
+keyframe (\fBlibx264\fR with \fBrepeat\-headers=1\fR, \fBh264_vaapi\fR).
+.IP \(bu 3
+\fBtrue\fR \(em the encoder emits parameter sets only as global extradata
+(\fBh264_nvenc\fR); the \fBdump_extra\fR bitstream filter reinserts them into
+the byte stream.
+.RE
+
+The RDP GFX wire carries raw Annex\(hyB NAL units with no extradata
+side\(hychannel, so the parameter sets must be in the byte stream exactly once:
+a missing SPS/PPS is undecodable everywhere, and a duplicated SPS/PPS blacks
+out strict decoders (the macOS Windows App). The pre\(hyconnect verification
+therefore refuses the AVC candidate loudly \(em with the failure class in the
+log \(em when the declared value does not match the encoder's real bitstream.
+The value is never adapted at runtime.
+
+.TP
 \fBencoder_args\fR = \fI<array of strings>\fR
 The encoder block, inserted verbatim into the \fBffmpeg\fR argv immediately
 after the input mapping and before the output framing. Each array element
@@ -243,17 +266,23 @@ threaded\(hyframe delay so the child emits one encoded picture per input frame
 instead of withholding several until end\(hyof\(hystream.
 
 Example selecting an NVIDIA hardware encoder (xrdp needs no change to support
-this):
+this; tested on a Tesla T4, driver 580.159.03, Ubuntu ffmpeg 8.0.1).
+\fBh264_nvenc\fR keeps SPS/PPS in global extradata only, so
+\fBdump_extra = true\fR is required:
 
 .nf
 [avc444_ffmpeg]
 path = "/usr/bin/ffmpeg"
+dump_extra = true
 encoder_args = [
   "\-c:v", "h264_nvenc",
   "\-preset", "p1",
   "\-tune", "ll",
   "\-rc", "constqp",
   "\-qp", "20",
+  "\-bf", "0",
+  "\-delay", "0",
+  "\-g", "240",
 ]
 .fi
 

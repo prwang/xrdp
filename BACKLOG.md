@@ -11,6 +11,59 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 header policy: static gfx.toml `dump_extra` + verify-once probe — IN PROGRESS (2026-07-26, owner directive)
+
+Owner directive (chat, 2026-07-26): remove the adaptive dump_extra probe
+ladder. In-band header policy is per-box administrator configuration (like
+`encoder_args`, which gfx.toml already owns); the probe only VERIFIES it.
+
+**Why (T4 cold-boot heisenbug, 2026-07-26).** First connections after the
+T4 instance boot fell back to RFX: both ladder attempts burned the full 4s
+probe deadline (GPU up 01:07, failures 01:15/01:18; a warm probe at 01:39
+passed in 2.2s, and an offline replay of the same nvenc bytes through the
+real NUT parser + validators passes every check — cold CUDA first-init is
+the failure, not content). Underlying design flaw: the probe returned one
+bit, so the ladder could not distinguish CONTENT REJECT (deterministic
+evidence of extradata-only headers) from TIMEOUT (environmental), and it
+flipped `use_dump_extra` on either. Latent WRONG-BIT hazard: an in-band
+encoder timing out pristine then passing a warm dump_extra retry would put
+duplicated SPS/PPS on the wire — the exact Mac-black bitstream class
+`7927efa7` was built to prevent.
+
+**Scope.**
+- gfx.toml `[avc444_ffmpeg] dump_extra = true|false` (default false);
+  tconfig field + parse; template and man page document it, including the
+  tested NVENC block (Tesla T4, driver 580.159.03, ffmpeg 8.0.1,
+  2026-07-26).
+- The adaptive ladder in `xrdp_mm.c` is deleted; ONE probe run with the
+  configured flag; a timeout (or any environmental failure) must never
+  cascade into a different header policy.
+- Probe observability debt paid: outcome classes (OK / SPAWN_FAIL /
+  TIMEOUT / STREAM_ERROR / CONTENT_REJECT), child stderr logged, child
+  exit status logged, elapsed + packet count logged. (Folds in the
+  "Probe must log child stderr" item below.)
+- Bidirectional contract check: the reset packet must carry EXACTLY ONE
+  SPS. `dump_extra = true` on an in-band encoder is refused at the probe
+  (duplicates) instead of shipping Mac-black bytes; `dump_extra = false`
+  on an extradata-only encoder is refused with a message naming the fix.
+  The runtime first-packet check gains the same duplicate guard.
+- PRD: FR-PROBE-6 (verify-only contract) + §25 addendum.
+
+**Signed-off shipped-behavior change** (strict-honesty rule): the silent
+runtime adaptation is REMOVED. A wrong/missing `dump_extra` now loudly
+removes the AVC candidate for that connection (codec order proceeds, e.g.
+RFX) with an actionable log line. Owner directive in chat, 2026-07-26.
+
+**Acceptance.**
+- Unit: tconfig parses `dump_extra` (absent → false); pristine probe of a
+  global-header encoder returns CONTENT_REJECT (not a generic failure);
+  the same encoder with dump_extra returns OK; dump_extra on an in-band
+  encoder returns CONTENT_REJECT (duplicate SPS); a hanging fake encoder
+  returns TIMEOUT; exactly-one-SPS wire guard passes in both configs.
+- T4: deb built from the committed branch, installed; `/etc/xrdp/gfx.toml`
+  sets `dump_extra = true` for h264_nvenc; a fresh connection logs the
+  verification PASS and matches AVC444; failure classes visible in log.
+
 ## AVC444 resize-to-black regression (non-16-aligned surface) — FIX DONE (2026-07-25)
 
 **Symptom (owner, single 4K monitor):** resize from fullscreen to a smaller
@@ -841,7 +894,7 @@ encoders. If revisited, the structural suspect is slice count (x264
 `-x264-params slices=1` and one disciplined Mac run. Cheapest to fold
 into the batched T4 hour alongside the NVENC 444 rerun.
 
-## Re-fold slice 7 on the clean branch with the ADAPTIVE dump_extra — TODO (2026-07-23)
+## Re-fold slice 7 on the clean branch with the STATIC dump_extra config — TODO (2026-07-23, reshaped 2026-07-26)
 
 **GATES the AVC444 upstream port** (owner, 2026-07-24: "NVENC Linux test
 regressed"): the NVENC-on-Linux path must be green — the blanket-`dump_extra`
@@ -850,14 +903,15 @@ reframe is ported. See `docs/avc444_upstream_port_plan.md` gate 2.
 
 The clean branch `avc444-ffmpeg-upstream` @ `c74a09e7` carries the
 BLANKET dump_extra (slice 7 `04e43ee2`), which is the regression fixed on
-dev by `7927efa7`. Before any upstream push the slice-7 fold must be
-redone with the adaptive form (probe pristine first, retry on missing
-headers; the `use_dump_extra` plumbing through cfg/mm/encoder). Same
-no-separate-fix-commit rule; re-run the bisectability walk after. The
-`c74a09e7` cleanroom deb and any artifact built from it are POISONED for
-the macOS client — do not hand out.
+dev by `7927efa7`. 2026-07-26 owner directive replaced the adaptive form
+in turn with the STATIC gfx.toml `dump_extra` + verify-once probe (see
+the item at the top; adaptive had a timeout→wrong-policy hazard). The
+slice-7 refold must use the static-config form — do not port the adaptive
+intermediate. Same no-separate-fix-commit rule; re-run the bisectability
+walk after. The `c74a09e7` cleanroom deb and any artifact built from it
+are POISONED for the macOS client — do not hand out.
 
-## Probe must log child stderr — TODO (2026-07-22)
+## Probe must log child stderr — FOLDED (2026-07-26) into "static dump_extra + verify-once probe" (top item)
 
 `xrdp_ffmpeg_avc444_probe()` drains and discards the child's stderr, so a
 probe failure logs only `ffmpeg probe FAILED` with no reason. The T4/NVENC

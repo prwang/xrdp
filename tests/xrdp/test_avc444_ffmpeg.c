@@ -113,13 +113,17 @@ count_sps(const unsigned char *d, int len)
     return n;
 }
 
-/* REGRESSION pair (both proven live):
- * - Tesla T4 2026-07-22: extradata-only encoders (h264_nvenc) fail the
- *   pristine probe; the dump_extra retry must succeed.
- * - macOS Windows App 2026-07-23: chaining dump_extra unconditionally
- *   DUPLICATED the parameter sets on in-band encoders and strict
- *   decoders rendered black; the pristine probe must fail first
- *   (use_dump_extra=0) before dump_extra may be enabled. */
+/* REGRESSION trio (all proven live; PRD FR-PROBE-6):
+ * - Tesla T4 2026-07-22: extradata-only encoders (h264_nvenc) violate the
+ *   in-band contract unless dump_extra reinserts the parameter sets. With
+ *   the STATIC gfx.toml policy this misconfiguration must be classified
+ *   as CONTENT_REJECT (deterministic evidence), never a generic failure.
+ * - macOS Windows App 2026-07-23: duplicated parameter sets (dump_extra
+ *   chained onto an in-band encoder) render BLACK on strict decoders.
+ *   The declared-policy verification must refuse that config outright.
+ * - Tesla T4 2026-07-26: a cold-GPU probe TIMEOUT was conflated with the
+ *   content reject by the old adaptive ladder and could flip the policy
+ *   bit; timeout is environmental and must classify as TIMEOUT. */
 START_TEST(test_ffmpeg_probe_global_header_encoder)
 {
     struct xrdp_ffmpeg_avc444_config cfg;
@@ -129,16 +133,61 @@ START_TEST(test_ffmpeg_probe_global_header_encoder)
         return; /* skipped: no ffmpeg configured */
     }
     set_global_header_only_args(&cfg);
-    /* pristine probe refuses the headerless stream ... */
+    /* dump_extra=false on an extradata-only encoder: refused, and refused
+     * for the RIGHT reason (content, not environment) */
     cfg.use_dump_extra = 0;
-    ck_assert_int_ne(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
-    /* ... and the dump_extra retry accepts it (the mm ladder) */
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_CONTENT_REJECT);
+    /* dump_extra=true matches this encoder: verified OK */
     cfg.use_dump_extra = 1;
-    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_OK);
 }
 END_TEST
 
-/* exactly ONE SPS per keyframe on the wire, in BOTH adaptive branches */
+/* the Mac-black misconfiguration: dump_extra=true on an encoder that
+ * already repeats headers in-band duplicates the SPS on the wire. The
+ * verification must refuse it (exactly-one-SPS bound) instead of letting
+ * it reach a strict decoder. */
+START_TEST(test_ffmpeg_probe_duplicate_headers_rejected)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return; /* skipped: no ffmpeg configured */
+    }
+    /* default args: libx264 with repeat-headers=1 (in-band) */
+    cfg.use_dump_extra = 1;
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_CONTENT_REJECT);
+}
+END_TEST
+
+/* a hanging "encoder" (cold hardware init, T4 2026-07-26) must classify
+ * as TIMEOUT -- environmental, carrying no evidence about header policy.
+ * Needs only /bin/sh, so it is not gated on XRDP_TEST_FFMPEG_PATH. */
+START_TEST(test_ffmpeg_probe_timeout_classified)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    char *abs_path;
+
+    xrdp_ffmpeg_avc444_config_default(&cfg);
+    /* XRDP_TOP_SRCDIR is relative for in-tree builds; the probe requires
+     * an absolute path */
+    abs_path = realpath(XRDP_TOP_SRCDIR
+                        "/tests/xrdp/gfx/fake_encoder_hang.sh", NULL);
+    ck_assert_ptr_ne(abs_path, NULL);
+    /* cfg.path is zero-filled by config_default, so this stays terminated */
+    strncpy(cfg.path, abs_path, sizeof(cfg.path) - 1);
+    free(abs_path);
+    cfg.stream_ready_timeout_ms = 100; /* deadline = 2x = 200ms */
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_TIMEOUT);
+}
+END_TEST
+
+/* exactly ONE SPS per keyframe on the wire, in BOTH static configs */
 START_TEST(test_ffmpeg_single_sps_per_keyframe)
 {
     struct xrdp_ffmpeg_avc444_config cfg;
@@ -443,6 +492,8 @@ make_suite_avc444_ffmpeg(void)
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ffmpeg_probe);
     tcase_add_test(tc, test_ffmpeg_probe_global_header_encoder);
+    tcase_add_test(tc, test_ffmpeg_probe_duplicate_headers_rejected);
+    tcase_add_test(tc, test_ffmpeg_probe_timeout_classified);
     tcase_add_test(tc, test_ffmpeg_single_sps_per_keyframe);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_encode_single);

@@ -50,7 +50,7 @@ struct xrdp_encoder
     int avc444_ffmpeg;
     int avc420_ffmpeg; /* emit plain AVC420 (codec id 0x000B), single view */
     int avc444_v2;   /* emit AVC444 v2 (ChromaV2, codec id 0x000F)    */
-    int avc444_dump_extra; /* probe decision: encoder needs dump_extra  */
+    int avc444_dump_extra; /* static gfx.toml policy, probe-verified    */
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;
@@ -64,7 +64,7 @@ struct xrdp_encoder
      * arm a short idle timer after a real frame and drain a bounded number of
      * duplicate frames to push the withheld frame out. */
     int avc444_flush_enabled;        /* gfx.toml tail_flush opt-in (last   */
-                                     /* resort; default off)               */
+    /* resort; default off)               */
     int avc444_flush_armed;          /* a tail frame may be withheld       */
     int avc444_flush_mon;            /* which surface to flush             */
     unsigned long long avc444_flush_seq; /* desktop_seq of latest real frame */

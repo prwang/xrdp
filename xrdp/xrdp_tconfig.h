@@ -106,6 +106,15 @@ struct xrdp_tconfig_gfx
      * (h264_vaapi -async_depth 1, or libx264 -tune zerolatency). Enable this
      * only when stuck on an encoder whose pipeline depth cannot be lowered. */
     int avc444_ffmpeg_tail_flush;
+    /* STATIC in-band parameter-set policy (administrator declaration, like
+     * encoder_args). 0 (default): the encoder repeats SPS/PPS in-band on
+     * keyframes (libx264 repeat-headers=1, h264_vaapi). 1: the encoder emits
+     * parameter sets only as global extradata (h264_nvenc); chain the
+     * dump_extra bsf to reinsert them. The pre-confirm probe VERIFIES the
+     * declared value against the real bitstream and refuses the AVC
+     * candidate on mismatch; it never changes the policy at runtime
+     * (PRD FR-PROBE-6). */
+    int avc444_ffmpeg_dump_extra;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

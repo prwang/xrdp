@@ -439,7 +439,7 @@ struct xrdp_mm
     int avc444_ffmpeg; /* external stock-ffmpeg AVC444 backend selected */
     int avc420_ffmpeg; /* external ffmpeg backend, plain AVC420 (0x000B) */
     int avc444_v2;     /* client supports AVC444 v2 (ChromaV2, 0x000F)   */
-    int avc444_dump_extra; /* probe decision: encoder needs dump_extra    */
+    int avc444_dump_extra; /* static gfx.toml policy, probe-verified      */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.
@@ -482,7 +482,7 @@ struct xrdp_keymap
     struct xrdp_key_info keys_shiftcapslockaltgr[SCANCODE_MAX_INDEX + 1];
     // NumLock is restricted to a much smaller set of keys
     struct xrdp_key_info keys_numlock[SCANCODE_MAX_NUMLOCK -
-                                          SCANCODE_MIN_NUMLOCK + 1];
+                                                               SCANCODE_MIN_NUMLOCK + 1];
 };
 
 /* the window manager */

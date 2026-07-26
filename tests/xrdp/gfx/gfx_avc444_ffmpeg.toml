@@ -5,6 +5,8 @@ h264_encoder = "ffmpeg"
 [avc444_ffmpeg]
 path = "/opt/custom/ffmpeg"
 avc_mode = "444v1"
+# static in-band header policy: h264_nvenc keeps SPS/PPS in extradata only
+dump_extra = true
 # verbatim encoder-arg passthrough (execve tokens, no shell). Replaces the
 # built-in default encoder block entirely.
 encoder_args = [

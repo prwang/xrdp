@@ -29,6 +29,17 @@ h264_encoder = "x264"
 # # compatibility knob; e.g. the macOS Windows App mis-renders v2/ChromaV2).
 # # Default auto.
 # avc_mode = "auto"
+# # dump_extra: STATIC in-band parameter-set policy; set it to match the
+# # encoder chosen in encoder_args (default false).
+# #   false: the encoder itself repeats SPS/PPS in-band on every keyframe
+# #          (libx264 with repeat-headers=1, h264_vaapi).
+# #   true:  the encoder emits parameter sets only as global extradata
+# #          (h264_nvenc); the dump_extra bitstream filter reinserts them.
+# # The pre-connect verification refuses the AVC candidate LOUDLY when the
+# # declared value does not match the encoder's real bitstream (missing or
+# # duplicated SPS -- duplicates black out strict decoders such as the macOS
+# # Windows App). The value is never adapted at runtime.
+# dump_extra = false
 # # tail_flush: legacy backstop, off by default and normally unnecessary. The
 # # historical "last frame withheld until next input" lag was a runner bug
 # # (stale content emitted under the current damage region) fixed by the now-
@@ -58,6 +69,15 @@ h264_encoder = "x264"
 #   "-c:v", "h264_vaapi",
 #   "-rc_mode", "CQP", "-qp", "20",
 #   "-bf", "0", "-async_depth", "1",
+# ]
+#
+# Hardware H.264 via NVENC (NVIDIA). Tested: Tesla T4, driver 580.159.03,
+# Ubuntu ffmpeg 8.0.1, 2026-07-26. h264_nvenc keeps SPS/PPS in global
+# extradata only, so dump_extra = true is REQUIRED with these args:
+# dump_extra = true
+# encoder_args = [
+#   "-c:v", "h264_nvenc", "-preset", "p1", "-tune", "ll",
+#   "-rc", "constqp", "-qp", "20", "-bf", "0", "-delay", "0", "-g", "240",
 # ]
 
 #

@@ -171,6 +171,9 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
     tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
     ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/usr/bin/ffmpeg");
     ck_assert_int_eq(gfxconfig.avc444_ffmpeg_avc_mode, XTC_AVC_AUTO);
+    /* dump_extra absent -> false: in-band header encoders are the default;
+     * the probe verifies (never adapts) this static policy */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_dump_extra, 0);
     a = &gfxconfig.avc444_ffmpeg_encoder_args;
     ck_assert_int_gt(a->count, 0);
     ck_assert_int_ge(find_enc_arg(a, "libx264"), 0);
@@ -201,6 +204,8 @@ START_TEST(test_tconfig_gfx_avc444_override)
     ck_assert_str_eq(gfxconfig.avc444_ffmpeg_path, "/opt/custom/ffmpeg");
     /* "444v1": AVC444 with codec id 0x000E pinned (v2/ChromaV2 suppressed) */
     ck_assert_int_eq(gfxconfig.avc444_ffmpeg_avc_mode, XTC_AVC_FORCE_444V1);
+    /* the stub declares an extradata-only encoder (h264_nvenc) */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_dump_extra, 1);
     a = &gfxconfig.avc444_ffmpeg_encoder_args;
     ck_assert_int_eq(a->count, 10);
     ck_assert_str_eq(a->arg[0], "-c:v");
