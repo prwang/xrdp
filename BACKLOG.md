@@ -26,6 +26,31 @@ row-decode restructure (`e7ecf30`, PRD FR-CAPTURE-7): T4 full-4K 19.2 ms,
 (sha256 4e0563c5…). Damage-proportional cost itself is by design
 (rect-limited packing); the constant was the bug.
 
+**Amdahl checkpoint (2026-07-26, owner-directed profile before further
+loop tuning).** New harness `PR-demo/t4_profile/profile_drag.sh` (real
+T4 AVC444/nvenc session as throwaway `tester`, scripted 2000x1000
+xdotool drag on the 4K screen, perf on the session Xorg). Result: the
+bottleneck HAS shifted — process split during drag: ffmpeg ~21-27%,
+Xorg ~18%, xrdp ~13-15% of a core (none saturated under the scripted
+~50 moves/s load). Inside Xorg: pack loops 36.5% + vectorized
+avc444_decode_row.avx2 17.8% (AVX2 clone confirmed selected) + fbBlt
+window-move blit 12.2% (X core, not ours) + glyph drawing 2.9%.
+Implications: (a) further pack-loop vectorization can reclaim at most
+~1/3 of Xorg's 18% ≈ 6pp of a core — diminishing; (b) the largest
+single consumer is now the ffmpeg child's INPUT side (pipe read =
+27.6 MB/frame kernel-to-user copy + rawvideo framing + nvenc upload) —
+the high-leverage next step is sending FEWER BYTES, i.e. the planned
+LC=1/LC=2 reframe (skip the aux view when chroma is unchanged), which
+halves encoder input AND is the Mac-compat prerequisite; (c) xrdp's
+13-15% is vmsplice page-ref + NUT demux kernel time — structural,
+small. Owner observation of Xorg near a full core likely includes xfce
+compositor damage amplification (tester harness runs WM-less); verify
+against the owner's xfce session when they retest. T4 config changes
+for the harness, both reversible and recorded: `tester` user (cred in
+root-only /root/.tester_cred on the T4), /etc/xrdp/wm1.sh now lets
+non-ubuntu users exec ~/.xsession (backup wm1.sh.bak-profile; ubuntu
+path unchanged).
+
 **Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
 (xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
 83/83 incl. new page-aligned layout math; the ffmpeg encode tests
