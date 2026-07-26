@@ -1,108 +1,117 @@
 #!/bin/sh
-# Bring up an OFFSCREEN tester session on the T4 that reproduces the
-# owner's dual-monitor layout — 2560x1440 (top, +594+0) stacked on
-# 3840x2400 (bottom 4K, +0+1440), virtual screen 3840x3840 — without
-# any human client attached. Run FROM the dev box.
+# Bring up an OFFSCREEN dual-monitor RDP session on the T4 that reproduces
+# the owner's layout — 2560x1440 (top, +594+0) stacked on 3840x2400
+# (bottom 4K, +0+1440), virtual screen 3840x3840 — with no human client
+# attached. Runs ENTIRELY on the dev box per CLAUDE.md "T4 test
+# methodology": local Xorg+dummy client display with two ACTIVE outputs
+# (fake `xrandr --setmonitor` monitors are inactive and FreeRDP's
+# XRRGetMonitors(get_active=1) ignores them — learned 2026-07-26), local
+# H264-capable xfreerdp3 with /multimon, ssh -L forward to the T4's
+# loopback RDP port, login as ubuntu (owner-equivalent account).
 #
-# How: Xvfb :99 at the virtual-screen size on the T4, two FAKE RandR
-# monitors via `xrandr --setmonitor` matching the owner geometry, then
-# a fresh xfreerdp3 /multimon login as tester (wm1.sh gives tester the
-# same xfce stack as the owner, so drag workloads are representative).
-# On success prints the session display, Xauthority path and server-
-# side monitor list; the frame-accounting/demo harnesses then run with
-#   DISP=<display> XAUTH=/var/run/xrdp/<uid>/Xauthority SESS_USER=tester
-#
-# Box assumptions (env-overridable): tester account with empty password
-# (same as the smoke gate), xrdp on 127.0.0.1:3389, xfreerdp3 + Xvfb
-# installed on the T4.
-T4=${T4:-ubuntu@3.86.96.223}
+# NOTE: dummy-driver client X validated on the old T4; first run on this
+# dev box should verify Xorg+dummy starts in this container.
+T4=${T4:-$(cat /root/.t4_host 2>/dev/null)}
 T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
+[ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
+RDP_USER=${RDP_USER:-ubuntu}
+CRED_FILE=${RDP_PASS_FILE:-/root/.ubuntu_cred}
+LPORT=${TUNNEL_PORT:-33890}
 CLI=${CLI:-:99}
 MON0=${MON0:-2560x1440+594+0}
 MON1=${MON1:-3840x2400+0+1440}
 VSIZE=${VSIZE:-3840x3840}
-RDP_USER=${RDP_USER:-tester}
-# root-owned credential file on the T4 (never printed; see /args-from)
-RDP_PASS_FILE=${RDP_PASS_FILE:-/root/.tester_cred}
 
 set -e
-ssh -i "$T4_KEY" "$T4" CLI="$CLI" MON0="$MON0" MON1="$MON1" \
-    VSIZE="$VSIZE" RDP_USER="$RDP_USER" RDP_PASS_FILE="$RDP_PASS_FILE" \
-    'bash -s' <<'REMOTE'
-set -e
-geom() { echo "$1" | sed 's/[x+]/ /g'; }   # "WxH+X+Y" -> "W H X Y"
+t4() { ssh -i "$T4_KEY" "$T4" "$@"; }
 
-# client-side X server at the full virtual-screen size
-if ! DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null \
-        | grep -q "^${VSIZE%x*} ${VSIZE#*x}$"; then
-    pkill -9 -f "Xvfb $CLI" 2>/dev/null || true
-    sleep 1
-    setsid Xvfb "$CLI" -screen 0 "${VSIZE}x24" </dev/null >/dev/null 2>&1 &
-    sleep 2
+if ! ss -tln 2>/dev/null | grep -q ":$LPORT "; then
+    ssh -i "$T4_KEY" -f -N -o ExitOnForwardFailure=yes \
+        -L "$LPORT:127.0.0.1:3389" "$T4"
 fi
-# fake RandR monitors: xfreerdp3 /multimon announces one RDP monitor
-# per RandR monitor, which is how the server ends up with the owner's
-# stacked rdp0/rdp1 layout
-DISPLAY=$CLI xrandr --delmonitor fake0 >/dev/null 2>&1 || true
-DISPLAY=$CLI xrandr --delmonitor fake1 >/dev/null 2>&1 || true
-set -- $(geom "$MON0")
-DISPLAY=$CLI xrandr --setmonitor fake0 "$1/${1}x$2/$2+$3+$4" none
-set -- $(geom "$MON1")
-DISPLAY=$CLI xrandr --setmonitor fake1 "$1/${1}x$2/$2+$3+$4" none
+
+# local client X server: Xorg + dummy driver, two VirtualHeads so both
+# monitors are ACTIVE RandR monitors that FreeRDP announces via /multimon
+if ! DISPLAY=$CLI xrandr --listactivemonitors 2>/dev/null \
+        | grep -q "Monitors: 2"; then
+    cat > /tmp/xorg-dummy.conf <<'EOF'
+Section "ServerFlags"
+    Option "AutoAddDevices" "false"
+    Option "DontVTSwitch" "true"
+EndSection
+Section "Device"
+    Identifier "dummy"
+    Driver "dummy"
+    VideoRam 262144
+    Option "VirtualHeads" "2"
+EndSection
+Section "Monitor"
+    Identifier "mon0"
+EndSection
+Section "Screen"
+    Identifier "screen0"
+    Device "dummy"
+    Monitor "mon0"
+    DefaultDepth 24
+    SubSection "Display"
+        Depth 24
+        Virtual 3840 3840
+    EndSubSection
+EndSection
+EOF
+    pkill -9 -x Xorg 2>/dev/null || true
+    pkill -9 -x Xvfb 2>/dev/null || true
+    sleep 1
+    setsid Xorg "$CLI" -config /tmp/xorg-dummy.conf -noreset -nolisten tcp \
+        -logfile /tmp/xorg99.log </dev/null >/dev/null 2>&1 &
+    sleep 4
+    geom() { echo "$1" | sed 's/[x+]/ /g'; }
+    set -- $(geom "$MON0")
+    M1=$(cvt -r "$1" "$2" 60 | grep Modeline | sed 's/Modeline //;s/"[^"]*"//')
+    P0="+$3+$4"; MODE0="${1}x$2"
+    set -- $(geom "$MON1")
+    M2=$(cvt -r "$1" "$2" 60 | grep Modeline | sed 's/Modeline //;s/"[^"]*"//')
+    P1="+$3+$4"; MODE1="${1}x$2"
+    DISPLAY=$CLI xrandr --newmode own0 $M1
+    DISPLAY=$CLI xrandr --newmode own1 $M2
+    DISPLAY=$CLI xrandr --addmode DUMMY0 own0
+    DISPLAY=$CLI xrandr --addmode DUMMY1 own1
+    DISPLAY=$CLI xrandr --fb "$VSIZE" \
+        --output DUMMY0 --mode own0 --pos "${P0#+}" \
+        --output DUMMY1 --mode own1 --pos "${P1#+}"
+fi
 echo "=== client RandR monitors ==="
-DISPLAY=$CLI xrandr --listmonitors
+DISPLAY=$CLI xrandr --listactivemonitors
 
-# cold tester login (same teardown discipline as the smoke gate)
-pkill -9 -f xfreerdp3 2>/dev/null || true
-sudo -u "$RDP_USER" pkill -u "$RDP_USER" -TERM xfce4-session 2>/dev/null || true
-sleep 2
-sudo -u "$RDP_USER" pkill -u "$RDP_USER" -KILL -f 'xfce4-session|Xorg :' \
-    2>/dev/null || true
-for i in $(seq 1 25); do
-    pgrep -u "$RDP_USER" -f 'Xorg :1[0-9]' >/dev/null || break
-    sleep 1
-done
-sleep 2
+# cold login as the owner-equivalent account
+pkill -9 -x xfreerdp3 2>/dev/null || true
+t4 "pkill -TERM -u $RDP_USER xfce4-session" 2>/dev/null || true
+sleep 3
 
-# credential via env + /args-from: never in the process list or logs
-PW=""
-if [ -n "${RDP_PASS_FILE:-}" ]; then
-    PW=$(sudo cat "$RDP_PASS_FILE")
-fi
-# one argument per line (that is how /args-from splits its input)
-RDPARGS=$(printf '%s\n' "/v:127.0.0.1:3389" "/u:$RDP_USER" "/p:$PW" \
+# credential via env + /args-from: never in a process list or log
+PW=$(t4 "sudo cat $CRED_FILE")
+RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$LPORT" "/u:$RDP_USER" "/p:$PW" \
                         "/multimon" "/gfx:AVC444" "/cert:ignore" \
                         "/log-level:WARN")
 setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
     xfreerdp3 /args-from:env:RDPARGS \
     </dev/null >/tmp/offscreen_login.log 2>&1 &
 unset PW RDPARGS
-sleep 8
-for r in 1 2 3; do
-    fw=$(DISPLAY=$CLI xdotool search --name FreeRDP 2>/dev/null | head -1)
-    [ -n "$fw" ] && DISPLAY=$CLI xdotool key --window "$fw" Return \
-        >/dev/null 2>&1
-    sleep 5
-done
-sleep 5
+sleep 16
 fw=$(DISPLAY=$CLI xdotool search --name FreeRDP 2>/dev/null | head -1)
 if [ -z "$fw" ]; then
     echo "FAIL: no FreeRDP window (login failed)"
     tail -5 /tmp/offscreen_login.log
     exit 1
 fi
-SD=$(sudo -u "$RDP_USER" pgrep -a -u "$RDP_USER" Xorg \
-     | grep -oE ':[0-9]+' | head -1)
+SD=$(t4 'pgrep -a -u $(id -u) -x Xorg' | grep -oE ' :[0-9]+ ' | head -1 \
+     | tr -d ' ')
 if [ -z "$SD" ]; then
-    echo "FAIL: no tester Xorg session"
+    echo "FAIL: no $RDP_USER Xorg session on the T4"
     exit 1
 fi
-UIDN=$(id -u "$RDP_USER")
-XA=/var/run/xrdp/$UIDN/Xauthority
 echo "=== server-side session ==="
 echo "SESSION_DISPLAY=$SD"
-echo "XAUTH=$XA"
-sudo -u "$RDP_USER" env DISPLAY=$SD XAUTHORITY=$XA xrandr --listmonitors
+t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority xrandr --listmonitors"
 echo "=== xrdp encoder mode (latest login) ==="
-sudo grep -E "probe OK|Matched .* mode" /var/log/xrdp.log | tail -3
-REMOTE
+t4 "sudo grep -E 'probe OK|Matched .* mode' /var/log/xrdp.log | tail -3"

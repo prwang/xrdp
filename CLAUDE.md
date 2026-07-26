@@ -171,3 +171,31 @@ selling point, so its numbers are evidence, not just debugging.
   silently and the owner unknowingly tests the old code — a state change
   that invalidates the test (strict-honesty rule). If the contract version
   changed, login fails with a mismatch complaint instead.
+
+### T4 test methodology (owner directive, 2026-07-26, after the failed offscreen-rig session)
+
+The first offscreen-rig attempt burned a day on serial environment
+discovery (client stack built on the T4, a special `tester` account with
+its own session policy, interactive ssh-heredoc measurement piping) and
+was declared unacceptable. Binding rules for all future T4 testing:
+
+- **Test as `ubuntu`** — the owner-equivalent account whose session
+  environment is the one under test. Do NOT create special test users or
+  modify the session-policy script (`wm1.sh`/`startwm.sh`) for testing.
+  ubuntu's RDP credential lives ONLY in root-owned `/root/.ubuntu_cred`
+  (mode 600) on the T4; fetch it over ssh into a shell variable at use
+  time, never print it, never store it off-box.
+- **All client-side harness runs on THIS dev box** (H264-capable
+  xfreerdp3, Xvfb/dummy X server, screenshots, classification), reaching
+  the T4 through an ssh port-forward of its loopback RDP socket
+  (`ssh -L <local>:127.0.0.1:3389`). Install NOTHING client-side on the
+  T4.
+- **Remote measurement is a persistent deploy, not interactive piping.**
+  Measurement/orbit scripts that must run on the T4 (perf uprobes,
+  session-side xdotool) are versioned in `PR-demo/`, installed onto the
+  T4 once per change (checksum-gated scp by the wrapper), and invoked as
+  a single non-interactive command. No bash-over-ssh heredocs.
+- The T4 may be recreated at any time from a clean AMI with no
+  xrdp/xorgxrdp installed — the full deb install flow (DEPLOY_RUNBOOK)
+  plus persistent-harness install must bring it from bare to measurable
+  without ad-hoc steps.

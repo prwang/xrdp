@@ -235,6 +235,50 @@ The ack-leak test runs live on the T4 (kill ffmpeg mid-drag with a
 queued successor, verify acks and capture resume) as part of the
 deploy validation.
 
+**Validation record (2026-07-26, first T4 deploy — partial).** xrdp
+`4932908b` + xorgxrdp `251bc4d` (contract v20260727) deployed on the
+(since-terminated) T4. Results that stand:
+- Smoke gate PASS 8/8 at 1920x1080 AND 1024x768, zero lag, zero
+  encoder errors, with the new colour-edge check (edge fidelity 1.000
+  both sizes — the full-chroma calibration value for FR-PROC-7's
+  floor). Uprobe traces showed capture/encode/wire/ack all healthy and
+  server-vs-client framebuffers pixel-identical.
+- Two REAL bugs found and fixed by the strict offscreen client:
+  1. `f0104284` (xrdp): metablock region rects had even origins but
+     ODD extents — FreeRDP's SSE 4:4:4 reconstruction hard-asserts
+     even widths and aborted; lenient clients (mstsc/Mac) only
+     tolerate it. Pre-existing, not a 4B regression.
+  2. xorgxrdp `251bc4d`: dual-monitor starvation — the monitor-scan
+     rotation used the LIVE rect_id (increments per send); the serial
+     gate used to break the loop after one send, masking it, but with
+     two outstanding the loop revisited the just-sent monitor,
+     skipped the other, and the nothing-changed branch destroyed the
+     skipped monitor's damage (frozen bottom 4K during drags). Fixed
+     by snapshotting the rotation base per pass.
+- NOT captured: the 4B-only fps number. The T4 was terminated before
+  the measurement ran; re-measure on the replacement instance.
+- The FR-PROC-7 (Lever 2) implementation drafted the same day lived
+  only in /tmp during the deb split and was lost to the box restart;
+  re-implement from the committed PRD FR-PROC-7 design when picked up
+  (design + all decisions are fully recorded there).
+
+**Methodology reset (owner directive, 2026-07-26 — the lesson).** The
+first offscreen-rig session was unacceptable: a full day of serial
+environment discovery with no fps number. Concrete failures: client
+stack built ON the T4 (Ubuntu's freerdp3 ships without H264 — had to
+source-build); a special `tester` account whose fresh xfce profile
+behaved differently from the owner's session (compositor repaint
+stalls consumed hours of false-lead debugging against the transport);
+per-run interactive ssh-heredoc measurement scripts; three separate
+self-inflicted `pkill -f` shell suicides; harness assumptions (empty
+password, uid 1000 Xauthority, qterminal) discovered broken one at a
+time. Binding rules now in CLAUDE.md ("T4 test methodology"): test as
+`ubuntu` only (cred in root-owned /root/.ubuntu_cred on the T4), never
+touch the session-policy script, ALL client-side harness on the dev
+box over an ssh -L forward of 127.0.0.1:3389, and on-box measurement
+as a persistent checksum-gated deploy invoked non-interactively.
+Harness reworked accordingly (smoke gate + `t4_measure.sh`).
+
 **Scope (grounded, exact touch points):**
 - xorgxrdp `rdpClientCon.c:909/:946` — double the per-monitor region in
   the `xup_cap_h264_shmem_layout()` sizing; two slot offsets per monitor.

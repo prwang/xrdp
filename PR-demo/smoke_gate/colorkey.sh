@@ -11,6 +11,7 @@
 # same at 4:2:0 and 4:4:4; narrow opposing-chroma stripes wash out at 4:2:0,
 # so a screenshot taken after the pipeline settles must show full saturation
 # (the deferred LC=2 aux has landed) or chroma is stuck at 4:2:0.
+mkdir -p /tmp/ab 2>/dev/null
 stty -echo 2>/dev/null; tput civis 2>/dev/null
 declare -A C=( [r]=41 [g]=42 [b]=44 [w]=47 )
 n=0
