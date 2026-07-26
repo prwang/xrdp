@@ -39,6 +39,10 @@ struct xrdp_encoder
     tbus xrdp_encoder_term_done;
     struct fifo *fifo_to_proc;
     struct fifo *fifo_processed;
+    /* items currently in fifo_to_proc (mutex-guarded); the xorgxrdp
+     * producer gate bounds it to the outstanding-rect budget for the
+     * AVC444 two-slot capture (PRD FR-CAPTURE-8 mandated assertion) */
+    int fifo_to_proc_depth;
     tbus mutex;
     int (*process_enc)(struct xrdp_encoder *self, struct xrdp_enc_data *enc);
     void *codec_handle_rfx;

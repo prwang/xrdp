@@ -88,8 +88,13 @@ struct xup_client_info
  * nv12_709fr for main-only) instead of planar YUV444, so xrdp can
  * vmsplice the shmem straight to the encoder (PRD FR-CAPTURE-6 /
  * FR-PROC-6); xup_client_info gained avc444_chroma_align; regions are
- * page-aligned (XUP_CAP_REGION_ALIGN 64 -> XUP_CAP_PAGE_ALIGN 4096). */
-#define XUP_CLIENT_INFO_CURRENT_VERSION 20260726
+ * page-aligned (XUP_CAP_REGION_ALIGN 64 -> XUP_CAP_PAGE_ALIGN 4096).
+ * 20260727: CC_GFX_AVC444 per-monitor regions hold TWO slots (PRD
+ * FR-CAPTURE-8 two-slot pipelined capture); the slot for a frame is
+ * selected by the parity of its rect_id and carried in the existing
+ * per-frame shmem_offset field, so capture of frame N+1 can overlap
+ * the synchronous encode of frame N. Single-slot modes unchanged. */
+#define XUP_CLIENT_INFO_CURRENT_VERSION 20260727
 
 /*
  * Shared-memory layout for the GFX H.264 capture family
@@ -186,15 +191,58 @@ xup_cap_h264_mon_bytes(enum xrdp_capture_code capture_code,
     return awidth * aheight * 2;
 }
 
+/* CC_GFX_AVC444 per-monitor regions hold exactly this many capture
+ * slots (PRD FR-CAPTURE-8): two, so capture of frame N+1 can overlap
+ * the synchronous encode of frame N. FIXED at 2 in the versioned
+ * contract — every extra slot adds one frame of raw inventory and one
+ * frame of backpressure lag, so changing it is a contract change
+ * requiring owner sign-off, never a tuning knob. */
+#define XUP_CAP_AVC444_SLOT_COUNT 2
+
+/* one CC_GFX_AVC444 slot: the packed [main NV12][aux NV12] views for
+ * one monitor, padded to a page boundary so both slots and the views
+ * inside them stay page-aligned (whole pages are what vmsplice moves
+ * by reference) */
+static inline int
+xup_cap_avc444_slot_bytes(int capture_format, int chroma_align,
+                          int width, int height)
+{
+    return xup_cap_page_align(
+               xup_cap_h264_mon_bytes(CC_GFX_AVC444, capture_format,
+                                      chroma_align, width, height));
+}
+
+/* capture bytes one monitor's whole region needs: the slot bytes times
+ * the slot count for CC_GFX_AVC444 (FR-CAPTURE-8), one slot's bytes
+ * for every single-slot mode */
+static inline int
+xup_cap_h264_mon_region_bytes(enum xrdp_capture_code capture_code,
+                              int capture_format, int chroma_align,
+                              int width, int height)
+{
+    if (capture_code == CC_GFX_AVC444)
+    {
+        return XUP_CAP_AVC444_SLOT_COUNT *
+               xup_cap_avc444_slot_bytes(capture_format, chroma_align,
+                                         width, height);
+    }
+    return xup_cap_h264_mon_bytes(capture_code, capture_format,
+                                  chroma_align, width, height);
+}
+
 /* Fill offsets[] with each monitor's capture region offset and return
  * the total shmem bytes required. With no monitors (single screen) the
- * session dimensions get one region at offset 0. */
+ * session dimensions get one region at offset 0. For CC_GFX_AVC444
+ * each region is XUP_CAP_AVC444_SLOT_COUNT slots and slot_bytes[]
+ * (optional, may be NULL) receives each monitor's slot stride: a
+ * frame's slot lives at offsets[mon] + slot_index * slot_bytes[mon]. */
 static inline int
 xup_cap_h264_shmem_layout(const struct display_size_description *displays,
                           enum xrdp_capture_code capture_code,
                           int capture_format, int chroma_align,
                           int session_width, int session_height,
-                          int offsets[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS])
+                          int offsets[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS],
+                          int slot_bytes[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS])
 {
     int index;
     int count;
@@ -205,6 +253,10 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
     for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++index)
     {
         offsets[index] = 0;
+        if (slot_bytes != NULL)
+        {
+            slot_bytes[index] = 0;
+        }
     }
     count = 0;
     if (displays != NULL)
@@ -217,9 +269,16 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
     }
     if (count < 1)
     {
-        return xup_cap_h264_mon_bytes(capture_code, capture_format,
-                                      chroma_align,
-                                      session_width, session_height);
+        if (slot_bytes != NULL && capture_code == CC_GFX_AVC444)
+        {
+            slot_bytes[0] = xup_cap_avc444_slot_bytes(capture_format,
+                            chroma_align,
+                            session_width,
+                            session_height);
+        }
+        return xup_cap_h264_mon_region_bytes(capture_code, capture_format,
+                                             chroma_align,
+                                             session_width, session_height);
     }
     total = 0;
     for (index = 0; index < count; ++index)
@@ -229,10 +288,17 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
                  - displays->minfo[index].left + 1;
         mheight = displays->minfo[index].bottom
                   - displays->minfo[index].top + 1;
+        if (slot_bytes != NULL && capture_code == CC_GFX_AVC444)
+        {
+            slot_bytes[index] = xup_cap_avc444_slot_bytes(capture_format,
+                                chroma_align,
+                                mwidth, mheight);
+        }
         total += xup_cap_page_align(
-                     xup_cap_h264_mon_bytes(capture_code, capture_format,
-                                            chroma_align,
-                                            mwidth, mheight));
+                     xup_cap_h264_mon_region_bytes(capture_code,
+                                                   capture_format,
+                                                   chroma_align,
+                                                   mwidth, mheight));
     }
     return total;
 }

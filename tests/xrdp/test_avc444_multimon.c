@@ -16,6 +16,12 @@
  * capture-shmem contract that gives every monitor a DISJOINT plane region
  * (the multimon cross-monitor plane-overwrite ghost fix). The layout uses
  * minfo (same source dev->minfo is copied from), not minfo_wm.
+ *
+ * FR-CAPTURE-8 (two-slot pipelined capture): every CC_GFX_AVC444 region
+ * holds exactly XUP_CAP_AVC444_SLOT_COUNT (2) page-aligned slots so the
+ * capture of frame N+1 can overlap the synchronous encode of frame N;
+ * slot_bytes[] reports the per-monitor slot stride. Single-slot modes
+ * (CC_GFX_A2) are unchanged and report a zero stride.
  */
 
 static void
@@ -119,17 +125,21 @@ END_TEST
 START_TEST(test_cap_layout_no_monitors_session_at_zero)
 {
     int offs[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int slots[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
     int total;
 
     /* single screen: one region at offset 0, 16-aligned coded dims.
      * packed views ([main NV12][aux NV12], 1.5 B/px each) total the same
      * 3 B/px as the former planar YUV444 when the view size is already a
-     * page multiple (1376*768*1.5 = 387 pages exactly) */
+     * page multiple (1376*768*1.5 = 387 pages exactly); the region holds
+     * two such slots (FR-CAPTURE-8) */
     total = xup_cap_h264_shmem_layout(NULL, CC_GFX_AVC444,
                                       XRDP_yuv444_v2_stream_709fr, 16,
-                                      1366, 768, offs);
-    ck_assert_int_eq(total, 1376 * 768 * 3);
+                                      1366, 768, offs, slots);
+    ck_assert_int_eq(total, 2 * (1376 * 768 * 3));
     ck_assert_int_eq(offs[0], 0);
+    ck_assert_int_eq(slots[0], 1376 * 768 * 3);
+    ck_assert_int_eq(slots[0] % XUP_CAP_PAGE_ALIGN, 0);
     /* the aux view starts on the next page after the main view */
     ck_assert_int_eq(xup_cap_avc444_aux_offset(1366, 768, 16),
                      1376 * 768 * 3 / 2);
@@ -149,15 +159,17 @@ START_TEST(test_cap_layout_single_monitor_matches_session_formula)
     set_monitor_cap(&d, 0, 0, 0, 3839, 2399);   /* 3840x2400 */
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
                                       XRDP_yuv444_v2_stream_709fr, 16,
-                                      3840, 2400, offs);
-    ck_assert_int_eq(total, 3840 * 2400 * 3);   /* == old session formula */
+                                      3840, 2400, offs, NULL);
+    /* two slots of the old session formula (FR-CAPTURE-8) */
+    ck_assert_int_eq(total, 2 * (3840 * 2400 * 3));
     ck_assert_int_eq(offs[0], 0);
     /* main-only (external AVC420, nv12_709fr under CC_GFX_AVC444) needs
-     * just the one view */
+     * just the one view per slot; the region still holds two slots
+     * because the pipelined gate keys on the capture code */
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
                                       XRDP_nv12_709fr, 16,
-                                      3840, 2400, offs);
-    ck_assert_int_eq(total, 3840 * 2400 * 3 / 2);
+                                      3840, 2400, offs, NULL);
+    ck_assert_int_eq(total, 2 * (3840 * 2400 * 3 / 2));
 }
 END_TEST
 
@@ -178,12 +190,14 @@ START_TEST(test_cap_layout_owner_dual_disjoint)
     set_monitor_cap(&d, 1, 0, 1440, 3839, 3839);    /* 3840x2400 */
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
                                       XRDP_yuv444_v2_stream_709fr, 16,
-                                      3840, 3840, offs);
-    mon0_bytes = 2560 * 1440 * 3;
+                                      3840, 3840, offs, NULL);
+    /* each region is two slots (FR-CAPTURE-8); the 4K's region must
+     * still start beyond ALL of the primary's plane bytes */
+    mon0_bytes = 2 * (2560 * 1440 * 3);
     ck_assert_int_eq(offs[0], 0);
     ck_assert_int_eq(offs[1], mon0_bytes);          /* already page-aligned */
     ck_assert_int_ge(offs[1], mon0_bytes);          /* disjoint */
-    ck_assert_int_eq(total, mon0_bytes + 3840 * 2400 * 3);
+    ck_assert_int_eq(total, mon0_bytes + 2 * (3840 * 2400 * 3));
 }
 END_TEST
 
@@ -201,7 +215,7 @@ START_TEST(test_cap_layout_nv12_dual)
     set_monitor_cap(&d, 1, 1024, 0, 2047, 767);
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_A2,
                                       XRDP_nv12_709fr, 0,
-                                      2048, 768, offs);
+                                      2048, 768, offs, NULL);
     ck_assert_int_eq(offs[0], 0);
     ck_assert_int_eq(offs[1], 1024 * 768 * 2);      /* 384 pages exactly */
     ck_assert_int_eq(total, 2 * (1024 * 768 * 2));
@@ -226,10 +240,11 @@ START_TEST(test_cap_layout_unaligned_dims_stay_disjoint)
     set_monitor_cap(&d, 1, 1366, 0, 2732, 769);    /* 1367x770 */
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
                                       XRDP_yuv444_v2_stream_709fr, 16,
-                                      2733, 770, offs);
-    mon0_bytes = 1376 * 768 * 3;
-    mon1_bytes = xup_cap_avc444_aux_offset(1367, 770, 16)
-                 + 1376 * 784 * 3 / 2;
+                                      2733, 770, offs, NULL);
+    /* two slots per region (FR-CAPTURE-8) */
+    mon0_bytes = 2 * (1376 * 768 * 3);
+    mon1_bytes = 2 * (xup_cap_avc444_aux_offset(1367, 770, 16)
+                      + 1376 * 784 * 3 / 2);
     ck_assert_int_ge(xup_cap_avc444_aux_offset(1367, 770, 16),
                      1376 * 784 * 3 / 2);
     ck_assert_int_eq(xup_cap_avc444_aux_offset(1367, 770, 16)
@@ -255,12 +270,62 @@ START_TEST(test_cap_layout_degenerate_monitor_zero_bytes)
     set_monitor_cap(&d, 1, 0, 0, 1023, 767);
     total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
                                       XRDP_yuv444_v2_stream_709fr, 16,
-                                      1024, 768, offs);
+                                      1024, 768, offs, NULL);
     ck_assert_int_eq(offs[0], 0);
-    /* 16x16 coded: main view 384 B, aux view on the next page; the
-     * region is page-padded so monitor 1 starts at 2 pages */
-    ck_assert_int_eq(offs[1], 2 * XUP_CAP_PAGE_ALIGN);
-    ck_assert_int_eq(total, 2 * XUP_CAP_PAGE_ALIGN + 1024 * 768 * 3);
+    /* 16x16 coded: main view 384 B, aux view on the next page, so one
+     * slot is 2 pages and the two-slot region 4 pages (FR-CAPTURE-8) */
+    ck_assert_int_eq(offs[1], 4 * XUP_CAP_PAGE_ALIGN);
+    ck_assert_int_eq(total, 4 * XUP_CAP_PAGE_ALIGN + 2 * (1024 * 768 * 3));
+}
+END_TEST
+
+START_TEST(test_cap_layout_two_slot_strides)
+{
+    struct display_size_description d;
+    int offs[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int slots[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int total;
+    int index;
+
+    /* FR-CAPTURE-8 contract: exactly two slots, and a frame's slot at
+     * offsets[mon] + slot_index * slot_bytes[mon] never crosses into
+     * the next monitor's region or past the total */
+    ck_assert_int_eq(XUP_CAP_AVC444_SLOT_COUNT, 2);
+    g_memset(&d, 0, sizeof(d));
+    d.monitorCount = 2;
+    set_monitor_cap(&d, 0, 594, 0, 3153, 1439);     /* 2560x1440 */
+    set_monitor_cap(&d, 1, 0, 1440, 3839, 3839);    /* 3840x2400 */
+    total = xup_cap_h264_shmem_layout(&d, CC_GFX_AVC444,
+                                      XRDP_yuv444_v2_stream_709fr, 16,
+                                      3840, 3840, offs, slots);
+    ck_assert_int_eq(slots[0], 2560 * 1440 * 3);
+    ck_assert_int_eq(slots[1], 3840 * 2400 * 3);
+    for (index = 0; index < 2; ++index)
+    {
+        ck_assert_int_eq(slots[index] % XUP_CAP_PAGE_ALIGN, 0);
+        ck_assert_int_eq(slots[index],
+                         xup_cap_avc444_slot_bytes(
+                             XRDP_yuv444_v2_stream_709fr, 16,
+                             d.minfo[index].right - d.minfo[index].left + 1,
+                             d.minfo[index].bottom - d.minfo[index].top + 1));
+    }
+    /* slot 1 of monitor 0 ends exactly where monitor 1 begins here */
+    ck_assert_int_eq(offs[0] + 2 * slots[0], offs[1]);
+    ck_assert_int_eq(offs[1] + 2 * slots[1], total);
+
+    /* single-slot modes report a zero stride */
+    total = xup_cap_h264_shmem_layout(&d, CC_GFX_A2,
+                                      XRDP_nv12_709fr, 0,
+                                      3840, 3840, offs, slots);
+    ck_assert_int_eq(slots[0], 0);
+    ck_assert_int_eq(slots[1], 0);
+
+    /* no-monitor session fills slot 0's stride */
+    total = xup_cap_h264_shmem_layout(NULL, CC_GFX_AVC444,
+                                      XRDP_yuv444_v2_stream_709fr, 16,
+                                      1366, 768, offs, slots);
+    ck_assert_int_eq(slots[0], 1376 * 768 * 3);
+    ck_assert_int_eq(total, 2 * slots[0]);
 }
 END_TEST
 
@@ -284,6 +349,7 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc, test_cap_layout_nv12_dual);
     tcase_add_test(tc, test_cap_layout_unaligned_dims_stay_disjoint);
     tcase_add_test(tc, test_cap_layout_degenerate_monitor_zero_bytes);
+    tcase_add_test(tc, test_cap_layout_two_slot_strides);
     suite_add_tcase(s, tc);
     return s;
 }

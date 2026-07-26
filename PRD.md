@@ -609,6 +609,15 @@ Contract, when implemented:
    byte-identical to the serial design: with idle slots, capture,
    encode and send happen immediately and nothing waits for a
    successor.
+9. Slot staleness re-pack (implementation consequence, 2026-07-26):
+   the capture packs only damaged rects and the encoder consumes the
+   full plane, so a slot's planes miss whatever was captured into the
+   other slot while it sat idle. Each slot therefore tracks a
+   per-monitor "missing" region (initialized to the full screen on
+   allocation, emptied when the slot is captured, grown by the fresh
+   damage that lands in the other slot) which is unioned into that
+   slot's next capture region. Without this, damage from frame N−1
+   visibly regresses on the wire every other frame.
 
 Expected effect: period drops from the serial sum (~50 ms) to ~the
 encode duration (~31–36 ms); composed with FR-PROC-7 preemptive aux

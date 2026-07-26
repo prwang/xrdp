@@ -213,12 +213,27 @@ color-edge fidelity-after-settle check (FR-PROC-7 §8); Mac validation
 rides this item. Consolidate with the LC reframe / Mac items below
 when picked up.
 
-## Lever 4B: two-slot pipelined capture — TODO, ORDERED FIRST (owner decision 2026-07-26; prerequisite of Lever 2 preemptive aux)
+## Lever 4B: two-slot pipelined capture — IN PROGRESS (implemented 2026-07-26, pending T4 deploy + smoke gate + fps measurement; owner decision 2026-07-26; prerequisite of Lever 2 preemptive aux)
 
 Contract: PRD FR-CAPTURE-8. Capture frame N+1 into the second shmem
 slot while ffmpeg consumes slot N; period drops from the serial sum
 (~50ms) to ~encode duration (~31-36ms, ~28-32fps); composed with
 Lever 2's halved encode -> ~16-18ms, ~55-60fps.
+
+**Implementation note (2026-07-26):** landed as designed with one
+addition the design pass missed — per-slot staleness re-pack (now PRD
+FR-CAPTURE-8 clause 9): the capture packs only damaged rects while
+the encoder consumes the full plane, so each slot tracks the region
+it missed while the other slot was being written (`cap_slot_missing`,
+initialized to full screen on allocation, emptied when the slot is
+captured, grown by fresh damage landing in the other slot) and
+re-packs it on its next capture. Without it, frame N-1's damage would
+visibly regress every other frame. Slot stride rides a new optional
+`slot_bytes[]` out-param of `xup_cap_h264_shmem_layout()`; contract
+v20260727. Unit: 84/84 incl. new `test_cap_layout_two_slot_strides`.
+The ack-leak test runs live on the T4 (kill ffmpeg mid-drag with a
+queued successor, verify acks and capture resume) as part of the
+deploy validation.
 
 **Scope (grounded, exact touch points):**
 - xorgxrdp `rdpClientCon.c:909/:946` — double the per-monitor region in
