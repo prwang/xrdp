@@ -1529,3 +1529,45 @@ fps, same rig/orbit) IN PROGRESS; box to be restored to the 4B pair +
 re-smoked as the LAST step. Note the pre-4B arm is only measurable at all
 because the oracle never decodes (old xrdp lacks the metablock even-extent
 fix f0104284 that SIGABRTs strict decoding clients).
+
+### Oracle A/B result: 4B vs pre-4B server-only fps (2026-07-26, T4 3.83.30.88)
+
+Same rig, same orbit (thunar circle, bottom 4K of the owner dual layout),
+oracle save-only client (acks at arrival), quiet-gated (glycin storms —
+see below), as-shipped config (fif=2 default, no trace), nvenc.
+
+| pair | fps (all stages lockstep) | frame period p50 | structure |
+|---|---|---|---|
+| pre-4B `52099149`+`ee1ec01` | **24.0** | 34.0 ms | serial: encode 25.4 + ack 7.5 + turnaround; capture ack-released (ack->cap 3.4 ms) |
+| 4B `4932908b`+`251bc4d` | **29.1** | 26.5 ms | pipelined: period == ENCODE p50 (26.4 ms); encode-throughput-bound |
+
+4B removes the ack+turnaround legs from the period entirely (period ==
+encode). The oracle's ack costs only ~7-14 ms, so the serial arm's penalty
+here is small; against a real client whose ack is slower the pre-4B period
+grows by that full amount per frame while 4B stays at encode — i.e. 4B
+makes server fps client-independent. Next ceiling is the serialized
+dual-monitor encode pair itself (24+44 ms in one thread) — exactly what
+FR-PROC-7 (halve via credit-gated aux deferral) and, later, cross-monitor
+submit overlap address. Oracle dump from the 4B arm splits into playable
+streams (277 main + 277 aux 3840x2400 frames / 12 s; aux ~20% of bytes).
+
+Deploy-record notes: avc444_pack_bench on the new T4: 4K vectorized pack
+7.89 ms/frame (matches old-box record). Two measurement-validity guards
+added after live incidents: (a) quiet gate in t4_measure.sh — fresh logins
+AND thunar launches spawn ~10 sandboxed glycin-svg icon loaders (~50
+CPU-s, all 4 cores pinned ~18 s; owner-spotted mid-run) — recording now
+requires sustained >=85 % idle with no live glycin loaders, checked at
+session start AND immediately pre-record; (b) keytest.sh moved to its own
+client display :98 with verified Xvfb geometry — sharing :99 with the
+layout rig's Xorg produced a false smoke FAIL at 1024x768 (client window
+mapped at the rig's +594+0 monitor origin; fixed sample coords read
+black; screenshots proved the server rendering perfect red/stripes).
+Also: /tmp on the T4 does not survive reboots — staged debs must be
+re-copied (a 4B "reinstall" silently no-oped on missing files; caught by
+dpkg -l verification; also note git-hash deb versions do not sort, always
+pass --allow-downgrades and VERIFY dpkg -l after every swap).
+
+Final state: 4B pair restored and verified (dpkg -l), SMOKE PASS 8/8 at
+both sizes edge=1.000 post-restore. FR-CAPTURE-8 fps deliverable: DONE
+(29.1 vs 24.0 server-only, +21 % on the oracle rig, client-independent by
+construction). Next: FR-PROC-7 with the clause-9 credit gate.
