@@ -93,7 +93,7 @@ owner reference load above; harness:
 Lever 2.** (Recorded: with this order lever 1 realizes its full
 10-12pp immediately; lever 2 then subsumes the aux share.)
 
-## Lever 1: vectorize the AVC444 pack loops — DEPLOYED to T4 (2026-07-26), awaiting owner acceptance run
+## Lever 1: vectorize the AVC444 pack loops — DONE (owner-load profile confirms; 2026-07-26)
 
 **Result (xorgxrdp `ee1ec01`).** Clamps hoisted into replicated
 row-buffer tails, aux pack split into single-output-stream flat loops,
@@ -102,9 +102,20 @@ RDP_VECTORIZE on the fused function. Bench: T4 full-4K conversion
 4.27 -> 1.64 ms — beats the 10-12pp estimate (~15pp of a core under
 the owner load, projected). Gates: dev-box burr single+dual NO
 residual (bit-parity oracle), SMOKE PASS; deb sha256 9a7f0b6a…
-installed on T4. Acceptance = owner onscreen drag +
-`PR-demo/t4_profile/profile_owner_load.sh` re-run with the owner
-attached (expect Xorg ~46 -> ~30pp).
+installed on T4.
+
+**Acceptance run (2026-07-26, owner attached, Thunar 2500x1800 orbit
+fully on the bottom 4K monitor).** Pack loops **17.4pp -> 3.2pp** of a
+core (~14pp returned, beats estimate); decode.avx2 steady at ~7.7pp
+(untouched, as expected). Xorg total ~44pp but NOT comparable to the
+~46pp baseline: the saved cycles were reinvested as throughput — the
+same 400-move trace that filled the baseline window now drains in
+<15s (~30 moves/s vs ~13, roughly 2x frame rate), and the window sat
+fully on the 4K monitor (baseline orbit straddled both monitors), so
+pixman composite (~11pp) and blt (~13pp) grew with the extra frames.
+Per-second CPU flat, per-frame cost halved, drag visibly smoother.
+Post-lever-1 Xorg profile is now dominated by compositor/blit (~24pp
+combined) — strengthens Lever 3's case after Lever 2.
 
 Restructure the pack half of `a8r8g8b8_to_avc444_box` (xorgxrdp) into
 branchless/SIMD-friendly shuffle loops per PRD FR-CAPTURE-7, targeting
