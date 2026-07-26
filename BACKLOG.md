@@ -1587,3 +1587,45 @@ correctness proven individually by deterministic offscreen unit tests
 (mocked ffmpeg seam, no GPU, no timers — see PRD clause 12 for the
 per-policy test matrix). Measured ladder to verify: 29 -> ~38 -> ~55 ->
 toward the 2x11 ms/picture T4 hardware floor.
+
+### macOS Windows App black on nvenc — bisect log (2026-07-26 evening, IN PROGRESS)
+
+Record correction first: the "Mac rendered NVENC from the old T4" memory
+traces to one ambiguous PRD sentence; the BACKLOG's own T4 Windows/Mac
+client matrix was never completed. Treat Mac x NVENC as a NEVER-VALIDATED
+cell, not a regression. The only Mac-green data points are dev-box VAAPI
+(High, CQP, no HRD) and x264 in-band.
+
+Evidence chain (all grounded, one Mac reconnect per arm):
+- T4 black on BOTH 444 and 420, immediately at connect, clean 16-aligned
+  single-monitor sessions included; server pipeline healthy; the Mac
+  stops sending egfx frame acks after <=2 frames -> 4B capture gate
+  starves (rect_id vs rect_id_ack frozen) -> permanent black. Server
+  robustness gap noted separately: 2 lost acks must never deadlock us.
+- Arm 2: the exact old-T4 pair (71179f67+e86bff0) on the new T4: BLACK ->
+  the whole xrdp range 71179f67..4932908b exonerated.
+- Offline QuickTime matrix (9 mp4s incl. the REAL black-arm wire bytes):
+  ALL render -> the elementary stream is VideoToolbox-decodable; the
+  failure lives in the Windows App's in-RDP annex-b/H264 feeding path.
+- Traffic diff good(vaapi)/black(nvenc), both AVC420, identical ffmpeg
+  8.0.1: nvenc-only features = per-frame pic_timing+buffering_period SEI,
+  nal_hrd VUI, Main profile, level 5.2, refs/dpb 3. Reshape of
+  profile/refs/dpb via encoder_args: still black -> those three
+  exonerated.
+- M1 (dev box, single-delta on the Mac-good server): baseline VAAPI CQP +
+  "-rc_mode CBR -b:v 20M -sei +timing" (adds HRD VUI + BP/PT SEI, keeps
+  High/5.1/refs1): **BLACK** -> conviction pocket = {HRD VUI in SPS} +
+  {buffering_period/pic_timing SEI NALs}. Reverted to baseline
+  immediately after verdict (owner protocol: revert after every black,
+  keep the live diff single-delta); revert byte-verified via oracle dump
+  (nal_hrd=0, no per-frame SEI).
+- NEXT: M1a = CBR + "-sei identifier" (HRD VUI, NO BP/PT SEI NALs).
+  Renders -> SEI NALs convicted (fix: strip SEI types 0/1 in the runner's
+  bsf chain for extradata-only encoders; offline-verifiable). Black ->
+  HRD VUI convicted (fix: SPS-level, harder; note nvenc emits HRD even at
+  constqp, so rc mode itself is not in the nvenc pocket).
+
+Instruments built tonight: oracle save-only client (PR-demo/oracle_client)
+= per-arm byte verification without a Mac; QuickTime offline matrix
+(container path) now understood to exonerate only the codec layer, not
+the App's RDP path.
