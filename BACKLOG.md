@@ -165,6 +165,15 @@ sharpened):
 - Also worth a look inside the 30ms: nvenc 2x4K should be ~16ms; the
   remainder is pipe transport + ffmpeg demux framing. Profile the
   ffmpeg side before assuming nvenc is saturated.
+- **REJECTED (closed thread, do not re-propose): main||aux in two
+  encoder processes.** PRD §6.5: both sub-streams must come from the
+  SAME encoder and decode as ONE stream ("never ... one FFmpeg process
+  for main and another for auxiliary"). Ground truth
+  (`vm/GROUND_TRUTH_win2022_avc444.md`): one SPS/IDR per session, all
+  views P-slices on a single shared reference chain / frame_num
+  sequence. Two encoders = two chains interleaved into the client's
+  single decoder = P-reference desync garbage, plus duplicate SPS
+  (the Mac-black class the exactly-one-SPS bound exists to prevent).
 
 ## Lever 2: LC=1/LC=2 motion-time aux skip — TODO (after Lever 1)
 
