@@ -508,6 +508,46 @@ copies — pointer arithmetic and `vmsplice` only).
 5. `xrdp_avc444_convert.c` remains in-tree as the executable REFERENCE for
    the view layout (unit tests / oracle), off the hot path.
 
+### FR-CAPTURE-7: Conversion loops must be vectorization-friendly (2026-07-26)
+
+The capture-side color conversion is the pipeline's only pixel-domain pass
+(FR-CAPTURE-6) and runs on the X server thread; its per-pixel constant is
+the interactive-latency budget. Any packed output layout — including
+future ones — MUST be implemented so the ARGB→YUV matrix math stays in a
+flat, contiguous, branch-free loop the compiler auto-vectorizes:
+
+1. Decode each source row ONCE through a single `RDP_VECTORIZE`d flat
+   loop (contiguous loads/stores, branchless clamps); do layout packing
+   as separate cheap shuffle/gather steps over the cache-hot row buffers.
+   The layout never forces scalar matrix math: strided formats cost a
+   pack step, not the matrix.
+2. No per-sample function calls, no per-sample coordinate clamping in
+   interior loops (hoist edge replication to the row decode / pad tails),
+   no re-decoding a pixel separately for U and for V.
+3. Every conversion function carries `RDP_VECTORIZE` (the module builds
+   at -O2; the attribute supplies O3 + tree-vectorize + AVX2 clones).
+4. Changes to these loops are benchmarked with `tools/avc444_pack_bench.c`
+   (offline, no session needed; verbatim copies of the shipped loops —
+   keep them in sync) before deploying.
+
+**Negative example (measured 2026-07-26, the reason this FR exists).**
+The first-cut FR-CAPTURE-6 packers (xorgxrdp `75c19283ab87`) violated all
+three rules: per-sample `avc444_px()/px_u()/px_v()` helper calls with two
+clamp branches each, U and V re-decoding the same pixel, and no
+`RDP_VECTORIZE` attribute. Result — ~7x the per-pixel cost of the old
+vectorized planar loop, observed live as Xorg burning 50-70% of a core
+during 4K drags with cost proportional to damage size:
+
+    ms/frame              old planar   scalar packers   row-decode fix
+    T4    3840x2400 rect        6.88            49.40            19.24
+    T4    2000x1000 rect        1.24            10.77             4.27
+    T4     500x200  rect        0.06             0.52             0.19
+    dev   3840x2400 rect        3.27            23.60             7.30
+
+("old planar" was only xorgxrdp's HALF of the pre-FR-CAPTURE-6 pipeline;
+xrdp then re-walked every pixel again, full-frame, regardless of damage.
+The row-decode fix is the whole pipeline's pixel work, damage-limited.)
+
 ### Integration seams
 
 - `xrdp_encoder_create()` in `xrdp/xrdp_encoder.c`

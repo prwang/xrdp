@@ -13,6 +13,19 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ## AVC444 splicable capture: wire-format views from xorgxrdp + vmsplice-only feed — DEPLOYED to T4 (2026-07-26), awaiting owner onscreen perf verdict
 
+**Perf regression in the first-cut packers — FIXED (2026-07-26, same
+day).** Owner observed Xorg at 50-70% of a core, cost proportional to
+damage size. `tools/avc444_pack_bench.c` (new, checked in; offline, old
+vs scalar vs vectorized verbatim copies) quantified it: the scalar
+first-cut (`75c1928`) cost ~7x the old vectorized planar loop per pixel
+(T4 full-4K 49.4 ms/frame). Root causes: per-sample helper calls with
+clamp branches, U/V double-decode, missing RDP_VECTORIZE. Fixed by the
+row-decode restructure (`e7ecf30`, PRD FR-CAPTURE-7): T4 full-4K 19.2 ms,
+2000x1000 drag rect 4.3 ms, 500x200 0.19 ms. Gates re-run on the dev box
+(burr single+dual NO residual, SMOKE PASS) and deb deployed to T4
+(sha256 4e0563c5…). Damage-proportional cost itself is by design
+(rect-limited packing); the constant was the bug.
+
 **Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
 (xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
 83/83 incl. new page-aligned layout math; the ffmpeg encode tests
