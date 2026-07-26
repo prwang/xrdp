@@ -51,6 +51,22 @@ root-only /root/.tester_cred on the T4), /etc/xrdp/wm1.sh now lets
 non-ubuntu users exec ~/.xsession (backup wm1.sh.bak-profile; ubuntu
 path unchanged).
 
+**Owner-load profile (2026-07-26, Thunar 2500x1800 circular trace in the
+real xfce session, compositing=true, dual-monitor, driven via xdotool in
+the owner's :10).** Process split: Xorg 40-47%, ffmpeg 21-24% (two
+children, one per monitor), xrdp 10-14% — nothing saturated post-e7ecf30.
+Inside Xorg: pack loops 37.9% + avc444_decode_row.avx2 17.2% (conversion
+= 55%, same ratio as the WM-less run), xfwm compositor rendering via
+rdpComposite/pixman 10.3%, window-move blit rdpCopyArea 6.9%. The Xorg
+delta vs the WM-less harness (46% vs 18%) tracks the damage area (2.25x
+window) plus the compositor's own rendering — no new mystery component.
+Priority order that follows: (1) LC=1/LC=2 reframe — during motion it
+skips the aux view end-to-end (aux pack in Xorg, vmsplice, ffmpeg pipe
+read, nvenc input), the single biggest cross-cutting win and the Mac
+prerequisite; (2) pack-loop vectorization (~10pp of a core under the
+real load); (3) optionally disable xfwm compositing on the T4 (~10pp,
+cosmetic tradeoff, owner's call).
+
 **Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
 (xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
 83/83 incl. new page-aligned layout math; the ffmpeg encode tests
