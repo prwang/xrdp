@@ -56,21 +56,14 @@ struct xrdp_encoder
     struct xrdp_avc444_encoder_args avc444_encoder_args;
     unsigned long long avc444_seq;
     void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
-    void *avc444_conv[16];           /* struct xrdp_avc444_conv *    */
+    int avc444_actual_w[16];         /* per-surface visible dims for  */
+    int avc444_actual_h[16];         /* resize detection (FR-RESIZE)  */
     /* tail-flush (OPT-IN last resort, gfx.toml tail_flush; default off): a deep
      * encoder pipeline (e.g. -async_depth > 1) withholds the last frame of an
      * idle-bounded burst until the next input. The root-cause fix is a shallow
      * pipeline (-async_depth 1 / -tune zerolatency); when that is impossible,
      * arm a short idle timer after a real frame and drain a bounded number of
      * duplicate frames to push the withheld frame out. */
-    int avc444_flush_enabled;        /* gfx.toml tail_flush opt-in (last   */
-    /* resort; default off)               */
-    int avc444_flush_armed;          /* a tail frame may be withheld       */
-    int avc444_flush_mon;            /* which surface to flush             */
-    unsigned long long avc444_flush_seq; /* desktop_seq of latest real frame */
-    int avc444_flush_frame_id;       /* last GFX frame id, reused for marks */
-    int avc444_flush_surface_id[16]; /* retained per-surface emit context  */
-    int avc444_flush_pixel_format[16];
     int frame_id_client; /* last frame id received from client */
     int frame_id_server; /* last frame id received from Xorg */
     int frame_id_server_sent;

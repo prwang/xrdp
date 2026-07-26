@@ -280,6 +280,10 @@ struct xrdp_client_info
 
     enum unicode_input_state unicode_input_support;
     enum xrdp_capture_code capture_code;
+    /* CC_GFX_AVC444: coded-WIDTH alignment of the packed capture views
+     * (16 FreeRDP / 32 mstsc); forwarded to xorgxrdp via xup_client_info
+     * so the capture packs at the final coded geometry (FR-CAPTURE-6) */
+    int avc444_chroma_align;
 };
 
 /*

@@ -11,6 +11,58 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
+## AVC444 splicable capture: wire-format views from xorgxrdp + vmsplice-only feed — IN PROGRESS (2026-07-26, owner directive)
+
+Owner directive (chat, 2026-07-26): "the shmem from xorgxrdp must be
+directly vmspliced [to ffmpeg] right now ... xrdp must do zero hot path
+work; vmsplice is the only allowed xrdp→ffmpeg interaction." We own the
+AVC444 wire format; an intermediate shmem format that is not splicable
+is a design defect (and an upstream-PR rejection risk).
+
+**Why.** The YUV444 offload left a SECOND full-frame pass inside xrdp:
+`xrdp_avc444_conv_update()` re-walks every pixel per frame with
+per-sample bounds-clamped `sample_yuv()` calls (~25M samples per 4K
+frame; the luma copy re-fetches U/V it discards), then memcpys the two
+views into the runner's staging queue, then write()s 27.6 MB/frame into
+the pipe. Live T4 signature (owner, 2026-07-26): 4K window drag is slow
+and htop shows xrdp burning MORE CPU than Xorg — the process doing the
+actual color conversion. On the T4's weak CPU this is release-blocking.
+
+**Design.**
+- xorgxrdp packs the final wire format per damage rect, fused into the
+  existing capture conversion: per-monitor shmem region becomes
+  `[main NV12][aux NV12]`, both at the FINAL coded size (width aligned
+  to the client-derived chroma_align 16/32, height align16), each view
+  page-aligned (4096) for vmsplice.
+- Aux variant rides the EXISTING `capture_format` contract field using
+  the reserved constants: `XRDP_yuv444_v2_stream_709fr` (ChromaV2 aux),
+  `XRDP_yuv444_v1_stream_709fr` (v1 banded aux), `XRDP_nv12_709fr` +
+  `CC_GFX_AVC444` (main-only, the ffmpeg AVC420 mode). v1 aux may
+  repack the full view per frame (diagnostic mode, perf uncritical).
+- New `avc444_chroma_align` field in the xup client info; layout
+  helpers reworked (page-aligned regions + aux-offset helper);
+  `XUP_CLIENT_INFO_CURRENT_VERSION` bumped 20260725 → 20260726, loud
+  refusal on mismatch as before.
+- xrdp hot path: pointer math + `vmsplice()` only. The runner's inq
+  staging memcpy is replaced by a borrowed-iovec queue; pump() feeds
+  ffmpeg exclusively via vmsplice (probe too). Pipe enlarged via
+  F_SETPIPE_SZ (best effort). SPLICE_F_GIFT is NOT used (pages are
+  xorgxrdp's shmem). Borrowed input never outlives the encode call:
+  if input is not fully spliced when the synchronous wait ends, the
+  call errors and the child restarts (no torn-frame window).
+- `xrdp_avc444_convert.c` leaves the hot path and stays in-tree as the
+  format REFERENCE (unit tests / oracle).
+- Visual gates before deploy: PR-demo/smoke_gate + multimon_burr on the
+  dev box (truth-vs-client compare catches any packing error), then T4
+  deb pair.
+
+**Perf accounting (4K single monitor).** Removed from xrdp per frame:
+~25M clamped samples (the 16ms/frame encoder-thread cost), 27.6 MB
+staging memcpy, 27.6 MB write() kernel copy. Added to xorgxrdp: ~0 —
+the packer replaces the equal-cost planar YUV444 writes inside the
+same per-rect conversion walk, and it is damage-rect-limited where
+xrdp's pass was full-frame.
+
 ## AVC444 header policy: static gfx.toml `dump_extra` + verify-once probe — DONE (2026-07-26, deployed to T4)
 
 **Validation record (2026-07-26).** Commit `820f558e`; unit suites all

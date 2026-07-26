@@ -70,14 +70,26 @@ struct xup_client_info
     int rfx_frame_interval;
     int h264_frame_interval;
     int normal_frame_interval;
+
+    /* CC_GFX_AVC444: coded-WIDTH alignment of the packed views (16 for
+     * FreeRDP-derived clients, 32 for mstsc); the capture packs at the
+     * FINAL coded geometry so the shmem is splicable (PRD FR-CAPTURE-6) */
+    int avc444_chroma_align;
 };
 
 /* yyyymmdd of last incompatible change to xup_client_info OR to the
  * xup wire protocol / shared-memory capture contract.
  * 20260725: GFX H.264 multimon shmem split — WIRETOSURFACE_1 (msg 62)
  * gained a trailing per-monitor capture shmem offset field, and the
- * capture shmem is laid out per xup_cap_h264_shmem_layout() below. */
-#define XUP_CLIENT_INFO_CURRENT_VERSION 20260725
+ * capture shmem is laid out per xup_cap_h264_shmem_layout() below.
+ * 20260726: CC_GFX_AVC444 capture carries the FINAL wire-format views
+ * ([main NV12][aux NV12] at the coded geometry, page-aligned, variant
+ * selected by capture_format: yuv444_v2_stream / yuv444_v1_stream /
+ * nv12_709fr for main-only) instead of planar YUV444, so xrdp can
+ * vmsplice the shmem straight to the encoder (PRD FR-CAPTURE-6 /
+ * FR-PROC-6); xup_client_info gained avc444_chroma_align; regions are
+ * page-aligned (XUP_CAP_REGION_ALIGN 64 -> XUP_CAP_PAGE_ALIGN 4096). */
+#define XUP_CLIENT_INFO_CURRENT_VERSION 20260726
 
 /*
  * Shared-memory layout for the GFX H.264 capture family
@@ -98,28 +110,80 @@ struct xup_client_info
  * the whole-shmem layout and offset 0.
  */
 
-/* each per-monitor region starts cache-line aligned (even, so NV12
-   UV-pair alignment is preserved) */
-#define XUP_CAP_REGION_ALIGN 64
+/* each per-monitor region AND each view within it starts page aligned:
+ * whole pages are what vmsplice moves by reference (PRD FR-PROC-6) */
+#define XUP_CAP_PAGE_ALIGN 4096
 
-/* capture plane bytes one monitor needs; dims are 16-aligned to the
- * H.264 coded size. CC_GFX_AVC444: three planar YUV444 planes.
- * CC_GFX_A2: NV12 needs 1.5 B/px; 2 B/px is kept for slack, matching
- * the historical session-level formula. */
 static inline int
-xup_cap_h264_mon_bytes(enum xrdp_capture_code capture_code,
-                       int width, int height)
+xup_cap_page_align(int v)
 {
-    int awidth;
-    int aheight;
+    return (v + (XUP_CAP_PAGE_ALIGN - 1)) & ~(XUP_CAP_PAGE_ALIGN - 1);
+}
+
+/* one NV12 view's bytes at the FINAL coded geometry: width aligned to
+ * chroma_align (16 or 32; anything else is treated as 16, matching the
+ * converter), height 16-aligned */
+static inline int
+xup_cap_avc444_nv12_bytes(int width, int height, int chroma_align)
+{
+    int cw;
+    int ch;
 
     if (width < 1 || height < 1)
     {
         return 0;
     }
+    if (chroma_align != 32)
+    {
+        chroma_align = 16;
+    }
+    cw = (width + chroma_align - 1) & ~(chroma_align - 1);
+    ch = (height + 15) & ~15;
+    return cw * ch + cw * (ch / 2);
+}
+
+/* offset of the auxiliary view within a monitor's CC_GFX_AVC444 region
+ * (the main view is at 0; the aux view starts on the next page) */
+static inline int
+xup_cap_avc444_aux_offset(int width, int height, int chroma_align)
+{
+    return xup_cap_page_align(
+               xup_cap_avc444_nv12_bytes(width, height, chroma_align));
+}
+
+/* capture bytes one monitor needs.
+ * CC_GFX_AVC444 (PRD FR-CAPTURE-6): the packed wire views —
+ *   [main NV12][aux NV12], each at the final coded geometry, aux view
+ *   page-aligned; capture_format XRDP_nv12_709fr means main-only (the
+ *   external AVC420 mode), yuv444_v1/v2_stream carry an aux view.
+ * CC_GFX_A2: NV12 needs 1.5 B/px; 2 B/px is kept for slack, matching
+ * the historical session-level formula (16-aligned dims). */
+static inline int
+xup_cap_h264_mon_bytes(enum xrdp_capture_code capture_code,
+                       int capture_format, int chroma_align,
+                       int width, int height)
+{
+    int awidth;
+    int aheight;
+    int nv12;
+
+    if (width < 1 || height < 1)
+    {
+        return 0;
+    }
+    if (capture_code == CC_GFX_AVC444)
+    {
+        nv12 = xup_cap_avc444_nv12_bytes(width, height, chroma_align);
+        if (capture_format == XRDP_nv12_709fr)
+        {
+            return nv12; /* main view only (external AVC420) */
+        }
+        return xup_cap_avc444_aux_offset(width, height, chroma_align)
+               + nv12;
+    }
     awidth = (width + 15) & ~15;
     aheight = (height + 15) & ~15;
-    return awidth * aheight * ((capture_code == CC_GFX_AVC444) ? 3 : 2);
+    return awidth * aheight * 2;
 }
 
 /* Fill offsets[] with each monitor's capture region offset and return
@@ -128,6 +192,7 @@ xup_cap_h264_mon_bytes(enum xrdp_capture_code capture_code,
 static inline int
 xup_cap_h264_shmem_layout(const struct display_size_description *displays,
                           enum xrdp_capture_code capture_code,
+                          int capture_format, int chroma_align,
                           int session_width, int session_height,
                           int offsets[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS])
 {
@@ -152,7 +217,8 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
     }
     if (count < 1)
     {
-        return xup_cap_h264_mon_bytes(capture_code,
+        return xup_cap_h264_mon_bytes(capture_code, capture_format,
+                                      chroma_align,
                                       session_width, session_height);
     }
     total = 0;
@@ -163,9 +229,10 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
                  - displays->minfo[index].left + 1;
         mheight = displays->minfo[index].bottom
                   - displays->minfo[index].top + 1;
-        total += (xup_cap_h264_mon_bytes(capture_code, mwidth, mheight)
-                  + (XUP_CAP_REGION_ALIGN - 1))
-                 & ~(XUP_CAP_REGION_ALIGN - 1);
+        total += xup_cap_page_align(
+                     xup_cap_h264_mon_bytes(capture_code, capture_format,
+                                            chroma_align,
+                                            mwidth, mheight));
     }
     return total;
 }

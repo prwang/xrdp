@@ -152,6 +152,14 @@ The first milestone always uses `LC=0`: main and auxiliary views are sent togeth
 
 Complete reconstructed subframes are serialized to FFmpeg. The extra process-boundary copies are an accepted portability tradeoff.
 
+**SUPERSEDED (2026-07-26, owner directive).** Zero-copy transport is now a
+requirement, not a non-goal: the capture shmem carries the final wire-format
+views and xrdp feeds FFmpeg exclusively via `vmsplice(2)` — see FR-CAPTURE-6
+and FR-PROC-6. The MVP-era copies (in-xrdp repack + staging memcpy + pipe
+`write()`) were measured as the encoder-thread bottleneck on a weak-CPU 4K
+host (T4, 2026-07-26): xrdp burned more CPU than the X server that performs
+the actual color conversion.
+
 ### NG-8: H.264 decoding in xrdp
 
 xrdp demuxes NUT and inspects/normalizes H.264 NAL units. It does not decode the H.264 pictures. The RDP client is the decoder.
@@ -463,6 +471,43 @@ Every visible dimension change reallocates/revalidates the capture surface and t
 
 The current encoder work item and capture acknowledgement remain the source-lifetime contract. The converter reads the complete persistent XRGB surface only while processing that work item. After the complete main and auxiliary NV12 buffers have been reconstructed, the source capture memory is no longer needed by the FFmpeg child.
 
+**Amendment (2026-07-26, FR-CAPTURE-6):** with wire-format views in the
+capture shmem and `vmsplice` feeding, "no longer needed" is defined by the
+synchronous encode: the shmem pages are referenced by the pipe until the
+FFmpeg child has read them, which the synchronous wait guarantees happens
+before the encode call returns and the frame is acknowledged. If input is
+not fully spliced when the wait ends, the call must error and the child be
+replaced — borrowed pages never outlive the encode call.
+
+### FR-CAPTURE-6: Wire-format views in the capture shmem (2026-07-26)
+
+The capture side (xorgxrdp) produces the **final encoder input**, fused into
+its per-damage-rect conversion pass; xrdp performs **zero pixel-domain work**
+on the hot path (no color matrix, no subsampling, no repacking, no staging
+copies — pointer arithmetic and `vmsplice` only).
+
+1. Per-monitor shmem region layout: `[main NV12][aux NV12]`, both at the
+   FINAL coded geometry — width aligned to the client-derived
+   `chroma_align` (16 FreeRDP / 32 mstsc), height 16-aligned — with each
+   view and each region page-aligned (4096) so `vmsplice` can move whole
+   pages.
+2. The auxiliary-view variant rides the existing `capture_format` contract
+   field, binding the §6.4 reserved constants: `XRDP_yuv444_v2_stream_709fr`
+   (ChromaV2 aux), `XRDP_yuv444_v1_stream_709fr` (v1 banded aux), and
+   `XRDP_nv12_709fr` under `CC_GFX_AVC444` (main-view-only; the external
+   AVC420 mode). The v1 variant is diagnostic; it may repack its full view
+   per frame.
+3. `chroma_align` joins the xup client info; any change to this contract
+   bumps `XUP_CLIENT_INFO_CURRENT_VERSION` and both daemons refuse loudly
+   on mismatch (never silent corruption).
+4. Rationale (recorded): the previous intermediate planar-YUV444 shmem was
+   neither the capture format nor the encoder format, forcing a second
+   full-frame per-pixel pass inside xrdp (~25M bounds-clamped samples per
+   4K frame) — the measured T4 bottleneck. The owner owns the 444 wire
+   format; the shmem must be splicable as-is.
+5. `xrdp_avc444_convert.c` remains in-tree as the executable REFERENCE for
+   the view layout (unit tests / oracle), off the hot path.
+
 ### Integration seams
 
 - `xrdp_encoder_create()` in `xrdp/xrdp_encoder.c`
@@ -581,6 +626,25 @@ This permits `-nostdin` and keeps FFmpeg interactive stdin separate from media i
 ### FR-PROC-4: FD behavior
 
 Parent fds are nonblocking and close-on-exec. Child inheritance is restricted to intended descriptors. The parent drains input progress, stdout, and stderr in one `poll()` loop.
+
+### FR-PROC-6: vmsplice-only input feed (2026-07-26, owner directive)
+
+`vmsplice(2)` is the ONLY permitted mechanism for moving media bytes from
+xrdp to the FFmpeg child. No `write()` on the media descriptor, no staging
+buffer, no memcpy of pixel data anywhere in xrdp's hot path.
+
+1. The runner queues borrowed `{pointer, length}` segments (capture shmem
+   for live frames; heap fixtures for the probe) and the poll loop feeds
+   them with `vmsplice(fd, iov, 1, SPLICE_F_NONBLOCK)`.
+2. `SPLICE_F_GIFT` is forbidden — the pages belong to the xorgxrdp shmem.
+3. Borrowed segments never outlive the encode call that queued them
+   (FR-CAPTURE-6 amendment): unsplice'd input at wait end is an error and
+   replaces the child.
+4. The pipe capacity is raised best-effort via `F_SETPIPE_SZ` to reduce
+   syscall count; failure to raise it is not an error.
+5. Page-aligned segments take the kernel's reference path (true zero-copy);
+   unaligned tails fall back to an in-kernel copy — still never a
+   user-space copy.
 
 ### FR-PROC-5: MVP FFmpeg command
 
