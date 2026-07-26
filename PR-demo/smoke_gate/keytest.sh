@@ -23,7 +23,13 @@ T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
 SU=${KEYTEST_USER:-ubuntu}
 CRED_FILE=${KEYTEST_PASS_FILE:-/root/.ubuntu_cred}
 LPORT=${KEYTEST_TUNNEL_PORT:-33890}
-CLI=${KEYTEST_CLIENT_DISPLAY:-:99}
+# :98, NOT :99 — :99 belongs to the dual-monitor layout rig's Xorg+dummy
+# (offscreen_owner_layout.sh). Sharing it broke the gate (2026-07-26):
+# Xvfb silently failed to bind the busy display, the client mapped at the
+# rig's first-monitor origin +594+0 on the 3840x3840 fb, and the fixed
+# sample coordinates read black — a false FAIL with the server rendering
+# perfectly.
+CLI=${KEYTEST_CLIENT_DISPLAY:-:98}
 # Session size. MUST be exercised at more than one size: a resolution-
 # dependent encoder failure (ffmpeg probesize analysis window) once passed
 # every 1920x1080 run while freezing every 1024x768 (mstsc) login.
@@ -50,12 +56,17 @@ if [ "$LSUM" != "$RSUM" ]; then
     t4 "sudo install -m 755 /tmp/colorkey.sh /usr/local/bin/colorkey.sh"
 fi
 
-# client-side X server for xfreerdp (local)
+# client-side X server for xfreerdp (local); geometry VERIFIED after
+# start — a silent bind failure on a busy display must abort, not fall
+# through onto whatever X happens to own it
 CLIENT_SIZE=${KEYTEST_CLIENT_SIZE:-1920x1080}
 if ! DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null | grep -q "^${CLIENT_SIZE%x*} ${CLIENT_SIZE#*x}$"; then
-    pkill -9 -x Xvfb 2>/dev/null; sleep 1
+    pkill -9 -f "Xvfb $CLI" 2>/dev/null; sleep 1
     setsid Xvfb "$CLI" -screen 0 "${CLIENT_SIZE}x24" </dev/null >/dev/null 2>&1 &
     sleep 2
+    DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null \
+        | grep -q "^${CLIENT_SIZE%x*} ${CLIENT_SIZE#*x}$" \
+        || { echo "FAIL: client X $CLI not at $CLIENT_SIZE (display busy?)"; exit 1; }
 fi
 
 # end any existing session + client so this is a cold login
