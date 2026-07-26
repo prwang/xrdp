@@ -67,6 +67,52 @@ prerequisite; (2) pack-loop vectorization (~10pp of a core under the
 real load); (3) optionally disable xfwm compositing on the T4 (~10pp,
 cosmetic tradeoff, owner's call).
 
+**Lever accounting in consistent units (pp of ONE core, under the
+owner reference load above; harness:
+`PR-demo/t4_profile/profile_owner_load.sh`).** Baseline: Xorg ~46
+(pack loops 17.4 / decode.avx2 7.9 / compositor render 4.7 / move blit
+3.2 / rest ~12.8), ffmpeg x2 ~22, xrdp ~13 — pipeline total ~81.
+- Lever 1, vectorize the pack loops: pack is ~69% of conversion (bench:
+  decode 6.9ms vs pack 12.3ms full-4K; perf agrees 37.9 vs 17.2). A
+  proper shuffle implementation cuts it ~60-70% -> SAVES ~10-12pp.
+  Floor: the 7.9pp decode is already vector-optimal.
+- Lever 2, LC=1/LC=2 motion-time aux skip: removes the aux view
+  end-to-end during motion (Xorg aux pack ~9-10pp + chroma decode ~3pp;
+  ffmpeg input/pictures halve ~8-10pp; xrdp splice bytes halve ~3-4pp)
+  -> SAVES ~22-26pp across the pipeline, halves wire bandwidth, and is
+  the macOS prerequisite. Costs: chroma catch-up bursts off the
+  interactive path; 4:2:0 during motion only (Windows-identical).
+- Lever 3, compositing off: 4.7pp direct + ~2-3pp damage-halo ripple ->
+  SAVES ~6-8pp; zero engineering, cosmetic tradeoff, reversible.
+- Interaction: lever 2 removes the aux portion of the work lever 1
+  vectorizes; done after lever 2, lever 1's remaining value is ~5-6pp.
+  Both together: motion-time conversion ~25pp -> ~9pp, pipeline ~81 ->
+  ~45pp (before compositor).
+
+**Owner-decided order (2026-07-26): implement Lever 1 FIRST, then
+Lever 2.** (Recorded: with this order lever 1 realizes its full
+10-12pp immediately; lever 2 then subsumes the aux share.)
+
+## Lever 1: vectorize the AVC444 pack loops — TODO (next up, owner-ordered 2026-07-26)
+
+Restructure the pack half of `a8r8g8b8_to_avc444_box` (xorgxrdp) into
+branchless/SIMD-friendly shuffle loops per PRD FR-CAPTURE-7, targeting
+~60-70% pack-cost reduction (~10-12pp of a core under the owner load;
+T4 full-4K conversion 19.2ms -> ~10ms). Gate with
+`tools/avc444_pack_bench.c` (extend with the new variant) BEFORE
+deploying; then dev-box burr harness (parity) + smoke; then T4 deb +
+`PR-demo/t4_profile/profile_owner_load.sh` re-run for the
+user-acceptance number.
+
+## Lever 2: LC=1/LC=2 motion-time aux skip — TODO (after Lever 1)
+
+Luma-only frames during motion (LC=1), deferred chroma catch-up
+(LC=2), per `docs/avc444_lc_reframe_design.md` — ~22-26pp saving across
+Xorg/ffmpeg/xrdp under the owner load, halves wire bandwidth, macOS
+Windows App prerequisite. Touches the capture contract again (aux pack
+skip flag or per-frame view selection) — pairs with the existing LC
+reframe / Mac items below; consolidate scopes when picked up.
+
 **Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
 (xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
 83/83 incl. new page-aligned layout math; the ffmpeg encode tests
