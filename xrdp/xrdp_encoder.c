@@ -841,16 +841,23 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
     index = 0;
     while (xrdp_region_get_rect(reg, index, &rect) == 0)
     {
-        /* Even-align the rect origin to the chroma sampling grid. The AVC444
+        /* Even-align the WHOLE rect to the chroma sampling grid. The AVC444
          * decoder reconstructs chroma one region rect at a time, indexing the
          * odd columns/rows relative to the rect origin (MS-RDPEGFX 3.3.8.3.x);
          * an odd left/top flips chroma parity and fringes the rect's left/top
-         * edge (magenta/teal burr on high-contrast edges). Rounding the origin
-         * down to even only grows the already 1px-expanded rect by <= 1px and
-         * never exceeds the surface (left/top >= 0). right/bottom need no
-         * alignment: the decoder covers odd widths via (width + 1) / 2. */
+         * edge (magenta/teal burr on high-contrast edges), and an odd width/
+         * height leaves the last column/row's chroma pairing ambiguous —
+         * lenient decoders cover it via (width + 1) / 2, but strict ones
+         * (FreeRDP's SSE 4:4:4 reconstruction) hard-assert even dimensions.
+         * Origins round down, extents round up (both content-preserving on
+         * the already 1px-expanded rect), clamped to the surface; a rect
+         * flush against an odd-sized surface edge stays odd there, which
+         * only an odd-sized surface can produce. */
         rect.left &= ~1;
         rect.top &= ~1;
+        rect.right = MIN(dst_rect->x2 - dst_rect->x1, (rect.right + 1) & ~1);
+        rect.bottom = MIN(dst_rect->y2 - dst_rect->y1,
+                          (rect.bottom + 1) & ~1);
         out_uint16_le(s, rect.left);
         out_uint16_le(s, rect.top);
         out_uint16_le(s, rect.right);
