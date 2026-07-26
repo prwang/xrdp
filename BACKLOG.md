@@ -126,12 +126,54 @@ deploying; then dev-box burr harness (parity) + smoke; then T4 deb +
 `PR-demo/t4_profile/profile_owner_load.sh` re-run for the
 user-acceptance number.
 
+## End-to-end frame accounting — DONE (2026-07-26); fps ceiling root-caused
+
+Owner challenge: drag still feels <10fps post-lever-1; cpu% is the
+wrong unit for delivered-fps accounting, and the "network can't catch
+up" hypothesis needed validation. Built
+`PR-demo/t4_profile/frame_accounting.sh`: uprobes on the DEPLOYED
+binaries (capture entry / encode entry+return / wire send / xup ack /
+client GFX ack with arg values) + per-second `ss -ti` on the RDP
+socket. No restart, no redeploy.
+
+**Result (owner load, dual-mon, nvenc):** 20.1 fps in exact lockstep
+at every stage — zero drops anywhere. Client `queue_depth=0` on every
+ack (decoder idle). Network REFUTED as bottleneck with data: ~8 Mbit/s
+used of ~98 Mbit/s measured delivery rate, Send-Q ~0, rtt 17ms flat,
+0 retrans in-window. Cycle partition (p50):
+5.6ms capture+pack -> **30.1ms synchronous encode_pair** (p90 47.5;
+main+aux = TWO full-4K nvenc encodes serially through one ffmpeg,
+~24MB piped per frame) -> <1ms send -> ~5ms ack-to-next-capture.
+Frame period p50 ~50ms, p90 61ms. The pipeline is fully SERIAL:
+capture cannot overlap encode because the single shmem buffer is
+borrowed by the encoder for the whole synchronous call (FR-PROC-6),
+and the xup ack that frees capture fires only at encode return.
+fif=2 send-time module ack verified working — it is not the limiter.
+"Feels <10fps": p90 period 61ms + 2-3 mouse steps coalesced per frame.
+
+Consequences for lever order (owner-approved order unchanged, value
+sharpened):
+- **Lever 2 (LC aux skip) is the fps lever, not just a cpu lever**:
+  dropping the aux encode during motion halves the dominant 30ms term
+  -> period ~28-33ms -> ~30-35fps expected.
+- **New candidate lever 4: pipeline capture with encode** (double- or
+  ring-buffered capture shmem so xorgxrdp captures frame N+1 while
+  ffmpeg consumes N). Removes the serial 5.4+5.3ms and hides
+  capture under encode -> period ~= encode duration. Combined with
+  lever 2: period ~16-18ms -> 55-60fps. Touches the capture contract
+  (per-view buffer slots + slot-tagged acks); design before code.
+- Also worth a look inside the 30ms: nvenc 2x4K should be ~16ms; the
+  remainder is pipe transport + ffmpeg demux framing. Profile the
+  ffmpeg side before assuming nvenc is saturated.
+
 ## Lever 2: LC=1/LC=2 motion-time aux skip — TODO (after Lever 1)
 
 Luma-only frames during motion (LC=1), deferred chroma catch-up
 (LC=2), per `docs/avc444_lc_reframe_design.md` — ~22-26pp saving across
 Xorg/ffmpeg/xrdp under the owner load, halves wire bandwidth, macOS
-Windows App prerequisite. Touches the capture contract again (aux pack
+Windows App prerequisite. Per the frame accounting above, ALSO the
+direct fps lever: halves the 30ms synchronous encode term, expected
+~20 -> ~30-35fps. Touches the capture contract again (aux pack
 skip flag or per-frame view selection) — pairs with the existing LC
 reframe / Mac items below; consolidate scopes when picked up.
 
