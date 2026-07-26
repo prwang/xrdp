@@ -42,8 +42,20 @@ sudo -u $SU pkill -u $SU -KILL -f 'xfce4-session|Xorg :' 2>/dev/null
 for i in $(seq 1 25); do pgrep -f 'Xorg :1[0-9]' >/dev/null || break; sleep 1; done
 sleep 3
 
-setsid env DISPLAY=$CLI xfreerdp3 /v:"$HOST" /u:$SU /p: /size:"$SIZE" \
-    /gfx:AVC444 /cert:ignore /log-level:WARN </dev/null >$OUT/keytest_login.log 2>&1 &
+# Credential: empty by default (dev box). On boxes where the tester
+# account has a real password, point KEYTEST_PASS_FILE at a root-owned
+# credential file; the secret rides an env var into /args-from so it
+# never appears in the process list, shell history or logs.
+PW=""
+if [ -n "${KEYTEST_PASS_FILE:-}" ]; then
+    PW=$(sudo cat "$KEYTEST_PASS_FILE")
+fi
+# one argument per line (that is how /args-from splits its input)
+RDPARGS=$(printf '%s\n' "/v:$HOST" "/u:$SU" "/p:$PW" "/size:$SIZE" \
+                        "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
+setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
+    xfreerdp3 /args-from:env:RDPARGS </dev/null >$OUT/keytest_login.log 2>&1 &
+unset PW RDPARGS
 sleep 8
 fw=""
 for r in 1 2 3; do
@@ -117,4 +129,21 @@ for k in r g b w r g b w; do
         fail=1
     fi
 done
+
+# colour-edge fidelity after settle (FR-PROC-7 §8): narrow red/blue stripes,
+# screenshot well past the deferred-aux window (one aux encode ~15ms; 2s is
+# generous). The fraction of strongly-saturated pixels in the centre crop
+# collapses if chroma is stuck at 4:2:0. smoke.sh asserts the threshold.
+DISPLAY=$CLI xdotool key --window "$fw" e
+sleep 2
+shot "$OUT/keytest_edge.png"
+python3 - "$OUT/keytest_edge.png" "$SW" "$SH" <<'EOF'
+import sys, numpy as np
+from PIL import Image
+im = Image.open(sys.argv[1]).convert('RGB')
+cx, cy = int(sys.argv[2]) // 2, int(sys.argv[3]) // 2
+a = np.asarray(im.crop((cx-200, cy-100, cx+200, cy+100))).astype(int)
+rb = np.abs(a[:, :, 0] - a[:, :, 2])
+print("EDGE_FIDELITY %.3f" % float((rb > 110).mean()))
+EOF
 exit $fail

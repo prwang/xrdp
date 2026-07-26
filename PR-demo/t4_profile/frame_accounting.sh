@@ -30,6 +30,8 @@ T4=${T4:-ubuntu@3.86.96.223}
 T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
 DISP=${DISP:-:10}
 XAUTH=${XAUTH:-/var/run/xrdp/1000/Xauthority}
+# session user driving the orbit (the offscreen rig runs as tester)
+SESS_USER=${SESS_USER:-ubuntu}
 SECS=${SECS:-12}
 ORBIT_X=${ORBIT_X:-670}
 ORBIT_Y=${ORBIT_Y:-1740}
@@ -38,6 +40,7 @@ REVS=${REVS:-20}
 
 set -e
 ssh -i "$T4_KEY" "$T4" DISP="$DISP" XAUTH="$XAUTH" SECS="$SECS" \
+    SESS_USER="$SESS_USER" \
     ORBIT_X="$ORBIT_X" ORBIT_Y="$ORBIT_Y" ORBIT_R="$ORBIT_R" \
     REVS="$REVS" 'bash -s' <<'REMOTE'
 set -e
@@ -48,7 +51,11 @@ if ! ss -tn state established '( sport = :3389 )' | grep -q 3389; then
 fi
 XRDP_BIN=/usr/sbin/xrdp
 XORGXRDP_SO=/usr/lib/xorg/modules/libxorgxrdp.so
-probe_add() { sudo perf probe -x "$1" "$2" >/dev/null 2>&1 || true; }
+# delete-then-add: a probe installed against a PREVIOUS binary keeps its
+# stale file offsets and silently records nothing after a redeploy
+probe_add() { b=${1##*/}; b=${b%%.*}
+              sudo perf probe -d "probe_${b}:${2%%=*}*" >/dev/null 2>&1
+              sudo perf probe -x "$1" "$2" >/dev/null 2>&1 || true; }
 probe_add "$XRDP_BIN" "enc_pair=xrdp_ffmpeg_avc444_encode_pair"
 probe_add "$XRDP_BIN" "enc_ret=xrdp_ffmpeg_avc444_encode_pair%return"
 probe_add "$XRDP_BIN" "wire_send=xrdp_egfx_send_data"
@@ -56,7 +63,7 @@ probe_add "$XRDP_BIN" \
     "egfx_ack=xrdp_mm_egfx_frame_ack queue_depth frame_id frames_decoded"
 probe_add "$XORGXRDP_SO" "cap_a2=rdpCaptureGfxA2"
 probe_add "$XORGXRDP_SO" "ack_rx=rdpClientConProcessMsgClientRegionEx"
-XD="sudo -u ubuntu env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY"
+XD="sudo -u $SESS_USER env DISPLAY=$DISPLAY XAUTHORITY=$XAUTHORITY"
 WID=$($XD xdotool search --onlyvisible --class thunar | head -1)
 if [ -z "$WID" ]; then
     echo "no visible Thunar; launching one"
