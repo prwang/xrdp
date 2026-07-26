@@ -1,0 +1,68 @@
+# Containerfile — one self-contained xrdp server per bisect arm.
+#
+# Owner directive (2026-07-26, CLAUDE.md "Bisect/diagnosis sessions"): during
+# a bisect we never mutate the host's deployed xrdp instance. Every variant
+# under test runs as its own pod built from this image, with its own binaries
+# and its own /etc/xrdp/gfx.toml (ConfigMap), all arms up at once on distinct
+# loopback host ports. SERVER SIDE ONLY — the client harness on the host is
+# never rebuilt or redeployed as part of a bisect.
+#
+# Build (from PR-demo/mac_bisect_matrix; build_and_deploy.sh does this):
+#   podman build --build-arg XRDP_DEB=<file> --build-arg XORGXRDP_DEB=<file> \
+#       -t xrdp-bisect:<tag> -f Containerfile .build/
+#
+# The image replicates the dev box (Debian 13) Mac-good baseline environment:
+# distro ffmpeg + Mesa radeonsi VAAPI, xserver-xorg-legacy with
+# allowed_users=anybody, xrdp.ini autorun=Xorg. GPU comes in via a /dev/dri
+# hostPath; the session is a deterministic full-screen arm banner (banner.sh),
+# identical in every arm, so the ONLY difference between arms is the xrdp
+# deb + gfx.toml.
+
+FROM debian:trixie
+
+ARG XRDP_DEB
+ARG XORGXRDP_DEB
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        libva2 libva-drm2 mesa-va-drivers vainfo \
+        xserver-xorg-core xserver-xorg-legacy \
+        x11-xserver-utils xterm xfonts-base fonts-dejavu-core \
+        dbus procps openssl ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# xrdp + xorgxrdp developer debs for THIS arm (copied into the build context
+# by build_and_deploy.sh; /work/dist is the deb archive of record)
+COPY ${XRDP_DEB} ${XORGXRDP_DEB} /tmp/debs/
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/debs/*.deb \
+    && rm -rf /tmp/debs /var/lib/apt/lists/*
+
+# Match the dev box Xorg wrapper policy (sesman starts Xorg as the user)
+RUN printf 'allowed_users=anybody\nneeds_root_rights=no\n' \
+        > /etc/X11/Xwrapper.config
+
+# Match the dev box xrdp.ini deltas, except the listen address: inside the
+# pod netns xrdp must listen on all interfaces so the CNI hostPort DNAT
+# (127.0.0.1:<arm port> on the host) can reach it.
+RUN sed -i -e 's|^port=3389|port=tcp://:3389|' \
+           -e 's|^autorun=$|autorun=Xorg|' /etc/xrdp/xrdp.ini
+
+# tester account mirrors the host baseline account the owner already uses;
+# the password hash is injected at runtime (entrypoint) from a host-side
+# root-only file — never baked into the image or committed.
+RUN useradd -m -u 1000 -s /bin/bash tester \
+    && usermod -aG video,render tester \
+    && useradd -m -u 1001 -s /bin/bash probe444 \
+    && usermod -aG video,render probe444
+
+COPY startwm.sh /etc/xrdp/startwm.sh
+COPY banner.sh /usr/local/bin/banner.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 755 /etc/xrdp/startwm.sh /usr/local/bin/banner.sh \
+              /usr/local/bin/entrypoint.sh
+
+EXPOSE 3389
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

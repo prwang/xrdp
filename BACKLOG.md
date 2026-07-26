@@ -1629,3 +1629,33 @@ Instruments built tonight: oracle save-only client (PR-demo/oracle_client)
 = per-arm byte verification without a Mac; QuickTime offline matrix
 (container path) now understood to exonerate only the codec layer, not
 the App's RDP path.
+
+### 2026-07-26 late: bisect methodology change — containerized matrix (owner directive)
+
+Two more host-breakage incidents from deb-swap iteration (xrdp-dev deb's
+`Breaks: xorgxrdp (<< 1:0.10.80~)` silently removed xorgxrdp-dev and
+deleted /etc/X11/xrdp/xorg.conf; an M1a config leaked into the M1b arm).
+Owner ruling: NEVER iterate a bisect by mutating the single deployed
+instance. New rig (CLAUDE.md "Bisect/diagnosis sessions" + task #42):
+
+- Host restored to the untouched Mac-good baseline and frozen for the
+  session: xrdp-dev 52099149 + xorgxrdp-dev ee1ec01 + CQP gfx.toml,
+  session creation re-verified (AVC420/ffmpeg matched).
+- k3s single-node on the dev box (nested LXC; /dev/kmsg symlink,
+  KubeletInUserNamespace, conntrack-max-per-core=0, **native
+  snapshotter** — overlayfs pod rootfs breaks credential-changing exec:
+  sgid unix_chkpwd dies in ld.so RELRO mprotect EACCES, so PAM denies
+  every login; plain-dir snapshots restore normal behavior).
+- One pod per arm, each with pinned debs + own gfx.toml (ConfigMaps from
+  committed gfx/arm-*.toml), all live simultaneously on loopback
+  hostPorts; SERVER SIDE ONLY — client harness on the host untouched.
+- PR-demo/mac_bisect_matrix/: Containerfile, entrypoint, banner session,
+  per-arm tomls, k8s manifests, build_and_deploy.sh, verify_matrix.sh
+  (oracle-client byte verification of every arm before human handoff).
+- Matrix v1 (supersedes serial M1a/M1b plan — all arms at once):
+  arm-a :40000 CQP baseline (control-good) | arm-b :40001 CBR+timing SEI
+  (M1 control-black) | arm-c :40002 CBR+timing SEI+strip_sei (SEI NALs
+  stripped, HRD VUI stays; xrdp e96e655416dc) | arm-d :40003 CBR only.
+  Verdict rule: C renders => SEI NALs convicted (strip_sei = nvenc fix
+  candidate); C black => HRD VUI in SPS convicted; D pins whether plain
+  CBR drags in HRD VUI (byte-verify decides).
