@@ -256,21 +256,30 @@ avc444_decode_row(const uint32_t *s32, uint8_t *yp, uint8_t *urow,
         urow[x] = urow[xlim - 1];
         vrow[x] = vrow[xlim - 1];
     }
+    /* replicated slack so the pack loops read odd/4-grid neighbours
+     * (2cx+1, 4x+2) branch-free at the rect edge; the row buffers carry
+     * 16 spare bytes for this */
+    for (x = xe; x < xe + 4; x++)
+    {
+        urow[x] = urow[xe - 1];
+        vrow[x] = vrow[xe - 1];
+    }
 }
 
 /* U/V row buffers for one 2-row band. The capture path runs on the
  * single X server thread, so plain static storage is safe; 16384 is the
  * coded-width ceiling. */
-static uint8_t g_avc444_u0[16384];
-static uint8_t g_avc444_v0[16384];
-static uint8_t g_avc444_u1[16384];
-static uint8_t g_avc444_v1[16384];
+static uint8_t g_avc444_u0[16384 + 16];
+static uint8_t g_avc444_v0[16384 + 16];
+static uint8_t g_avc444_u1[16384 + 16];
+static uint8_t g_avc444_v1[16384 + 16];
 
 /* main view (+ optional ChromaV2 aux view) for one damage rect, two
  * source rows per iteration. aux_y == NULL packs the main view only
  * (external AVC420, and the v1 mode whose banded aux is built by
  * a8r8g8b8_to_avc444v1_aux below). point_chroma: v1 stores the
  * (even,even) point sample instead of the 2x2 average. */
+RDP_VECTORIZE
 static int
 a8r8g8b8_to_avc444_box(const uint8_t *src, int src_stride,
                        uint8_t *dst_y, uint8_t *dst_uv,
@@ -297,8 +306,13 @@ a8r8g8b8_to_avc444_box(const uint8_t *src, int src_stride,
                           xd, xe, w);
         avc444_decode_row(s1, dst_y + cw * (y + 1), g_avc444_u1,
                           g_avc444_v1, xd, xe, w);
+        /* pack loops: flat, branch-free (edge handling lives in the
+         * replicated row-buffer tails), one output stream per loop so
+         * the auto-vectorizer sees plain stride-2/stride-4 gathers
+         * with contiguous or pair-interleaved stores */
         if (point_chroma)
         {
+            RDP_LOOP_VECTORIZE
             for (cx = x1 / 2; cx < xe / 2; cx++)
             {
                 uvp[2 * cx] = g_avc444_u0[2 * cx];
@@ -307,6 +321,7 @@ a8r8g8b8_to_avc444_box(const uint8_t *src, int src_stride,
         }
         else
         {
+            RDP_LOOP_VECTORIZE
             for (cx = x1 / 2; cx < xe / 2; cx++)
             {
                 uvp[2 * cx] =
@@ -326,6 +341,7 @@ a8r8g8b8_to_avc444_box(const uint8_t *src, int src_stride,
             uint8_t *auvp = aux_uv + cw * (y / 2);
             int half = cw / 2;
             int quarter = cw / 4;
+            int cx1 = x1 / 2;
             int cx_end = (xe + 1) / 2;
             int x_end = (xe + 3) / 4;
 
@@ -333,25 +349,37 @@ a8r8g8b8_to_avc444_box(const uint8_t *src, int src_stride,
             {
                 x_end = quarter;
             }
-            for (cx = x1 / 2; cx < cx_end; cx++)
+            RDP_LOOP_VECTORIZE
+            for (cx = cx1; cx < cx_end; cx++)
             {
-                int sx = 2 * cx + 1;
-                sx = (sx < xe) ? sx : (xe - 1);
-                ay0[cx] = g_avc444_u0[sx];
-                ay0[half + cx] = g_avc444_v0[sx];
-                ay1[cx] = g_avc444_u1[sx];
-                ay1[half + cx] = g_avc444_v1[sx];
+                ay0[cx] = g_avc444_u0[2 * cx + 1];
             }
+            RDP_LOOP_VECTORIZE
+            for (cx = cx1; cx < cx_end; cx++)
+            {
+                ay0[half + cx] = g_avc444_v0[2 * cx + 1];
+            }
+            RDP_LOOP_VECTORIZE
+            for (cx = cx1; cx < cx_end; cx++)
+            {
+                ay1[cx] = g_avc444_u1[2 * cx + 1];
+            }
+            RDP_LOOP_VECTORIZE
+            for (cx = cx1; cx < cx_end; cx++)
+            {
+                ay1[half + cx] = g_avc444_v1[2 * cx + 1];
+            }
+            RDP_LOOP_VECTORIZE
             for (x = xd / 4; x < x_end; x++)
             {
-                int ia = 4 * x;
-                int ib = 4 * x + 2;
-                ia = (ia < xe) ? ia : (xe - 1);
-                ib = (ib < xe) ? ib : (xe - 1);
-                auvp[2 * x] = g_avc444_u1[ia];
-                auvp[2 * x + 1] = g_avc444_u1[ib];
-                auvp[2 * (quarter + x)] = g_avc444_v1[ia];
-                auvp[2 * (quarter + x) + 1] = g_avc444_v1[ib];
+                auvp[2 * x] = g_avc444_u1[4 * x];
+                auvp[2 * x + 1] = g_avc444_u1[4 * x + 2];
+            }
+            RDP_LOOP_VECTORIZE
+            for (x = xd / 4; x < x_end; x++)
+            {
+                auvp[2 * (quarter + x)] = g_avc444_v1[4 * x];
+                auvp[2 * (quarter + x) + 1] = g_avc444_v1[4 * x + 2];
             }
         }
     }
