@@ -23,7 +23,7 @@
 #endif
 
 #include "xrdp_encoder.h"
-#include "xrdp_avc444_convert.h"
+#include "xup_client_info.h"
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp.h"
 #include "ms-rdpbcgr.h"
@@ -235,7 +235,13 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             "xrdp_encoder_create: starting ffmpeg AVC444 gfx session");
         self->in_codec_mode = 1;
         client_info->capture_code = CC_GFX_AVC444;
-        client_info->capture_format = XRDP_yuv444_709fr;
+        /* the capture packs the FINAL wire views (FR-CAPTURE-6); the
+         * aux-view variant rides capture_format */
+        client_info->capture_format = mm->avc444_v2
+                                      ? XRDP_yuv444_v2_stream_709fr
+                                      : XRDP_yuv444_v1_stream_709fr;
+        client_info->avc444_chroma_align =
+            mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
         self->gfx = 1;
         self->avc444_ffmpeg = 1;
         self->avc444_v2 = mm->avc444_v2;
@@ -248,8 +254,12 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
         self->avc444_chroma_align =
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
-        self->avc444_flush_enabled =
-            mm->wm->gfx_config->avc444_ffmpeg_tail_flush;
+        if (mm->wm->gfx_config->avc444_ffmpeg_tail_flush)
+        {
+            LOG(LOG_LEVEL_WARNING, "xrdp_encoder_create: gfx.toml "
+                "tail_flush is inert under the splicable-capture "
+                "contract (FR-PROC-6) and is ignored");
+        }
     }
     else if (mm->avc420_ffmpeg)
     {
@@ -260,7 +270,10 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             "xrdp_encoder_create: starting ffmpeg AVC420 gfx session");
         self->in_codec_mode = 1;
         client_info->capture_code = CC_GFX_AVC444;
-        client_info->capture_format = XRDP_yuv444_709fr;
+        /* main view only at the coded geometry (FR-CAPTURE-6) */
+        client_info->capture_format = XRDP_nv12_709fr;
+        client_info->avc444_chroma_align =
+            mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
         self->gfx = 1;
         self->avc420_ffmpeg = 1;
         self->avc444_dump_extra = mm->avc444_dump_extra;
@@ -270,8 +283,12 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_encoder_args;
         self->avc444_chroma_align =
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
-        self->avc444_flush_enabled =
-            mm->wm->gfx_config->avc444_ffmpeg_tail_flush;
+        if (mm->wm->gfx_config->avc444_ffmpeg_tail_flush)
+        {
+            LOG(LOG_LEVEL_WARNING, "xrdp_encoder_create: gfx.toml "
+                "tail_flush is inert under the splicable-capture "
+                "contract (FR-PROC-6) and is ignored");
+        }
     }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)
     else if (mm->libh264_loaded && (mm->egfx_flags & XRDP_EGFX_H264) != 0)
@@ -481,12 +498,6 @@ xrdp_encoder_delete(struct xrdp_encoder *self)
             xrdp_ffmpeg_avc444_delete((struct xrdp_ffmpeg_avc444 *)
                                       self->avc444_ffmpeg_handle[index]);
             self->avc444_ffmpeg_handle[index] = NULL;
-        }
-        if (self->avc444_conv[index] != NULL)
-        {
-            xrdp_avc444_conv_delete((struct xrdp_avc444_conv *)
-                                    self->avc444_conv[index]);
-            self->avc444_conv[index] = NULL;
         }
     }
 
@@ -964,7 +975,8 @@ avc444_debug_dump(unsigned long long seq, int twidth, int theight,
                   int cwidth, int cheight,
                   struct xrdp_egfx_rect *d_rects, int num_rects,
                   const struct xrdp_avc444_encoded_pair *pair,
-                  const struct xrdp_avc444_conv *conv)
+                  const unsigned char *main_view,
+                  const unsigned char *aux_view, int nv12_bytes)
 {
     const char *dir;
     char path[512];
@@ -982,24 +994,28 @@ avc444_debug_dump(unsigned long long seq, int twidth, int theight,
     {
         g_mkdir(dir);
     }
-    /* also dump the converter's NV12 views (pre-H.264): losslessly combinable
-     * with no reference chain, so the converter can be isolated from the H.264
-     * encode/decode. These are the CURRENT frame's converter output. */
-    if (conv != NULL)
+    /* also dump the packed NV12 views the capture delivered (pre-H.264):
+     * losslessly combinable with no reference chain, so the capture packer
+     * can be isolated from the H.264 encode/decode. */
+    if (main_view != NULL && nv12_bytes > 0)
     {
         g_snprintf(path, sizeof(path), "%s/%06llu_conv_main.nv12", dir, seq);
         fd = g_file_open_ex(path, 0, 1, 1, 1);
         if (fd >= 0)
         {
-            g_file_write(fd, (const char *)conv->main_nv12, conv->nv12_size);
+            g_file_write(fd, (const char *)main_view, nv12_bytes);
             g_file_close(fd);
         }
-        g_snprintf(path, sizeof(path), "%s/%06llu_conv_aux.nv12", dir, seq);
-        fd = g_file_open_ex(path, 0, 1, 1, 1);
-        if (fd >= 0)
+        if (aux_view != NULL)
         {
-            g_file_write(fd, (const char *)conv->aux_nv12, conv->nv12_size);
-            g_file_close(fd);
+            g_snprintf(path, sizeof(path), "%s/%06llu_conv_aux.nv12", dir,
+                       seq);
+            fd = g_file_open_ex(path, 0, 1, 1, 1);
+            if (fd >= 0)
+            {
+                g_file_write(fd, (const char *)aux_view, nv12_bytes);
+                g_file_close(fd);
+            }
         }
     }
     g_snprintf(path, sizeof(path), "%s/%06llu_main.264", dir, seq);
@@ -1064,9 +1080,10 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     struct xrdp_egfx_rect *d_rects;
     struct xrdp_egfx_rect dst_rect;
     struct xrdp_enc_gfx_cmd *enc_gfx_cmd = &(enc->u.gfx);
-    struct xrdp_avc444_conv *conv;
+    const unsigned char *main_view;
     struct xrdp_ffmpeg_avc444 *ff;
     struct xrdp_avc444_encoded_pair pic;
+    int nv12_bytes;
     struct stream ls;
     struct stream *s;
     struct stream *rv;
@@ -1139,44 +1156,27 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     dst_rect.x2 = width;
     dst_rect.y2 = height;
 
-    if (twidth < 1 || theight < 1 ||
+    nv12_bytes = xup_cap_avc444_nv12_bytes(twidth, theight,
+                                           self->avc444_chroma_align);
+    if (twidth < 1 || theight < 1 || nv12_bytes < 1 ||
             shmem_offset < 0 || shmem_offset > enc_gfx_cmd->data_bytes ||
-            3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
-            enc_gfx_cmd->data_bytes - shmem_offset)
+            nv12_bytes > enc_gfx_cmd->data_bytes - shmem_offset)
     {
         g_free(d_rects);
         return NULL;
     }
 
-    /* lazily (re)create the per-surface converter and ffmpeg child; a visible
-     * resize drops both so the new generation starts with a fresh IDR */
-    conv = (struct xrdp_avc444_conv *)self->avc444_conv[mon_index];
-    if (conv != NULL &&
-            (conv->actual_width != twidth || conv->actual_height != theight))
-    {
-        xrdp_avc444_conv_delete(conv);
-        self->avc444_conv[mon_index] = NULL;
-        conv = NULL;
-        if (self->avc444_ffmpeg_handle[mon_index] != NULL)
-        {
-            xrdp_ffmpeg_avc444_delete((struct xrdp_ffmpeg_avc444 *)
-                                      self->avc444_ffmpeg_handle[mon_index]);
-            self->avc444_ffmpeg_handle[mon_index] = NULL;
-        }
-    }
-    if (conv == NULL)
-    {
-        conv = xrdp_avc444_conv_create(twidth, theight,
-                                       self->avc444_chroma_align);
-        if (conv == NULL)
-        {
-            g_free(d_rects);
-            return NULL;
-        }
-        conv->main_only = 1;
-        self->avc444_conv[mon_index] = conv;
-    }
+    /* lazily (re)create the per-surface ffmpeg child; a visible resize
+     * drops it so the new generation starts with a fresh IDR */
     ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon_index];
+    if (ff != NULL &&
+            (self->avc444_actual_w[mon_index] != twidth ||
+             self->avc444_actual_h[mon_index] != theight))
+    {
+        xrdp_ffmpeg_avc444_delete(ff);
+        self->avc444_ffmpeg_handle[mon_index] = NULL;
+        ff = NULL;
+    }
     if (ff == NULL)
     {
         struct xrdp_ffmpeg_avc444_config cfg;
@@ -1192,22 +1192,21 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
             return NULL;
         }
         self->avc444_ffmpeg_handle[mon_index] = ff;
+        self->avc444_actual_w[mon_index] = twidth;
+        self->avc444_actual_h[mon_index] = theight;
     }
 
-    if (xrdp_avc444_conv_update(conv,
-                                (const unsigned char *)enc_gfx_cmd->data
-                                + shmem_offset,
-                                (twidth + 15) & ~15, twidth, theight) != 0)
-    {
-        g_free(d_rects);
-        return NULL;
-    }
-    enc_rv = xrdp_ffmpeg_avc444_encode_single(ff, conv->main_nv12,
-             conv->nv12_size, self->avc444_seq++, &pic);
+    /* the capture shmem already holds the packed main NV12 view at the
+     * coded geometry (FR-CAPTURE-6); hand the borrowed pointer straight
+     * to the vmsplice feeder -- zero pixel-domain work here (FR-PROC-6) */
+    main_view = (const unsigned char *)enc_gfx_cmd->data + shmem_offset;
+    enc_rv = xrdp_ffmpeg_avc444_encode_single(ff, main_view,
+             nv12_bytes, self->avc444_seq++, &pic);
     if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
     {
-        int cy_off = (conv->coded_height / 2) * conv->coded_width
-                     + conv->coded_width / 2;
+        int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
+        int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
+                     + t_cw / 2;
         LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
             "%lld rv=%s inflight=%d centerY=%d",
             (unsigned long long)(self->avc444_seq - 1),
@@ -1215,7 +1214,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
             ? (long long)pic.desktop_sequence : -1LL,
             enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
             xrdp_ffmpeg_avc444_inflight(ff),
-            (int)conv->main_nv12[cy_off]);
+            (int)main_view[cy_off]);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -1223,16 +1222,6 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         self->avc444_ffmpeg_handle[mon_index] = NULL;
         g_free(d_rects);
         return NULL;
-    }
-    /* legacy opt-in tail-flush: with the synchronous encode nothing is
-     * normally left in flight (the drain no-ops); kept as a backstop */
-    if (self->avc444_flush_enabled)
-    {
-        self->avc444_flush_surface_id[mon_index] = surface_id;
-        self->avc444_flush_pixel_format[mon_index] = pixel_format;
-        self->avc444_flush_seq = self->avc444_seq - 1;
-        self->avc444_flush_mon = mon_index;
-        self->avc444_flush_armed = 1;
     }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
@@ -1301,9 +1290,12 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     struct xrdp_egfx_rect *d_rects;
     struct xrdp_egfx_rect dst_rect;
     struct xrdp_enc_gfx_cmd *enc_gfx_cmd = &(enc->u.gfx);
-    struct xrdp_avc444_conv *conv;
+    const unsigned char *main_view;
+    const unsigned char *aux_view;
     struct xrdp_ffmpeg_avc444 *ff;
     struct xrdp_avc444_encoded_pair pair;
+    int nv12_bytes;
+    int aux_offset;
     struct stream ls;
     struct stream *s;
     struct stream *rv;
@@ -1376,45 +1368,31 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     dst_rect.x2 = width;
     dst_rect.y2 = height;
 
-    if (twidth < 1 || theight < 1 ||
+    nv12_bytes = xup_cap_avc444_nv12_bytes(twidth, theight,
+                                           self->avc444_chroma_align);
+    aux_offset = xup_cap_avc444_aux_offset(twidth, theight,
+                                           self->avc444_chroma_align);
+    if (twidth < 1 || theight < 1 || nv12_bytes < 1 ||
             shmem_offset < 0 || shmem_offset > enc_gfx_cmd->data_bytes ||
-            3 * (((twidth + 15) & ~15) * ((theight + 15) & ~15)) >
+            aux_offset + nv12_bytes >
             enc_gfx_cmd->data_bytes - shmem_offset)
     {
         g_free(d_rects);
         return NULL;
     }
 
-    /* lazily (re)create the per-surface converter and ffmpeg child; a visible
-     * resize drops both (kill/reap) so the new generation starts with a full
+    /* lazily (re)create the per-surface ffmpeg child; a visible resize
+     * drops it (kill/reap) so the new generation starts with a full
      * LC=0 reset pair (PRD FR-RESIZE) */
-    conv = (struct xrdp_avc444_conv *)self->avc444_conv[mon_index];
-    if (conv != NULL &&
-            (conv->actual_width != twidth || conv->actual_height != theight))
-    {
-        xrdp_avc444_conv_delete(conv);
-        self->avc444_conv[mon_index] = NULL;
-        conv = NULL;
-        if (self->avc444_ffmpeg_handle[mon_index] != NULL)
-        {
-            xrdp_ffmpeg_avc444_delete((struct xrdp_ffmpeg_avc444 *)
-                                      self->avc444_ffmpeg_handle[mon_index]);
-            self->avc444_ffmpeg_handle[mon_index] = NULL;
-        }
-    }
-    if (conv == NULL)
-    {
-        conv = xrdp_avc444_conv_create(twidth, theight,
-                                       self->avc444_chroma_align);
-        if (conv == NULL)
-        {
-            g_free(d_rects);
-            return NULL;
-        }
-        conv->chroma_v2 = self->avc444_v2;
-        self->avc444_conv[mon_index] = conv;
-    }
     ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon_index];
+    if (ff != NULL &&
+            (self->avc444_actual_w[mon_index] != twidth ||
+             self->avc444_actual_h[mon_index] != theight))
+    {
+        xrdp_ffmpeg_avc444_delete(ff);
+        self->avc444_ffmpeg_handle[mon_index] = NULL;
+        ff = NULL;
+    }
     if (ff == NULL)
     {
         struct xrdp_ffmpeg_avc444_config cfg;
@@ -1430,25 +1408,26 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             return NULL;
         }
         self->avc444_ffmpeg_handle[mon_index] = ff;
+        self->avc444_actual_w[mon_index] = twidth;
+        self->avc444_actual_h[mon_index] = theight;
     }
 
-    if (xrdp_avc444_conv_update(conv,
-                                (const unsigned char *)enc_gfx_cmd->data
-                                + shmem_offset,
-                                (twidth + 15) & ~15, twidth, theight) != 0)
-    {
-        g_free(d_rects);
-        return NULL;
-    }
-    enc_rv = xrdp_ffmpeg_avc444_encode_pair(ff, conv->main_nv12,
-                                            conv->aux_nv12, conv->nv12_size,
+    /* the capture shmem already holds the packed wire views
+     * (FR-CAPTURE-6): main NV12 at shmem_offset, aux NV12 on the next
+     * page boundary after it; hand the borrowed pointers straight to
+     * the vmsplice feeder -- zero pixel-domain work here (FR-PROC-6) */
+    main_view = (const unsigned char *)enc_gfx_cmd->data + shmem_offset;
+    aux_view = main_view + aux_offset;
+    enc_rv = xrdp_ffmpeg_avc444_encode_pair(ff, main_view, aux_view,
+                                            nv12_bytes,
                                             self->avc444_seq++, &pair);
     if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
     {
         /* centre luma of the CURRENT capture: proves which colour this
          * submission carries vs which sequence the popped pair returns */
-        int cy_off = (conv->coded_height / 2) * conv->coded_width
-                     + conv->coded_width / 2;
+        int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
+        int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
+                     + t_cw / 2;
         LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
             "%lld rv=%s inflight=%d centerY=%d",
             (unsigned long long)(self->avc444_seq - 1),
@@ -1456,7 +1435,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             ? (long long)pair.desktop_sequence : -1LL,
             enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
             xrdp_ffmpeg_avc444_inflight(ff),
-            (int)conv->main_nv12[cy_off]);
+            (int)main_view[cy_off]);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -1465,16 +1444,6 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         g_free(d_rects);
         return NULL;
     }
-    /* legacy opt-in tail-flush: with the synchronous encode nothing is
-     * normally left in flight (the drain no-ops); kept as a backstop */
-    if (self->avc444_flush_enabled)
-    {
-        self->avc444_flush_surface_id[mon_index] = surface_id;
-        self->avc444_flush_pixel_format[mon_index] = pixel_format;
-        self->avc444_flush_seq = self->avc444_seq - 1;
-        self->avc444_flush_mon = mon_index;
-        self->avc444_flush_armed = 1;
-    }
     if (enc_rv != XRDP_FFMPEG_PAIR_READY)
     {
         g_free(d_rects); /* defensive: no pair; client keeps prior content */
@@ -1482,8 +1451,10 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     }
 
     avc444_debug_dump(pair.desktop_sequence, twidth, theight,
-                      conv->coded_width, conv->coded_height,
-                      d_rects, num_rects_d, &pair, conv);
+                      xrdp_ffmpeg_avc444_coded_width(ff),
+                      xrdp_ffmpeg_avc444_coded_height(ff),
+                      d_rects, num_rects_d, &pair, main_view, aux_view,
+                      nv12_bytes);
 
     need = 4 + pair.main_len + pair.aux_len + num_rects_d * 24 + 512;
     s = &ls;
@@ -2251,7 +2222,6 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         {
             /* remember the last GFX frame id so an idle tail-flush can reuse it
              * for its own STARTFRAME/ENDFRAME without perturbing frame acks */
-            self->avc444_flush_frame_id = frame_id;
         }
         if (s != NULL)
         {
@@ -2288,214 +2258,6 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
  * frames (the retained NV12) to push the withheld real frame out and emit it
  * once. Bounded and one-shot per idle burst, so idle never becomes a fixed-fps
  * duplicate stream. */
-#define XRDP_AVC444_FLUSH_MS 33          /* ~one frame at the 30fps floor  */
-#define XRDP_AVC444_FLUSH_MAX_DRAIN 4    /* >= plausible pipeline depth    */
-
-/* Build the WireToSurface1 PDU(s) for a flushed frame. Mirrors the emit tail of
- * gfx_wiretosurface1_avc444/avc420 for a single full-surface region. Returns the
- * primary PDU (AVC420 for is420, else the AVC444 LC=1 luma PDU) and, for AVC444,
- * the deferred LC=2 chroma PDU via *chroma_out (NULL for AVC420); the caller
- * sends both inside one GFX frame. Returns NULL and leaves *chroma_out NULL on
- * error. */
-static struct stream *
-avc444_flush_build_wts1(struct xrdp_encoder *self, int mon, int is420,
-                        struct xrdp_avc444_encoded_pair *pair,
-                        struct stream **chroma_out)
-{
-    struct xrdp_avc444_conv *conv =
-        (struct xrdp_avc444_conv *)self->avc444_conv[mon];
-    struct xrdp_egfx_bulk *bulk = self->mm->egfx->bulk;
-    struct xrdp_egfx_rect dst_rect;
-    struct xrdp_egfx_rect d_rects[1];
-    struct stream ls;
-    struct stream *s = &ls;
-    struct stream *rv;
-    int codec_id;
-    int bitmap_data_length;
-    int surface_id = self->avc444_flush_surface_id[mon];
-    int pixel_format = self->avc444_flush_pixel_format[mon];
-
-    *chroma_out = NULL;
-    dst_rect.x1 = 0;
-    dst_rect.y1 = 0;
-    dst_rect.x2 = conv->actual_width;
-    dst_rect.y2 = conv->actual_height;
-    d_rects[0] = dst_rect;
-
-    g_memset(s, 0, sizeof(struct stream));
-    s->size = 4 + pair->main_len + pair->aux_len + 24 + 512;
-    s->data = g_new(char, s->size);
-    if (s->data == NULL)
-    {
-        return NULL;
-    }
-    s->p = s->data;
-    if (is420)
-    {
-        if (out_RFX_AVC420_METABLOCK(&dst_rect, s, d_rects, 1) != 0)
-        {
-            g_free(s->data);
-            return NULL;
-        }
-        out_uint8a(s, pair->main_data, pair->main_len);
-        s_mark_end(s);
-        bitmap_data_length = (int)(s->end - s->data);
-        rv = xrdp_egfx_wire_to_surface1(bulk, surface_id,
-                                        XR_RDPGFX_CODECID_AVC420,
-                                        pixel_format, &dst_rect,
-                                        s->data, bitmap_data_length);
-        g_free(s->data);
-        return rv;
-    }
-    /* AVC444: LC=1 luma PDU + LC=2 chroma PDU, same framing as the live path */
-    codec_id = self->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2
-               : XR_RDPGFX_CODECID_AVC444;
-    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, 1,
-                                          pair->main_data, pair->main_len,
-                                          1) != 0)
-    {
-        g_free(s->data);
-        return NULL;
-    }
-    bitmap_data_length = (int)(s->end - s->data);
-    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id, pixel_format,
-                                    &dst_rect, s->data, bitmap_data_length);
-    if (rv == NULL)
-    {
-        g_free(s->data);
-        return NULL;
-    }
-    s->p = s->data;
-    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, 1,
-                                          pair->aux_data, pair->aux_len,
-                                          2) != 0)
-    {
-        free_stream(rv);
-        g_free(s->data);
-        return NULL;
-    }
-    bitmap_data_length = (int)(s->end - s->data);
-    *chroma_out = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id,
-                  pixel_format, &dst_rect,
-                  s->data, bitmap_data_length);
-    g_free(s->data);
-    if (*chroma_out == NULL)
-    {
-        free_stream(rv);
-        return NULL;
-    }
-    return rv;
-}
-
-static void
-avc444_flush_tail(struct xrdp_encoder *self)
-{
-    int mon = self->avc444_flush_mon;
-    int is420 = self->avc420_ffmpeg;
-    struct xrdp_ffmpeg_avc444 *ff;
-    struct xrdp_avc444_conv *conv;
-    struct xrdp_avc444_encoded_pair pair;
-    struct stream *s_start;
-    struct stream *s_wts1;
-    struct stream *s_wts1_chroma;
-    struct stream *s_end;
-    XRDP_ENC_DATA *fenc;
-    int fid = self->avc444_flush_frame_id;
-    int i;
-    int rv;
-    int got = 0;
-
-    self->avc444_flush_armed = 0; /* one-shot: do not re-arm after a flush */
-    if (mon < 0 || mon >= 16)
-    {
-        return;
-    }
-    ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon];
-    conv = (struct xrdp_avc444_conv *)self->avc444_conv[mon];
-    if (ff == NULL || conv == NULL)
-    {
-        return;
-    }
-    if (xrdp_ffmpeg_avc444_inflight(ff) <= 0)
-    {
-        return; /* nothing withheld */
-    }
-    /* feed bounded duplicate frames until the latest real frame emerges */
-    for (i = 0; i < XRDP_AVC444_FLUSH_MAX_DRAIN; i++)
-    {
-        if (is420)
-        {
-            rv = xrdp_ffmpeg_avc444_encode_single(ff, conv->main_nv12,
-                                                  conv->nv12_size,
-                                                  self->avc444_seq++, &pair);
-        }
-        else
-        {
-            rv = xrdp_ffmpeg_avc444_encode_pair(ff, conv->main_nv12,
-                                                conv->aux_nv12, conv->nv12_size,
-                                                self->avc444_seq++, &pair);
-        }
-        if (rv == XRDP_FFMPEG_PAIR_ERROR)
-        {
-            xrdp_ffmpeg_avc444_delete(ff);
-            self->avc444_ffmpeg_handle[mon] = NULL;
-            return;
-        }
-        if (rv == XRDP_FFMPEG_PAIR_READY &&
-                pair.desktop_sequence == self->avc444_flush_seq)
-        {
-            got = 1;
-            break; /* the latest real frame is now out */
-        }
-        /* intermediate real frame or pending: keep draining (bounded) */
-    }
-    if (!got)
-    {
-        return;
-    }
-
-    /* emit STARTFRAME + WireToSurface1 + ENDFRAME, reusing the last frame id so
-     * frame-ack flow control (frame_id_server/frame_id_client) is unchanged */
-    s_wts1 = avc444_flush_build_wts1(self, mon, is420, &pair, &s_wts1_chroma);
-    if (s_wts1 == NULL)
-    {
-        return;
-    }
-    s_start = xrdp_egfx_frame_start(self->mm->egfx->bulk, fid, 0);
-    s_end = xrdp_egfx_frame_end(self->mm->egfx->bulk, fid);
-    fenc = g_new0(XRDP_ENC_DATA, 1);
-    if (s_start == NULL || s_end == NULL || fenc == NULL)
-    {
-        free_stream(s_start);
-        free_stream(s_wts1);
-        free_stream(s_wts1_chroma);
-        free_stream(s_end);
-        g_free(fenc);
-        return;
-    }
-    /* synthesized enc: GFX bit set, cmd/shmem NULL so the main thread frees it
-     * cleanly on the last (ENDFRAME) enc_done. For AVC444 the LC=1 luma and
-     * LC=2 chroma PDUs both go inside this one frame (atomic), matching the
-     * live path; s_wts1_chroma is NULL for AVC420. */
-    ENC_SET_BIT(fenc->flags, ENC_FLAGS_GFX_BIT);
-    gfx_send_done(self, fenc, (int)(s_start->end - s_start->data), 0,
-                  s_start->data, 0, 0, 0);
-    gfx_send_done(self, fenc, (int)(s_wts1->end - s_wts1->data), 0,
-                  s_wts1->data, 0, 0, 0);
-    if (s_wts1_chroma != NULL)
-    {
-        gfx_send_done(self, fenc, (int)(s_wts1_chroma->end - s_wts1_chroma->data),
-                      0, s_wts1_chroma->data, 0, 0, 0);
-    }
-    gfx_send_done(self, fenc, (int)(s_end->end - s_end->data), 0,
-                  s_end->data, 1, fid, 1);
-    g_free(s_start); /* main thread owns/free the ->data via comp_pad_data */
-    g_free(s_wts1);
-    g_free(s_wts1_chroma);
-    g_free(s_end);
-    LOG_DEVEL(LOG_LEVEL_DEBUG, "avc444_flush_tail: flushed seq %llu after "
-              "%d dup(s)", (unsigned long long)self->avc444_flush_seq, i + 1);
-}
 
 /**
  * Encoder thread main loop
@@ -2539,7 +2301,7 @@ proc_enc_msg(void *arg)
         /* when a frame may be withheld in the ffmpeg pipeline, wait only a
          * short time so an idle tail-flush can push it out (BACKLOG:
          * AVC444/AVC420 tail-frame withholding) */
-        timeout = self->avc444_flush_armed ? XRDP_AVC444_FLUSH_MS : -1;
+        timeout = -1;
         robjs_count = 0;
         wobjs_count = 0;
         robjs[robjs_count++] = term_obj;
@@ -2582,11 +2344,6 @@ proc_enc_msg(void *arg)
                 enc = (XRDP_ENC_DATA *) fifo_remove_item(fifo_to_proc);
                 tc_mutex_unlock(mutex);
             }
-        }
-        else if (self->avc444_flush_armed)
-        {
-            /* idle timeout with no new damage: push the withheld tail frame */
-            avc444_flush_tail(self);
         }
 
     } /* end while (cont) */

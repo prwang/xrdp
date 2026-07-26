@@ -51,6 +51,7 @@
 #include <time.h>
 #include <sys/wait.h>
 #include <sys/types.h>
+#include <sys/uio.h>
 
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_nut.h"
@@ -65,6 +66,8 @@
 #define FF_MAX_ARGV 128
 #define FF_READ_CHUNK 65536
 #define FF_MAX_INFLIGHT_PAIRS 8
+/* borrowed input segments queued for the vmsplice feeder */
+#define FF_IN_IOV_MAX 32
 
 struct ff_pkt
 {
@@ -93,11 +96,13 @@ struct xrdp_ffmpeg_avc444
 
     struct xrdp_nut_ctx *nut;
 
-    /* pending raw input bytes waiting to be written to the child */
-    unsigned char *inq;
-    int inq_cap;
-    int inq_len;
-    int inq_off;
+    /* pending input segments, fed exclusively via vmsplice
+     * (PRD FR-PROC-6): BORROWED pointers (capture shmem / probe
+     * fixtures) valid only within the encode call that queued them */
+    struct iovec in_iov[FF_IN_IOV_MAX];
+    int in_iov_count;
+    int in_iov_head;
+    size_t in_iov_off;
 
     /* completed-packet FIFO (in coded-picture order) */
     struct ff_pkt *pk;
@@ -473,6 +478,9 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     fcntl(outpipe[0], F_SETFD, FD_CLOEXEC);
     fcntl(errpipe[0], F_SETFL, O_NONBLOCK);
     fcntl(errpipe[0], F_SETFD, FD_CLOEXEC);
+    /* enlarge the input pipe (best effort) so vmsplice moves fewer,
+     * larger batches of page references (FR-PROC-6) */
+    fcntl(inpipe[1], F_SETPIPE_SZ, 1024 * 1024);
     *in_fd = inpipe[1];
     *out_fd = outpipe[0];
     *err_fd = errpipe[0];
@@ -675,6 +683,70 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
 /* polling until child EOF or the deadline (used to flush after closing      */
 /* input). Returns 0 ok, 1 error, 2 child EOF.                             */
 static int
+in_iov_push(struct xrdp_ffmpeg_avc444 *self, const void *data, size_t len)
+{
+    if (self->in_iov_count >= FF_IN_IOV_MAX)
+    {
+        return 1;
+    }
+    self->in_iov[self->in_iov_count].iov_base = (void *)(uintptr_t)data;
+    self->in_iov[self->in_iov_count].iov_len = len;
+    self->in_iov_count++;
+    return 0;
+}
+
+/*****************************************************************************/
+static int
+in_iov_pending(const struct xrdp_ffmpeg_avc444 *self)
+{
+    return self->in_iov_head < self->in_iov_count;
+}
+
+/*****************************************************************************/
+/* move the next chunk of queued input into the child's pipe by page
+ * reference -- vmsplice is the ONLY input mechanism (PRD FR-PROC-6).
+ * SPLICE_F_GIFT is never used: the pages belong to the capture shmem.
+ * returns 0 on progress/would-block, 1 on fatal error */
+static int
+feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
+{
+    struct iovec iov;
+    ssize_t n;
+
+    if (self->in_fd < 0 || !in_iov_pending(self))
+    {
+        return 0;
+    }
+    iov.iov_base = (char *)self->in_iov[self->in_iov_head].iov_base
+                   + self->in_iov_off;
+    iov.iov_len = self->in_iov[self->in_iov_head].iov_len
+                  - self->in_iov_off;
+    n = vmsplice(self->in_fd, &iov, 1, SPLICE_F_NONBLOCK);
+    if (n > 0)
+    {
+        self->metrics.input_bytes += n;
+        self->in_iov_off += n;
+        if (self->in_iov_off >= self->in_iov[self->in_iov_head].iov_len)
+        {
+            self->in_iov_head++;
+            self->in_iov_off = 0;
+            if (self->in_iov_head >= self->in_iov_count)
+            {
+                self->in_iov_head = 0;
+                self->in_iov_count = 0;
+            }
+        }
+        return 0;
+    }
+    if (n < 0 && errno != EAGAIN && errno != EWOULDBLOCK && errno != EINTR)
+    {
+        return 1;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+static int
 pump(struct xrdp_ffmpeg_avc444 *self, long long deadline, int drain_to_eof)
 {
     for (;;)
@@ -691,7 +763,7 @@ pump(struct xrdp_ffmpeg_avc444 *self, long long deadline, int drain_to_eof)
         {
             return 0;
         }
-        want_write = (self->in_fd >= 0 && self->inq_off < self->inq_len);
+        want_write = (self->in_fd >= 0 && in_iov_pending(self));
         if (want_write)
         {
             pfd[nfds].fd = self->in_fd;
@@ -736,25 +808,9 @@ pump(struct xrdp_ffmpeg_avc444 *self, long long deadline, int drain_to_eof)
             {
                 return 1;
             }
+            if (feed_vmsplice(self) != 0)
             {
-                int remain = self->inq_len - self->inq_off;
-                int w = (int)write(self->in_fd, self->inq + self->inq_off,
-                                   remain);
-                if (w > 0)
-                {
-                    self->inq_off += w;
-                    self->metrics.input_bytes += w;
-                    if (self->inq_off >= self->inq_len)
-                    {
-                        self->inq_len = 0;
-                        self->inq_off = 0;
-                    }
-                }
-                else if (w < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
-                         errno != EINTR)
-                {
-                    return 1;
-                }
+                return 1;
             }
         }
         drain_stderr(self);
@@ -944,14 +1000,14 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    /* queue this pair's two pictures for writing */
-    if (grow(&self->inq, &self->inq_cap, self->inq_len + 2 * nv12_size) != 0)
+    /* queue this pair's two pictures for the vmsplice feeder; the
+     * pointers are BORROWED (capture shmem) and are fully consumed by
+     * the child before this call returns READY (FR-PROC-6) */
+    if (in_iov_push(self, main_nv12, nv12_size) != 0 ||
+            in_iov_push(self, aux_nv12, nv12_size) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    memcpy(self->inq + self->inq_len, main_nv12, nv12_size);
-    memcpy(self->inq + self->inq_len + nv12_size, aux_nv12, nv12_size);
-    self->inq_len += 2 * nv12_size;
     if (seq_push(self, desktop_sequence) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
@@ -989,6 +1045,14 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
             }
         }
     }
+    if (in_iov_pending(self))
+    {
+        /* output implies the child consumed its input; borrowed segments
+         * must never outlive this call (FR-PROC-6) */
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: input not fully spliced at "
+            "pair return; restarting encoder");
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
     if (pop_pair(self, result) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
@@ -1020,12 +1084,11 @@ xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
         return XRDP_FFMPEG_PAIR_ERROR;
     }
     /* queue this frame's single picture for writing */
-    if (grow(&self->inq, &self->inq_cap, self->inq_len + nv12_size) != 0)
+    /* borrowed pointer for the vmsplice feeder (FR-PROC-6) */
+    if (in_iov_push(self, nv12, nv12_size) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    memcpy(self->inq + self->inq_len, nv12, nv12_size);
-    self->inq_len += nv12_size;
     if (seq_push(self, desktop_sequence) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
@@ -1058,6 +1121,12 @@ xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
                 return XRDP_FFMPEG_PAIR_ERROR;
             }
         }
+    }
+    if (in_iov_pending(self))
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: input not fully spliced at "
+            "picture return; restarting encoder");
+        return XRDP_FFMPEG_PAIR_ERROR;
     }
     if (pop_single(self, result) != 0)
     {
@@ -1243,7 +1312,6 @@ xrdp_ffmpeg_avc444_delete(struct xrdp_ffmpeg_avc444 *self)
     }
     g_free(self->pk);
     g_free(self->seq);
-    g_free(self->inq);
     g_free(self->main_buf);
     g_free(self->aux_buf);
     g_free(self);
@@ -1462,10 +1530,15 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
         }
         if (in_slot >= 0 && (pfd[in_slot].revents & POLLOUT))
         {
-            int w = (int)write(in_fd, blob + off, total - off);
+            struct iovec iov;
+            ssize_t w;
+
+            iov.iov_base = blob + off;
+            iov.iov_len = total - off;
+            w = vmsplice(in_fd, &iov, 1, SPLICE_F_NONBLOCK);
             if (w > 0)
             {
-                off += w;
+                off += (int)w;
             }
             else if (w < 0 && errno != EAGAIN && errno != EWOULDBLOCK &&
                      errno != EINTR)

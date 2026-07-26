@@ -214,6 +214,7 @@ convert_xrdp_client_info_to_xup_client_info(
 
     dst->capture_code = src->capture_code;
     dst->capture_format = src->capture_format;
+    dst->avc444_chroma_align = src->avc444_chroma_align;
 
     memcpy(dst->model, src->model, CI_KBD_MODEL_SIZE);
     memcpy(dst->layout, src->layout, CI_KBD_LAYOUT_SIZE);
