@@ -11,7 +11,19 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
-## AVC444 splicable capture: wire-format views from xorgxrdp + vmsplice-only feed — IN PROGRESS (2026-07-26, owner directive)
+## AVC444 splicable capture: wire-format views from xorgxrdp + vmsplice-only feed — DEPLOYED to T4 (2026-07-26), awaiting owner onscreen perf verdict
+
+**Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
+(xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
+83/83 incl. new page-aligned layout math; the ffmpeg encode tests
+exercise the vmsplice feeder end-to-end. Dev box (vaapi/x264): burr
+harness single 4K NO residual, dual owner-layout NO residual (the
+truth-vs-client compare is the packer parity oracle vs the in-tree
+reference converter), SMOKE PASS both sizes as the last step after
+install. T4: deb pair installed (sha256 b5e22ac2…/3a6ed395…), probe OK
+(dump_extra=1) 1342 ms, AVC444 v2 matched. NOT yet validated: a real
+T4 session (Xorg-side packers + nvenc under drag load — the owner's
+onscreen perf verdict) and the Windows/Mac client matrix.
 
 Owner directive (chat, 2026-07-26): "the shmem from xorgxrdp must be
 directly vmspliced [to ffmpeg] right now ... xrdp must do zero hot path
