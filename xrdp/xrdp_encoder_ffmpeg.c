@@ -194,6 +194,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     memset(cfg, 0, sizeof(*cfg));
     xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
+    cfg->strip_sei = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
                                * [avc444_ffmpeg] dump_extra); verified --
                                * never changed -- by the probe
@@ -360,8 +361,21 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
      * such keyframes (macOS Windows App rendered black; bisected live
      * 2026-07-23). Exactly one SPS/PPS copy per keyframe either way. */
     ADD("-bsf:v");
-    ADD(cfg->use_dump_extra ? "dump_extra,h264_mp4toannexb"
-        : "h264_mp4toannexb");
+    /* strip_sei removes buffering_period(0)/pic_timing(1) SEI NALs:
+     * the macOS Windows App's RDP H264 path blacks on the HRD SEI
+     * class (bisected 2026-07-26 on the dev box; QuickTime plays the
+     * same bytes, so this is App-path-specific). */
+    if (cfg->strip_sei)
+    {
+        ADD(cfg->use_dump_extra
+            ? "dump_extra,filter_units=remove_types=0|1,h264_mp4toannexb"
+            : "filter_units=remove_types=0|1,h264_mp4toannexb");
+    }
+    else
+    {
+        ADD(cfg->use_dump_extra ? "dump_extra,h264_mp4toannexb"
+            : "h264_mp4toannexb");
+    }
     ADD("-flush_packets");
     ADD("1");
     ADD("-write_index");

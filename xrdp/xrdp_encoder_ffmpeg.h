@@ -73,6 +73,9 @@ struct xrdp_ffmpeg_avc444_config
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
     /* match the converter's width_align     */
+    int strip_sei;                  /* chain filter_units to remove         */
+    /* buffering_period(0)/pic_timing(1)     */
+    /* SEI NALs (macOS Windows App interop)  */
     int use_dump_extra;             /* chain the dump_extra bsf: ONLY for    */
     /* encoders with no in-band SPS/PPS      */
     /* (extradata only, e.g. h264_nvenc).    */
