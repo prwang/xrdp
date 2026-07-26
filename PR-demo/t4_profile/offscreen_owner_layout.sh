@@ -68,17 +68,17 @@ EOF
     geom() { echo "$1" | sed 's/[x+]/ /g'; }
     set -- $(geom "$MON0")
     M1=$(cvt -r "$1" "$2" 60 | grep Modeline | sed 's/Modeline //;s/"[^"]*"//')
-    P0="+$3+$4"; MODE0="${1}x$2"
+    P0="${3}x$4"; MODE0="${1}x$2"
     set -- $(geom "$MON1")
     M2=$(cvt -r "$1" "$2" 60 | grep Modeline | sed 's/Modeline //;s/"[^"]*"//')
-    P1="+$3+$4"; MODE1="${1}x$2"
+    P1="${3}x$4"; MODE1="${1}x$2"
     DISPLAY=$CLI xrandr --newmode own0 $M1
     DISPLAY=$CLI xrandr --newmode own1 $M2
     DISPLAY=$CLI xrandr --addmode DUMMY0 own0
     DISPLAY=$CLI xrandr --addmode DUMMY1 own1
     DISPLAY=$CLI xrandr --fb "$VSIZE" \
-        --output DUMMY0 --mode own0 --pos "${P0#+}" \
-        --output DUMMY1 --mode own1 --pos "${P1#+}"
+        --output DUMMY0 --mode own0 --pos "$P0" \
+        --output DUMMY1 --mode own1 --pos "$P1"
 fi
 echo "=== client RandR monitors ==="
 DISPLAY=$CLI xrandr --listactivemonitors

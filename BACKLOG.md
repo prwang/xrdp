@@ -1471,3 +1471,61 @@ bug themselves. Applies to xrdp (slices above renumber after it) AND
 xorgxrdp (`feat/avc444-yuv444-capture` rebases onto its fix slice). Keep the
 fix slice scoped to the real blast radius (GFX H.264 family), not narrowed
 to AVC444. Status: TODO, after the fix lands + owner onscreen PASS.
+
+### New-T4 bring-up + fps-methodology findings (2026-07-26 evening) — measurement campaign record
+
+New T4 (3.83.30.88) brought from bare AMI to deployed per DEPLOY_RUNBOOK:
+deps + xrdp `4932908b` + xorgxrdp `251bc4d` debs, nvenc gfx.toml
+(dump_extra=true), Xwrapper. ubuntu cred generated on-box into root-owned
+`/root/.ubuntu_cred` (never printed). Smoke gate PASS 8/8 both sizes,
+edge=1.000, AVC444 v2 probe OK incl. 3840x2400. Owner dual-monitor layout
+session validated (2560x1440+594+0 over 3840x2400+0+1440).
+
+**End-to-end fps on the offscreen rig measures the CLIENT, not the server.**
+Full evidence chain (thunar orbit, owner layout, uprobes + shipped
+XRDP_GFX_TRACE + client stack sampling):
+
+- 4B pair end-to-end: 14.5 fps AVC444; ack-credit window pegged at
+  frames_in_flight (2 or 4 — fps identical, knob not binding);
+  send(N)->ack(N) p50 260 ms; server admission turnaround (ack ->
+  capture+encode+send of freed slot) 18 ms p50; serialized dual-monitor
+  encode pair 24+44 ms (per-monitor ffmpeg processes exist but the single
+  proc_enc_msg thread + synchronous runner never overlaps them —
+  `inflight=0` on every trace line).
+- Eliminated: WAN RTT 25 ms (additive only, not stop-and-wait — credit
+  loop); TCP queues ~0 both ends; X blit 1-3 ms (x11perf); client CPU not
+  saturated (busiest thread 39%).
+- Convicted: xfreerdp software AVC444 post-decode path ~65 ms/frame
+  serial on one channel thread — stack samples: ~66% `yuv444_context_decode`
+  (4:4:4 reconstruction), ~20% `sse41_YUV444ToRGB`, ~14%
+  `av_hwframe_transfer_data`. A/B proofs: client /gfx:AVC420 -> 27.1 fps,
+  send->ack 113 ms (halved with WAN unchanged); VAAPI hw-decode client
+  build (Debian ships `-DWITH_VAAPI=OFF`; rebuilt 3.15.0 WITH_VAAPI=ON,
+  hw engaged — renderD128 open, hwframe transfers in stacks) -> 13.9 fps,
+  UNCHANGED, because H264 decode was never the dominant term.
+- Consequence recorded as PRD FR-PROC-7 clause 9: aux (`LC=2`) send now
+  additionally requires spare egfx ack credit — client-declared flow
+  control, no new tunables; slow clients ride mains-only (measured 27 vs
+  14.5 fps upside), chroma converges on settle (smoke edge check pins it).
+- Environment incident (honesty rule): Ubuntu unattended-upgrades replaced
+  the nvidia userspace under the loaded driver mid-session (18:37); nvenc
+  probe failed -> that login silently matched RFX; caught before use,
+  tainted trace discarded. Counter-measure: unattended-upgrades disabled +
+  apt periodic off on the T4; rebooted to consistent 580.173; AVC444
+  re-verified. T4 rig config MUST NOT change under test.
+
+**Oracle (save-only) client** — `PR-demo/oracle_client/`: FreeRDP 3.15.0
+patched so `FREERDP_ORACLE_DUMP=1` makes the AVC420/AVC444 gdi handlers
+append each encoded surface payload to `/tmp/oracle_avc_s<id>.bin` and
+return success before decode/present: the frame ack then measures
+server+WAN only (client contributes ~0), and the dump is splittable into
+playable .h264/.mp4. Purpose: measure the true server fps ceiling (and make
+Lever-2's encoder-busy condition reachable). Timing-only instrument — the
+distro client remains the fidelity/smoke client; the smoke gate never runs
+against the oracle.
+
+Status: oracle A/B (4B pair vs pre-4B pair `52099149`+`ee1ec01`, server-only
+fps, same rig/orbit) IN PROGRESS; box to be restored to the 4B pair +
+re-smoked as the LAST step. Note the pre-4B arm is only measurable at all
+because the oracle never decodes (old xrdp lacks the metablock even-extent
+fix f0104284 that SIGABRTs strict decoding clients).

@@ -59,26 +59,42 @@ probe_add "$XORGXRDP_SO" "cap_a2=rdpCaptureGfxA2"
 probe_add "$XORGXRDP_SO" "ack_rx=rdpClientConProcessMsgClientRegionEx"
 
 if [ "$NO_DRAG" != "1" ]; then
-    WID=$(xdotool search --onlyvisible --class thunar | head -1)
+    # thunar maps several tiny helper windows (10x10, 2x2) that match
+    # --class thunar; moving one of those generates no damage (measured
+    # 0.4 fps, 2026-07-26). Require real geometry.
+    pick_thunar() {
+        for w in $(xdotool search --onlyvisible --class thunar 2>/dev/null)
+        do
+            eval "$(xdotool getwindowgeometry --shell "$w" 2>/dev/null)"
+            if [ "${WIDTH:-0}" -ge 300 ]; then echo "$w"; return; fi
+        done
+    }
+    WID=$(pick_thunar)
     if [ -z "$WID" ]; then
         echo "no visible Thunar; launching one"
         setsid thunar </dev/null >/dev/null 2>&1 &
         sleep 4
-        WID=$(xdotool search --onlyvisible --class thunar | head -1)
+        WID=$(pick_thunar)
     fi
-    [ -z "$WID" ] && { echo "ABORT: no Thunar window"; exit 1; }
+    [ -z "$WID" ] && { echo "ABORT: no real-size Thunar window"; exit 1; }
+    echo "orbiting thunar WID=$WID"
     xdotool windowactivate --sync "$WID" >/dev/null 2>&1 || true
     # ONE xdotool process with the whole orbit as chained argv commands:
     # spawning xdotool per move costs ~100ms under load and caps the
     # OFFERED move rate below the pipeline ceiling (measured 2026-07-26:
-    # 9 moves/s offered -> 9.3 fps delivered, pipeline idle)
+    # 9 moves/s offered -> 9.3 fps delivered, pipeline idle).
+    # --sync is REQUIRED: without it this xdotool build leaves every
+    # windowmove in Xlib's output buffer until process exit, so the
+    # sleeps pace nothing and all moves land as one burst after the
+    # recording window (measured 0.3 fps, 2026-07-26 on the new T4);
+    # --sync round-trips per move, flushing each one on schedule.
     CHAIN=$(python3 -c "
 import math
 out = []
 for rev in range($REVS):
     for s in range(40):
         t = 2*math.pi*s/40
-        out.append('windowmove $WID %d %d sleep 0.016' % (
+        out.append('windowmove --sync $WID %d %d sleep 0.016' % (
                    int($ORBIT_X+$ORBIT_R*math.cos(t)),
                    int($ORBIT_Y+$ORBIT_R*math.sin(t))))
 print(' '.join(out))")
