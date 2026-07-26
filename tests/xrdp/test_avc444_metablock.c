@@ -53,6 +53,17 @@ check_all_origins_even(struct xrdp_egfx_rect *dst,
         /* origin must be even-aligned to the chroma grid */
         ck_assert_int_eq(left & 1, 0);
         ck_assert_int_eq(top & 1, 0);
+        /* width/height must be even too (strict clients hard-assert it:
+         * FreeRDP sse41_YUV444ToRGB) unless clamped at an odd-sized
+         * surface's far edge — the only place an odd extent can remain */
+        if (right != dst->x2 - dst->x1)
+        {
+            ck_assert_int_eq((right - left) & 1, 0);
+        }
+        if (bottom != dst->y2 - dst->y1)
+        {
+            ck_assert_int_eq((bottom - top) & 1, 0);
+        }
         /* alignment only grows the rect; origin never negative or past end */
         ck_assert_int_ge(left, 0);
         ck_assert_int_ge(top, 0);
