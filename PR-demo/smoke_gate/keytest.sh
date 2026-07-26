@@ -1,18 +1,28 @@
 #!/bin/bash
 # Keystroke-driven end-to-end colour test (the smoke-gate workhorse).
 #
-# Fresh-LOGIN xfreerdp session on Xvfb :99 -> fullscreen colorkey.sh in the
-# tester session -> press r/g/b/w twice each through the RDP client -> after
-# every keypress, screenshot the CLIENT framebuffer and assert the screen
-# centre shows that key's colour. A withheld/stale frame shows the PREVIOUS
-# colour => "LAG". Prints one "ok"/"LAG" line per keypress.
+# Architecture (CLAUDE.md "T4 test methodology"): EVERYTHING client-side
+# runs on THIS dev box — Xvfb, the H264-capable xfreerdp3, screenshots,
+# classification — reaching the T4's loopback-bound RDP port through an
+# ssh -L forward. The test account is `ubuntu` (the owner-equivalent
+# session; no special test users, no session-policy edits); its RDP
+# credential is fetched from root-owned /root/.ubuntu_cred ON the T4 at
+# use time and never printed or stored locally. Session-side actions
+# (colour-key terminal, window placement) are single ssh commands; the
+# colour-key app is a persistent checksum-gated install on the T4.
 #
-# Box assumptions (documented per PR-demo policy, env-overridable):
-#   tester account, empty password, xrdp on 127.0.0.1:3389, Xvfb on :99.
+# Flow: fresh RDP login -> full-screen colorkey.sh in the session ->
+# press r/g/b/w twice each through the client -> after every keypress,
+# screenshot the CLIENT framebuffer and assert the screen centre shows
+# that key's colour ("LAG" otherwise) -> colour-EDGE fidelity after
+# settle (FR-PROC-7 §8).
 set -u
-SU=${KEYTEST_USER:-tester}
-SX=/var/run/xrdp/1000/Xauthority
-HOST=${KEYTEST_HOST:-127.0.0.1:3389}
+T4=${T4:-$(cat /root/.t4_host 2>/dev/null)}
+T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
+[ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
+SU=${KEYTEST_USER:-ubuntu}
+CRED_FILE=${KEYTEST_PASS_FILE:-/root/.ubuntu_cred}
+LPORT=${KEYTEST_TUNNEL_PORT:-33890}
 CLI=${KEYTEST_CLIENT_DISPLAY:-:99}
 # Session size. MUST be exercised at more than one size: a resolution-
 # dependent encoder failure (ffmpeg probesize analysis window) once passed
@@ -23,36 +33,43 @@ SH=${SIZE#*x}
 D=$(cd "$(dirname "$0")" && pwd)
 OUT=/tmp/ab
 mkdir -p "$OUT"
-chmod 1777 "$OUT"   # colorkey.sh (running as tester) appends keylog.txt here
 
-# client-side X server for xfreerdp
-# Client framebuffer size; must be >= the session size. Overridable so a
-# large non-16-aligned session (e.g. a 4K window resize) can be reproduced.
+t4() { ssh -i "$T4_KEY" "$T4" "$@"; }
+
+# ssh tunnel to the T4's loopback RDP socket
+if ! ss -tln 2>/dev/null | grep -q ":$LPORT "; then
+    ssh -i "$T4_KEY" -f -N -o ExitOnForwardFailure=yes \
+        -L "$LPORT:127.0.0.1:3389" "$T4"
+fi
+
+# persistent session-side colour-key app (checksum-gated install)
+LSUM=$(md5sum "$D/colorkey.sh" | cut -d' ' -f1)
+RSUM=$(t4 "md5sum /usr/local/bin/colorkey.sh 2>/dev/null | cut -d' ' -f1")
+if [ "$LSUM" != "$RSUM" ]; then
+    scp -q -i "$T4_KEY" "$D/colorkey.sh" "$T4:/tmp/colorkey.sh"
+    t4 "sudo install -m 755 /tmp/colorkey.sh /usr/local/bin/colorkey.sh"
+fi
+
+# client-side X server for xfreerdp (local)
 CLIENT_SIZE=${KEYTEST_CLIENT_SIZE:-1920x1080}
 if ! DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null | grep -q "^${CLIENT_SIZE%x*} ${CLIENT_SIZE#*x}$"; then
-    pkill -9 -f "Xvfb $CLI" 2>/dev/null; sleep 1
+    pkill -9 -x Xvfb 2>/dev/null; sleep 1
     setsid Xvfb "$CLI" -screen 0 "${CLIENT_SIZE}x24" </dev/null >/dev/null 2>&1 &
     sleep 2
 fi
 
-# end any existing tester session + client so this is a cold login
-pkill -9 -f xfreerdp3 2>/dev/null
-sudo -u $SU pkill -u $SU -TERM xfce4-session 2>/dev/null; sleep 2
-sudo -u $SU pkill -u $SU -KILL -f 'xfce4-session|Xorg :' 2>/dev/null
-for i in $(seq 1 25); do pgrep -f 'Xorg :1[0-9]' >/dev/null || break; sleep 1; done
-sleep 3
+# end any existing session + client so this is a cold login
+pkill -9 -x xfreerdp3 2>/dev/null
+t4 "pkill -TERM -u $SU xfce4-session" 2>/dev/null; sleep 2
+t4 'for i in $(seq 1 25); do pgrep -u $(id -u) -x Xorg >/dev/null || break; sleep 1; done'
+sleep 2
 
-# Credential: empty by default (dev box). On boxes where the tester
-# account has a real password, point KEYTEST_PASS_FILE at a root-owned
-# credential file; the secret rides an env var into /args-from so it
-# never appears in the process list, shell history or logs.
-PW=""
-if [ -n "${KEYTEST_PASS_FILE:-}" ]; then
-    PW=$(sudo cat "$KEYTEST_PASS_FILE")
-fi
-# one argument per line (that is how /args-from splits its input)
-RDPARGS=$(printf '%s\n' "/v:$HOST" "/u:$SU" "/p:$PW" "/size:$SIZE" \
-                        "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
+# credential: root-owned file on the T4 -> env var -> /args-from (never in
+# any process list, log or local file); one argument per line
+PW=$(t4 "sudo cat $CRED_FILE")
+RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$LPORT" "/u:$SU" "/p:$PW" \
+                        "/size:$SIZE" "/gfx:AVC444" "/cert:ignore" \
+                        "/log-level:WARN")
 setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
     xfreerdp3 /args-from:env:RDPARGS </dev/null >$OUT/keytest_login.log 2>&1 &
 unset PW RDPARGS
@@ -69,32 +86,35 @@ sleep 6
 fw=$(DISPLAY=$CLI xdotool search --name FreeRDP 2>/dev/null | head -1)
 [ -z "$fw" ] && { echo "FAIL: no FreeRDP window (login failed)"; exit 1; }
 
-SD=$(pgrep -a Xorg | grep -oE ':1[0-9]+' | head -1)
+SD=$(t4 'pgrep -a -u $(id -u) -x Xorg' | grep -oE ' :[0-9]+ ' | head -1 | tr -d ' ')
 [ -z "$SD" ] && { echo "FAIL: no fresh Xorg session"; exit 1; }
-echo "session display=$SD client=$CLI"
-sess(){ sudo -u $SU env DISPLAY=$SD XAUTHORITY=$SX "$@"; }
+echo "session display=$SD client=$CLI target=$T4 via :$LPORT"
+sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
 
-# fullscreen terminal running the colour-key app
-sess pkill -u $SU qterminal 2>/dev/null; sleep 1
-sess setsid qterminal -e bash "$D/colorkey.sh" </dev/null >/dev/null 2>&1 &
+# fullscreen terminal running the colour-key app. xterm, launched
+# OVERSIZED at +0+0 instead of resized afterwards: xfwm's compositor on
+# headless xrdp sessions repaints window moves but can freeze the
+# on-screen image across window RESIZES (server-side framebuffer proven
+# stale vs xdotool geometry, 2026-07-26).
+sess "pkill -f 'xterm.*colorkey'" 2>/dev/null; sleep 1
+COLS=$((SW / 6 + 10))
+ROWS=$((SH / 13 + 10))
+sess "setsid xterm -geometry ${COLS}x${ROWS}+0+0 -e bash /usr/local/bin/colorkey.sh </dev/null >/dev/null 2>&1 & sleep 0.1"
 qw=""
 for i in $(seq 1 15); do
     sleep 1
-    qw=$(sess xdotool search --class qterminal 2>/dev/null | tail -1)
+    qw=$(sess "xdotool search --class 'XTerm|xterm'" 2>/dev/null | tail -1)
     [ -n "$qw" ] && break
 done
 [ -z "$qw" ] && { echo "FAIL: no terminal"; exit 1; }
 # dismiss any polkit prompt (e.g. colord on fresh login) — it floats over
 # the screen centre and would be read instead of the terminal colour
 for i in 1 2; do
-    pw=$(sess xdotool search --name '^Authenticate$' 2>/dev/null | head -1)
+    pw=$(sess "xdotool search --name '^Authenticate$'" 2>/dev/null | head -1)
     [ -z "$pw" ] && break
-    sess xdotool key --window "$pw" Escape >/dev/null 2>&1
+    sess "xdotool key --window $pw Escape" >/dev/null 2>&1
     sleep 1
 done
-sess xdotool windowactivate --sync "$qw" >/dev/null 2>&1
-sess xdotool key --window "$qw" F11 >/dev/null 2>&1
-sleep 3
 
 shot(){ ffmpeg -hide_banner -loglevel error -f x11grab -video_size "$CLIENT_SIZE" \
         -i "$CLI.0" -frames:v 1 -y "$1" 2>/dev/null; }
@@ -112,6 +132,28 @@ best = min(names, key=lambda n: sum((a[i]-names[n][i])**2 for i in range(3)))
 print(best)
 EOF
 }
+
+# Synchronize on the DISPLAYED state, not a blind sleep: wait until the
+# client actually shows colorkey's initial black screen. Window geometry
+# is retried inside the loop (applying it right after launch races the
+# WM's initial mapping; move only — never resize, see above), and the
+# cold-login paint flood can back up the client for a few seconds; the
+# press loop must measure steady-state responsivity, not login catch-up.
+settled=0
+for i in $(seq 1 20); do
+    for w in $(sess "xdotool search --class 'XTerm|xterm'" 2>/dev/null); do
+        sess "xdotool windowactivate --sync $w; xdotool windowmove --sync $w 0 0" \
+            >/dev/null 2>&1
+    done
+    sleep 1
+    shot "$OUT/keytest_settle.png"
+    got_pre=$(classify "$OUT/keytest_settle.png")
+    if [ "$got_pre" = "black" ]; then
+        settled=1
+        break
+    fi
+done
+[ "$settled" = "1" ] || { echo "FAIL: colorkey screen never displayed"; exit 1; }
 
 declare -A NAME=( [r]=red [g]=green [b]=blue [w]=white )
 fail=0; i=0
