@@ -151,3 +151,23 @@ Concretely:
 - The smoke gate (above) still runs as the LAST step, against the package-
   installed binary + config — a package that was never smoke-gated post-install
   counts for nothing.
+
+### T4 test-box deployments (owner directive, 2026-07-26)
+
+The T4 box (EC2, Cascade Lake + Tesla T4/NVENC) is the representative
+low-to-average old-CPU target: proving smooth 4K there is a headline PR
+selling point, so its numbers are evidence, not just debugging.
+
+- **After every deb build touching the encoder/conversion path**, run
+  `tools/avc444_pack_bench.c` remotely on the T4 (scp the `-O2` binary; the
+  bench carries verbatim copies of the shipped loops — keep them in sync)
+  and RECORD the ms/frame results in `BACKLOG.md`/`PRD.md` alongside the
+  deployed commit hashes. Perf history on the reference CPU is part of the
+  deploy record.
+- **Tear down stale Xorg sessions on the T4 BEFORE handing over for
+  onscreen testing** (kill the session Xorg; verify sesman logs the clean
+  session finish). A surviving session keeps the PREVIOUS xorgxrdp module
+  loaded: if the xup contract version happens to match, reconnecting pairs
+  silently and the owner unknowingly tests the old code — a state change
+  that invalidates the test (strict-honesty rule). If the contract version
+  changed, login fails with a mismatch complaint instead.
