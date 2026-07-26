@@ -1571,3 +1571,19 @@ Final state: 4B pair restored and verified (dpkg -l), SMOKE PASS 8/8 at
 both sizes edge=1.000 post-restore. FR-CAPTURE-8 fps deliverable: DONE
 (29.1 vs 24.0 server-only, +21 % on the oracle rig, client-independent by
 construction). Next: FR-PROC-7 with the clause-9 credit gate.
+
+### Lever 2 scope finalized: three policies, one construction (owner directive 2026-07-26)
+
+Task #40 scope per PRD FR-PROC-7 clauses 10-12: implement the shared
+SUBMIT/COLLECT state machine (pending-completion records, event-driven
+collect, ordered completion emission, finalize-as-preempted error paths)
+and all THREE scheduling policies on it — (a) aux PREEMPT (clauses 1-9
+incl. the clause-9 credit gate), (b) multi-monitor BREADTH (concurrent
+per-child submits; cycle = max not sum), (c) DEPTH (outstanding<=2 per
+child; upload/encode overlap). DONE only when all three are functional
+and validated TOGETHER (oracle fps + cycle-partition signatures + full
+smoke gate incl. edge fidelity on the same build); each policy's
+correctness proven individually by deterministic offscreen unit tests
+(mocked ffmpeg seam, no GPU, no timers — see PRD clause 12 for the
+per-policy test matrix). Measured ladder to verify: 29 -> ~38 -> ~55 ->
+toward the 2x11 ms/picture T4 hardware floor.

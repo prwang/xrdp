@@ -841,6 +841,78 @@ threshold, NO "is the user active" policy anywhere in the pipeline.
    chroma convergence on settle, still pinned by the smoke-gate
    edge-fidelity check.
 
+10. **Shared construction (architecture, 2026-07-26).** The atomic
+    blocking encode call is the single cause of three measured
+    serializations (aux always rides the pair, 44 vs 17 ms; upload
+    serialized behind encode, 34 % NVENC idle at max drive; monitors
+    serialized against each other, 24 ms QHD queued behind 44 ms 4K
+    despite per-monitor ffmpeg children). Lever 2 therefore splits
+    encode into **SUBMIT** (feed pictures to the child, non-blocking)
+    and **COLLECT** (read packets back when ready) with a
+    **pending-completion record** in between: `{enc, mon_index,
+    frame_id, got_frame_id, surface_id, pixel_format, codec_id,
+    twidth/theight, dst_rect, d_rects (ownership moved), num_rects_d,
+    aux_view, nv12 layout}`. The encoder thread loop becomes
+    event-driven on the fifo AND the children's stdout fds:
+    (1) COLLECT ready packets — in submit order per handle,
+    sequence-checked, loud restart on mismatch (the runner's
+    integrity contract is unchanged; only the allowed outstanding
+    depth grows); (2) emit completions IN ORDER — the data enc_dones
+    were sent withholding frame-id+last, the completion enc_done
+    carries them (comp_bytes=0, last=1); (3) ADMIT the next submit by
+    priority: fifo non-empty → main(s), newer main preempts that
+    monitor's pending aux; else pending aux with spare ack credit
+    (clause 9) → submit aux; else wait. The ack/slot discipline is
+    written ONCE for every pending kind: cumulative-ack ordering
+    (flush pendings before emitting any undeferred got_frame_id),
+    finalize-as-preempted on ffmpeg death / geometry change /
+    teardown (an ack can never leak, a shmem slot can never wedge —
+    FR-CAPTURE-8 §4's rect ack defers until aux sent-or-preempted).
+    §6.5 stands untouched: no new processes, no second reference
+    chain, one SPS, monotonic interleave — ALL concurrency lives in
+    submit scheduling against the existing children, never in stream
+    structure.
+11. **Three policies, one machine.** (a) **PREEMPT** — clauses 1–9:
+    aux as a deferred, credit-gated, supersede-able pending.
+    (b) **BREADTH** — multi-monitor concurrent submits: submit each
+    monitor's frame to its own child without waiting, collect both;
+    dual-monitor cycle becomes max(44, 24) not 44+24.
+    (c) **DEPTH** — outstanding ≤ 2 per child: frame N+1's ~14 MB
+    upload flows while N encodes, recovering the measured 34 % NVENC
+    idle toward the ~11 ms/picture hardware floor (T4, 3840x2400,
+    p1 — measured 2026-07-26; profile already optimal: p1 fastest,
+    NUT mux free, `ull` slower than `ll`).
+    Measured ladder on the reference rig (oracle client, owner dual
+    layout): 29 fps today → ~38 (preempt) → ~55 (+breadth) →
+    approaching the 2×11 ms floor (+depth). Expectations to verify,
+    not acceptance gates.
+12. **Completion criteria (owner directive 2026-07-26).** Lever 2 /
+    FR-PROC-7 is COMPLETE only when **all three policies are built,
+    functional, and validated TOGETHER** on the reference rig: oracle
+    server-only fps plus cycle-partition signatures proving each
+    mechanism live simultaneously (mains-only stream during motion
+    with LC=2 on settle; per-monitor encode windows overlapping in
+    the trace; inter-submit gap under the single-encode duration),
+    and the full smoke gate including edge-fidelity-after-settle
+    green on the same build. **Individual correctness must be proven
+    by deterministic offscreen unit tests per policy** (Check
+    framework, CI, no GPU / no live session; the ffmpeg child seam
+    is mocked at the fd/function boundary; no timers):
+    - preempt: pending aux dropped on newer same-monitor main;
+      submitted on empty-fifo + spare credit; held while credit
+      saturated (clause 9); frame-id/last withheld from data
+      enc_dones and emitted exactly once by the completion; ack
+      never leaked across preempt / ffmpeg-death / resize / teardown
+      finalize paths.
+    - breadth: interleaved submits across ≥2 mock handles collect
+      without cross-monitor completion reorder; cumulative-ack
+      ordering preserved against rect_id order; per-handle sequence
+      checks independent.
+    - depth: outstanding=2 on one handle collects strictly in
+      order; sequence mismatch fails LOUDLY (no silent drop);
+      depth bound respected; a slot's pixels never released before
+      its submit is consumed.
+
 Expected effect, composed with FR-CAPTURE-8: steady-motion period
 ~16–18 ms (~55–60 fps) at half the wire bytes, with full-chroma
 convergence one frame after any damage gap.
