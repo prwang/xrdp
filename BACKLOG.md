@@ -11,7 +11,22 @@ See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
 
 ---
 
-## AVC444 header policy: static gfx.toml `dump_extra` + verify-once probe — IN PROGRESS (2026-07-26, owner directive)
+## AVC444 header policy: static gfx.toml `dump_extra` + verify-once probe — DONE (2026-07-26, deployed to T4)
+
+**Validation record (2026-07-26).** Commit `820f558e`; unit suites all
+green (libcommon 157, libipm 35, libxrdp 13, xrdp 83 — incl. the four
+probe-class tests run against real ffmpeg via `XRDP_TEST_FFMPEG_PATH`).
+Deb `xrdp-dev_0.10.80+git820f558ea79c` (sha256 `9532415...dd4607`)
+installed on T4; `/etc/xrdp/gfx.toml` sets `dump_extra = true` for
+h264_nvenc (backup `gfx.toml.bak-820f558e`). Live daemon connection:
+`verifying ffmpeg AVC444 ... (gfx.toml dump_extra=1)` → `xrdp_ffmpeg:
+probe OK (dump_extra=1) at 1920x1088 in 1124 ms` → `Matched H264/AVC444
+v2`; shim log confirms exactly ONE ffmpeg spawn per verification (the
+double-spawn ladder is gone). Not yet exercised live: the cold-boot
+TIMEOUT classification (needs an instance reboot; the class is
+unit-tested via the hang fixture). Owner onscreen test on T4
+(Windows mstsc + macOS Windows App) still the final gate — see the
+T4 validation-matrix item.
 
 Owner directive (chat, 2026-07-26): remove the adaptive dump_extra probe
 ladder. In-band header policy is per-box administrator configuration (like
