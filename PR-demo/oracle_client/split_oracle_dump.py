@@ -43,24 +43,28 @@ while pos + 4 <= len(data):
         print('truncated record at end, ignored', file=sys.stderr)
         break
     frames += 1
-    if mode == 'AVC420':
-        main.write(avc420_nals(rec))
-        mains += 1
-        continue
-    (w,) = struct.unpack_from('<I', rec, 0)
-    avc1len = w & 0x3FFFFFFF
-    lc = (w >> 30) & 0x3
-    avc1 = rec[4:4 + avc1len]
-    if lc in (0, 1):
-        main.write(avc420_nals(avc1))
-        mains += 1
-    if lc == 0:
-        aux.write(rec[4 + avc1len:])
-        auxes += 1
-    elif lc == 2:
-        main_view = avc420_nals(avc1)  # LC=2: the avc1 slot carries the aux
-        aux.write(main_view)
-        auxes += 1
+    try:
+        if mode == 'AVC420':
+            main.write(avc420_nals(rec))
+            mains += 1
+            continue
+        (w,) = struct.unpack_from('<I', rec, 0)
+        avc1len = w & 0x3FFFFFFF
+        lc = (w >> 30) & 0x3
+        avc1 = rec[4:4 + avc1len]
+        if lc in (0, 1):
+            main.write(avc420_nals(avc1))
+            mains += 1
+        if lc == 0:
+            aux.write(rec[4 + avc1len:])
+            auxes += 1
+        elif lc == 2:
+            # LC=2: the aux stream is the sole payload; encoders write 0 in
+            # the bitstream1-length slot and the stream follows the header
+            aux.write(avc420_nals(avc1 if avc1len > 0 else rec[4:]))
+            auxes += 1
+    except struct.error:
+        print('malformed record %d skipped' % frames, file=sys.stderr)
 main.close()
 aux.close()
 print('%d records -> %d main, %d aux (%s_main.h264 / %s_aux.h264)' %
