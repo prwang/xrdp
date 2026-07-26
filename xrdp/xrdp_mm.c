@@ -1367,6 +1367,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
              * duplicated SPS/PPS on the wire, the Mac-black class). */
             cfg.use_dump_extra =
                 self->wm->gfx_config->avc444_ffmpeg_dump_extra;
+            cfg.strip_sei =
+                self->wm->gfx_config->avc444_ffmpeg_strip_sei;
             LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: verifying "
                 "ffmpeg %s %s at %dx%d (gfx.toml dump_extra=%d)",
                 want_420 ? "AVC420" : "AVC444", cfg.path, cw, ch,
@@ -1374,6 +1376,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             pres = xrdp_ffmpeg_avc444_probe(&cfg, cw, ch);
             self->avc444_dump_extra =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.use_dump_extra;
+            self->avc444_strip_sei =
+                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.strip_sei;
             if (pres == XRDP_FFMPEG_PROBE_OK)
             {
                 if (want_420)

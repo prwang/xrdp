@@ -115,6 +115,11 @@ struct xrdp_tconfig_gfx
      * candidate on mismatch; it never changes the policy at runtime
      * (PRD FR-PROBE-6). */
     int avc444_ffmpeg_dump_extra;
+    /* DIAGNOSTIC/interop knob: strip buffering_period (0) and pic_timing
+     * (1) SEI NALs from the encoder output (filter_units bsf). Added for
+     * the 2026-07-26 macOS Windows App bisect: HRD-class bytes black the
+     * Mac's RDP H264 path. Default 0 (off). */
+    int avc444_ffmpeg_strip_sei;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

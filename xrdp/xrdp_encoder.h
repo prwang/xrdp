@@ -55,6 +55,7 @@ struct xrdp_encoder
     int avc420_ffmpeg; /* emit plain AVC420 (codec id 0x000B), single view */
     int avc444_v2;   /* emit AVC444 v2 (ChromaV2, codec id 0x000F)    */
     int avc444_dump_extra; /* static gfx.toml policy, probe-verified    */
+    int avc444_strip_sei;  /* strip BP/PT SEI NALs (macOS interop)      */
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;
