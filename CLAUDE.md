@@ -152,6 +152,33 @@ Concretely:
   installed binary + config — a package that was never smoke-gated post-install
   counts for nothing.
 
+### Bisect/diagnosis sessions: never mutate the deployed instance (owner directive, 2026-07-26)
+
+- **During a bisect or A/B diagnosis session, do NOT iterate by repeatedly
+  installing/uninstalling debs or overwriting live config on a box's single
+  deployed xrdp instance.** That workflow caused two real incidents on the
+  dev box in one evening: (a) installing an xrdp-dev deb silently REMOVED
+  xorgxrdp-dev via its `Breaks: xorgxrdp (<< 1:0.10.80~)` relation and
+  deleted `/etc/X11/xrdp/xorg.conf`, breaking all session creation; (b) a
+  leftover config from one bisect arm leaked into the next arm, invalidating
+  it. Deb-swap iteration also serializes the whole matrix through one
+  instance and one human reconnect per arm.
+- Instead: the host install stays **fixed as the known-good reference** for
+  the whole session, and every variant under test runs as its **own fresh
+  container** — one pod per arm, each with its own binaries + config, all up
+  simultaneously on distinct loopback ports (`127.0.0.1:40000+`), so the
+  tester validates the entire matrix in one pass. The container image,
+  entrypoint, per-arm config and k8s manifests are checked into git
+  (`PR-demo/mac_bisect_matrix/`); GPU access via `/dev/dri` hostPath.
+- **The container fleet is for the RDP SERVER side only.** The client-side
+  harness (xfreerdp3, the oracle client, Xvfb displays) stays exactly as
+  deployed on the host — do not containerize, rebuild or redeploy the client
+  as part of a server bisect; a changed client invalidates the comparison
+  (same class of lesson as the early xfreerdp rebuild incident).
+- General deb hazard (both boxes): xrdp-dev debs `Breaks:` old xorgxrdp —
+  after ANY xrdp-dev install, verify with `dpkg -l` that the xorgxrdp-dev
+  package is still installed, and reinstall it if not.
+
 ### T4 test-box deployments (owner directive, 2026-07-26)
 
 The T4 box (EC2, Cascade Lake + Tesla T4/NVENC) is the representative

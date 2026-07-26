@@ -1,0 +1,61 @@
+# Bisect C: CBR + timing SEI + strip_sei
+# RDP endpoint on the host: 127.0.0.1:40002 (tester / host tester password).
+# Image tag pins the xrdp-dev commit; gfx.toml comes from the committed
+# gfx/arm-c.toml via ConfigMap xrdp-gfx-arm-c (created by build_and_deploy.sh).
+# Privileged + /dev/dri hostPath: the pod's ffmpeg encodes via VAAPI on the
+# host GPU, same as the host baseline instance.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-arm-c
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: arm-c
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: arm-c
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: arm-c
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:e96e655416dc
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: ARM_LABEL
+              value: "C: CBR + timing SEI + strip_sei  (port 40002)"
+          ports:
+            - containerPort: 3389
+              hostPort: 40002
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+      volumes:
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-arm-c

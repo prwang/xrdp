@@ -1,0 +1,6 @@
+# All bisect-matrix arms live here; `kubectl delete ns bisect-matrix`
+# tears the whole matrix down without touching anything else.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: bisect-matrix
