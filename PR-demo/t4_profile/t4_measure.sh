@@ -47,29 +47,34 @@ XAUTH=/var/run/xrdp/$(id -u)/Xauthority
 export DISPLAY=$DISP XAUTHORITY=$XAUTH
 echo "session display=$DISP user=$(whoami)"
 
-# Quiet gate: fresh xfce logins fire a ~20s all-core CPU storm (measured
-# 2026-07-26: ~10 sandboxed glycin-svg icon loaders, ~50 CPU-s, idle
-# pinned to 0%) which would contaminate any measurement on this 4-core
-# box. Refuse to record until CPU idle is sustained; abort loudly rather
-# than measure through noise. Guards against ANY background storm, and
-# does not alter the session environment.
-quiet=0
-for i in $(seq 1 60); do
-    idle=$(top -b -n1 | grep '%Cpu' | head -1 | grep -oE '[0-9.]+ id' \
-           | cut -d' ' -f1 | cut -d. -f1)
-    if [ "${idle:-0}" -ge 85 ]; then
-        quiet=$((quiet + 1))
-        [ "$quiet" -ge 3 ] && break
-    else
-        quiet=0
-    fi
-    sleep 2
-done
-if [ "$quiet" -lt 3 ]; then
-    echo "ABORT: CPU never went quiet (login storm or foreign load)"
+# Quiet gate: fresh xfce logins AND app launches (thunar) fire multi-
+# second all-core CPU storms of sandboxed glycin-svg icon loaders
+# (measured 2026-07-26: ~10 loaders, ~50 CPU-s, idle pinned to 0%; a
+# single loader still burns ~65% of a core) which would contaminate any
+# measurement on this 4-core box. Called at start AND again right
+# before recording (after thunar launch — which spawns its own storm).
+# Additionally refuses while any glycin loader is alive, storming or
+# not. Aborts loudly rather than measure through noise; does not alter
+# the session environment.
+quiet_wait() {
+    local quiet=0 idle i
+    for i in $(seq 1 60); do
+        idle=$(top -b -n1 | grep '%Cpu' | head -1 | grep -oE '[0-9.]+ id' \
+               | cut -d' ' -f1 | cut -d. -f1)
+        if [ "${idle:-0}" -ge 85 ] && ! pgrep -f glycin-loaders >/dev/null
+        then
+            quiet=$((quiet + 1))
+            [ "$quiet" -ge 3 ] && { echo "quiet gate ($1): idle=${idle}%"
+                                    return 0; }
+        else
+            quiet=0
+        fi
+        sleep 2
+    done
+    echo "ABORT: CPU never went quiet at $1 (login storm or foreign load)"
     exit 1
-fi
-echo "quiet gate passed (idle=${idle}%)"
+}
+quiet_wait "session"
 
 probe_add() { b=${1##*/}; b=${b%%.*}
               sudo perf probe -d "probe_${b}:${2%%=*}*" >/dev/null 2>&1 || true
@@ -102,6 +107,9 @@ if [ "$NO_DRAG" != "1" ]; then
     fi
     [ -z "$WID" ] && { echo "ABORT: no real-size Thunar window"; exit 1; }
     echo "orbiting thunar WID=$WID"
+    # thunar's own icon loading spawns another glycin storm; re-gate
+    # before the recorded window
+    quiet_wait "pre-record"
     xdotool windowactivate --sync "$WID" >/dev/null 2>&1 || true
     # ONE xdotool process with the whole orbit as chained argv commands:
     # spawning xdotool per move costs ~100ms under load and caps the
