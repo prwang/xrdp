@@ -89,4 +89,33 @@ xrdp_h264_sanitize_hrd(unsigned char *data, int *len);
 int
 xrdp_h264_strip_pic_struct(unsigned char *data, int *len);
 
+
+/* cached SPS/PPS fields needed to parse slice headers (strip_mmco) */
+struct xrdp_h264_param_cache
+{
+    int have_sps;
+    int log2_max_frame_num;
+    int log2_max_poc_lsb;
+    int poc_type;
+    int frame_mbs_only;
+    int have_pps;
+    int entropy_cabac;
+    int slice_groups;
+    int weighted_pred;
+    int deblock_present;
+    int redundant_present;
+};
+
+/*
+ * DIAGNOSTIC (Mac k=1 bisect): rewrite every non-IDR reference slice so
+ * dec_ref_pic_marking uses sliding-window instead of an explicit MMCO
+ * op list, re-padding the CABAC alignment (payload copied verbatim).
+ * SPS/PPS NALs encountered in the stream update *cache. Fails loudly on
+ * any slice shape our encoders do not emit.
+ */
+int
+xrdp_h264_strip_mmco(unsigned char *data, int *len,
+                     struct xrdp_h264_param_cache *cache);
+
 #endif /* _XRDP_H264_ANNEXB_H */
+

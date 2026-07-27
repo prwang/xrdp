@@ -77,6 +77,7 @@ struct xrdp_ffmpeg_avc444_config
     /* (one-frame chroma slip, bisect arm-K)*/
     int sanitize_hrd;               /* rewrite SPS NALs to drop VUI HRD     */
     int strip_pic_struct;           /* clear VUI pic_struct_present_flag    */
+    int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
     /* of blacking the macOS Windows App    */

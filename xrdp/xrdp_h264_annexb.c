@@ -22,6 +22,7 @@
 #include "config_ac.h"
 #endif
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "xrdp_h264_annexb.h"
@@ -659,4 +660,441 @@ int
 xrdp_h264_strip_pic_struct(unsigned char *data, int *len)
 {
     return sanitize_walk(data, len, 0, 1);
+}
+
+
+/*
+ * MMCO stripping (DIAGNOSTIC, 2026-07-27 Mac k=1 bisect).
+ *
+ * The Mac-clean VAAPI wire marks references with explicit MMCO ops in
+ * every P slice; the Mac-broken nvenc wire uses sliding-window marking.
+ * With max_num_ref_frames = 1 the two are semantically identical, so
+ * converting the clean stream to sliding window is a single-delta arm:
+ * if the Mac starts mis-pairing on it, reference marking is convicted.
+ * The rewrite replaces dec_ref_pic_marking's adaptive op list with
+ * adaptive_ref_pic_marking_mode_flag = 0 and re-pads the CABAC
+ * alignment so the entropy-coded payload is copied byte-verbatim.
+ * Fail-loud contract: any slice shape outside what our own encoders
+ * emit (list modification, weighted prediction, poc_type 1, slice
+ * groups, fields) fails the whole call.
+ */
+
+/*****************************************************************************/
+static void
+cache_sps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
+          int nal_len)
+{
+    unsigned char rbsp[SPS_RBSP_MAX];
+    struct sps_bits b;
+    unsigned int profile_idc;
+    unsigned int cfi;
+    unsigned int n;
+    unsigned int i;
+    int rlen;
+    int zeros;
+    int j;
+
+    rlen = 0;
+    zeros = 0;
+    for (j = 1; j < nal_len && rlen < SPS_RBSP_MAX; j++)
+    {
+        if (zeros == 2 && nal[j] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[j] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[j];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    profile_idc = bits_u(&b, 8);
+    bits_u(&b, 16);
+    bits_ue(&b);             /* sps id */
+    if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 ||
+            profile_idc == 244 || profile_idc == 44 || profile_idc == 83 ||
+            profile_idc == 86 || profile_idc == 118 || profile_idc == 128)
+    {
+        cfi = bits_ue(&b);
+        if (cfi == 3)
+        {
+            bits_u(&b, 1);
+        }
+        bits_ue(&b);
+        bits_ue(&b);
+        bits_u(&b, 1);
+        if (bits_u(&b, 1))
+        {
+            n = (cfi != 3) ? 8 : 12;
+            for (i = 0; i < n && !b.err; i++)
+            {
+                if (bits_u(&b, 1))
+                {
+                    skip_scaling_list(&b, (i < 6) ? 16 : 64);
+                }
+            }
+        }
+    }
+    c->log2_max_frame_num = bits_ue(&b) + 4;
+    c->poc_type = bits_ue(&b);
+    if (c->poc_type == 0)
+    {
+        c->log2_max_poc_lsb = bits_ue(&b) + 4;
+    }
+    bits_ue(&b);             /* max_num_ref_frames */
+    bits_u(&b, 1);           /* gaps allowed */
+    bits_ue(&b);             /* width */
+    bits_ue(&b);             /* height */
+    c->frame_mbs_only = bits_u(&b, 1);
+    c->have_sps = !b.err;
+}
+
+/*****************************************************************************/
+static void
+cache_pps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
+          int nal_len)
+{
+    unsigned char rbsp[SPS_RBSP_MAX];
+    struct sps_bits b;
+    int rlen;
+    int zeros;
+    int j;
+
+    rlen = 0;
+    zeros = 0;
+    for (j = 1; j < nal_len && rlen < SPS_RBSP_MAX; j++)
+    {
+        if (zeros == 2 && nal[j] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[j] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[j];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    bits_ue(&b);                          /* pps id */
+    bits_ue(&b);                          /* sps id */
+    c->entropy_cabac = bits_u(&b, 1);
+    bits_u(&b, 1);                        /* bottom_field_pic_order */
+    c->slice_groups = bits_ue(&b);        /* num_slice_groups_minus1 */
+    bits_ue(&b);                          /* num_ref_idx_l0_default */
+    bits_ue(&b);                          /* num_ref_idx_l1_default */
+    c->weighted_pred = bits_u(&b, 1);
+    bits_u(&b, 2);                        /* weighted_bipred_idc */
+    bits_se(&b);                          /* pic_init_qp */
+    bits_se(&b);                          /* pic_init_qs */
+    bits_se(&b);                          /* chroma_qp_offset */
+    c->deblock_present = bits_u(&b, 1);
+    bits_u(&b, 1);                        /* constrained_intra */
+    c->redundant_present = bits_u(&b, 1);
+    c->have_pps = !b.err;
+}
+
+/*****************************************************************************/
+/* rewrite one non-IDR ref slice NAL: adaptive MMCO list -> sliding      */
+/* window. returns new length, 0 = untouched, -1 = failure.              */
+static int
+slice_strip_mmco(const unsigned char *nal, int nal_len, unsigned char *out,
+                 int out_cap, const struct xrdp_h264_param_cache *c)
+{
+    unsigned char *rbsp;
+    unsigned char *newr;
+    struct sps_bits b;
+    unsigned int stype;
+    unsigned int op;
+    int rlen;
+    int zeros;
+    int i;
+    int mark_start;
+    int mark_end;
+    int hdr_end;
+    int pay_byte;
+    int opos;
+    int oerr;
+    int olen;
+    int bit;
+    int nbytes;
+
+    if (nal_len < 4)
+    {
+        return -1;
+    }
+    rbsp = (unsigned char *)malloc(nal_len);
+    newr = (unsigned char *)malloc(nal_len + 8);
+    if (rbsp == NULL || newr == NULL)
+    {
+        free(rbsp);
+        free(newr);
+        return -1;
+    }
+    rlen = 0;
+    zeros = 0;
+    for (i = 1; i < nal_len; i++)
+    {
+        if (zeros == 2 && nal[i] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[i] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[i];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    bits_ue(&b);                          /* first_mb_in_slice */
+    stype = bits_ue(&b) % 5;
+    bits_ue(&b);                          /* pps id */
+    bits_u(&b, c->log2_max_frame_num);    /* frame_num */
+    if (!c->frame_mbs_only || c->slice_groups != 0 || stype == 1)
+    {
+        goto unsupported;                 /* fields/slice groups/B */
+    }
+    if (c->poc_type == 0)
+    {
+        bits_u(&b, c->log2_max_poc_lsb);
+    }
+    else if (c->poc_type == 1)
+    {
+        goto unsupported;
+    }
+    if (c->redundant_present)
+    {
+        bits_ue(&b);
+    }
+    if (stype == 0)                       /* P */
+    {
+        if (bits_u(&b, 1))                /* num_ref_idx override */
+        {
+            bits_ue(&b);
+        }
+        if (bits_u(&b, 1))                /* ref_pic_list_modification */
+        {
+            goto unsupported;
+        }
+        if (c->weighted_pred)
+        {
+            goto unsupported;
+        }
+    }
+    mark_start = b.pos;
+    if (bits_u(&b, 1) == 0)               /* adaptive marking flag */
+    {
+        free(rbsp);
+        free(newr);
+        return 0;                         /* already sliding window */
+    }
+    do
+    {
+        op = bits_ue(&b);
+        switch (op)
+        {
+            case 0:
+                break;
+            case 1:
+            case 2:
+            case 4:
+            case 6:
+                bits_ue(&b);
+                break;
+            case 3:
+                bits_ue(&b);
+                bits_ue(&b);
+                break;
+            case 5:
+                break;
+            default:
+                goto unsupported;
+        }
+    }
+    while (op != 0 && !b.err);
+    mark_end = b.pos;
+    if (stype == 0 && c->entropy_cabac)
+    {
+        bits_ue(&b);                      /* cabac_init_idc */
+    }
+    bits_se(&b);                          /* slice_qp_delta */
+    if (c->deblock_present)
+    {
+        if (bits_ue(&b) != 1)             /* disable_deblocking_idc */
+        {
+            bits_se(&b);
+            bits_se(&b);
+        }
+    }
+    hdr_end = b.pos;
+    if (b.err || !c->entropy_cabac)
+    {
+        /* CAVLC data is not byte-aligned; only CABAC is supported */
+        goto unsupported;
+    }
+    pay_byte = (hdr_end + 7) / 8;         /* CABAC payload after alignment */
+    if (pay_byte >= rlen)
+    {
+        goto unsupported;
+    }
+    memset(newr, 0, nal_len + 8);
+    opos = 0;
+    oerr = 0;
+    for (i = 0; i < mark_start && !oerr; i++)
+    {
+        bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
+        put_bit(newr, &opos, (nal_len + 8) * 8, bit, &oerr);
+    }
+    put_bit(newr, &opos, (nal_len + 8) * 8, 0, &oerr); /* sliding window */
+    for (i = mark_end; i < hdr_end && !oerr; i++)
+    {
+        bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
+        put_bit(newr, &opos, (nal_len + 8) * 8, bit, &oerr);
+    }
+    while ((opos & 7) != 0 && !oerr)      /* cabac_alignment_one_bit */
+    {
+        put_bit(newr, &opos, (nal_len + 8) * 8, 1, &oerr);
+    }
+    nbytes = opos / 8;
+    if (oerr || nbytes + (rlen - pay_byte) > nal_len + 8)
+    {
+        goto unsupported;
+    }
+    memcpy(newr + nbytes, rbsp + pay_byte, rlen - pay_byte);
+    nbytes += rlen - pay_byte;
+    /* re-escape */
+    out[0] = nal[0];
+    olen = 1;
+    zeros = 0;
+    for (i = 0; i < nbytes; i++)
+    {
+        if (zeros == 2 && newr[i] <= 3)
+        {
+            if (olen >= out_cap)
+            {
+                goto unsupported;
+            }
+            out[olen++] = 3;
+            zeros = 0;
+        }
+        if (olen >= out_cap)
+        {
+            goto unsupported;
+        }
+        zeros = (newr[i] == 0) ? zeros + 1 : 0;
+        out[olen++] = newr[i];
+    }
+    free(rbsp);
+    free(newr);
+    return olen;
+unsupported:
+    free(rbsp);
+    free(newr);
+    return -1;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_strip_mmco(unsigned char *data, int *len,
+                     struct xrdp_h264_param_cache *cache)
+{
+    unsigned char *out;
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nal_count;
+    int rv;
+
+    if (data == NULL || len == NULL || cache == NULL || *len < 4)
+    {
+        return 1;
+    }
+    if (!find_start_code(data, *len, 0, &nal_start, &sc_prefix))
+    {
+        return 1;
+    }
+    out = (unsigned char *)malloc(*len + 16);
+    if (out == NULL)
+    {
+        return 1;
+    }
+    rv = 0;
+    pos = nal_start;
+    nal_count = 0;
+    while (pos < *len && nal_count < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+        int nal_end;
+        int nal_len;
+        int new_len;
+        int ntype;
+
+        nal_count++;
+        if (find_start_code(data, *len, pos + 1, &next_start, &next_prefix))
+        {
+            nal_end = next_start - next_prefix;
+        }
+        else
+        {
+            nal_end = *len;
+            next_start = -1;
+        }
+        nal_len = nal_end - pos;
+        ntype = data[pos] & 0x1f;
+        if (ntype == 7)
+        {
+            cache_sps(cache, data + pos, nal_len);
+        }
+        else if (ntype == 8)
+        {
+            cache_pps(cache, data + pos, nal_len);
+        }
+        else if (ntype == 1 && ((data[pos] >> 5) & 3) != 0)
+        {
+            if (!cache->have_sps || !cache->have_pps)
+            {
+                rv = 1;
+                break;
+            }
+            new_len = slice_strip_mmco(data + pos, nal_len, out,
+                                       *len + 16, cache);
+            if (new_len < 0)
+            {
+                rv = 1;
+                break;
+            }
+            if (new_len > 0 && new_len != nal_len)
+            {
+                if (new_len > nal_len)
+                {
+                    /* never grow the caller buffer; diagnostic knob */
+                    rv = 1;
+                    break;
+                }
+                memcpy(data + pos, out, new_len);
+                memmove(data + pos + new_len, data + nal_end,
+                        *len - nal_end);
+                *len -= nal_len - new_len;
+                if (next_start > 0)
+                {
+                    next_start -= nal_len - new_len;
+                }
+            }
+            else if (new_len > 0)
+            {
+                memcpy(data + pos, out, new_len);
+            }
+        }
+        if (next_start < 0)
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    free(out);
+    return rv;
 }

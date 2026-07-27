@@ -1375,6 +1375,14 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_strip_pic_struct;
             cfg.fault_aux_delay =
                 self->wm->gfx_config->avc444_ffmpeg_fault_aux_delay;
+            cfg.fault_strip_mmco =
+                self->wm->gfx_config->avc444_ffmpeg_fault_strip_mmco;
+            if (cfg.fault_strip_mmco)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml fault_strip_mmco is ON: "
+                    "reference marking rewritten MMCO -> sliding window "
+                    "(bisect diagnostics only)");
+            }
             if (cfg.fault_aux_delay)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml fault_aux_delay is ON: "
@@ -1396,6 +1404,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.strip_pic_struct;
             self->avc444_fault_aux_delay =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_aux_delay;
+            self->avc444_fault_strip_mmco =
+                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_strip_mmco;
             if (pres == XRDP_FFMPEG_PROBE_OK)
             {
                 if (want_420)
