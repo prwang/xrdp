@@ -125,6 +125,10 @@ struct xrdp_tconfig_gfx
      * 2026-07-27 matrix verdict: HRD in the SPS VUI alone blacks the
      * macOS Windows App even with all SEI NALs stripped. Default 0. */
     int avc444_ffmpeg_sanitize_hrd;
+    /* DIAGNOSTIC fault injection: delay the aux stream by one pair to
+     * visualize a main/aux pairing slip (2026-07-27 arm-K). Default 0;
+     * the runner logs a WARNING whenever it is active. */
+    int avc444_ffmpeg_fault_aux_delay;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

@@ -73,6 +73,8 @@ struct xrdp_ffmpeg_avc444_config
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
     /* match the converter's width_align     */
+    int fault_aux_delay;            /* DIAGNOSTIC: ship previous pair's aux */
+    /* (one-frame chroma slip, bisect arm-K)*/
     int sanitize_hrd;               /* rewrite SPS NALs to drop VUI HRD     */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
