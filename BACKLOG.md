@@ -1964,3 +1964,33 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   layer unpack, a few minutes worst case). Fleet re-created 12/12.
   Config comment updated in /etc/rancher/k3s/config.yaml with the
   rollback tell (PAM login failures -> suspect snapshotter first).
+- MECHANISM PROVEN (2026-07-27, offline, no live arms): cross-view
+  inter prediction in the single-context AVC444 interleave. Full
+  static-analysis proof + reproduction commands in
+  PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md. Summary:
+  our one-encoder interleave makes every frame's previous decode-order
+  frame the OTHER view; nvenc emits ~300 cross-view inter MBs per P
+  frame in flat regions (VAAPI CQP emits ZERO inter MBs — clean arms
+  were immune by accident); a client decoding the views per-view
+  resolves those MBs against same-view references -> wrong prediction
+  base -> chroma-dominant error (luma clips at black) that compounds
+  through the DPB (temporal) and intra prediction (spatial smooth
+  down-right beams), heals only at IDR, skip-coded EPOCH repaints
+  cannot heal. Reproduced deterministically in ffmpeg: per-view decode
+  of the committed T4 main stream diverges from correct-topology
+  decode at P frame 1 (60% pixels off) saturating ~83% / mean |d|~120
+  by frame 10 (background ROI black -> magenta 240,80,247, matching
+  the Mac video beams); arm-L per-view decode is bit-identical
+  (all-intra). The owner's monkeypatching veto was correct: header
+  knobs could never fix a payload/topology defect. arm-H's reported
+  local bleed is NOT explained (its capture is all-intra) and stays
+  quarantined under the stand-in rule.
+- TODO (awaiting owner sign-off): AVC444 per-view encoder contexts —
+  encode main/aux in two independent encoders (own DPB, own frame_num,
+  aux carries SPS/PPS + IDR cadence), removing cross-view references
+  structurally; correct for single-decoder AND per-view clients.
+  Acceptance: per-view ffmpeg decode of BOTH emitted streams is
+  bit-identical to interleaved decode on a probe corpus; in-tree unit
+  test asserts aux independence (SPS/PPS+IDR present, per-view
+  frame_num); T4 perf re-recorded per deploy rule; Mac onscreen
+  validation last.
