@@ -2044,3 +2044,31 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   particular aux rate converts a deterministic defect into a
   load/timing-dependent heisenbug. Acceptance stays: drop-all-aux and
   per-view decodes bit-identical at full 1:1 alternation.
+- PROBE RESULT (2026-07-27, T4 offscreen, unmodified /usr/bin/ffmpeg
+  8.0.1 + h264_nvenc on Tesla T4): -nonref_p is NOT respected. RED.
+  Synthetic 1:1 alternating input (testsrc2/smptebars interleave,
+  1600x900, 60 frames), 7 variants: shipped args (constqp qp20 bf0
+  delay0 g240 refs1 dpb_size1) with/without -nonref_p 1 -> outputs
+  BYTE-IDENTICAL (option silently ignored); dpb-free, vbr+
+  rc-lookahead 8, p1+ull, p4+ll+cbr, p7 -> all 59 P frames nri!=0 in
+  every variant. ffmpeg sets NVENC enableNonRefP, but that is a
+  permission, not a command — the driver never chose to emit non-ref
+  P in any tested config. Candidate (a) via the stock-ffmpeg CLI
+  contract is dead. Per-frame reference/pict_type control is an
+  API-level feature (AVFrame->pict_type / NVENC per-pic params) that
+  the external stock-ffmpeg pipe architecture (PRD §8.4) cannot
+  reach.
+- Surviving mechanism candidate (feasibility spike BEFORE any deploy,
+  provable offline by the bit-identity acceptance test): merged
+  single chain with rewriter-assisted aux leaves — main view from the
+  encoder as today (its chain then self-references only main frames
+  since aux never enters it); every aux frame coded ALL-INTRA and
+  spliced into the chain by the annexb rewriter as a non-reference,
+  non-IDR I frame (nal type 5->1 with idr_pic_id removed, nri=0,
+  frame_num per non-ref picture rules, single shared SPS/PPS).
+  DPB-inert aux leaves = drop-safe and per-view-safe at ANY aux
+  cadence; single decoder chain preserved for in-order clients.
+  Open feasibility questions: non-IDR all-I emission or IDR->I
+  rewrite correctness (CABAC init deltas between slice types 5/7 vs
+  2/7 contexts), PPS bit-compat across two encoder invocations.
+  NOT implemented; awaiting owner sign-off on the spike.
