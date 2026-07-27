@@ -417,6 +417,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_dump_extra = 0;
     config->avc444_ffmpeg_strip_sei = 0;
     config->avc444_ffmpeg_sanitize_hrd = 0;
+    config->avc444_ffmpeg_strip_pic_struct = 0;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
@@ -430,6 +431,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t de = toml_bool_in(avc, "dump_extra");
             toml_datum_t ss = toml_bool_in(avc, "strip_sei");
             toml_datum_t sh = toml_bool_in(avc, "sanitize_hrd");
+            toml_datum_t sp = toml_bool_in(avc, "strip_pic_struct");
             toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
             if (tf.ok)
             {
@@ -446,6 +448,10 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             if (sh.ok)
             {
                 config->avc444_ffmpeg_sanitize_hrd = sh.u.b ? 1 : 0;
+            }
+            if (sp.ok)
+            {
+                config->avc444_ffmpeg_strip_pic_struct = sp.u.b ? 1 : 0;
             }
             if (fa.ok)
             {

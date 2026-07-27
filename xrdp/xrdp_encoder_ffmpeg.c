@@ -201,6 +201,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
     cfg->strip_sei = 0;
     cfg->sanitize_hrd = 0;
+    cfg->strip_pic_struct = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
                                * [avc444_ffmpeg] dump_extra); verified --
@@ -917,6 +918,19 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
         }
     }
 
+    if (self->cfg.strip_pic_struct)
+    {
+        if (xrdp_h264_strip_pic_struct(self->main_buf,
+                                       &self->main_len) != 0 ||
+                xrdp_h264_strip_pic_struct(self->aux_buf,
+                                           &self->aux_len) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: strip_pic_struct could not "
+                "rewrite an SPS; refusing to ship the packet");
+            return 1;
+        }
+    }
+
     if (self->pairs_returned == 0)
     {
         struct xrdp_h264_nal_summary sum;
@@ -986,6 +1000,15 @@ pop_single(struct xrdp_ffmpeg_avc444 *self,
             xrdp_h264_sanitize_hrd(self->main_buf, &self->main_len) != 0)
     {
         LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: sanitize_hrd could not "
+            "rewrite an SPS; refusing to ship the packet");
+        return 1;
+    }
+
+    if (self->cfg.strip_pic_struct &&
+            xrdp_h264_strip_pic_struct(self->main_buf,
+                                       &self->main_len) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: strip_pic_struct could not "
             "rewrite an SPS; refusing to ship the packet");
         return 1;
     }

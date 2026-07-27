@@ -1887,3 +1887,18 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   golden tests, deb, conffile-safe T4 deploy, owner probe re-read
   (k=0 => fixed; k=1 => pic_struct exonerated, next axes: aspect/
   timing-units/mv declarations, MMCO-vs-sliding-window).
+- strip_pic_struct knob implemented (2026-07-27): sanitize_walk refactor
+  in xrdp_h264_annexb.c (shared SPS walk; sps_rewrite_nal takes
+  strip_hrd/strip_ps flags; pic_struct_present_flag is the bit at
+  hrd_end, forced to 0 with everything else copied bit-exact),
+  xrdp_h264_strip_pic_struct() public, plumbed gfx.toml
+  [avc444_ffmpeg] strip_pic_struct -> tconfig -> mm (probe-latched) ->
+  encoder -> ffmpeg runner (fail-loud on both pop paths, like
+  sanitize_hrd). Verified against the REAL captured nvenc stream:
+  ffmpeg trace_headers field diff = ONLY pic_struct 1->0, framemd5
+  pixel-exact, idempotent (single byte 0x13->0x11, length unchanged).
+  Unit tests: golden clear (real T4 nvenc SPS vector), zero-flag
+  untouched (arm-a VAAPI vector), truncated fails - 91/91 make check,
+  astyle clean. Purpose: falsify the VT-output-pacing explanation of
+  the MEASURED k=1 aux lag; deploying to the T4 for the owner probe
+  re-read.

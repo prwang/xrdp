@@ -77,4 +77,16 @@ xrdp_h264_aux_ok(const unsigned char *data, int len);
 int
 xrdp_h264_sanitize_hrd(unsigned char *data, int *len);
 
+/*
+ * Clear pic_struct_present_flag in the VUI of every SPS in an Annex-B
+ * access unit, in place (macOS interop: the flag declares per-frame
+ * picture-timing SEI which xrdp strips, and a declared-but-absent
+ * timing feed changes VideoToolbox output pacing). Every other SPS
+ * field is preserved bit-exactly; SPS NALs without VUI or with the
+ * flag already 0 pass through untouched. Same failure contract as
+ * xrdp_h264_sanitize_hrd().
+ */
+int
+xrdp_h264_strip_pic_struct(unsigned char *data, int *len);
+
 #endif /* _XRDP_H264_ANNEXB_H */
