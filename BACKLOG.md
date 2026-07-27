@@ -1835,3 +1835,21 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   rewrite clearing pic_struct_present_flag (no bit-shifting — flag flip
   only), then the last resort is slice-data-level (encoder-internal)
   differences.
+- Profile axis REJECTED too (owner Mac test, 2026-07-27): high-profile
+  nvenc wire still full-screen wrong color. Owner directive: stop
+  one-bit-per-test config permutation; ship a DISCRIMINATING payload.
+  Built PR-demo/mac_bisect_matrix/chroma_probe.py ("chroma-probe",
+  installed on the T4, python3-tk): luma and chroma carry independent
+  readable clocks — numerals/labels are luma-only, timed patches use an
+  equiluminant palette (constant Y under BT.709 full, hue rotating in
+  U/V only), so ANY main/aux desync is readable off one screenshot:
+  fast(1Hz)+slow(1/8Hz) clocks measure chroma lag k in damage-frames;
+  frozen patch = aux stalled; legend+named bars detect channel
+  swaps/casts; 1px red/blue stripes = 4:2:0-vs-4:4:4; static-vs-motion
+  zones split connect-time faults from damage-path faults (caseH).
+  Validated end-to-end via xfreerdp3 against the live T4 (correct
+  decoder control): clocks tick, hues track indices — reference
+  screenshots committed (captures/chroma_probe_reference_xfreerdp*.png).
+  Probe left running in the T4 session; owner Mac connect reads the
+  failure vector directly. T4 config under test: nvenc profile-high +
+  refs1/dpb1 + strip_sei + sanitize_hrd + avc_mode 444.
