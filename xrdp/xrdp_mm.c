@@ -1371,6 +1371,14 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_strip_sei;
             cfg.sanitize_hrd =
                 self->wm->gfx_config->avc444_ffmpeg_sanitize_hrd;
+            cfg.fault_aux_delay =
+                self->wm->gfx_config->avc444_ffmpeg_fault_aux_delay;
+            if (cfg.fault_aux_delay)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml fault_aux_delay is ON: "
+                    "DELIBERATE one-frame chroma pairing fault (bisect "
+                    "diagnostics only) — output is intentionally wrong");
+            }
             LOG(LOG_LEVEL_INFO, "xrdp_mm_egfx_caps_advertise: verifying "
                 "ffmpeg %s %s at %dx%d (gfx.toml dump_extra=%d)",
                 want_420 ? "AVC420" : "AVC444", cfg.path, cw, ch,
@@ -1382,6 +1390,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.strip_sei;
             self->avc444_sanitize_hrd =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.sanitize_hrd;
+            self->avc444_fault_aux_delay =
+                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_aux_delay;
             if (pres == XRDP_FFMPEG_PROBE_OK)
             {
                 if (want_420)

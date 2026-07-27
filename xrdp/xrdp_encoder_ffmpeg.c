@@ -128,6 +128,11 @@ struct xrdp_ffmpeg_avc444
     int aux_cap;
     int aux_len;
 
+    /* DIAGNOSTIC (fault_aux_delay): previous pair's aux, swapped in */
+    unsigned char *fault_aux_buf;
+    int fault_aux_cap;
+    int fault_aux_len;
+
     char errline[512];
     int errline_len;
 
@@ -196,6 +201,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
     cfg->strip_sei = 0;
     cfg->sanitize_hrd = 0;
+    cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
                                * [avc444_ffmpeg] dump_extra); verified --
                                * never changed -- by the probe
@@ -868,6 +874,38 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
     self->aux_len = a->len;
     self->pk_head += 2;
 
+    if (self->cfg.fault_aux_delay)
+    {
+        /* DIAGNOSTIC FAULT INJECTION (bisect arm-K, 2026-07-27): ship
+         * the PREVIOUS pair's aux with this pair's main — a deliberate
+         * one-frame chroma pairing slip that models a decoder-side
+         * main/aux association error (hypothesis A). Never enable
+         * outside a bisect arm. */
+        unsigned char *tb = self->fault_aux_buf;
+        int tl = self->fault_aux_len;
+        int tc = self->fault_aux_cap;
+
+        self->fault_aux_buf = self->aux_buf;
+        self->fault_aux_len = self->aux_len;
+        self->fault_aux_cap = self->aux_cap;
+        self->aux_buf = tb;
+        self->aux_len = tl;
+        self->aux_cap = tc;
+        if (self->aux_buf == NULL || self->aux_len == 0)
+        {
+            /* very first pair has no predecessor: emit its own aux */
+            tb = self->fault_aux_buf;
+            tl = self->fault_aux_len;
+            tc = self->fault_aux_cap;
+            self->fault_aux_buf = self->aux_buf;
+            self->fault_aux_len = self->aux_len;
+            self->fault_aux_cap = self->aux_cap;
+            self->aux_buf = tb;
+            self->aux_len = tl;
+            self->aux_cap = tc;
+        }
+    }
+
     if (self->cfg.sanitize_hrd)
     {
         if (xrdp_h264_sanitize_hrd(self->main_buf, &self->main_len) != 0 ||
@@ -1348,6 +1386,7 @@ xrdp_ffmpeg_avc444_delete(struct xrdp_ffmpeg_avc444 *self)
     g_free(self->seq);
     g_free(self->main_buf);
     g_free(self->aux_buf);
+    g_free(self->fault_aux_buf);
     g_free(self);
 }
 
