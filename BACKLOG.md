@@ -1714,3 +1714,15 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   8/8 keys at 1920x1080 AND 1024x768 with color-edge fidelity 1.000
   (vs 0.67 under 420) — full 4:4:4 chroma confirmed through the
   deployed binary+config. AWAITING owner Mac 444 test.
+- 2026-07-27 NEW SYMPTOM: Mac renders T4 AVC444 with WRONG COLORS
+  (regional hue casts: whites->cyan, magenta streaks — aux chroma
+  misassembly signature), while the SAME wire is color-correct on
+  xfreerdp (smoke classified 8/8 colors, edge 1.000) and mstsc was fully
+  functional earlier. 420 was color-correct on the Mac. Colour VUI
+  identical VAAPI vs nvenc (709 full range both) — matrix/range
+  declaration exonerated. => Mac's 444 chroma reconstruction vs our aux
+  packing. arm-f :40005 added: build 52099149 (pre even-align/4B) +
+  VAAPI CQP + avc_mode=444. Mac verdict splits: correct colors =>
+  packing regressed in 52099149..bd1ab35b (suspect f0104284 metablock
+  even-align); wrong colors => Mac 444 color fidelity never validated,
+  investigate ChromaV2 interpretation difference.
