@@ -2093,3 +2093,27 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   ref VCL rejected, truncated aux rejected) -> 95/95 pass. NEXT: deb
   build, T4 deploy, wire-capture acceptance (drop-aux + per-view
   bit-identity on the real wire), xfreerdp render check, smoke gate.
+- DEPLOYED + VALIDATED (2026-07-27): aux_intra_leaf on the T4.
+  Deb xrdp-dev 0.10.80+git20260727225731.9539565594e3 installed
+  (dpkg conffile prompt resolved --force-confold; cert.pem/key.pem
+  verified byte-identical to the pre-install snapshot
+  /root/xrdp-conf-backup-20260727225840; xorgxrdp-dev 251bc4d still
+  ii). gfx.toml: aux_intra_leaf = true added, all other knobs
+  unchanged. Stale session Xorg logged off (sesman logged the clean
+  finish) before testing. WIRE (oracle capture, 434 records,
+  captures/t4_leaf_20260727/): main chain [SPS,PPS,IDR]+216 P all
+  nri=3 with per-view-consecutive frame_num; ALL 217 aux records =
+  single type-1 I slice nri=0 fn=main+1; main P frames shrank from
+  25-76KB (cross-view refs useless) to 0.6-2.5KB (real same-view
+  refs). ACCEPTANCE (the ground-truth robustness test, owner-set):
+  drop all 217 aux leaves -> 217/217 main frames BIT-IDENTICAL to
+  the interleaved decode, 0 decoder warnings — our wire now has the
+  Win2022 property (348/348). VISUAL (xfreerdp3 over tunnel, chroma
+  probe): k=0 (FAST/SLOW patch hues match numerals), background
+  black, worst named-bar deviation 4/255, no bleed, no trails
+  (captures/t4_leaf_20260727/t4_leaf_shot{1,2}.png). PERF: pack
+  bench on T4 unchanged (4K vectorized 9.05 ms/frame). SMOKE GATE
+  (last step): PASS both sizes, edge 1.000, encoder_errors=0.
+  REMAINING: Mac onscreen validation by owner (the decisive test);
+  aux leaf bitrate (~60KB/frame all-intra) is the known cost — perf
+  work only after Mac verdict.
