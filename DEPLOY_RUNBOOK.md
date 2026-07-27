@@ -99,6 +99,22 @@ printf 'allowed_users=anybody\nneeds_root_rights=no\n' \
 sudo systemctl restart xrdp-sesman
 ```
 
+xrdp sessions are also not polkit-"local": on every fresh xfce login polkit
+pops **"Authentication is required to create a color managed device"**,
+which blocks unattended and onscreen testing (hit live 2026-07-27). Allow
+the colord actions once per box:
+
+```sh
+sudo tee /etc/polkit-1/rules.d/45-allow-colord.rules >/dev/null <<'RULES'
+polkit.addRule(function(action, subject) {
+    if (action.id.indexOf("org.freedesktop.color-manager.") == 0) {
+        return polkit.Result.YES;
+    }
+});
+RULES
+sudo systemctl restart polkit
+```
+
 The dev box passes only because its `/etc/X11/Xwrapper.config` was hand-set to
 `allowed_users=anybody`; a stock cloud image will not have this.
 
