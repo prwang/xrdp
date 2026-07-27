@@ -1810,3 +1810,28 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   AND 1024x768, edge fidelity 1.000, 0 encoder errors. AWAITING owner
   Mac test on the T4 (expected: wrong-color-at-connect gone if the DPB
   axis is the cause).
+- DPB axis REJECTED (owner Mac test, 2026-07-27): refs=1/dpb=1 wire
+  still full-screen wrong color at connect. Deeper structural inventory
+  (PR-demo/mac_bisect_matrix/wire_inventory.py, real captures): the
+  interleaved decode-order structure is IDENTICAL between real-nvenc
+  and clean VAAPI wires — same [SPS,PPS,IDR],[auxP],[mainP],[auxP]...
+  LC1/LC2 alternation, continuous frame_num 0..N across main/aux,
+  single slice/frame, POC type 2 both (no reordering possible),
+  gaps_in_frame_num=0 both, PPS equal modulo deblock-present + High-only
+  tail, ref model equivalent (VAAPI explicit MMCO vs nvenc sliding
+  window, both = prev-decode-order-frame reference, which is why both
+  emit near-IDR-sized P frames). arm-I clean wire even carries SEI =>
+  SEI presence/absence is not the axis. Elimination logic: T4 420 with
+  the SAME nvenc VUI rendered clean on the Mac => remaining suspects
+  must be declarations whose effect is OUTPUT TIMING (invisible in 420,
+  fatal to 444 main/aux pairing). Config ladder continued on the REAL
+  encoder: -profile:v high deployed (profile 77->100, chroma fields now
+  match clean arm). Full remaining wire delta vs Mac-clean arm-I:
+  pic_struct_present_flag 1 vs 0 (BEHAVIORAL suspect — output timing),
+  constraint_set4/5, aspect(sq), timing units (same 120fps ratio), mv
+  hints (all informational). Wire re-verified sanitized (hrd 0/0, SEI
+  0). SMOKE PASS 8/8 both sizes edge 1.000. AWAITING owner Mac test on
+  profile-high config. If STILL wrong: next is a one-bit in-place SPS
+  rewrite clearing pic_struct_present_flag (no bit-shifting — flag flip
+  only), then the last resort is slice-data-level (encoder-internal)
+  differences.
