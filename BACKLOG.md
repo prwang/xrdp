@@ -1753,3 +1753,12 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   arm-i :40008 (new pair + G CQP config, single-delta vs G) and arm-j
   :40009 (xrdp 649b447c = 4B commit, pre f0104284-even-align, paired
   251bc4d) split the two suspect commits.
+- Hypothesis B CLOSED (2026-07-27): tools/sanitize_hrd_corpus_check.sh —
+  19/19 streams (VAAPI CBR x10 resolutions incl. 3840x2400; x264
+  nvenc-shaped level5.2/refs3, pic_struct, vbr-hrd, x3 resolutions each)
+  pass field-exactness (SPS after == SPS before minus exactly the HRD
+  block; bitstream_restriction/max_dec_frame_buffering untouched),
+  pixel-exact decode (framemd5), idempotency. The rewrite does not
+  corrupt any SPS shape in scope. Hypothesis A (decoder-side main/aux
+  pairing slip) is now the lead: arm-K next = deliberate one-frame aux
+  delay fault injection for visual signature comparison vs the T4.
