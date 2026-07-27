@@ -1994,3 +1994,44 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   test asserts aux independence (SPS/PPS+IDR present, per-view
   frame_num); T4 perf re-recorded per deploy rule; Mac onscreen
   validation last.
+- RECONCILIATION with the two-encoder rejection (owner challenge,
+  2026-07-27): the rejected-thread note (this file, ~line 171; PRD
+  §6.5; vm/GROUND_TRUTH_win2022_avc444.md) stands and the "two
+  independent encoder contexts" TODO above is WITHDRAWN — two
+  processes = two frame_num chains + duplicate SPS into the client's
+  single decoder = desync garbage on Windows/xfreerdp, exactly as
+  recorded. New ground-truth measurement closes the apparent
+  contradiction: the real Win2022 wire is ONE chain (every frame,
+  main AND aux, is an nri=3 reference P on one continuous frame_num
+  sequence; SPS max_num_ref_frames=3/dpb=3) yet it is
+  REFERENCE-PARTITIONED: decoding gfxwin_anim with ALL 9 aux AUs
+  dropped leaves every one of 348 main frames BIT-IDENTICAL (mean 0,
+  max 0) to the full interleaved decode. Single chain != cross-view
+  prediction: Microsoft's encoder keeps a 3-deep DPB so same-view
+  references are always available and never predicts main from aux.
+  Our wire copies the chain structure but not the reference
+  discipline (ffmpeg-CLI nvenc picks the cross-view adjacent frame,
+  ~300 MBs/frame in flat regions) — so ours corrupts under ANY client
+  deviation from strict in-order single-decoder feeding (drop, defer,
+  per-view), while Windows' wire is provably robust to all of them.
+  This also means the Mac client's exact behavior (dropper vs
+  per-view) is no longer decidable from our data and no longer
+  matters: the fix target is the Windows property, not a client
+  model.
+- TODO (replaces withdrawn two-context item; needs owner sign-off):
+  AVC444 reference partitioning within the SINGLE encoder chain —
+  main frames must never reference aux frames (and aux never main
+  where avoidable). Candidate mechanisms to evaluate: (a) aux frames
+  as non-reference (nri=0, excluded from DPB; main chain then
+  self-links even at refs=1) — needs deterministic per-frame non-ref
+  control (nvenc enableNonRefP / VAAPI / x264 equivalents; ffmpeg
+  -nonref_p is "automatic", must verify determinism or find a
+  per-frame path); (b) Windows cadence (Lever 2 / FR-PROC-7,
+  LC=1-dominant + rare LC=2 catch-up) shrinks exposure ~14x but alone
+  does not eliminate cross-view refs at insertion points; (c) refs>=2
+  alone is NOT sufficient (original broken T4 wire was refs=3: nvenc
+  still picked cross-view refs in flat regions). ACCEPTANCE = the
+  ground-truth robustness test: decode our wire with all aux AUs
+  dropped and per-view; main frames must be bit-identical to the
+  interleaved decode (same test that passes on gfxwin_anim), run as
+  an offline corpus check before any Mac onscreen validation.
