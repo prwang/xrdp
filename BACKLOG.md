@@ -1685,3 +1685,23 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   => same knob is the T4/nvenc fix path). 4 new unit tests incl. golden:
   captured arm-c SPS must rewrite to captured arm-a SPS byte-for-byte
   (87/87 pass). AWAITING: byte-verify arm-e on the wire, owner Mac test.
+- 2026-07-27 VERDICT: arm-e RENDERS on the Mac => sanitize_hrd+strip_sei
+  is the proven fix. Productized: diag commits cherry-picked onto
+  dev/avc444_metablock_checkpoint (88/88 make check), deb versioning
+  fixed to monotonic commit-timestamp (bare git hashes broke dpkg
+  ordering AND tripped xorgxrdp-dev's contract guard Breaks: xrdp-dev
+  << 4932908b8842 against a strictly newer build).
+- T4 deploy (bd1ab35b791e + xorgxrdp 251bc4d, one apt transaction —
+  installing either dev deb alone REMOVES the other via mutual Breaks):
+  conffile protocol held (pre-install snapshot /root/xrdp-conf-backup-*,
+  --force-confold, cert.pem/key.pem silently replaced by dpkg and
+  restored from snapshot, MANIFEST byte-verified afterwards). gfx.toml:
+  exactly two lines added (strip_sei/sanitize_hrd), backup
+  gfx.toml.pre_sanitize_hrd. nvenc wire byte-verified through tunnel:
+  nal_hrd_vui=0, sei 0/33, reset=[SPS,PPS,IDR] then [P] — the SPS parser
+  handled the real nvenc SPS (nvenc emits HRD even at constqp).
+- Pack bench (deploy record, T4 Cascade Lake): 3840x2400 8.90 ms/frame
+  vectorized (48.58 scalar), 2000x1000 2.29, 500x200 0.09 — unchanged
+  from the 4B-era numbers (sanitize path touches only SPS-bearing
+  packets, not the conversion loops).
+- AWAITING: smoke gate result, then owner Mac test against the T4.
