@@ -1732,3 +1732,16 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   spoke xup contract 20260726 and sesman rejected logins against
   bd1ab35b's 20260727. Rebuilt+redeployed; login verified, wire matches
   T4 shape (nal_hrd=0, sei=0), AVC444 v2.
+- 2026-07-27 G/H verdicts (Mac + Windows UWP): G (old pair 52099149+
+  ee1ec01, CQP) fully clean on BOTH clients. H (T4 pair bd1ab35b+251bc4d,
+  CBR mimic + strip+sanitize) = Mac wrong color LOCALIZED to regions
+  after new damage (clean on connect/resize; block-aligned chroma
+  garbage trailing window drags — see caseH_localized_wrong_color png);
+  UWP on H connects but blurry text (suspect CBR 20M quality starvation,
+  not chroma — UWP wallpaper shows NO wrong-color blocks). T4 (real
+  nvenc, constqp): Mac wrong color at immediate connect, UWP fine.
+  Reading: incremental-damage aux/metablock geometry regression in the
+  new pair; strict Mac blits chroma garbage, xfreerdp/UWP tolerate.
+- arm-i :40008 queued: new pair + G's EXACT CQP config (no CBR/knobs) —
+  single-delta vs G = deb pair only. Mac wrong-after-damage on I =>
+  code pair convicted outright; UWP sharp on I => H blur was CBR config.
