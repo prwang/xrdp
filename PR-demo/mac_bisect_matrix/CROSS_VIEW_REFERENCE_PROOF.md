@@ -128,13 +128,27 @@ Every observed Mac symptom follows from one event class.
   Header knobs could never have fixed this; the owner's monkeypatching
   veto was correct.
 
-## Proposed fix (needs sign-off, not implemented)
+## Fix constraint (owner directive, 2026-07-27)
 
-Encode main and aux in two independent encoder contexts: per-view DPB
-and frame_num (0,1,2,… each), aux stream carries its own SPS/PPS and IDR
-cadence. This removes cross-view references structurally, making the
-stream correct for single-decoder AND per-view clients. Cost: a second
-encoder session (T4/NVENC unrestricted; re-run avc444_pack_bench and the
-perf record per the T4 deploy rule). Backstop: in-tree unit test asserting
-the aux stream of a synthetic pair is independently decodable
-(SPS/PPS+IDR present, no cross-view frame_num interleave).
+The ORIGINAL fix proposal here (two independent encoder contexts) is
+WITHDRAWN — it is the previously rejected thread (BACKLOG ~line 171,
+PRD §6.5): two frame_num chains + duplicate SPS into the client's
+single decoder = desync garbage on Windows/xfreerdp clients.
+
+Ground truth (vm/GROUND_TRUTH_win2022_avc444.md, measured 2026-07-27):
+the real Win2022 wire is ONE chain (all frames nri=3 reference Ps,
+continuous frame_num, max_num_ref_frames=3) yet REFERENCE-PARTITIONED:
+decoding gfxwin_anim with all 9 aux AUs dropped leaves 348/348 main
+frames bit-identical to the full interleaved decode. Single chain does
+not imply cross-view prediction.
+
+**Binding constraint (owner, 2026-07-27): the reference discipline
+must be fixed BY ITSELF — main frames never reference aux frames —
+with NO restriction on how many aux frames are produced or when.
+Aux-cadence changes (Lever 2 / FR-PROC-7) are IRRELEVANT as a
+correctness mitigation: a fix that only holds under a particular aux
+rate turns a deterministic defect into a load/timing-dependent
+heisenbug.** Acceptance is the ground-truth robustness test on OUR
+wire at full 1:1 main/aux alternation: drop all aux AUs (and,
+separately, per-view decode) → main frames bit-identical to the
+interleaved decode.

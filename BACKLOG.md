@@ -2035,3 +2035,12 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   dropped and per-view; main frames must be bit-identical to the
   interleaved decode (same test that passes on gfxwin_anim), run as
   an offline corpus check before any Mac onscreen validation.
+- OWNER DIRECTIVE (2026-07-27, binding): the reference discipline MUST
+  be fixed by itself — main never references aux — with NO restriction
+  on how many aux frames are produced or when. Aux-cadence measures
+  (Lever 2 / FR-PROC-7) are IRRELEVANT as a correctness mitigation:
+  candidate (b) in the TODO above is struck as a correctness lever
+  (it remains a perf item only). A fix that only holds under a
+  particular aux rate converts a deterministic defect into a
+  load/timing-dependent heisenbug. Acceptance stays: drop-all-aux and
+  per-view decodes bit-identical at full 1:1 alternation.
