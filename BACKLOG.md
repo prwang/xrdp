@@ -1902,3 +1902,18 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   astyle clean. Purpose: falsify the VT-output-pacing explanation of
   the MEASURED k=1 aux lag; deploying to the T4 for the owner probe
   re-read.
+- strip_pic_struct DEPLOYED to T4 (2026-07-27): deb pair
+  57a27245b362 + xorgxrdp 251bc4d one transaction (both ii), conffile
+  protocol: dpkg silently replaced cert.pem/key.pem AGAIN — and
+  comparison against the 19:08 backup shows that install had replaced
+  them too and the miss went uncaught (earlier check was inconclusive;
+  protocol slip recorded). Restored from the immediate pre-install
+  snapshot (the pair the owner's Mac used all evening). Live wire
+  re-verified: profile 100, hrd 0, SEI 0, dpb 1, pic_struct_present_flag
+  now 0 on the real nvenc stream. Smoke gate first run FAILED red
+  (login failure) — root cause a STALE keytest ssh tunnel holding
+  127.0.0.1:33890 from the previous smoke run, keytest's own tunnel
+  could not bind; killed by PID, rerun: SMOKE PASS 8/8 both sizes,
+  edge 1.000, 0 encoder errors. AWAITING owner Mac probe re-read
+  (k=0 and no residue => pic_struct convicted; k=1 persists =>
+  exonerated, next axes aspect/timing-units/MMCO).
