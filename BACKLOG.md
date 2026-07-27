@@ -1946,3 +1946,21 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   validated capture run recorded here + fail-loud runtime contract.
   Purpose: arm-l = arm-i's Mac-clean VAAPI CQP config + this knob =
   single-delta reference-marking arm on 127.0.0.1:40011.
+- arm-K :40010 live (xrdp 8b8d17c2636a + 251bc4d, CQP 444 +
+  fault_aux_delay=true, WARNING-logged). Key datapoint already: the
+  deliberate one-frame chroma slip is INVISIBLE through xfreerdp
+  (screenshots clean at connect burst and on menu damage) — matching
+  the pattern where the T4 wire renders fine on xfreerdp/UWP but wrong
+  on the Mac. A pairing slip is only visible to strict reconstructors;
+  Mac connect to :40010 decides whether its visual signature matches
+  the T4 (wedge + discolor at connect).
+- k3s snapshotter native -> fuse-overlayfs (owner directive 2026-07-27,
+  "20 minutes on new arm deployment must be resolved"): native
+  full-copied the ~100k-file rootfs at first container create per
+  image; fuse-overlayfs (userspace, avoids the kernel-overlayfs sgid
+  bug) unpacks layers once and mounts overlays. Gates after the
+  switch: real RDP PAM login OK (sgid unix_chkpwd regression absent),
+  timed pod re-create 8s (was minutes; new-image first create = one
+  layer unpack, a few minutes worst case). Fleet re-created 12/12.
+  Config comment updated in /etc/rancher/k3s/config.yaml with the
+  rollback tell (PAM login failures -> suspect snapshotter first).

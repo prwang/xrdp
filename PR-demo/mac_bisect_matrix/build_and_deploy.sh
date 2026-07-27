@@ -84,10 +84,12 @@ for arm in $ARMS; do
         --build-arg XORGXRDP_DEB="$xorg_deb" \
         --build-arg INSTALL_XFCE="$xfce" \
         -t "localhost/xrdp-bisect:$tag" -f "$D/Containerfile" "$BUILD"
-    # k3s runs pods with the native snapshotter (see /etc/rancher/k3s/
-    # config.yaml); ctr import can't target it in this containerd build,
-    # so the first container create unpacks the image natively — that
-    # full-copy is why kubelet needs runtime-request-timeout=15m
+    # k3s runs pods with the fuse-overlayfs snapshotter (see
+    # /etc/rancher/k3s/config.yaml; switched from native 2026-07-27 —
+    # native full-copied the rootfs per image at first create, ~20 min
+    # per new arm). New images still unpack layers once at first create
+    # (minutes, kubelet runtime-request-timeout=15m covers it); every
+    # later pod create is an overlay mount (seconds)
     podman save "localhost/xrdp-bisect:$tag" \
         | k3s ctr images import - >/dev/null
     echo "image xrdp-bisect:$tag built + imported"
