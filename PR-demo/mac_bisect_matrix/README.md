@@ -15,10 +15,19 @@ the host is never touched by this rig.
 | B | 127.0.0.1:40001 | 52099149 | CBR 20M + `-sei +timing` | control-black (M1 repro: HRD VUI + BP/PT SEI) |
 | C | 127.0.0.1:40002 | e96e655416dc | CBR 20M + `-sei +timing` + `strip_sei` | SEI NALs removed post-encode, HRD VUI stays |
 | D | 127.0.0.1:40003 | 52099149 | CBR 20M | rate control without the SEI flag |
+| E | 127.0.0.1:40004 | c693eeab5ec2 | CBR 20M + `strip_sei` + `sanitize_hrd` | fix candidate: SPS rewritten to drop nal_hrd |
 
-Verdict table: C renders ⇒ SEI NALs convicted (strip_sei is the nvenc fix
-candidate). C black ⇒ HRD VUI in the SPS convicted. D's meaning is fixed by
-byte-verification of what Mesa actually emits under plain CBR.
+2026-07-27 owner verdict on A–D: A renders, B/C/D black. arm-c (zero SEI
+NALs, HRD VUI kept) black => nal_hrd_parameters in the SPS VUI convicted;
+timing_info exonerated (present in A). arm-d shows Mesa emits HRD + SEI
+from CBR alone. arm-e carries the fix candidate: xrdp_h264_sanitize_hrd()
+rewrites every SPS post-encode (golden unit test: captured arm-c SPS
+rewrites to captured arm-a SPS byte-for-byte).
+
+Original A–D verdict table (resolved 2026-07-27, kept for the record):
+C renders ⇒ SEI NALs convicted. C black ⇒ HRD VUI in the SPS convicted
+(what happened). Now: E renders ⇒ sanitize_hrd+strip_sei is the proven
+macOS fix, portable to T4/nvenc. E black ⇒ conviction wrong, re-open.
 
 Every arm's session is the same full-screen banner (arm name + colour field
 stepping 1/s), so a frozen/black screen is a pipeline failure by

@@ -26,9 +26,10 @@ if ! DISPLAY=$CLI xdotool getdisplaygeometry >/dev/null 2>&1; then
     sleep 2
 fi
 
-declare -A PORT=( [arm-a]=40000 [arm-b]=40001 [arm-c]=40002 [arm-d]=40003 )
+declare -A PORT=( [arm-a]=40000 [arm-b]=40001 [arm-c]=40002 [arm-d]=40003
+                  [arm-e]=40004 )
 fail=0
-for arm in arm-a arm-b arm-c arm-d; do
+for arm in arm-a arm-b arm-c arm-d arm-e; do
     port=${PORT[$arm]}
     echo "=== $arm (127.0.0.1:$port) ==="
     pkill -9 -x xfreerdp 2>/dev/null; sleep 1
