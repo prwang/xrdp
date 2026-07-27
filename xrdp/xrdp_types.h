@@ -442,6 +442,7 @@ struct xrdp_mm
     int avc444_dump_extra; /* static gfx.toml policy, probe-verified      */
     int avc444_strip_sei;  /* strip BP/PT SEI NALs (macOS interop)        */
     int avc444_sanitize_hrd; /* drop SPS VUI HRD (macOS interop)          */
+    int avc444_strip_pic_struct; /* clear VUI pic_struct flag (macOS)     */
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip          */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;

@@ -270,6 +270,9 @@ skip_hrd_parameters(struct sps_bits *b)
 /* returns 0 and sets [*hrd_start, *hrd_end) = bit range spanning          */
 /* nal_hrd flag .. low_delay_hrd_flag inclusive, with *have_hrd = 1, when  */
 /* either hrd flag is set; *have_hrd = 0 when the SPS carries no HRD.      */
+/* when the SPS has no VUI at all, *hrd_start / *hrd_end stay -1.          */
+/* pic_struct_present_flag is always the bit AT *hrd_end (first VUI bit    */
+/* after the HRD region, present or not).                                  */
 /* returns non-zero on any parse failure.                                  */
 static int
 sps_locate_hrd(const unsigned char *rbsp, int nbits,
@@ -289,6 +292,8 @@ sps_locate_hrd(const unsigned char *rbsp, int nbits,
     b.pos = 0;
     b.err = 0;
     *have_hrd = 0;
+    *hrd_start = -1;
+    *hrd_end = -1;
 
     profile_idc = bits_u(&b, 8);
     bits_u(&b, 16);          /* constraint flags + level_idc */
@@ -436,12 +441,13 @@ put_bit(unsigned char *out, int *pos, int cap_bits, int bit, int *err)
 }
 
 /*****************************************************************************/
-/* rewrite one SPS NAL (header byte + escaped payload) without HRD.        */
-/* returns the new NAL length, 0 if the SPS has no HRD (out untouched),    */
-/* or -1 on failure. out must hold at least nal_len bytes.                 */
+/* rewrite one SPS NAL (header byte + escaped payload): drop the VUI HRD   */
+/* (strip_hrd) and/or clear pic_struct_present_flag (strip_ps).            */
+/* returns the new NAL length, 0 if nothing needed changing (out           */
+/* untouched), or -1 on failure. out must hold at least nal_len bytes.     */
 static int
 sps_rewrite_nal(const unsigned char *nal, int nal_len,
-                unsigned char *out)
+                unsigned char *out, int strip_hrd, int strip_ps)
 {
     unsigned char rbsp[SPS_RBSP_MAX];
     unsigned char newr[SPS_RBSP_MAX];
@@ -452,6 +458,8 @@ sps_rewrite_nal(const unsigned char *nal, int nal_len,
     int hrd_start;
     int hrd_end;
     int have_hrd;
+    int need_hrd;
+    int need_ps;
     int last_one;
     int opos;
     int oerr;
@@ -480,7 +488,14 @@ sps_rewrite_nal(const unsigned char *nal, int nal_len,
     {
         return -1;
     }
-    if (!have_hrd)
+    if (hrd_end < 0 || hrd_end >= nbits)
+    {
+        return 0;            /* no VUI -> neither HRD nor pic_struct */
+    }
+    need_hrd = strip_hrd && have_hrd;
+    need_ps = strip_ps &&
+              ((rbsp[hrd_end >> 3] >> (7 - (hrd_end & 7))) & 1);
+    if (!need_hrd && !need_ps)
     {
         return 0;
     }
@@ -507,9 +522,23 @@ sps_rewrite_nal(const unsigned char *nal, int nal_len,
         bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
         put_bit(newr, &opos, SPS_RBSP_MAX * 8, bit, &oerr);
     }
-    put_bit(newr, &opos, SPS_RBSP_MAX * 8, 0, &oerr); /* nal_hrd = 0 */
-    put_bit(newr, &opos, SPS_RBSP_MAX * 8, 0, &oerr); /* vcl_hrd = 0 */
-    for (i = hrd_end; i <= last_one && !oerr; i++)
+    if (need_hrd)
+    {
+        put_bit(newr, &opos, SPS_RBSP_MAX * 8, 0, &oerr); /* nal_hrd = 0 */
+        put_bit(newr, &opos, SPS_RBSP_MAX * 8, 0, &oerr); /* vcl_hrd = 0 */
+    }
+    else
+    {
+        for (i = hrd_start; i < hrd_end && !oerr; i++)
+        {
+            bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
+            put_bit(newr, &opos, SPS_RBSP_MAX * 8, bit, &oerr);
+        }
+    }
+    /* pic_struct_present_flag is the bit at hrd_end */
+    bit = need_ps ? 0 : ((rbsp[hrd_end >> 3] >> (7 - (hrd_end & 7))) & 1);
+    put_bit(newr, &opos, SPS_RBSP_MAX * 8, bit, &oerr);
+    for (i = hrd_end + 1; i <= last_one && !oerr; i++)
     {
         bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
         put_bit(newr, &opos, SPS_RBSP_MAX * 8, bit, &oerr);
@@ -545,8 +574,10 @@ sps_rewrite_nal(const unsigned char *nal, int nal_len,
 }
 
 /*****************************************************************************/
-int
-xrdp_h264_sanitize_hrd(unsigned char *data, int *len)
+/* walk every SPS NAL in the access unit and apply the requested VUI
+ * rewrites (drop HRD / clear pic_struct_present_flag) */
+static int
+sanitize_walk(unsigned char *data, int *len, int strip_hrd, int strip_ps)
 {
     unsigned char out[SPS_RBSP_MAX];
     int pos;
@@ -585,7 +616,8 @@ xrdp_h264_sanitize_hrd(unsigned char *data, int *len)
         nal_len = nal_end - pos;
         if ((data[pos] & 0x1f) == 7)
         {
-            new_len = sps_rewrite_nal(data + pos, nal_len, out);
+            new_len = sps_rewrite_nal(data + pos, nal_len, out,
+                                      strip_hrd, strip_ps);
             if (new_len < 0)
             {
                 return 1;
@@ -613,4 +645,18 @@ xrdp_h264_sanitize_hrd(unsigned char *data, int *len)
         pos = next_start;
     }
     return 0;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_sanitize_hrd(unsigned char *data, int *len)
+{
+    return sanitize_walk(data, len, 1, 0);
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_strip_pic_struct(unsigned char *data, int *len)
+{
+    return sanitize_walk(data, len, 0, 1);
 }

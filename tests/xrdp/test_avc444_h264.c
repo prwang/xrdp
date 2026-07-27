@@ -136,6 +136,82 @@ static const unsigned char sps_arm_c[] =
     0xcb, 0xdc, 0xe0, 0x1e, 0x11, 0x08, 0xd4
 };
 
+/* Real nvenc SPS captured from the T4 (2026-07-27, h264_nvenc profile
+ * high, refs=1/dpb_size=1, post sanitize_hrd): Main-profile-free VUI
+ * with pic_struct_present_flag = 1 and no HRD. Clearing pic_struct is a
+ * one-bit in-place change (byte 22: 0x13 -> 0x11); every other field must stay bit-exact (ffmpeg trace_headers
+ * verified). */
+static const unsigned char sps_nvenc_ps1[] =
+{
+    0x67, 0x4d, 0x40, 0x33, 0x95, 0xa0, 0x19, 0x01,
+    0xce, 0xc0, 0x5b, 0x80, 0x80, 0x80, 0xa0, 0x00,
+    0x00, 0x7d, 0x00, 0x00, 0x75, 0x30, 0x13, 0xe3,
+    0x85, 0x54
+};
+static const unsigned char sps_nvenc_ps0[] =
+{
+    0x67, 0x4d, 0x40, 0x33, 0x95, 0xa0, 0x19, 0x01,
+    0xce, 0xc0, 0x5b, 0x80, 0x80, 0x80, 0xa0, 0x00,
+    0x00, 0x7d, 0x00, 0x00, 0x75, 0x30, 0x11, 0xe3,
+    0x85, 0x54
+};
+
+START_TEST(test_h264_strip_pic_struct_clears_flag)
+{
+    unsigned char au[4 + sizeof(sps_nvenc_ps1)];
+    unsigned char want[4 + sizeof(sps_nvenc_ps0)];
+    int len;
+
+    memset(au, 0, sizeof(au));
+    au[3] = 1;
+    memcpy(au + 4, sps_nvenc_ps1, sizeof(sps_nvenc_ps1));
+    memset(want, 0, sizeof(want));
+    want[3] = 1;
+    memcpy(want + 4, sps_nvenc_ps0, sizeof(sps_nvenc_ps0));
+    len = sizeof(au);
+    ck_assert_int_eq(xrdp_h264_strip_pic_struct(au, &len), 0);
+    ck_assert_int_eq(len, (int)sizeof(want));
+    ck_assert_mem_eq(au, want, sizeof(want));
+    /* idempotent: a second pass changes nothing */
+    ck_assert_int_eq(xrdp_h264_strip_pic_struct(au, &len), 0);
+    ck_assert_int_eq(len, (int)sizeof(want));
+    ck_assert_mem_eq(au, want, sizeof(want));
+}
+END_TEST
+
+START_TEST(test_h264_strip_pic_struct_zero_flag_untouched)
+{
+    /* the VAAPI arm-A SPS declares pic_struct = 0 already: must pass
+     * through byte-identical (and sanitize_hrd's golden output shape
+     * stays valid input for the pic_struct pass) */
+    unsigned char au[4 + sizeof(sps_arm_a)];
+    unsigned char want[4 + sizeof(sps_arm_a)];
+    int len;
+
+    memset(au, 0, sizeof(au));
+    au[3] = 1;
+    memcpy(au + 4, sps_arm_a, sizeof(sps_arm_a));
+    memcpy(want, au, sizeof(au));
+    len = sizeof(au);
+    ck_assert_int_eq(xrdp_h264_strip_pic_struct(au, &len), 0);
+    ck_assert_int_eq(len, (int)sizeof(want));
+    ck_assert_mem_eq(au, want, sizeof(want));
+}
+END_TEST
+
+START_TEST(test_h264_strip_pic_struct_truncated_sps_fails)
+{
+    unsigned char au[4 + 8];
+    int len;
+
+    memset(au, 0, sizeof(au));
+    au[3] = 1;
+    memcpy(au + 4, sps_nvenc_ps1, 8); /* cut mid-SPS */
+    len = sizeof(au);
+    ck_assert_int_ne(xrdp_h264_strip_pic_struct(au, &len), 0);
+}
+END_TEST
+
 START_TEST(test_h264_sanitize_hrd_rewrites_to_golden)
 {
     /* AU: [SPS-with-HRD][PPS][IDR] -> sanitize -> the SPS must become the
@@ -252,6 +328,9 @@ make_suite_avc444_h264(void)
     tcase_add_test(tc, test_h264_sanitize_hrd_no_hrd_untouched);
     tcase_add_test(tc, test_h264_sanitize_hrd_idempotent);
     tcase_add_test(tc, test_h264_sanitize_hrd_truncated_sps_fails);
+    tcase_add_test(tc, test_h264_strip_pic_struct_clears_flag);
+    tcase_add_test(tc, test_h264_strip_pic_struct_zero_flag_untouched);
+    tcase_add_test(tc, test_h264_strip_pic_struct_truncated_sps_fails);
     suite_add_tcase(s, tc);
     return s;
 }
