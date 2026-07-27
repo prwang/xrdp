@@ -1659,3 +1659,29 @@ instance. New rig (CLAUDE.md "Bisect/diagnosis sessions" + task #42):
   Verdict rule: C renders => SEI NALs convicted (strip_sei = nvenc fix
   candidate); C black => HRD VUI in SPS convicted; D pins whether plain
   CBR drags in HRD VUI (byte-verify decides).
+
+### 2026-07-27: matrix verdict — HRD VUI in the SPS convicted
+
+Owner tested all four arms in one sitting (Mac, Windows App):
+40000/arm-a RENDERS; 40001/arm-b, 40002/arm-c, 40003/arm-d all BLACK.
+- arm-c black with SEI NALs 0/12 (byte-verified) => per-frame BP/PT SEI
+  NALs EXONERATED as the trigger; the poison is in the SPS itself.
+- Field-level SPS diff arm-a(good) vs arm-c(black): the ONLY difference
+  is nal_hrd_parameters_present_flag=1 + nal_hrd_parameters() structure
+  + low_delay_hrd_flag. timing_info_present=1 in BOTH (exonerated);
+  profile/level/bitstream_restriction identical.
+- arm-d finding: Mesa emits HRD VUI + per-frame SEI from CBR alone
+  ("-sei +timing" redundant) — D was a second control-black.
+- CONVICTED: nal_hrd_parameters in the SPS VUI kills the Windows App's
+  in-RDP VideoToolbox path (QuickTime plays the same bytes fine).
+- Fix candidate (encoder-agnostic => covers T4 nvenc): post-encode SPS
+  rewrite clearing nal_hrd (+ strip SEI NALs, which reference HRD).
+  NEXT: sanitize_hrd knob on the diag branch, unit-tested against the
+  captured arm-a/arm-c SPS bytes, deployed as matrix arm-e :40004.
+- arm-e (:40004) added, xrdp-dev c693eeab5ec2 (diag branch): CBR poison
+  input + strip_sei + NEW sanitize_hrd knob — xrdp_h264_sanitize_hrd()
+  bit-exact SPS splice dropping nal_hrd/vcl_hrd + low_delay_hrd_flag,
+  EPB-safe, fail-loud, applied in pop_pair/pop_single (encoder-agnostic
+  => same knob is the T4/nvenc fix path). 4 new unit tests incl. golden:
+  captured arm-c SPS must rewrite to captured arm-a SPS byte-for-byte
+  (87/87 pass). AWAITING: byte-verify arm-e on the wire, owner Mac test.
