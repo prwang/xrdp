@@ -195,6 +195,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     xrdp_ffmpeg_avc444_default_encoder_args(&cfg->encoder_args);
     cfg->chroma_align = 32;   /* default: match mstsc's 32-aligned U|V split */
     cfg->strip_sei = 0;
+    cfg->sanitize_hrd = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
                                * [avc444_ffmpeg] dump_extra); verified --
                                * never changed -- by the probe
@@ -867,6 +868,17 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
     self->aux_len = a->len;
     self->pk_head += 2;
 
+    if (self->cfg.sanitize_hrd)
+    {
+        if (xrdp_h264_sanitize_hrd(self->main_buf, &self->main_len) != 0 ||
+                xrdp_h264_sanitize_hrd(self->aux_buf, &self->aux_len) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: sanitize_hrd could not "
+                "rewrite an SPS; refusing to ship the packet");
+            return 1;
+        }
+    }
+
     if (self->pairs_returned == 0)
     {
         struct xrdp_h264_nal_summary sum;
@@ -931,6 +943,14 @@ pop_single(struct xrdp_ffmpeg_avc444 *self,
     self->main_len = m->len;
     self->main_key = m->keyframe;
     self->pk_head += 1;
+
+    if (self->cfg.sanitize_hrd &&
+            xrdp_h264_sanitize_hrd(self->main_buf, &self->main_len) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: sanitize_hrd could not "
+            "rewrite an SPS; refusing to ship the packet");
+        return 1;
+    }
 
     if (self->pairs_returned == 0)
     {

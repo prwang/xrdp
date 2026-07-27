@@ -2,6 +2,8 @@
 #include "config_ac.h"
 #endif
 
+#include <string.h>
+
 #include "xrdp_h264_annexb.h"
 #include "test_xrdp.h"
 
@@ -111,6 +113,127 @@ START_TEST(test_h264_malformed)
 }
 END_TEST
 
+
+/* Real SPS NALs captured from the 2026-07-27 bisect matrix (Mesa VAAPI,
+ * High 4.2, 1280x720). ARM_A: CQP baseline, no HRD -- renders on the
+ * macOS Windows App. ARM_C: CBR, nal_hrd_parameters present -- black on
+ * the Mac even with every SEI NAL stripped. Field-level diff of the two
+ * is EXACTLY the HRD region, so sanitizing ARM_C must yield ARM_A
+ * byte-for-byte. Both carry a 00 00 03 emulation-prevention byte. */
+static const unsigned char sps_arm_a[] =
+{
+    0x67, 0x64, 0x0c, 0x2a, 0xac, 0x2b, 0x40, 0x28,
+    0x02, 0xdd, 0x37, 0x01, 0x01, 0x01, 0x40, 0x00,
+    0x00, 0x03, 0x00, 0x40, 0x00, 0x00, 0x3c, 0x23,
+    0xc2, 0x21, 0x1a, 0x80
+};
+static const unsigned char sps_arm_c[] =
+{
+    0x67, 0x64, 0x0c, 0x2a, 0xac, 0x2b, 0x40, 0x28,
+    0x02, 0xdd, 0x37, 0x01, 0x01, 0x01, 0x40, 0x00,
+    0x00, 0x03, 0x00, 0x40, 0x00, 0x00, 0x3c, 0x39,
+    0xa8, 0x00, 0x09, 0x89, 0x60, 0x00, 0x13, 0x12,
+    0xcb, 0xdc, 0xe0, 0x1e, 0x11, 0x08, 0xd4
+};
+
+START_TEST(test_h264_sanitize_hrd_rewrites_to_golden)
+{
+    /* AU: [SPS-with-HRD][PPS][IDR] -> sanitize -> the SPS must become the
+     * captured no-HRD SPS bit-exactly and the tail must stay intact */
+    unsigned char au[4 + sizeof(sps_arm_c) + 5 + 7 + 64];
+    unsigned char want[4 + sizeof(sps_arm_a) + 5 + 7 + 64];
+    static const unsigned char pps[] = { 0, 0, 1, NAL_PPS, 0xce };
+    static const unsigned char idr[] =
+    { 0, 0, 0, 1, NAL_IDR, 0x88, 0x99 };
+    static const unsigned char sc4[] = { 0, 0, 0, 1 };
+    int len;
+    int want_len;
+
+    len = 0;
+    memcpy(au + len, sc4, 4);
+    len += 4;
+    memcpy(au + len, sps_arm_c, sizeof(sps_arm_c));
+    len += sizeof(sps_arm_c);
+    memcpy(au + len, pps, sizeof(pps));
+    len += sizeof(pps);
+    memcpy(au + len, idr, sizeof(idr));
+    len += sizeof(idr);
+
+    want_len = 0;
+    memcpy(want + want_len, sc4, 4);
+    want_len += 4;
+    memcpy(want + want_len, sps_arm_a, sizeof(sps_arm_a));
+    want_len += sizeof(sps_arm_a);
+    memcpy(want + want_len, pps, sizeof(pps));
+    want_len += sizeof(pps);
+    memcpy(want + want_len, idr, sizeof(idr));
+    want_len += sizeof(idr);
+
+    ck_assert_int_eq(xrdp_h264_sanitize_hrd(au, &len), 0);
+    ck_assert_int_eq(len, want_len);
+    ck_assert_int_eq(memcmp(au, want, len), 0);
+    ck_assert_int_eq(xrdp_h264_main_reset_ok(au, len), 1);
+}
+END_TEST
+
+START_TEST(test_h264_sanitize_hrd_no_hrd_untouched)
+{
+    /* an SPS already without HRD must pass through bit-exactly */
+    unsigned char au[4 + sizeof(sps_arm_a) + 7];
+    unsigned char orig[sizeof(au)];
+    static const unsigned char sc4[] = { 0, 0, 0, 1 };
+    static const unsigned char idr[] =
+    { 0, 0, 0, 1, NAL_IDR, 0x88, 0x99 };
+    int len;
+
+    memcpy(au, sc4, 4);
+    memcpy(au + 4, sps_arm_a, sizeof(sps_arm_a));
+    memcpy(au + 4 + sizeof(sps_arm_a), idr, sizeof(idr));
+    len = sizeof(au);
+    memcpy(orig, au, sizeof(au));
+
+    ck_assert_int_eq(xrdp_h264_sanitize_hrd(au, &len), 0);
+    ck_assert_int_eq(len, (int)sizeof(au));
+    ck_assert_int_eq(memcmp(au, orig, len), 0);
+}
+END_TEST
+
+START_TEST(test_h264_sanitize_hrd_idempotent)
+{
+    /* mid-stream SPS repeats (-g refresh) hit the rewrite again: the
+     * second pass must be a no-op on the already-sanitized bytes */
+    unsigned char au[4 + sizeof(sps_arm_c)];
+    unsigned char once[sizeof(au)];
+    static const unsigned char sc4[] = { 0, 0, 0, 1 };
+    int len;
+    int len_once;
+
+    memcpy(au, sc4, 4);
+    memcpy(au + 4, sps_arm_c, sizeof(sps_arm_c));
+    len = sizeof(au);
+    ck_assert_int_eq(xrdp_h264_sanitize_hrd(au, &len), 0);
+    len_once = len;
+    memcpy(once, au, len);
+    ck_assert_int_eq(xrdp_h264_sanitize_hrd(au, &len), 0);
+    ck_assert_int_eq(len, len_once);
+    ck_assert_int_eq(memcmp(au, once, len), 0);
+}
+END_TEST
+
+START_TEST(test_h264_sanitize_hrd_truncated_sps_fails)
+{
+    /* a truncated SPS with the HRD flag set must fail loudly, never
+     * ship a half-rewritten stream (strict honesty: no silent pass) */
+    unsigned char au[4 + 20];
+    int len;
+
+    memcpy(au, "\x00\x00\x00\x01", 4);
+    memcpy(au + 4, sps_arm_c, 20);
+    len = sizeof(au);
+    ck_assert_int_ne(xrdp_h264_sanitize_hrd(au, &len), 0);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_h264(void)
@@ -125,6 +248,10 @@ make_suite_avc444_h264(void)
     tcase_add_test(tc, test_h264_main_reset_missing_pps);
     tcase_add_test(tc, test_h264_aux_vcl);
     tcase_add_test(tc, test_h264_malformed);
+    tcase_add_test(tc, test_h264_sanitize_hrd_rewrites_to_golden);
+    tcase_add_test(tc, test_h264_sanitize_hrd_no_hrd_untouched);
+    tcase_add_test(tc, test_h264_sanitize_hrd_idempotent);
+    tcase_add_test(tc, test_h264_sanitize_hrd_truncated_sps_fails);
     suite_add_tcase(s, tc);
     return s;
 }
