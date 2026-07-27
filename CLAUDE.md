@@ -114,6 +114,17 @@ Concretely:
 - **Report state changes that alter what a test means.** If the environment
   or config differs from what the owner believes is deployed, say so first,
   in plain words, before any green result is claimed.
+- **Never diagnose the real component through a stand-in (2026-07-27).**
+  During the T4/nvenc AVC444 wrong-color bisect, a local "VAAPI configured
+  to look like nvenc" arm (arm-H) was treated as a source of wire-level
+  evidence about the real nvenc path. A substitute encoder's bitstream is
+  evidence about the substitute only: it may generate hypotheses cheaply,
+  but convicting or exonerating the real component requires bytes captured
+  from the real hardware/path. If the real rig is unavailable, the correct
+  report is "blocked on real capture" — do not promote stand-in results to
+  verdicts, and never let stand-in captures substitute for the real
+  component's forensics (which must be archived durably under `/work`,
+  never only in `/tmp`).
 - **Severe violation example (2026-07-17), do not repeat.** While validating
   the AVC444 synchronous-encode fix, the GPU VAAPI path started failing and
   the live rig was switched to software libx264 to obtain a passing smoke

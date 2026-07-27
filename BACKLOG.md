@@ -1762,3 +1762,51 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   corrupt any SPS shape in scope. Hypothesis A (decoder-side main/aux
   pairing slip) is now the lead: arm-K next = deliberate one-frame aux
   delay fault injection for visual signature comparison vs the T4.
+- arm-K verdict (owner, 2026-07-27): "40010 didn't wedge, reject" — a
+  steady one-frame aux/main slip does NOT reproduce the T4 signature
+  (and is visually invisible on xfreerdp): hypothesis A in its simple
+  form rejected.
+- HONESTY-RULE VIOLATION recorded (owner, 2026-07-27): arm-H ("VAAPI
+  pretending to be nvenc") was used as a source of wire-level claims
+  about the real nvenc path, and the actual T4 captures were left in
+  /tmp and lost to a container restart. Both are now codified in
+  CLAUDE.md ("Never diagnose the real component through a stand-in";
+  captures archived durably under /work). Corrective action: T4
+  relaunched by owner (52.205.130.199), REAL nvenc wire recaptured.
+- T4 re-bring-up (2026-07-27, restored AMI at 52.205.130.199): found
+  mid-teardown state — xrdp/sesman running from DELETED inodes of old
+  c74a09e7d000, all xrdp packages `rc`, no /root/.ubuntu_cred, gfx.toml
+  pointing at a (benign, argv-logging) /usr/local/bin/xrdp-ffmpeg-shim.
+  Redeployed bd1ab35b791e + xorgxrdp 251bc4d in ONE apt transaction
+  (both verified `ii`), conffile snapshot /root/xrdp-conf-backup-*,
+  path restored to /usr/bin/ffmpeg, knobs = nvenc constqp qp20 +
+  dump_extra + strip_sei + sanitize_hrd + avc_mode 444, ubuntu cred
+  regenerated on-box into root-owned /root/.ubuntu_cred (never
+  printed), stale-session check clean (sesman loaded 0 sessions),
+  xdotool reinstalled (missing on this AMI; smoke harness dependency).
+  Deb pair identical to the already-benched bd1ab35b791e build — the
+  recorded pack-bench numbers stand (no rebuild).
+- REAL nvenc wire facts (2026-07-27, captures archived in
+  PR-demo/mac_bisect_matrix/captures/): at identical 3840x2400,
+  full-SPS field diff real-nvenc vs Mac-clean arm-I (VAAPI CQP):
+  level_idc = 51 on BOTH (earlier "level 5.2" claim was WRONG);
+  max_num_reorder_frames = 0 on BOTH (reorder exonerated);
+  nal_hrd = vcl_hrd = 0, SEI = 0 main+aux, aux carries no SPS
+  (sanitize+strip verified on the real path). The REAL declaration
+  deltas: profile_idc 77 vs 100, max_num_ref_frames 3 vs 1,
+  max_dec_frame_buffering 3 vs 1, pic_struct_present_flag 1 vs 0
+  (+ cosmetic aspect/timing-units/mv-range). Lead hypothesis now
+  GROUNDED: dpb=3 permits a conformant decoder (VideoToolbox) to hold
+  frames before output; delayed output breaks client-side main/aux
+  chroma pairing => wrong color. Clean arms all declare dpb=1.
+- FIX-CANDIDATE ARM deployed on the T4 (config-only, real encoder):
+  encoder_args += "-refs 1 -dpb_size 1" (-refs alone only reached
+  refs/dpb=2). Recaptured wire: refs=1, dpb=1 — buffering declarations
+  now byte-equal to the clean arms; full-SPS diff vs the refs3 capture
+  shows ONLY those two fields moved (single-axis test; profile 77 and
+  pic_struct 1 still differ and remain suspects if the Mac still shows
+  wrong color). Stream decode-verified. gfx.toml backups:
+  .pre_capture_redeploy, .pre_refs1. SMOKE PASS 8/8 keys at 1920x1080
+  AND 1024x768, edge fidelity 1.000, 0 encoder errors. AWAITING owner
+  Mac test on the T4 (expected: wrong-color-at-connect gone if the DPB
+  axis is the cause).
