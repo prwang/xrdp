@@ -441,6 +441,7 @@ struct xrdp_mm
     int avc444_v2;     /* client supports AVC444 v2 (ChromaV2, 0x000F)   */
     int avc444_dump_extra; /* static gfx.toml policy, probe-verified      */
     int avc444_strip_sei;  /* strip BP/PT SEI NALs (macOS interop)        */
+    int avc444_sanitize_hrd; /* drop SPS VUI HRD (macOS interop)          */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.

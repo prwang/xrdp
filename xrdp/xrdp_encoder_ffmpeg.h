@@ -73,6 +73,10 @@ struct xrdp_ffmpeg_avc444_config
     struct xrdp_avc444_encoder_args encoder_args; /* verbatim -c:v + tuning */
     int chroma_align;               /* coded WIDTH alignment 16 or 32; must  */
     /* match the converter's width_align     */
+    int sanitize_hrd;               /* rewrite SPS NALs to drop VUI HRD     */
+    /* (xrdp_h264_sanitize_hrd); the 2026-  */
+    /* 07-27 matrix convicted SPS HRD alone */
+    /* of blacking the macOS Windows App    */
     int strip_sei;                  /* chain filter_units to remove         */
     /* buffering_period(0)/pic_timing(1)     */
     /* SEI NALs (macOS Windows App interop)  */

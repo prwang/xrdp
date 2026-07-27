@@ -63,4 +63,18 @@ xrdp_h264_main_reset_ok(const unsigned char *data, int len);
 int
 xrdp_h264_aux_ok(const unsigned char *data, int len);
 
+/**
+ * macOS interop (BACKLOG 2026-07-27): remove HRD parameters from every
+ * SPS in an Annex-B access unit, in place. Clears
+ * nal_hrd_parameters_present_flag and vcl_hrd_parameters_present_flag,
+ * drops their hrd_parameters() structures and low_delay_hrd_flag, and
+ * preserves every other SPS field bit-exactly (the stream can only
+ * shrink; *len is updated). SPS NALs without HRD pass through untouched.
+ * Returns 0 on success, non-zero on any parse or bounds failure — the
+ * caller must treat that as a validation failure and never ship a
+ * half-rewritten stream.
+ */
+int
+xrdp_h264_sanitize_hrd(unsigned char *data, int *len);
+
 #endif /* _XRDP_H264_ANNEXB_H */

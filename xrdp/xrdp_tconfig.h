@@ -120,6 +120,11 @@ struct xrdp_tconfig_gfx
      * the 2026-07-26 macOS Windows App bisect: HRD-class bytes black the
      * Mac's RDP H264 path. Default 0 (off). */
     int avc444_ffmpeg_strip_sei;
+    /* DIAGNOSTIC/interop knob: rewrite every SPS to drop
+     * nal_hrd/vcl_hrd parameters from the VUI (xrdp_h264_sanitize_hrd).
+     * 2026-07-27 matrix verdict: HRD in the SPS VUI alone blacks the
+     * macOS Windows App even with all SEI NALs stripped. Default 0. */
+    int avc444_ffmpeg_sanitize_hrd;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =
