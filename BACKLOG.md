@@ -1705,3 +1705,12 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   from the 4B-era numbers (sanitize path touches only SPS-bearing
   packets, not the conversion loops).
 - AWAITING: smoke gate result, then owner Mac test against the T4.
+- 2026-07-27 T4 verdict: Mac RENDERS on nvenc AVC420 + sanitize_hrd =>
+  fix proven on both encoders. Upgraded T4 to avc_mode="444" (one-line
+  gfx.toml change, backup gfx.toml.pre_444_upgrade). Wire byte-verified:
+  AVC444 v2 LC=1/LC=2 interleave, single sanitized SPS (nal_hrd=0), SEI
+  0 anywhere, aux P-frames share the main parameter sets per the
+  single-decoder model — the known-good reframe shape. Smoke gate PASS
+  8/8 keys at 1920x1080 AND 1024x768 with color-edge fidelity 1.000
+  (vs 0.67 under 420) — full 4:4:4 chroma confirmed through the
+  deployed binary+config. AWAITING owner Mac 444 test.
