@@ -135,6 +135,13 @@ struct xrdp_ffmpeg_avc444
     int fault_aux_cap;
     int fault_aux_len;
 
+    /* aux_intra_leaf: second child encoding the aux view all-IDR; its
+     * packets are rewritten into non-reference I leaves so the main
+     * chain never references aux frames (reference partitioning) */
+    struct xrdp_ffmpeg_avc444 *leaf;
+    struct xrdp_h264_param_cache leaf_main_cache;
+    struct xrdp_h264_param_cache leaf_aux_cache;
+
     char errline[512];
     int errline_len;
 
@@ -204,6 +211,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->strip_sei = 0;
     cfg->sanitize_hrd = 0;
     cfg->strip_pic_struct = 0;
+    cfg->aux_intra_leaf = 0;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -1120,6 +1128,52 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
+    if (self->cfg.aux_intra_leaf)
+    {
+        /* reference partitioning: the main child sees ONLY main frames
+         * (its chain self-references), the leaf child encodes the aux
+         * view all-IDR, and the aux packet is rewritten into
+         * non-reference I leaves before shipping. See
+         * PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md. */
+        struct xrdp_avc444_encoded_pair leaf_result;
+
+        st = xrdp_ffmpeg_avc444_encode_single(self, main_nv12, nv12_size,
+                                              desktop_sequence, result);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            return st;
+        }
+        st = xrdp_ffmpeg_avc444_encode_single(self->leaf, aux_nv12,
+                                              nv12_size, desktop_sequence,
+                                              &leaf_result);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            /* the main picture is already consumed; a pair without its
+             * aux would desync -- fail loudly and restart */
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf child did "
+                "not return the aux picture; restarting encoder");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        if (grow(&self->aux_buf, &self->aux_cap,
+                 leaf_result.main_len) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        memcpy(self->aux_buf, leaf_result.main_data, leaf_result.main_len);
+        self->aux_len = leaf_result.main_len;
+        if (xrdp_h264_aux_to_leaf(self->aux_buf, &self->aux_len,
+                                  self->main_buf, self->main_len,
+                                  &self->leaf_main_cache,
+                                  &self->leaf_aux_cache) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf rewrite "
+                "failed; refusing to ship the pair");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        result->aux_data = self->aux_buf;
+        result->aux_len = self->aux_len;
+        return XRDP_FFMPEG_PAIR_READY;
+    }
     /* queue this pair's two pictures for the vmsplice feeder; the
      * pointers are BORROWED (capture shmem) and are fully consumed by
      * the child before this call returns READY (FR-PROC-6) */
@@ -1289,13 +1343,27 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
         }
         self->flushing = 1;
     }
-    if (pk_available(self) < 2)
+    if (pk_available(self) < (self->cfg.aux_intra_leaf ? 1 : 2))
     {
         st = pump(self, now_ms() + self->cfg.pair_timeout_ms, 1);
         if (st == 1)
         {
             return XRDP_FFMPEG_PAIR_ERROR;
         }
+    }
+    if (self->cfg.aux_intra_leaf)
+    {
+        /* the main child holds single pictures in leaf mode; the leaf
+         * child is synchronous per call and never has a tail */
+        if (pk_available(self) >= 1)
+        {
+            if (pop_single(self, result) != 0)
+            {
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
+            return XRDP_FFMPEG_PAIR_READY;
+        }
+        return XRDP_FFMPEG_PAIR_DONE;
     }
     if (pk_available(self) >= 2)
     {
@@ -1359,6 +1427,51 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: spawned ffmpeg pid %d coded %dx%d "
         "generation %llu", self->pid, self->coded_width, self->coded_height,
         (unsigned long long)self->generation);
+    if (cfg->aux_intra_leaf)
+    {
+        /* second child for the aux view: same encoder block, every frame
+         * forced IDR; its packets are rewritten into non-reference I
+         * leaves by encode_pair. Diagnostic/rewrite knobs are cleared --
+         * the leaf rewrite drops the aux SPS/PPS/SEI itself. */
+        struct xrdp_ffmpeg_avc444_config leaf_cfg = *cfg;
+        static const char *const extra[] =
+        {
+            "-forced-idr", "1", "-force_key_frames", "expr:gte(t,0)"
+        };
+        int i;
+
+        leaf_cfg.aux_intra_leaf = 0;
+        leaf_cfg.fault_aux_delay = 0;
+        leaf_cfg.fault_strip_mmco = 0;
+        leaf_cfg.sanitize_hrd = 0;
+        leaf_cfg.strip_pic_struct = 0;
+        leaf_cfg.strip_sei = 0;
+        if (leaf_cfg.encoder_args.count + 4 > XRDP_AVC444_MAX_ENC_ARGS)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: no room to append the "
+                "aux_intra_leaf forced-IDR args");
+            xrdp_ffmpeg_avc444_delete(self);
+            return NULL;
+        }
+        for (i = 0; i < 4; i++)
+        {
+            g_strncpy(leaf_cfg.encoder_args.arg
+                      [leaf_cfg.encoder_args.count + i],
+                      extra[i], XRDP_AVC444_ENC_ARG_LEN - 1);
+        }
+        leaf_cfg.encoder_args.count += 4;
+        self->leaf = xrdp_ffmpeg_avc444_create(&leaf_cfg, actual_width,
+                                               actual_height);
+        if (self->leaf == NULL)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf child "
+                "failed to start");
+            xrdp_ffmpeg_avc444_delete(self);
+            return NULL;
+        }
+        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_intra_leaf active (aux "
+            "child pid %d)", self->leaf->pid);
+    }
     return self;
 }
 
@@ -1411,6 +1524,8 @@ xrdp_ffmpeg_avc444_delete(struct xrdp_ffmpeg_avc444 *self)
     {
         return;
     }
+    xrdp_ffmpeg_avc444_delete(self->leaf);
+    self->leaf = NULL;
     if (self->in_fd >= 0)
     {
         close(self->in_fd);

@@ -725,7 +725,8 @@ cache_sps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
         bits_ue(&b);
         bits_ue(&b);
         bits_u(&b, 1);
-        if (bits_u(&b, 1))
+        c->scaling_present = bits_u(&b, 1);
+        if (c->scaling_present)
         {
             n = (cfi != 3) ? 8 : 12;
             for (i = 0; i < n && !b.err; i++)
@@ -749,6 +750,31 @@ cache_sps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     bits_ue(&b);             /* height */
     c->frame_mbs_only = bits_u(&b, 1);
     c->have_sps = !b.err;
+}
+
+/*****************************************************************************/
+/* bit index just past the last data bit of an RBSP (i.e. the position of  */
+/* the rbsp_stop_one_bit), or -1 if none found                             */
+static int
+rbsp_data_bits(const unsigned char *rbsp, int rlen)
+{
+    int i;
+    int bit;
+
+    for (i = rlen - 1; i >= 0; i--)
+    {
+        if (rbsp[i] != 0)
+        {
+            for (bit = 7; bit >= 0; bit--)
+            {
+                if ((rbsp[i] >> (7 - bit)) & 1)
+                {
+                    return i * 8 + bit;
+                }
+            }
+        }
+    }
+    return -1;
 }
 
 /*****************************************************************************/
@@ -787,12 +813,31 @@ cache_pps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     bits_ue(&b);                          /* num_ref_idx_l1_default */
     c->weighted_pred = bits_u(&b, 1);
     bits_u(&b, 2);                        /* weighted_bipred_idc */
-    bits_se(&b);                          /* pic_init_qp */
+    c->pic_init_qp = bits_se(&b) + 26;
     bits_se(&b);                          /* pic_init_qs */
-    bits_se(&b);                          /* chroma_qp_offset */
+    c->chroma_qp_offset = bits_se(&b);
     c->deblock_present = bits_u(&b, 1);
     bits_u(&b, 1);                        /* constrained_intra */
     c->redundant_present = bits_u(&b, 1);
+    /* optional High-profile extension (transform_8x8 etc.) */
+    c->transform_8x8 = 0;
+    c->pps_scaling_present = 0;
+    c->second_chroma_qp_offset = c->chroma_qp_offset;
+    if (!b.err && b.pos < rbsp_data_bits(rbsp, rlen))
+    {
+        c->transform_8x8 = bits_u(&b, 1);
+        c->pps_scaling_present = bits_u(&b, 1);
+        if (c->pps_scaling_present)
+        {
+            /* payload interpretation would depend on the lists; the
+             * compat check rejects this shape, no need to parse them */
+            b.err = 1;
+        }
+        else
+        {
+            c->second_chroma_qp_offset = bits_se(&b);
+        }
+    }
     c->have_pps = !b.err;
 }
 
@@ -1094,6 +1139,444 @@ xrdp_h264_strip_mmco(unsigned char *data, int *len,
             break;
         }
         pos = next_start;
+    }
+    free(out);
+    return rv;
+}
+
+/*
+ * AVC444 reference partitioning (BACKLOG 2026-07-27).
+ *
+ * Mechanism proof (PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF
+ * .md): with one encoder context interleaving main/aux, inter MBs
+ * reference the OTHER view; any client that deviates from strict
+ * in-order single-decoder feeding resolves them against same-view
+ * frames instead and the wrong-reference error compounds through the
+ * DPB (the Mac chroma corruption). Ground truth (real Win2022) keeps
+ * ONE chain but never predicts across views. This rewrite reproduces
+ * that contract with two stock-ffmpeg children: the aux child encodes
+ * every frame as IDR, and each aux packet is rewritten into a
+ * non-reference, non-IDR I leaf spliced into the main child's chain.
+ * Leaves never enter the DPB, so the main chain self-references at
+ * ANY aux cadence (owner directive: no cadence-dependent correctness).
+ */
+
+/*****************************************************************************/
+static void
+put_ue(unsigned char *out, int *pos, int cap_bits, unsigned int v, int *err)
+{
+    unsigned int vv;
+    unsigned int t;
+    int n;
+    int i;
+
+    vv = v + 1;
+    n = 0;
+    t = vv;
+    while (t > 1)
+    {
+        t >>= 1;
+        n++;
+    }
+    for (i = 0; i < n; i++)
+    {
+        put_bit(out, pos, cap_bits, 0, err);
+    }
+    for (i = n; i >= 0; i--)
+    {
+        put_bit(out, pos, cap_bits, (vv >> i) & 1, err);
+    }
+}
+
+/*****************************************************************************/
+/* every parse-relevant SPS/PPS field must match between the two encoder   */
+/* children, or the leaf slice bits would be reinterpreted under the main  */
+/* parameter sets; anything outside the shapes our encoders emit fails     */
+static int
+leaf_caches_compatible(const struct xrdp_h264_param_cache *mc,
+                       const struct xrdp_h264_param_cache *ac)
+{
+    return mc->have_sps && mc->have_pps && ac->have_sps && ac->have_pps &&
+           mc->log2_max_frame_num == ac->log2_max_frame_num &&
+           mc->poc_type == 2 && ac->poc_type == 2 &&
+           mc->frame_mbs_only == 1 && ac->frame_mbs_only == 1 &&
+           mc->scaling_present == 0 && ac->scaling_present == 0 &&
+           mc->entropy_cabac == 1 && ac->entropy_cabac == 1 &&
+           mc->slice_groups == 0 && ac->slice_groups == 0 &&
+           mc->deblock_present == ac->deblock_present &&
+           mc->redundant_present == 0 && ac->redundant_present == 0 &&
+           mc->pic_init_qp == ac->pic_init_qp &&
+           mc->chroma_qp_offset == ac->chroma_qp_offset &&
+           mc->second_chroma_qp_offset == ac->second_chroma_qp_offset &&
+           mc->transform_8x8 == ac->transform_8x8 &&
+           mc->pps_scaling_present == 0 && ac->pps_scaling_present == 0;
+}
+
+/*****************************************************************************/
+/* rewrite one IDR slice NAL into a non-reference, non-IDR I leaf slice:   */
+/* nal_ref_idc 0, type 1, idr_pic_id and dec_ref_pic_marking removed,      */
+/* frame_num = new_fn, CABAC payload copied byte-verbatim after re-padding */
+/* the alignment. returns the new NAL length or -1 on failure.             */
+static int
+slice_idr_to_leaf(const unsigned char *nal, int nal_len, unsigned char *out,
+                  int out_cap, const struct xrdp_h264_param_cache *ac,
+                  const struct xrdp_h264_param_cache *mc, int new_fn)
+{
+    unsigned char *rbsp;
+    unsigned char *newr;
+    struct sps_bits b;
+    unsigned int first_mb;
+    unsigned int stype;
+    unsigned int pps_id;
+    int rlen;
+    int zeros;
+    int i;
+    int hdr2_start;
+    int hdr_end;
+    int pay_byte;
+    int opos;
+    int oerr;
+    int olen;
+    int bit;
+    int nbytes;
+
+    if (nal_len < 4)
+    {
+        return -1;
+    }
+    rbsp = (unsigned char *)malloc(nal_len);
+    newr = (unsigned char *)malloc(nal_len + 8);
+    if (rbsp == NULL || newr == NULL)
+    {
+        free(rbsp);
+        free(newr);
+        return -1;
+    }
+    rlen = 0;
+    zeros = 0;
+    for (i = 1; i < nal_len; i++)
+    {
+        if (zeros == 2 && nal[i] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[i] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[i];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    first_mb = bits_ue(&b);
+    stype = bits_ue(&b);
+    pps_id = bits_ue(&b);
+    bits_u(&b, ac->log2_max_frame_num);   /* frame_num (discarded) */
+    if (stype % 5 != 2)
+    {
+        goto unsupported;                 /* IDR must carry I slices */
+    }
+    bits_ue(&b);                          /* idr_pic_id (dropped) */
+    /* poc_type == 2 (enforced by leaf_caches_compatible): no POC fields */
+    bits_u(&b, 2);                        /* IDR dec_ref_pic_marking */
+    hdr2_start = b.pos;
+    bits_se(&b);                          /* slice_qp_delta */
+    if (ac->deblock_present)
+    {
+        if (bits_ue(&b) != 1)             /* disable_deblocking_idc */
+        {
+            bits_se(&b);
+            bits_se(&b);
+        }
+    }
+    hdr_end = b.pos;
+    if (b.err || !ac->entropy_cabac)
+    {
+        goto unsupported;
+    }
+    pay_byte = (hdr_end + 7) / 8;         /* CABAC payload after alignment */
+    if (pay_byte >= rlen)
+    {
+        goto unsupported;
+    }
+    memset(newr, 0, nal_len + 8);
+    opos = 0;
+    oerr = 0;
+    put_ue(newr, &opos, (nal_len + 8) * 8, first_mb, &oerr);
+    put_ue(newr, &opos, (nal_len + 8) * 8, stype, &oerr);
+    put_ue(newr, &opos, (nal_len + 8) * 8, pps_id, &oerr);
+    for (i = mc->log2_max_frame_num - 1; i >= 0 && !oerr; i--)
+    {
+        put_bit(newr, &opos, (nal_len + 8) * 8, (new_fn >> i) & 1, &oerr);
+    }
+    for (i = hdr2_start; i < hdr_end && !oerr; i++)
+    {
+        bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
+        put_bit(newr, &opos, (nal_len + 8) * 8, bit, &oerr);
+    }
+    while ((opos & 7) != 0 && !oerr)      /* cabac_alignment_one_bit */
+    {
+        put_bit(newr, &opos, (nal_len + 8) * 8, 1, &oerr);
+    }
+    nbytes = opos / 8;
+    if (oerr || nbytes + (rlen - pay_byte) > nal_len + 8)
+    {
+        goto unsupported;
+    }
+    memcpy(newr + nbytes, rbsp + pay_byte, rlen - pay_byte);
+    nbytes += rlen - pay_byte;
+    /* re-escape; leaf NAL header: forbidden 0, nal_ref_idc 0, type 1 */
+    out[0] = 0x01;
+    olen = 1;
+    zeros = 0;
+    for (i = 0; i < nbytes; i++)
+    {
+        if (zeros == 2 && newr[i] <= 3)
+        {
+            if (olen >= out_cap)
+            {
+                goto unsupported;
+            }
+            out[olen++] = 3;
+            zeros = 0;
+        }
+        if (olen >= out_cap)
+        {
+            goto unsupported;
+        }
+        zeros = (newr[i] == 0) ? zeros + 1 : 0;
+        out[olen++] = newr[i];
+    }
+    free(rbsp);
+    free(newr);
+    return olen;
+unsupported:
+    free(rbsp);
+    free(newr);
+    return -1;
+}
+
+/*****************************************************************************/
+/* cache SPS/PPS from the main packet and return the frame_num of its last */
+/* reference VCL NAL, or -1 on failure                                     */
+static int
+main_ref_frame_num(const unsigned char *data, int len,
+                   struct xrdp_h264_param_cache *mc)
+{
+    struct sps_bits b;
+    unsigned char rbsp[SPS_RBSP_MAX];
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nal_count;
+    int fn;
+    int rlen;
+    int zeros;
+    int i;
+
+    if (!find_start_code(data, len, 0, &nal_start, &sc_prefix))
+    {
+        return -1;
+    }
+    fn = -1;
+    pos = nal_start;
+    nal_count = 0;
+    while (pos < len && nal_count < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+        int nal_end;
+        int nal_len;
+        int ntype;
+
+        nal_count++;
+        if (find_start_code(data, len, pos + 1, &next_start, &next_prefix))
+        {
+            nal_end = next_start - next_prefix;
+        }
+        else
+        {
+            nal_end = len;
+            next_start = -1;
+        }
+        nal_len = nal_end - pos;
+        ntype = data[pos] & 0x1f;
+        if (ntype == 7)
+        {
+            cache_sps(mc, data + pos, nal_len);
+        }
+        else if (ntype == 8)
+        {
+            cache_pps(mc, data + pos, nal_len);
+        }
+        else if ((ntype == 1 || ntype == 5) && ((data[pos] >> 5) & 3) != 0)
+        {
+            if (!mc->have_sps)
+            {
+                return -1;
+            }
+            rlen = 0;
+            zeros = 0;
+            for (i = pos + 1; i < nal_end && rlen < SPS_RBSP_MAX; i++)
+            {
+                if (zeros == 2 && data[i] == 3)
+                {
+                    zeros = 0;
+                    continue;
+                }
+                zeros = (data[i] == 0) ? zeros + 1 : 0;
+                rbsp[rlen++] = data[i];
+            }
+            b.buf = rbsp;
+            b.nbits = rlen * 8;
+            b.pos = 0;
+            b.err = 0;
+            bits_ue(&b);                  /* first_mb_in_slice */
+            bits_ue(&b);                  /* slice_type */
+            bits_ue(&b);                  /* pps id */
+            i = bits_u(&b, mc->log2_max_frame_num);
+            if (b.err)
+            {
+                return -1;
+            }
+            fn = i;
+        }
+        if (next_start < 0)
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    return fn;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
+                      const unsigned char *main_data, int main_len,
+                      struct xrdp_h264_param_cache *main_cache,
+                      struct xrdp_h264_param_cache *aux_cache)
+{
+    unsigned char *out;
+    int out_len;
+    int main_fn;
+    int leaf_fn;
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nal_count;
+    int leaves;
+    int rv;
+
+    if (aux == NULL || aux_len == NULL || main_data == NULL ||
+            main_cache == NULL || aux_cache == NULL || *aux_len < 4)
+    {
+        return 1;
+    }
+    main_fn = main_ref_frame_num(main_data, main_len, main_cache);
+    if (main_fn < 0)
+    {
+        /* no reference VCL NAL in the main packet */
+        return 1;
+    }
+    if (!find_start_code(aux, *aux_len, 0, &nal_start, &sc_prefix))
+    {
+        return 1;
+    }
+    out = (unsigned char *)malloc(*aux_len + 16);
+    if (out == NULL)
+    {
+        return 1;
+    }
+    rv = 0;
+    out_len = 0;
+    leaves = 0;
+    pos = nal_start;
+    nal_count = 0;
+    while (pos < *aux_len && nal_count < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+        int nal_end;
+        int nal_len;
+        int new_len;
+        int ntype;
+
+        nal_count++;
+        if (find_start_code(aux, *aux_len, pos + 1, &next_start,
+                            &next_prefix))
+        {
+            nal_end = next_start - next_prefix;
+        }
+        else
+        {
+            nal_end = *aux_len;
+            next_start = -1;
+        }
+        nal_len = nal_end - pos;
+        ntype = aux[pos] & 0x1f;
+        if (ntype == 7)
+        {
+            cache_sps(aux_cache, aux + pos, nal_len);
+        }
+        else if (ntype == 8)
+        {
+            cache_pps(aux_cache, aux + pos, nal_len);
+        }
+        else if (ntype == 6 || ntype == 9)
+        {
+            /* SEI / AUD: dropped with the parameter sets */
+        }
+        else if (ntype == 5)
+        {
+            if (!leaf_caches_compatible(main_cache, aux_cache))
+            {
+                /* main/aux SPS-PPS parse fields differ or unsupported */
+                rv = 1;
+                break;
+            }
+            leaf_fn = (main_fn + 1) &
+                      ((1 << main_cache->log2_max_frame_num) - 1);
+            if (out_len + 4 + nal_len + 8 > *aux_len + 16)
+            {
+                rv = 1;
+                break;
+            }
+            out[out_len++] = 0;
+            out[out_len++] = 0;
+            out[out_len++] = 0;
+            out[out_len++] = 1;
+            new_len = slice_idr_to_leaf(aux + pos, nal_len, out + out_len,
+                                        *aux_len + 16 - out_len,
+                                        aux_cache, main_cache, leaf_fn);
+            if (new_len < 0)
+            {
+                rv = 1;
+                break;
+            }
+            out_len += new_len;
+            leaves++;
+        }
+        else
+        {
+            /* unexpected NAL type in the all-IDR aux stream */
+            rv = 1;
+            break;
+        }
+        if (next_start < 0)
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    if (rv == 0 && leaves == 0)
+    {
+        rv = 1;
+    }
+    if (rv == 0)
+    {
+        memcpy(aux, out, out_len);
+        *aux_len = out_len;
     }
     free(out);
     return rv;

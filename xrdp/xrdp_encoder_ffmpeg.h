@@ -77,6 +77,15 @@ struct xrdp_ffmpeg_avc444_config
     /* (one-frame chroma slip, bisect arm-K)*/
     int sanitize_hrd;               /* rewrite SPS NALs to drop VUI HRD     */
     int strip_pic_struct;           /* clear VUI pic_struct_present_flag    */
+    int aux_intra_leaf;             /* AVC444 reference partitioning: the   */
+    /* aux view is encoded by a second child */
+    /* (same encoder_args + forced per-frame */
+    /* IDR) and each aux packet is rewritten */
+    /* into non-reference, non-IDR I leaves  */
+    /* spliced into the main child's chain,  */
+    /* so the main chain self-references at  */
+    /* any aux cadence (cross-view reference */
+    /* fix, CROSS_VIEW_REFERENCE_PROOF.md)   */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */

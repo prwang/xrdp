@@ -249,6 +249,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_strip_sei = mm->avc444_strip_sei;
         self->avc444_sanitize_hrd = mm->avc444_sanitize_hrd;
         self->avc444_strip_pic_struct = mm->avc444_strip_pic_struct;
+        self->avc444_aux_intra_leaf = mm->avc444_aux_intra_leaf;
         self->avc444_fault_aux_delay = mm->avc444_fault_aux_delay;
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
         LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: AVC444 %s",
@@ -1424,6 +1425,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         cfg.strip_sei = self->avc444_strip_sei;
         cfg.sanitize_hrd = self->avc444_sanitize_hrd;
         cfg.strip_pic_struct = self->avc444_strip_pic_struct;
+        cfg.aux_intra_leaf = self->avc444_aux_intra_leaf;
         cfg.fault_aux_delay = self->avc444_fault_aux_delay;
         cfg.fault_strip_mmco = self->avc444_fault_strip_mmco;
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);

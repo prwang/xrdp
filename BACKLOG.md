@@ -2072,3 +2072,24 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   rewrite correctness (CABAC init deltas between slice types 5/7 vs
   2/7 contexts), PPS bit-compat across two encoder invocations.
   NOT implemented; awaiting owner sign-off on the spike.
+- IN PROGRESS: aux_intra_leaf implementation (owner-ordered fix,
+  branch dev/avc444_aux_intra_leaf). Feasibility spike GREEN on real
+  T4 nvenc bytes (offline, aux_leaf_spike.py + ffmpeg framemd5):
+  main child P-chain + aux child all-IDR (-forced-idr 1
+  -force_key_frames expr:gte(t,0), verified to init WITH the shipped
+  -refs 1 -dpb_size 1 args) merged into ONE chain with aux as
+  non-reference non-IDR I leaves -> 30/30 main frames bit-identical
+  to the standalone main decode (leaves DPB-inert), 30/30 leaf frames
+  pixel-identical, zero decoder warnings; non-ref frame_num rule
+  settled empirically = PrevRefFrameNum+1 (fn=PrevRefFrameNum makes
+  ffmpeg fold the pictures). C implementation: xrdp_h264_aux_to_leaf
+  (annexb module; extends param cache with pic_init_qp/transform_8x8/
+  chroma offsets/scaling flags; strict main-vs-aux SPS/PPS compat
+  guard, fail-loud), runner leaf mode (second full runner instance
+  driven via encode_single; main child sees ONLY main frames), knob
+  gfx.toml [avc444_ffmpeg] aux_intra_leaf (default OFF = existing
+  behavior preserved). Unit tests: 4 new (golden vs python-spike
+  output on real libx264 vectors, non-IDR aux rejected, main without
+  ref VCL rejected, truncated aux rejected) -> 95/95 pass. NEXT: deb
+  build, T4 deploy, wire-capture acceptance (drop-aux + per-view
+  bit-identity on the real wire), xfreerdp render check, smoke gate.
