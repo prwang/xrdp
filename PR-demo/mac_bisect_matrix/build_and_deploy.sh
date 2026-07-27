@@ -18,7 +18,7 @@ DIST=${DIST:-/work/dist}
 XORGXRDP_DEB="xorgxrdp-dev_1%3a0.10.80+gitee1ec01eed50_amd64.deb"
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
-    [arm-e]=c693eeab5ec2
+    [arm-e]=c693eeab5ec2 [arm-f]=52099149
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -62,7 +62,7 @@ done
 
 # --- deploy ---
 kubectl apply -f "$D/k8s/namespace.yaml"
-for arm in arm-a arm-b arm-c arm-d arm-e; do
+for arm in arm-a arm-b arm-c arm-d arm-e arm-f; do
     kubectl -n bisect-matrix create configmap "xrdp-gfx-$arm" \
         --from-file=gfx.toml="$D/gfx/$arm.toml" \
         --dry-run=client -o yaml | kubectl apply -f -
