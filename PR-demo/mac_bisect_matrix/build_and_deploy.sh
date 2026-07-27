@@ -42,7 +42,7 @@ declare -A TAG_DEB=(
     [e96e655416dc]="xrdp-dev_0.10.80+gite96e655416dc_amd64.deb"
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
     [bd1ab35b791e]="xrdp-dev_0.10.80+git20260727002823.bd1ab35b791e_amd64.deb"
-    [649b447c9f4d]="xrdp-dev_0.10.80+git649b447c9f4d_amd64.deb"
+    [649b447c9f4d]="xrdp-dev_0.10.80+git20260726151325.649b447c9f4d_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
