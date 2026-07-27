@@ -89,6 +89,28 @@ class Probe:
         self.root.after(50, self.motion_loop)
         self.root.after(50, self.clock_loop)
         self.root.bind('<Escape>', lambda e: self.root.destroy())
+        # survive session resolution changes (Mac reconnect resizes the
+        # session): adapt geometry and repaint instead of dying quietly
+        self.root.bind('<Configure>', self.on_configure)
+
+    def on_configure(self, e):
+        if e.widget is not self.root:
+            return
+        if abs(e.width - self.w) < 8 and abs(e.height - self.h) < 8:
+            return
+        self.w, self.h = e.width, e.height
+        self.c.config(width=self.w, height=self.h)
+        self.full_redraw('RESIZE ADAPT %dx%d' % (self.w, self.h))
+
+    def full_redraw(self, note):
+        self.c.delete('all')
+        self.static_zone()
+        self.legend_bars()
+        self.c.create_text(self.w - 20, self.h - 30, anchor='se',
+                           fill='white',
+                           font=('DejaVu Sans Mono', 18, 'bold'),
+                           text=note)
+        self.tick = -1   # force clock redraw on the next loop pass
 
     # -- rows layout ----------------------------------------------------
     def clock_loop(self):
@@ -100,13 +122,8 @@ class Probe:
             # fault lives in incremental-damage decode, not in a broken
             # base image — and the decoder is still alive.
             if t > 0 and t % 32 == 0:
-                self.c.delete('all')
-                self.static_zone()
-                self.legend_bars()
-                self.c.create_text(
-                    self.w - 20, self.h - 30, anchor='se', fill='white',
-                    font=('DejaVu Sans Mono', 18, 'bold'),
-                    text='FULL REPAINT EPOCH %d' % (t // 32))
+                self.full_redraw('FULL REPAINT EPOCH %d' % (t // 32))
+                self.tick = t
             self.draw_clock('fast', 20, 20, t % 8)
             self.draw_clock('slow', 20, 190, (t // 8) % 8)
         self.root.after(100, self.clock_loop)
