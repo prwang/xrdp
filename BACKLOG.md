@@ -1745,3 +1745,11 @@ Owner tested all four arms in one sitting (Mac, Windows App):
 - arm-i :40008 queued: new pair + G's EXACT CQP config (no CBR/knobs) —
   single-delta vs G = deb pair only. Mac wrong-after-damage on I =>
   code pair convicted outright; UWP sharp on I => H blur was CBR config.
+- T4 instance TORN DOWN (owner, 2026-07-27) until caseH is fixed on both
+  UWP and macOS — /root/.t4_host is stale; smoke gate and T4 scripts
+  paused. Re-validation path when fixed: fresh T4 from bare AMI via
+  DEPLOY_RUNBOOK (proven in task #39), deb pair install, smoke gate,
+  owner Mac+UWP test. Bisect proceeds entirely on the local matrix:
+  arm-i :40008 (new pair + G CQP config, single-delta vs G) and arm-j
+  :40009 (xrdp 649b447c = 4B commit, pre f0104284-even-align, paired
+  251bc4d) split the two suspect commits.
