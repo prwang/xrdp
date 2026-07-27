@@ -95,6 +95,18 @@ class Probe:
         t = int(time.monotonic() - self.t0)
         if t != self.tick:
             self.tick = t
+            # every 32 s: repaint EVERYTHING (full-screen damage). If an
+            # accumulated color error wipes clean here and re-grows, the
+            # fault lives in incremental-damage decode, not in a broken
+            # base image — and the decoder is still alive.
+            if t > 0 and t % 32 == 0:
+                self.c.delete('all')
+                self.static_zone()
+                self.legend_bars()
+                self.c.create_text(
+                    self.w - 20, self.h - 30, anchor='se', fill='white',
+                    font=('DejaVu Sans Mono', 18, 'bold'),
+                    text='FULL REPAINT EPOCH %d' % (t // 32))
             self.draw_clock('fast', 20, 20, t % 8)
             self.draw_clock('slow', 20, 190, (t // 8) % 8)
         self.root.after(100, self.clock_loop)
