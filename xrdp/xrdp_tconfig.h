@@ -131,6 +131,12 @@ struct xrdp_tconfig_gfx
      * timing SEI it announces; suspected VideoToolbox output-pacing
      * trigger for the measured one-frame aux/chroma lag. Default 0. */
     int avc444_ffmpeg_strip_pic_struct;
+    /* DIAGNOSTIC: rewrite non-IDR ref slices from explicit-MMCO
+     * reference marking to sliding window (xrdp_h264_strip_mmco).
+     * 2026-07-27 Mac k=1 bisect: the Mac-clean VAAPI wire uses MMCO,
+     * the Mac-broken nvenc wire uses sliding window; this converts the
+     * clean stream for a single-delta arm. Default 0. */
+    int avc444_ffmpeg_fault_strip_mmco;
     /* DIAGNOSTIC fault injection: delay the aux stream by one pair to
      * visualize a main/aux pairing slip (2026-07-27 arm-K). Default 0;
      * the runner logs a WARNING whenever it is active. */

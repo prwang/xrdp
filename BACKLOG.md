@@ -1931,3 +1931,18 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   from the clean VAAPI stream (new diagnostic knob, single-delta arm);
   (2) probe v3: double-strobe static repaint (second pass with 1-LSB
   tweak forces a second aux update => k-immune correct baseline zone).
+- fault_strip_mmco knob implemented (2026-07-27): xrdp_h264_strip_mmco
+  in the annexb module — SPS/PPS param cache + non-IDR ref slice
+  header rewrite (adaptive MMCO op list -> sliding-window flag, CABAC
+  alignment re-padded, entropy payload byte-verbatim, whole-NAL
+  unescape/re-escape, fail-loud on any shape our encoders don't emit;
+  never grows the buffer). OFFLINE VALIDATION on the captured clean
+  arm-i wire (shared cache, runner call pattern): main 6 MMCO trace
+  lines -> 0, aux 0 adaptive flags remain, BOTH streams decode
+  pixel-exact (framemd5; aux via spliced parameter sets). Plumbed as
+  DIAGNOSTIC gfx.toml fault_strip_mmco (WARNING at latch), same chain
+  as fault_aux_delay. Unit-test note: no in-tree unit vector (a valid
+  CABAC P slice is impractical to embed); coverage is the ffmpeg-
+  validated capture run recorded here + fail-loud runtime contract.
+  Purpose: arm-l = arm-i's Mac-clean VAAPI CQP config + this knob =
+  single-delta reference-marking arm on 127.0.0.1:40011.

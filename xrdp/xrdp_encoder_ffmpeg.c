@@ -130,6 +130,8 @@ struct xrdp_ffmpeg_avc444
 
     /* DIAGNOSTIC (fault_aux_delay): previous pair's aux, swapped in */
     unsigned char *fault_aux_buf;
+    /* SPS/PPS fields cached across calls for fault_strip_mmco */
+    struct xrdp_h264_param_cache mmco_cache;
     int fault_aux_cap;
     int fault_aux_len;
 
@@ -202,6 +204,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->strip_sei = 0;
     cfg->sanitize_hrd = 0;
     cfg->strip_pic_struct = 0;
+    cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
                                * [avc444_ffmpeg] dump_extra); verified --
@@ -931,6 +934,19 @@ pop_pair(struct xrdp_ffmpeg_avc444 *self,
         }
     }
 
+    if (self->cfg.fault_strip_mmco)
+    {
+        if (xrdp_h264_strip_mmco(self->main_buf, &self->main_len,
+                                 &self->mmco_cache) != 0 ||
+                xrdp_h264_strip_mmco(self->aux_buf, &self->aux_len,
+                                     &self->mmco_cache) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: fault_strip_mmco could not "
+                "rewrite a slice; refusing to ship the packet");
+            return 1;
+        }
+    }
+
     if (self->pairs_returned == 0)
     {
         struct xrdp_h264_nal_summary sum;
@@ -1010,6 +1026,15 @@ pop_single(struct xrdp_ffmpeg_avc444 *self,
     {
         LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: strip_pic_struct could not "
             "rewrite an SPS; refusing to ship the packet");
+        return 1;
+    }
+
+    if (self->cfg.fault_strip_mmco &&
+            xrdp_h264_strip_mmco(self->main_buf, &self->main_len,
+                                 &self->mmco_cache) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: fault_strip_mmco could not "
+            "rewrite a slice; refusing to ship the packet");
         return 1;
     }
 
