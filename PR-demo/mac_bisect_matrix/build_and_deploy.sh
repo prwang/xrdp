@@ -18,18 +18,27 @@ DIST=${DIST:-/work/dist}
 # (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
 # tweak content/config, roll ONE arm — never rebuilds or re-imports an
 # image (the ~1.5GB import + native-snapshotter unpack is the slow path).
-ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g}"
+ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h}"
 
-# arm -> xrdp-dev commit tag (xorgxrdp is the Mac-good ee1ec01 everywhere)
+# arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
+# but MUST be paired per-arm when the xrdp build speaks a newer xup
+# contract: arm-h (xrdp bd1ab35b, contract 20260727) requires the T4's
+# xorgxrdp 251bc4d — with ee1ec01 sesman rejects logins with a contract
+# version mismatch (caught live 2026-07-27, port 40007).
 XORGXRDP_DEB="xorgxrdp-dev_1%3a0.10.80+gitee1ec01eed50_amd64.deb"
+declare -A ARM_XORG_DEB=(
+    [arm-h]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
+)
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
     [arm-e]=c693eeab5ec2 [arm-f]=52099149 [arm-g]=52099149-xfce
+    [arm-h]=bd1ab35b791e-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
     [e96e655416dc]="xrdp-dev_0.10.80+gite96e655416dc_amd64.deb"
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
+    [bd1ab35b791e]="xrdp-dev_0.10.80+git20260727002823.bd1ab35b791e_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
@@ -59,10 +68,11 @@ for arm in $ARMS; do
     base_tag=${tag%-xfce}
     xfce=0; [ "$base_tag" != "$tag" ] && xfce=1
     deb=${TAG_DEB[$base_tag]}
-    cp "$DIST/$deb" "$DIST/$XORGXRDP_DEB" "$BUILD/"
+    xorg_deb="${ARM_XORG_DEB[$arm]:-$XORGXRDP_DEB}"
+    cp "$DIST/$deb" "$DIST/$xorg_deb" "$BUILD/"
     podman build \
         --build-arg XRDP_DEB="$deb" \
-        --build-arg XORGXRDP_DEB="$XORGXRDP_DEB" \
+        --build-arg XORGXRDP_DEB="$xorg_deb" \
         --build-arg INSTALL_XFCE="$xfce" \
         -t "localhost/xrdp-bisect:$tag" -f "$D/Containerfile" "$BUILD"
     # k3s runs pods with the native snapshotter (see /etc/rancher/k3s/

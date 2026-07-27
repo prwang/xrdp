@@ -1726,3 +1726,9 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   packing regressed in 52099149..bd1ab35b (suspect f0104284 metablock
   even-align); wrong colors => Mac 444 color fidelity never validated,
   investigate ChromaV2 interpretation difference.
+- arm-h rework (owner rule: no manual container patching — declarative
+  fix only): build script now pairs xorgxrdp per-arm; arm-h =
+  xrdp bd1ab35b + xorgxrdp 251bc4d (the T4 pair) — the baked-in ee1ec01
+  spoke xup contract 20260726 and sesman rejected logins against
+  bd1ab35b's 20260727. Rebuilt+redeployed; login verified, wire matches
+  T4 shape (nal_hrd=0, sei=0), AVC444 v2.
