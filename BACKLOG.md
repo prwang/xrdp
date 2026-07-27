@@ -1917,3 +1917,17 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   edge 1.000, 0 encoder errors. AWAITING owner Mac probe re-read
   (k=0 and no residue => pic_struct convicted; k=1 persists =>
   exonerated, next axes aspect/timing-units/MMCO).
+- pic_struct REJECTED (owner live, 2026-07-27 evening): bleed persists
+  with pic_struct_present_flag=0 verified on the live nvenc wire.
+  Owner also observed occasional bleed RESETS mid-epoch, not aligned to
+  the probe's 32s flashes — matching the -g 240 IDR cadence. This
+  CONFIRMS the decoder-state divergence model and exposes a probe
+  design flaw: the EPOCH flash repaints identical content, the encoder
+  skip-codes it, and skip blocks are exactly what propagate the
+  client's poisoned reference — only an IDR replaces every MB
+  unconditionally. Consequences: (1) top remaining axis = reference
+  marking (VAAPI clean wire: explicit MMCO ops per P slice; nvenc
+  broken wire: sliding window) — locally falsifiable by stripping MMCO
+  from the clean VAAPI stream (new diagnostic knob, single-delta arm);
+  (2) probe v3: double-strobe static repaint (second pass with 1-LSB
+  tweak forces a second aux update => k-immune correct baseline zone).
