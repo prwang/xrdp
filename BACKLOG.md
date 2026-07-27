@@ -1853,3 +1853,17 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   Probe left running in the T4 session; owner Mac connect reads the
   failure vector directly. T4 config under test: nvenc profile-high +
   refs1/dpb1 + strip_sei + sanitize_hrd + avc_mode 444.
+- Probe delivery reworked per owner rule (2026-07-27): remote GUI
+  lifecycle = ONLY (1) whole-session logoff or (2) login autostart —
+  codified in CLAUDE.md agent execution rules. chroma-probe is now an
+  XDG autostart entry (~/.config/autostart/chroma-probe.desktop for
+  ubuntu on the T4, versioned as PR-demo/mac_bisect_matrix/
+  chroma-probe.desktop); the stale session was logged off cleanly
+  (sesman: "Session on display X11-10 has finished"). Next owner Mac
+  connect = fresh login at Mac geometry with the probe fullscreen from
+  frame one — the video then captures onset from the very first frames.
+  Probe additions since first version: periodic FULL REPAINT EPOCH
+  (32 s) as accumulation-vs-poisoned-base discriminator; resize
+  adaptation. Also recorded: probe "crash" reports were false — PID
+  artifacts of setsid fork + self-matching pkill (the recurring lesson,
+  now structurally avoided by the two-operation rule).

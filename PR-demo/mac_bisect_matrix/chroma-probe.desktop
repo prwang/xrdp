@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=chroma-probe
+Comment=AVC444 main/aux pairing diagnostic (bisect payload, autostarts fullscreen)
+Exec=/usr/local/bin/chroma-probe
+Terminal=false
+X-GNOME-Autostart-enabled=true
