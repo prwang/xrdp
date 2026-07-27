@@ -85,6 +85,19 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Surface any scope/security/regression concern in `BACKLOG.md` rather than
   silently expanding scope.
 
+### Agent execution rules (owner directive, 2026-07-27)
+
+- **Logically blocking work must run in the FOREGROUND.** If the next
+  action depends on a command's result (a build the deploy needs, a
+  verification the handoff needs, a corpus run the verdict needs), run it
+  blocking and deliver the result in the same turn — regardless of how
+  heavy it is. Backgrounding is only for genuinely concurrent work whose
+  result nothing in this turn depends on. Ending a turn with "waiting on
+  X, I'll report when it lands" is unacceptable.
+- **Every command carries a reasonable, explicit timeout** sized to the
+  task (a build gets minutes, a probe gets seconds). No unbounded waits;
+  a timeout firing is a red result to report, not to retry silently.
+
 ## Strict honesty rule
 
 A red result must stay red until the thing that failed is fixed and proven.
