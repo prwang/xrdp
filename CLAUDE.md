@@ -97,6 +97,15 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - **Every command carries a reasonable, explicit timeout** sized to the
   task (a build gets minutes, a probe gets seconds). No unbounded waits;
   a timeout firing is a red result to report, not to retry silently.
+- **Remote GUI process lifecycle (owner directive, 2026-07-27): only two
+  operations are allowed.** (1) Log off the whole session; (2) have the
+  program autostart at login (XDG autostart entry, versioned in git).
+  Never pkill/relaunch/supervise GUI processes inside a live remote
+  session over ssh — that workflow produced self-matching pkills, PID
+  bookkeeping artifacts misread as crashes, and respawn loops that fight
+  the human for their own session. If a GUI payload must change: update
+  the autostart entry, log the session off, and let the next login start
+  it cleanly.
 
 ## Strict honesty rule
 
