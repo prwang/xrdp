@@ -1867,3 +1867,23 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   adaptation. Also recorded: probe "crash" reports were false — PID
   artifacts of setsid fork + self-matching pkill (the recurring lesson,
   now structurally avoided by the two-operation rule).
+- MEASURED VERDICT from owner screen recording (2026-07-27, first-30-
+  frames analysis; evidence frames in captures/mac_video_k1_20260727/):
+  the Mac applies aux chroma exactly ONE damage-frame late on the real
+  nvenc wire. Probe reads: t=15s numeral 1 / in-patch 1 / hue
+  palette[0]; t=17s numeral 2 / in-patch 2 / hue palette[1] => k=1,
+  constant. Corroborating: wallpaper CHROMA visible under probe-black
+  LUMA (BT.709 V~220 at Y=0 renders the observed dark magenta beams) in
+  once-damaged regions, frozen; twice-painted static regions converge
+  correct (one-late chroma of unchanged content is correct content);
+  moving bar leaves trailing bleed (owner's cyan accumulation);
+  arm-K non-wedge consistent (server-side -1 aux delay just deepens
+  stale chroma to 2 on a static desktop, near-invisible). Config axes
+  already equalized when this was measured: profile high, refs=1,
+  dpb=1, hrd=0, sei=0. Surviving wire delta with a plausible
+  VideoToolbox output-timing mechanism: pic_struct_present_flag=1
+  (declared, while pic timing SEI is stripped). NEXT: strip_pic_struct
+  knob — in-place single-bit clear in the SPS VUI (no length change),
+  golden tests, deb, conffile-safe T4 deploy, owner probe re-read
+  (k=0 => fixed; k=1 => pic_struct exonerated, next axes: aspect/
+  timing-units/mv declarations, MMCO-vs-sliding-window).
