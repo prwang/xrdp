@@ -38,9 +38,16 @@ else
     DIRTY=""
 fi
 
-# Debian version: base + git commit. '+' is a legal Debian version char and
-# sorts after the plain upstream version, so newer commits upgrade cleanly.
-VERSION="${BASE_VERSION}+git${GIT_HASH}${DIRTY}"
+# Debian version: base + commit TIMESTAMP + commit hash. Bare hashes do not
+# sort (dpkg compares leading digit runs numerically: 62c… < 4932…), which
+# has (a) forced --allow-downgrades on every deploy and (b) made a paired
+# xorgxrdp-dev contract guard (Breaks: xrdp-dev << <commit>) reject a
+# NEWER xrdp build (T4, 2026-07-27). The 14-digit commit timestamp is
+# monotonic and always beats any 12-hex-digit leading run, so newer
+# commits now really do sort newer; the hash stays for traceability.
+GIT_TIME="$(git -C "${BUILDDIR}" show -s --format=%cd \
+    --date=format:%Y%m%d%H%M%S HEAD)"
+VERSION="${BASE_VERSION}+git${GIT_TIME}.${GIT_HASH}${DIRTY}"
 ARCH="$(dpkg --print-architecture)"
 DEB_NAME="xrdp-dev_${VERSION}_${ARCH}.deb"
 
