@@ -1,42 +1,44 @@
-# Bisect E: CBR + strip_sei + sanitize_hrd (fix candidate)
-# RDP endpoint on the host: 127.0.0.1:40004 (tester / host tester password).
+# Bisect G: old build + 444 + full xfce4
+# RDP endpoint on the host: 127.0.0.1:40006 (tester / host tester password).
 # Image tag pins the xrdp-dev commit; gfx.toml comes from the committed
-# gfx/arm-e.toml via ConfigMap xrdp-gfx-arm-e (created by build_and_deploy.sh).
+# gfx/arm-g.toml via ConfigMap xrdp-gfx-arm-g (created by build_and_deploy.sh).
 # Privileged + /dev/dri hostPath: the pod's ffmpeg encodes via VAAPI on the
 # host GPU, same as the host baseline instance.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: xrdp-arm-e
+  name: xrdp-arm-g
   namespace: bisect-matrix
   labels:
     app: xrdp-bisect
-    arm: arm-e
+    arm: arm-g
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      arm: arm-e
+      arm: arm-g
   template:
     metadata:
       labels:
         app: xrdp-bisect
-        arm: arm-e
+        arm: arm-g
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:c693eeab5ec2
+          image: localhost/xrdp-bisect:52099149-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
           env:
+            - name: SESSION_KIND
+              value: "xfce"
             - name: ARM_LABEL
-              value: "E: CBR + strip_sei + sanitize_hrd (fix candidate)  (port 40004)"
+              value: "G: old build + 444 + full xfce4  (port 40006)"
           ports:
             - containerPort: 3389
-              hostPort: 40004
+              hostPort: 40006
               hostIP: 127.0.0.1
               protocol: TCP
           volumeMounts:
@@ -65,4 +67,4 @@ spec:
             defaultMode: 0o755
         - name: gfx
           configMap:
-            name: xrdp-gfx-arm-e
+            name: xrdp-gfx-arm-g

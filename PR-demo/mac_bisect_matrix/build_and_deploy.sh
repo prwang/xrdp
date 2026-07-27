@@ -13,12 +13,18 @@
 set -eu
 D=$(cd "$(dirname "$0")" && pwd)
 DIST=${DIST:-/work/dist}
+# Usage: build_and_deploy.sh [arm-x ...] — no args = all arms. Images are
+# only (re)built when missing (FORCE_BUILD=1 overrides): session content
+# (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
+# tweak content/config, roll ONE arm — never rebuilds or re-imports an
+# image (the ~1.5GB import + native-snapshotter unpack is the slow path).
+ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g}"
 
 # arm -> xrdp-dev commit tag (xorgxrdp is the Mac-good ee1ec01 everywhere)
 XORGXRDP_DEB="xorgxrdp-dev_1%3a0.10.80+gitee1ec01eed50_amd64.deb"
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
-    [arm-e]=c693eeab5ec2 [arm-f]=52099149
+    [arm-e]=c693eeab5ec2 [arm-f]=52099149 [arm-g]=52099149-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -44,12 +50,20 @@ fi
 BUILD="$D/.build"
 rm -rf "$BUILD" && mkdir -p "$BUILD"
 cp "$D/entrypoint.sh" "$D/startwm.sh" "$D/banner.sh" "$BUILD/"
-for tag in $(printf '%s\n' "${ARM_TAG[@]}" | sort -u); do
-    deb=${TAG_DEB[$tag]}
+for arm in $ARMS; do
+    tag=${ARM_TAG[$arm]}
+    if [ "${FORCE_BUILD:-0}" != "1" ] \
+            && k3s ctr images ls -q | grep -q "xrdp-bisect:$tag"; then
+        continue
+    fi
+    base_tag=${tag%-xfce}
+    xfce=0; [ "$base_tag" != "$tag" ] && xfce=1
+    deb=${TAG_DEB[$base_tag]}
     cp "$DIST/$deb" "$DIST/$XORGXRDP_DEB" "$BUILD/"
     podman build \
         --build-arg XRDP_DEB="$deb" \
         --build-arg XORGXRDP_DEB="$XORGXRDP_DEB" \
+        --build-arg INSTALL_XFCE="$xfce" \
         -t "localhost/xrdp-bisect:$tag" -f "$D/Containerfile" "$BUILD"
     # k3s runs pods with the native snapshotter (see /etc/rancher/k3s/
     # config.yaml); ctr import can't target it in this containerd build,
@@ -62,7 +76,10 @@ done
 
 # --- deploy ---
 kubectl apply -f "$D/k8s/namespace.yaml"
-for arm in arm-a arm-b arm-c arm-d arm-e arm-f; do
+kubectl -n bisect-matrix create configmap xrdp-banner \
+    --from-file=banner.sh="$D/banner.sh" \
+    --dry-run=client -o yaml | kubectl apply -f -
+for arm in $ARMS; do
     kubectl -n bisect-matrix create configmap "xrdp-gfx-$arm" \
         --from-file=gfx.toml="$D/gfx/$arm.toml" \
         --dry-run=client -o yaml | kubectl apply -f -
@@ -71,7 +88,10 @@ for arm in arm-a arm-b arm-c arm-d arm-e arm-f; do
     # but binaries/entrypoint state are not) — always roll
     kubectl -n bisect-matrix rollout restart "deployment/xrdp-$arm"
 done
-kubectl -n bisect-matrix rollout status deployment --timeout=180s
+for arm in $ARMS; do
+    kubectl -n bisect-matrix rollout status "deployment/xrdp-$arm" \
+        --timeout=300s
+done
 kubectl -n bisect-matrix get pods -o wide
 echo
 echo "matrix up: arm-a 127.0.0.1:40000  arm-b :40001  arm-c :40002" \

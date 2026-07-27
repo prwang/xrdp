@@ -33,6 +33,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         dbus procps openssl ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
+# Optional full desktop (arm-g class): real content — wallpaper
+# gradients, antialiased text, window chrome — is where the Mac
+# wrong-color symptom was observed; the banner alone can't fully clear
+# a chroma fault. WITH recommends deliberately: match a real install.
+ARG INSTALL_XFCE=0
+RUN if [ "$INSTALL_XFCE" = "1" ]; then \
+        apt-get update \
+        && apt-get install -y xfce4 xfce4-terminal dbus-x11 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
+
 # xrdp + xorgxrdp developer debs for THIS arm (copied into the build context
 # by build_and_deploy.sh; /work/dist is the deb archive of record)
 COPY ${XRDP_DEB} ${XORGXRDP_DEB} /tmp/debs/

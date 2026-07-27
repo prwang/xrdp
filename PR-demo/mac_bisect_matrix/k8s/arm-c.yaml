@@ -48,6 +48,9 @@ spec:
             - name: gfx
               mountPath: /etc/xrdp/gfx.toml
               subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
       volumes:
         - name: dri
           hostPath:
@@ -56,6 +59,10 @@ spec:
           hostPath:
             path: /etc/xrdp-matrix
             type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
         - name: gfx
           configMap:
             name: xrdp-gfx-arm-c
