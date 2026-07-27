@@ -21,6 +21,7 @@ if [ -s /run/matrix/probe.hash ]; then
 fi
 
 echo "${ARM_LABEL:-unlabeled-arm}" > /etc/arm_label
+echo "${SESSION_KIND:-banner}" > /etc/session_kind
 
 # ffmpeg runs as root under xrdp (see gfx.toml) so root reaching the render
 # node is what matters; group ids for video/render differ between host and
