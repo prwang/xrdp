@@ -78,12 +78,19 @@ chroma)
             sleep 0.2
         done'
     ;;
-code)
+code|codeline)
     # Scrolls the pre-generated ANSI corpus (real repo code, pygments
-    # solarized-dark + clangd semantic tokens — see gen_code_corpus.py)
-    # at 10 lines / 0.1 s. 3000 lines => a full pass takes 30 s, so no
-    # frame content repeats within a bench window. Fails LOUD if the
-    # corpus mount is missing — never silently benchmarks a fallback.
+    # solarized-dark + clangd semantic tokens — see gen_code_corpus.py).
+    #   code      10 lines / 0.1 s — fast-scroll stress: ~180 px shift
+    #             per encoded frame DEFEATS VAAPI motion search
+    #             (measured 2026-07-28: 5.9% inter MBs), so glyph MBs
+    #             re-code intra every frame.
+    #   codeline  1 line / 0.1 s — typical reading scroll: ~20 px per
+    #             encoded frame, inside motion-search range, so a
+    #             partitioned main chain can actually track it.
+    # 3000 lines => no frame content repeats within a bench window.
+    # Fails LOUD if the corpus mount is missing — never silently
+    # benchmarks a fallback.
     #
     # LCD SUBPIXEL AA (freetype RGB decimation): the container image
     # ships fontconfig 10-sub-pixel-none.conf, which ASSIGNS rgba=none
@@ -122,14 +129,18 @@ XRDBEOF
             done
         fi
         mapfile -t L < "$CORPUS"
+        STEP=10
+        [ "$(cat /etc/session_kind 2>/dev/null)" = codeline ] && STEP=1
         i=0
         tput civis 2>/dev/null
         while true; do
-            for n in 1 2 3 4 5 6 7 8 9 10; do
+            n=1
+            while [ "$n" -le "$STEP" ]; do
                 printf "%4d  %s\n" $(((i + n) % ${#L[@]})) \
                     "${L[$(((i + n) % ${#L[@]}))]}"
+                n=$((n + 1))
             done
-            i=$((i + 10))
+            i=$((i + STEP))
             sleep 0.1
         done'
     ;;

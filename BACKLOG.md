@@ -2362,6 +2362,37 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   -> near-0 (immaterial); code aux 78.7 KB is the number an
   aux-refs-aux P chain must beat on realistic content.
 
+### Scroll-step vs motion-search range: why "aux dominates" needs typical scroll (owner question, same day)
+
+- Owner expected the typical-payload shape "main properly inter-
+  compressed, aux dominates" on code — and the 10-line/0.1 s batch
+  scroll DEFEATS that: at ~8.3 delivered pairs/s the screen shifts
+  ~180 px (code, fs14) / ~350 px (scroll, fs22) per ENCODED frame,
+  beyond VAAPI motion-search range. Measured MB modes on the wires:
+  - scroll: arm-i 100% intra both views; arm-m main 19% intra /
+    25% skip / 56% inter (inter chosen but with near-useless
+    prediction — main only 300->222 KB/frame). Scroll is full-width
+    dense antialiased text => ~613 KB/frame pair on arm-i (~14% of
+    raw) — it is the stress bound by design, zoom committed
+    (scroll_zoom.png).
+  - code (10-line batch): arm-m main 25% intra / 69% skip / 6%
+    inter — the skip is just BACKGROUND (code screens are mostly
+    empty right of the text); glyph MBs re-code intra every frame,
+    NO motion tracking.
+- New workload `codeline` (1 line / 0.1 s ~ 20 px per encoded frame,
+  inside search range; same corpus): the expected shape appears
+  exactly —
+  - arm-i: main 76.7 / aux 64.1 / pair 140.8 KB/frame (old arch
+    still ~all-intra, cannot exploit small motion at all);
+  - arm-m: main 12.2 / aux 70.1 / pair 82.3 KB/frame (-41.5%);
+    main MBs 2.8% intra / 84% skip / 13% inter = genuine motion
+    compensation; AUX NOW DOMINATES the pair (85%).
+- Consequence for FR-H264-8: codeline is the representative
+  reading-scroll class and its arm-m aux (70.1 KB/frame constant
+  full-frame leaf intra vs 12.2 KB main) is the primary win target;
+  `code` (batch jump) and `scroll` remain the ME-defeating stress
+  bounds where even an aux P chain must code real residuals.
+
 ### Absolute numbers (owner directive: never percentages alone)
 
 - Steady-state wire rate, 1600x900, VAAPI CQP qp=20, 20 s windows:
