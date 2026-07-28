@@ -1478,9 +1478,10 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
             {
                 /* a tail main picture must still join the shared
                  * chain -- never ship an unrewritten frame_num */
-                int budget = xrdp_h264_ltr_growth_budget(self->main_buf,
-                                                         self->main_len);
+                int budget;
 
+                budget = xrdp_h264_ltr_growth_budget(self->main_buf,
+                                                     self->main_len);
                 if (grow(&self->main_buf, &self->main_cap,
                          self->main_len + budget) != 0 ||
                         xrdp_h264_ltr_rewrite_main(self->main_buf,

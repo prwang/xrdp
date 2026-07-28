@@ -1103,6 +1103,7 @@ START_TEST(test_ltr_rejects_existing_list_modification)
     struct ltr_hdr_bits b;
     static unsigned char buf[4096];
     int len;
+    int rv;
     int pos;
 
     memset(&st, 0, sizeof(st));
@@ -1126,9 +1127,9 @@ START_TEST(test_ltr_rejects_existing_list_modification)
     pos = b.pos;
     ck_assert_int_eq((buf[5 + (pos >> 3)] >> (7 - (pos & 7))) & 1, 0);
     buf[5 + (pos >> 3)] |= (unsigned char)(0x80 >> (pos & 7));
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_main(buf, &len, (int)sizeof(buf),
+                                    &st);
+    ck_assert_int_ne(rv, 0);
 }
 END_TEST
 
@@ -1140,6 +1141,7 @@ START_TEST(test_ltr_rejects_unseeded_aux_p)
     struct xrdp_h264_ltr_state st;
     static unsigned char buf[4096];
     int len;
+    int rv;
 
     memset(&st, 0, sizeof(st));
     ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
@@ -1152,9 +1154,9 @@ START_TEST(test_ltr_rejects_unseeded_aux_p)
     st.aux_seeded = 0;
     memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
     len = LTR_AUX_IN_1_LEN;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
-                                               (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_aux(buf, &len, (int)sizeof(buf),
+                                   &st);
+    ck_assert_int_ne(rv, 0);
 }
 END_TEST
 
@@ -1164,13 +1166,14 @@ START_TEST(test_ltr_rejects_main_start_without_idr)
     struct xrdp_h264_ltr_state st;
     static unsigned char buf[4096];
     int len;
+    int rv;
 
     memset(&st, 0, sizeof(st));
     memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
     len = LTR_MAIN_IN_1_LEN;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_main(buf, &len, (int)sizeof(buf),
+                                    &st);
+    ck_assert_int_ne(rv, 0);
 }
 END_TEST
 
@@ -1180,14 +1183,15 @@ START_TEST(test_ltr_rejects_truncated_and_small_cap)
     struct xrdp_h264_ltr_state st;
     static unsigned char buf[4096];
     int len;
+    int rv;
 
     /* truncated mid-slice */
     memset(&st, 0, sizeof(st));
     memcpy(buf, ltr_main_in_0, 200);
     len = 200;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_main(buf, &len, (int)sizeof(buf),
+                                    &st);
+    ck_assert_int_ne(rv, 0);
     /* an undersized caller buffer must fail, never overflow: the aux
      * P rewrite GROWS (in 13 -> golden 17 bytes) */
     memset(&st, 0, sizeof(st));
@@ -1199,9 +1203,9 @@ START_TEST(test_ltr_rejects_truncated_and_small_cap)
                                     LTR_AUX_GOLDEN_0_LEN), 0);
     memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
     len = LTR_AUX_IN_1_LEN;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
-                                               LTR_AUX_IN_1_LEN, &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_aux(buf, &len, LTR_AUX_IN_1_LEN,
+                                   &st);
+    ck_assert_int_ne(rv, 0);
 }
 END_TEST
 
@@ -1229,7 +1233,7 @@ START_TEST(test_ltr_emitter_high_counter_and_cadence)
     memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
     len = LTR_MAIN_IN_1_LEN;
     ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
+                     (int)sizeof(buf), &st),
                      0);
     ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
     ck_assert_int_eq((int)h.frame_num, 65000);
@@ -1240,7 +1244,7 @@ START_TEST(test_ltr_emitter_high_counter_and_cadence)
     memcpy(buf, ltr_main_in_2, LTR_MAIN_IN_2_LEN);
     len = LTR_MAIN_IN_2_LEN;
     ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
+                     (int)sizeof(buf), &st),
                      0);
     ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
     ck_assert_int_eq((int)h.frame_num, 65001);
@@ -1248,7 +1252,7 @@ START_TEST(test_ltr_emitter_high_counter_and_cadence)
     memcpy(buf, ltr_aux_in_2, LTR_AUX_IN_2_LEN);
     len = LTR_AUX_IN_2_LEN;
     ck_assert_int_eq(xrdp_h264_ltr_rewrite_aux(buf, &len,
-                                               (int)sizeof(buf), &st),
+                     (int)sizeof(buf), &st),
                      0);
     ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
     ck_assert_int_eq((int)h.frame_num, 65002);
@@ -1260,7 +1264,7 @@ START_TEST(test_ltr_emitter_high_counter_and_cadence)
     memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
     len = LTR_MAIN_IN_1_LEN;
     ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
+                     (int)sizeof(buf), &st),
                      0);
     ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
     ck_assert_int_eq((int)h.frame_num, 256);
@@ -1277,6 +1281,7 @@ START_TEST(test_ltr_emitter_epoch_restart_byte_exact)
     struct xrdp_h264_ltr_state st;
     static unsigned char buf[4096];
     int len;
+    int rv;
 
     memset(&st, 0, sizeof(st));
     ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
@@ -1297,9 +1302,9 @@ START_TEST(test_ltr_emitter_epoch_restart_byte_exact)
     /* aux P before the re-seed: loud failure (runner respawns) */
     memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
     len = LTR_AUX_IN_1_LEN;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
-                                               (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_aux(buf, &len, (int)sizeof(buf),
+                                   &st);
+    ck_assert_int_ne(rv, 0);
     /* the fresh-child IDR re-seeds and the epoch replays byte-exact */
     ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
                                     LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
@@ -1405,6 +1410,7 @@ START_TEST(test_ltr_rejects_b_slice_and_unknown_level)
     static unsigned char buf[4096];
     static unsigned char snap[4096];
     int len;
+    int rv;
 
     /* synthetic B slice: hdr 0x41 then first_mb ue(0)=1,
      * slice_type ue(1)=010 (B), pps ue(0)=1, frame_num u(4)=0001,
@@ -1424,9 +1430,9 @@ START_TEST(test_ltr_rejects_b_slice_and_unknown_level)
     buf[7] = 0xff;
     len = 8;
     memcpy(snap, buf, len);
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_main(buf, &len, (int)sizeof(buf),
+                                    &st);
+    ck_assert_int_ne(rv, 0);
     ck_assert_int_eq(len, 8);
     ck_assert_mem_eq(buf, snap, 8);
     ck_assert_int_eq(memcmp(&st, &st_snap, sizeof(st)), 0);
@@ -1438,9 +1444,9 @@ START_TEST(test_ltr_rejects_b_slice_and_unknown_level)
     len = LTR_MAIN_IN_0_LEN;
     memcpy(snap, buf, len);
     st_snap = st;
-    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
-                                                (int)sizeof(buf), &st),
-                     0);
+    rv = xrdp_h264_ltr_rewrite_main(buf, &len, (int)sizeof(buf),
+                                    &st);
+    ck_assert_int_ne(rv, 0);
     ck_assert_int_eq(len, LTR_MAIN_IN_0_LEN);
     ck_assert_mem_eq(buf, snap, len);
     /* the state must not have advanced (caches may have been read,

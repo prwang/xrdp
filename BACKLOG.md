@@ -2738,6 +2738,15 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   Main KB/frame near-identical between arms everywhere (the small
   main delta on code/scroll is arm-m's gop-120 IDR inside the
   window, the recorded A/B caveat).
+- CI-parity note: the pinned astyle 3.4.14 (built per CI recipe,
+  ~/astyle.local) was run over the tree; this task's files are
+  formatted to it. PRE-EXISTING drift in files this task never
+  touched (xrdp_avc444_caps.c, xrdp_encoder.c rfx block,
+  xrdp_types.h keymap, xup_client_info.h, tests repro_mbparity/*)
+  is NOT fixed here (controlled-scope rule) — the upstream
+  clean-room slicing pass must run scripts/run_astyle.sh before
+  any PR. Local system astyle is 3.1 and DISAGREES with 3.4.14;
+  never use it for gate checks.
 - STILL OPEN (owner-blocked, FR-H264-8 stays EXPERIMENTAL, leaf
   stays the shipped default): T4 nvenc capture (T4 redeploy
   pending), macOS onscreen verdict (must include watching a re-key
