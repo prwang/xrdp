@@ -2261,17 +2261,54 @@ Owner tested all four arms in one sitting (Mac, Windows App):
 - Honest interpretation: partitioning wins big only where the old
   cross-view refs poisoned an otherwise cheap chain (sparse/static
   content); on real motion both architectures must code the delta
-  (-11%); on chroma-heavy motion the all-intra leaf premium EXCEEDS
-  the old inter-aux cost — the shipped FR-H264-7 default is a
-  measured bandwidth REGRESSION on that class (topology correctness
-  still mandates it; recorded, not hidden). This is the quantified
-  motivation for FR-H264-8: on gray, aux-refs-aux P should be
-  near-all-skip (aux ~0); on chroma it still codes a real delta but
-  P-frames should beat full intra. Re-run this exact bench against
-  the FR-H264-8 arm when it exists.
+  (-11%); chroma-motion is a measured REGRESSION class (recorded, not
+  hidden; topology correctness still mandates the partitioning).
 - Caveat: gray is a GENTLE luma class (adjacent ANSI grayscale bands,
   ~10/255 steps) — a motion-direction discriminator, not a stress
   test; scroll is the stress-motion class (~6 MB/s saturation).
+
+### Chroma-regression root cause: MB-level analysis (same day) — CORRECTS the first-cut interpretation above
+
+- Owner asked why chroma regresses if VAAPI aux was "already
+  accidentally independent". Measured answer (trace_headers +
+  `ffmpeg -debug mb_type` on the chroma-workload wires of both arms):
+  1. The old VAAPI chain was NOT independent at the syntax level:
+     single frame_num chain, SPS max_num_ref_frames=1, zero ref-list
+     modifications — every P frame's only possible reference is the
+     immediately previous frame, i.e. ALWAYS the other view.
+  2. Mesa's mode decision, facing that useless cross-view reference,
+     coded 99.8% of MBs INTRA in EVERY frame of BOTH views — even
+     static regions (skip/inter would copy wrong-view content). The
+     old VAAPI stream was effectively a full-frame intra stream at
+     all times, wearing P-slice syntax (the remaining ~0.2% inter/
+     skip MBs are exactly the latent topology hazard the checker
+     flagged RED).
+  3. What the leaf changed per view on the chroma workload: aux
+     7.0 KB (P-slices full of intra + overhead) -> 6.1 KB clean
+     I-leaf — the leaf made aux CHEAPER, it is NOT the regression.
+     Main 3.9 KB (accidental full-intra) -> 9.6 KB (genuine inter:
+     20% intra / 55% skip / 25% inter MBs, identical slice QP 20
+     both arms) — the regression is ENTIRELY the main chain.
+  4. Why genuine inter loses to full intra there: the workload is
+     FLAT saturated color bands — flat blocks intra-code at ~0.7
+     bytes/MB (DC prediction, no residual), while motion-compensating
+     the band shift costs MV deltas + residuals at every saturated
+     edge (~3.7 bytes/MB over the non-skip half). Pathological
+     content where "re-encode everything intra" is anomalously cheap.
+- CORRECTION (strict honesty): the interpretation committed earlier
+  today ("all-intra leaf premium exceeds the old inter-aux cost") was
+  WRONG — measured and withdrawn same day. The +42% is a content
+  artifact of the flat-band chroma workload flattering the old
+  chain's accidental full-intra mode, not a leaf cost.
+- Benchmark consequence: the chroma workload measures FLAT chroma
+  motion (intra-friendly, old-arch-flattering); textured chroma-rich
+  motion is covered by scroll (-11%). Keep chroma as the adversarial
+  bound, but do not read it as "typical chroma content".
+- FR-H264-8 expectations, refined: gray remains the discriminator
+  (aux P near-all-skip vs leaf re-intra). On flat-chroma motion
+  FR-H264-8's aux P would motion-compensate the band shift — whether
+  that beats 6.1 KB flat-intra leaves is an open measurement, not a
+  given. Re-run this exact bench against the FR-H264-8 arm.
 
 
 ## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — TODO (owner directive, 2026-07-28)
