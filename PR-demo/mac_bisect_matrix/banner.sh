@@ -14,11 +14,15 @@
 #            an aux-refs-aux P frame is all-skip here, while the
 #            FR-H264-7 all-intra leaf re-encodes every damaged MB.
 #   chroma   full-screen moving color bands at 5 fps — large chroma
-#            motion, the aux path's honest worst case (any aux
-#            architecture must re-encode; FR-H264-8 gains least here).
+#            motion. NOTE: FLAT saturated bands, an intra-friendly
+#            adversarial bound (see BACKLOG 2026-07-28 MB analysis),
+#            not typical chroma-rich content.
+#   code     scrolling syntax-highlighted C on the Solarized Dark
+#            truecolor palette (~10 Hz) — the realistic developer
+#            payload: textured glyphs, color-rich but muted theme.
 #
-# All four are deterministic (fixed sequences, fixed cadence) so wire
-# byte counts are comparable across arms and across runs.
+# All are deterministic (fixed sequences, fixed cadence) so wire byte
+# counts are comparable across arms and across runs.
 ARM=$(cat /etc/arm_label 2>/dev/null || echo "unknown arm")
 KIND=$(cat /etc/session_kind 2>/dev/null || echo banner)
 
@@ -72,6 +76,33 @@ chroma)
             done
             i=$((i + 1))
             sleep 0.2
+        done'
+    ;;
+code)
+    # Scrolls the pre-generated ANSI corpus (real repo code, pygments
+    # solarized-dark + clangd semantic tokens — see gen_code_corpus.py)
+    # at 10 lines / 0.1 s. 3000 lines => a full pass takes 30 s, so no
+    # frame content repeats within a bench window. Fails LOUD if the
+    # corpus mount is missing — never silently benchmarks a fallback.
+    exec "${XTERM[@]}" -bg '#002b36' -fg '#839496' -fs 14 -e bash -c '
+        CORPUS=/usr/local/share/code_corpus.ansi
+        if [ ! -s "$CORPUS" ]; then
+            while true; do
+                clear
+                printf "\e[41m  NO CODE CORPUS at %s — bench invalid  \e[0m\n" "$CORPUS"
+                sleep 1
+            done
+        fi
+        mapfile -t L < "$CORPUS"
+        i=0
+        tput civis 2>/dev/null
+        while true; do
+            for n in 1 2 3 4 5 6 7 8 9 10; do
+                printf "%4d  %s\n" $(((i + n) % ${#L[@]})) \
+                    "${L[$(((i + n) % ${#L[@]}))]}"
+            done
+            i=$((i + 10))
+            sleep 0.1
         done'
     ;;
 *)

@@ -2267,6 +2267,35 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   ~10/255 steps) — a motion-direction discriminator, not a stress
   test; scroll is the stress-motion class (~6 MB/s saturation).
 
+### Fifth workload `code` (owner directive, same day): realistic payload, real-tool highlighting
+
+- Owner rejected a hand-colored fake-code payload; requirements were a
+  scalable EXTERNAL highlighter (LSP-grade, clangd) and a >= 2000-line
+  corpus from the repo itself so scrolled content cannot be "remembered"
+  (repeat-content skip) by the encoder within a bench window.
+- Implementation (committed): gen_code_corpus.py renders 3000 real
+  lines of xrdp/xrdp_mm.c to ANSI truecolor — pygments CLexer with the
+  solarized-dark style as the lexical base, overlaid with clangd 19
+  LSP `textDocument/semanticTokens/full` (1007 semantic tokens:
+  functions/types/macros/enums colored editor-style). The generated
+  code_corpus.ansi (317 KB) is COMMITTED (payload frozen at generation
+  time — later source edits don't silently change the benchmark) and
+  ships to the fleet in the xrdp-banner ConfigMap (server-side apply;
+  the corpus exceeds the 256 KB client-side annotation limit),
+  subPath-mounted by arm-i/arm-m at /usr/local/share/code_corpus.ansi.
+  banner.sh scrolls it at 10 lines/0.1 s on Solarized base03 bg with a
+  fail-LOUD red screen if the corpus mount is missing (caught a real
+  miss during rollout: a failed configmap apply short-circuited the
+  manifest apply; the screenshot showed the red screen, not a silent
+  wrong-payload bench).
+- RESULT: code workload arm-i 1.308 MB/s -> arm-m 1.231 MB/s (-5.9%).
+  The realistic developer payload lands near scroll (-11%): a modest
+  net win — main-chain gains mostly offset by the leaf premium under
+  sustained textured motion.
+- Reference screenshots of all five workloads, captured through the
+  live arm-m AVC444 pipeline (xfreerdp3 client on Xvfb, xwd):
+  captures/bench_workloads_20260728/{tick,scroll,gray,chroma,code}.png
+
 ### Chroma-regression root cause: MB-level analysis (same day) — CORRECTS the first-cut interpretation above
 
 - Owner asked why chroma regresses if VAAPI aux was "already

@@ -53,6 +53,9 @@ spec:
             - name: banner
               mountPath: /usr/local/bin/banner.sh
               subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
       volumes:
         - name: dri
           hostPath:

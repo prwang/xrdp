@@ -100,9 +100,13 @@ done
 
 # --- deploy ---
 kubectl apply -f "$D/k8s/namespace.yaml"
+# server-side apply: the code corpus (~300KB) exceeds the client-side
+# last-applied-configuration annotation limit (256KB)
 kubectl -n bisect-matrix create configmap xrdp-banner \
     --from-file=banner.sh="$D/banner.sh" \
-    --dry-run=client -o yaml | kubectl apply -f -
+    --from-file=code_corpus.ansi="$D/code_corpus.ansi" \
+    --dry-run=client -o yaml \
+    | kubectl apply --server-side --force-conflicts -f -
 for arm in $ARMS; do
     kubectl -n bisect-matrix create configmap "xrdp-gfx-$arm" \
         --from-file=gfx.toml="$D/gfx/$arm.toml" \
