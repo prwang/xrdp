@@ -2197,6 +2197,49 @@ Owner tested all four arms in one sitting (Mac, Windows App):
     hand-formatted edits shipped. Style verdict rests with CI.
 
 
+## FR-H264-7 VAAPI bandwidth saving: MEASURED, repeatable bench committed — DONE (2026-07-28)
+
+- Owner question: with the main chain now self-referencing on VAAPI,
+  can the traffic saving be verified, and is there a repeatable
+  benchmark? Answer: yes and yes (now).
+- New committed tooling (PR-demo/mac_bisect_matrix/):
+  - `bandwidth_stats.py` — per-view (LC split) / IDR-vs-P payload
+    stats of an oracle AVC444 dump.
+  - `bandwidth_bench.sh` — one-command A/B. Default mode attaches the
+    stock acking client (xfreerdp3) and reads the TCP socket rx
+    counter over a fixed window after a warmup (real sustained wire
+    rate, TLS framing identical across arms); `MODE=frames` runs the
+    oracle save-only client + bandwidth_stats.py (initial-paint
+    per-frame split ONLY — see pitfalls).
+- Controlled A/B: arm-i (pre-fix single-chain bd1ab35b791e) vs arm-m
+  (unconditional partitioning 39bb08a48377), IDENTICAL VAAPI CQP qp=20
+  444 config, identical banner content (static chart + 1 Hz tick),
+  1600x900, fresh session per run.
+- RESULTS, steady-state wire rate (12 s warmup, then 20-40 s window):
+  - arm-i: 38.2 KB/s run 1 (eight 5 s windows, 190394-191254 B each,
+    <0.5% spread), 38.4 KB/s run 2.
+  - arm-m:  7.5 KB/s run 1 (37472-37748 B per 5 s), 7.55 KB/s run 2.
+  - => 5.1x less sustained AVC444 traffic (~80% saving) from reference
+    partitioning alone on this content; run-to-run drift <1%.
+  - Per-frame split (MODE=frames, initial paint of identical content):
+    main non-IDR 33.5 KB avg -> 0.8 KB (42x); aux 29.9 KB inter ->
+    33.0 KB all-intra leaf (+10%, the known leaf cost); IDR 36.5 KB
+    identical both arms.
+- Pitfalls found and now encoded in the bench script header (strict
+  honesty: two earlier same-day measurements were INVALID and are
+  superseded by the above):
+  1. The oracle save-only client never acks — xrdp's in-flight window
+     fills after ~3 frames, so dump captures measure initial-paint
+     frames only, never sustained traffic.
+  2. Reconnecting to a stale probe444 session (dead wm => static
+     screen) reads as zero traffic on any build; each run needs a
+     fresh session (pod roll).
+  3. The xfce arms idle static: steady-state is ~0 on ANY build.
+     Bench runs need SESSION_KIND=banner (flipped via kubectl set env
+     for the measurement, reverted to xfce afterwards — fleet state
+     now matches git again).
+
+
 ## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — TODO (owner directive, 2026-07-28)
 
 - Origin: owner challenged the 4b rejection ("if aux refs previous aux,
