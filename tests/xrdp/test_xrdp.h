@@ -12,6 +12,7 @@ Suite *make_suite_avc444_convert(void);
 Suite *make_suite_avc444_caps(void);
 Suite *make_suite_avc444_metablock(void);
 Suite *make_suite_avc444_h264(void);
+Suite *make_suite_avc444_ltr(void);
 Suite *make_suite_avc444_nut(void);
 Suite *make_suite_avc444_ffmpeg(void);
 Suite *make_suite_avc444_multimon(void);
