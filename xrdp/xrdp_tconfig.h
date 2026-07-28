@@ -131,6 +131,13 @@ struct xrdp_tconfig_gfx
      * timing SEI it announces; suspected VideoToolbox output-pacing
      * trigger for the measured one-frame aux/chroma lag. Default 0. */
     int avc444_ffmpeg_strip_pic_struct;
+    /* AVC444 reference partitioning (cross-view reference fix,
+     * PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md): encode
+     * the aux view in a second all-IDR child and splice its frames into
+     * the main chain as non-reference, non-IDR I leaves, so main frames
+     * never reference aux frames at any aux cadence. Default 0 (off,
+     * existing single-child interleave preserved). */
+    int avc444_ffmpeg_aux_intra_leaf;
     /* DIAGNOSTIC: rewrite non-IDR ref slices from explicit-MMCO
      * reference marking to sliding window (xrdp_h264_strip_mmco).
      * 2026-07-27 Mac k=1 bisect: the Mac-clean VAAPI wire uses MMCO,

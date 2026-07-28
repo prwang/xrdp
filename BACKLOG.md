@@ -2072,3 +2072,60 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   rewrite correctness (CABAC init deltas between slice types 5/7 vs
   2/7 contexts), PPS bit-compat across two encoder invocations.
   NOT implemented; awaiting owner sign-off on the spike.
+- IN PROGRESS: aux_intra_leaf implementation (owner-ordered fix,
+  branch dev/avc444_aux_intra_leaf). Feasibility spike GREEN on real
+  T4 nvenc bytes (offline, aux_leaf_spike.py + ffmpeg framemd5):
+  main child P-chain + aux child all-IDR (-forced-idr 1
+  -force_key_frames expr:gte(t,0), verified to init WITH the shipped
+  -refs 1 -dpb_size 1 args) merged into ONE chain with aux as
+  non-reference non-IDR I leaves -> 30/30 main frames bit-identical
+  to the standalone main decode (leaves DPB-inert), 30/30 leaf frames
+  pixel-identical, zero decoder warnings; non-ref frame_num rule
+  settled empirically = PrevRefFrameNum+1 (fn=PrevRefFrameNum makes
+  ffmpeg fold the pictures). C implementation: xrdp_h264_aux_to_leaf
+  (annexb module; extends param cache with pic_init_qp/transform_8x8/
+  chroma offsets/scaling flags; strict main-vs-aux SPS/PPS compat
+  guard, fail-loud), runner leaf mode (second full runner instance
+  driven via encode_single; main child sees ONLY main frames), knob
+  gfx.toml [avc444_ffmpeg] aux_intra_leaf (default OFF = existing
+  behavior preserved). Unit tests: 4 new (golden vs python-spike
+  output on real libx264 vectors, non-IDR aux rejected, main without
+  ref VCL rejected, truncated aux rejected) -> 95/95 pass. NEXT: deb
+  build, T4 deploy, wire-capture acceptance (drop-aux + per-view
+  bit-identity on the real wire), xfreerdp render check, smoke gate.
+- DEPLOYED + VALIDATED (2026-07-27): aux_intra_leaf on the T4.
+  Deb xrdp-dev 0.10.80+git20260727225731.9539565594e3 installed
+  (dpkg conffile prompt resolved --force-confold; cert.pem/key.pem
+  verified byte-identical to the pre-install snapshot
+  /root/xrdp-conf-backup-20260727225840; xorgxrdp-dev 251bc4d still
+  ii). gfx.toml: aux_intra_leaf = true added, all other knobs
+  unchanged. Stale session Xorg logged off (sesman logged the clean
+  finish) before testing. WIRE (oracle capture, 434 records,
+  captures/t4_leaf_20260727/): main chain [SPS,PPS,IDR]+216 P all
+  nri=3 with per-view-consecutive frame_num; ALL 217 aux records =
+  single type-1 I slice nri=0 fn=main+1; main P frames shrank from
+  25-76KB (cross-view refs useless) to 0.6-2.5KB (real same-view
+  refs). ACCEPTANCE (the ground-truth robustness test, owner-set):
+  drop all 217 aux leaves -> 217/217 main frames BIT-IDENTICAL to
+  the interleaved decode, 0 decoder warnings — our wire now has the
+  Win2022 property (348/348). VISUAL (xfreerdp3 over tunnel, chroma
+  probe): k=0 (FAST/SLOW patch hues match numerals), background
+  black, worst named-bar deviation 4/255, no bleed, no trails
+  (captures/t4_leaf_20260727/t4_leaf_shot{1,2}.png). PERF: pack
+  bench on T4 unchanged (4K vectorized 9.05 ms/frame). SMOKE GATE
+  (last step): PASS both sizes, edge 1.000, encoder_errors=0.
+  REMAINING: Mac onscreen validation by owner (the decisive test);
+  aux leaf bitrate (~60KB/frame all-intra) is the known cost — perf
+  work only after Mac verdict.
+- OWNER VERDICT (2026-07-28): macOS Windows App renders the
+  aux_intra_leaf T4 build CLEAN — no chroma bleed, no wrong color.
+  The Mac wrong-color bisect is CLOSED: root cause cross-view inter
+  prediction in the single-context AVC444 interleave (mechanism proof
+  PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md), fix =
+  reference-partitioned single chain (aux as non-reference non-IDR I
+  leaves), validated offline (217/217 aux-drop bit-identity), on
+  xfreerdp (k=0, colors exact) and now onscreen on the Mac.
+  Follow-ups (separate items, not started): aux leaf bitrate
+  (all-intra ~60KB/frame) optimization; diagnostic knob retirement
+  (strip_pic_struct/fault_* arms no longer needed); upstream PR
+  clean-room slicing includes this fix.
