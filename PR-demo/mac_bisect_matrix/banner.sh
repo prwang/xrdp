@@ -7,8 +7,10 @@
 #            packing faults are self-evident ("the bar that says RED is
 #            blue"); a stalled tick = pipeline stall, black = ack
 #            starvation. Bench class: sparse small UI update.
-#   scroll   colored text scrolling at ~10 Hz — sustained mixed
-#            luma+chroma damage (terminal/browser-scroll shape).
+#   scroll   colored text scrolling LINE BY LINE (1 line / 0.1 s) —
+#            typical-scroll baseline: per-frame shift stays inside
+#            encoder motion-search range. scrollfast = 10 lines/0.1 s,
+#            the ME-defeating stress bound (~350 px per encoded frame).
 #   gray     full-screen moving grayscale bands at 5 fps — large LUMA
 #            motion with CONSTANT CHROMA. The FR-H264-8 discriminator:
 #            an aux-refs-aux P frame is all-skip here, while the
@@ -17,12 +19,19 @@
 #            motion. NOTE: FLAT saturated bands, an intra-friendly
 #            adversarial bound (see BACKLOG 2026-07-28 MB analysis),
 #            not typical chroma-rich content.
-#   code     scrolling syntax-highlighted C on the Solarized Dark
-#            truecolor palette (~10 Hz) — the realistic developer
-#            payload: textured glyphs, color-rich but muted theme.
+#   code     scrolling syntax-highlighted C (Solarized Dark truecolor,
+#            LCD subpixel AA) LINE BY LINE (1 line / 0.1 s) — the
+#            realistic developer payload and, with scroll, the
+#            FR-H264-8 BANDWIDTH GATE baseline (PRD FR-H264-8 (5)).
+#            codefast = 10 lines/0.1 s stress bound; codeline =
+#            legacy alias of code.
 #
 # All are deterministic (fixed sequences, fixed cadence) so wire byte
-# counts are comparable across arms and across runs.
+# counts are comparable across arms and across runs. Line-by-line is
+# the DEFAULT scroll granularity for both text classes (owner
+# directive 2026-07-28): it is the regime where the main chain is
+# properly inter-compressed and the aux term dominates — the regime
+# FR-H264-8 optimizes and is judged on.
 ARM=$(cat /etc/arm_label 2>/dev/null || echo "unknown arm")
 KIND=$(cat /etc/session_kind 2>/dev/null || echo banner)
 
@@ -31,17 +40,21 @@ xsetroot -solid '#204060' || true
 XTERM=(xterm -maximized -fa 'DejaVu Sans Mono' -fs 22 -bg black -fg white)
 
 case "$KIND" in
-scroll)
+scroll|scrollfast)
     exec "${XTERM[@]}" -e bash -c '
+        STEP=1
+        [ "$(cat /etc/session_kind 2>/dev/null)" = scrollfast ] && STEP=10
         i=0
         tput civis 2>/dev/null
         while true; do
-            for n in 1 2 3 4 5 6 7 8 9 10; do
+            n=1
+            while [ "$n" -le "$STEP" ]; do
                 c=$((31 + (i + n) % 7))
                 printf "\e[%dm%06d scroll workload: the quick brown fox jumps over the lazy dog 0123456789\e[0m\n" \
                     "$c" $((i + n))
+                n=$((n + 1))
             done
-            i=$((i + 10))
+            i=$((i + STEP))
             sleep 0.1
         done'
     ;;
@@ -78,16 +91,18 @@ chroma)
             sleep 0.2
         done'
     ;;
-code|codeline)
+code|codeline|codefast)
     # Scrolls the pre-generated ANSI corpus (real repo code, pygments
     # solarized-dark + clangd semantic tokens — see gen_code_corpus.py).
-    #   code      10 lines / 0.1 s — fast-scroll stress: ~180 px shift
+    #   code      1 line / 0.1 s (DEFAULT; codeline = legacy alias) —
+    #             typical reading scroll: ~20 px per encoded frame,
+    #             inside motion-search range, so a partitioned main
+    #             chain tracks it (measured: 84% skip / 13% inter).
+    #             FR-H264-8 bandwidth-gate baseline (PRD FR-H264-8).
+    #   codefast  10 lines / 0.1 s — fast-scroll stress: ~180 px shift
     #             per encoded frame DEFEATS VAAPI motion search
     #             (measured 2026-07-28: 5.9% inter MBs), so glyph MBs
     #             re-code intra every frame.
-    #   codeline  1 line / 0.1 s — typical reading scroll: ~20 px per
-    #             encoded frame, inside motion-search range, so a
-    #             partitioned main chain can actually track it.
     # 3000 lines => no frame content repeats within a bench window.
     # Fails LOUD if the corpus mount is missing — never silently
     # benchmarks a fallback.
@@ -129,8 +144,8 @@ XRDBEOF
             done
         fi
         mapfile -t L < "$CORPUS"
-        STEP=10
-        [ "$(cat /etc/session_kind 2>/dev/null)" = codeline ] && STEP=1
+        STEP=1
+        [ "$(cat /etc/session_kind 2>/dev/null)" = codefast ] && STEP=10
         i=0
         tput civis 2>/dev/null
         while true; do

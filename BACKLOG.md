@@ -2393,6 +2393,36 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   `code` (batch jump) and `scroll` remain the ME-defeating stress
   bounds where even an aux P chain must code real residuals.
 
+### Line-by-line scroll is now the DEFAULT for both text classes; bench GATES FR-H264-8 (owner directive, same day)
+
+- Workload renames (banner.sh): `scroll` and `code` are now LINE-BY-
+  LINE (1 line/0.1 s) — the regime where main is properly inter-
+  compressed and the aux term dominates, i.e. the regime FR-H264-8
+  optimizes; the 10-line batch stress bounds are now `scrollfast` /
+  `codefast` (`codeline` kept as legacy alias of `code`). Bench
+  default workload set: tick scroll gray chroma code.
+- PRD FR-H264-8 acceptance gate item (5) REWRITTEN: bandwidth_bench
+  (MODE=frames, line-scroll baselines scroll+code) is the benchmark
+  harness for the optimization, and its result GATES acceptance —
+  material reduction of steady aux KB/frame vs the leaf arm at equal
+  delivered pairs/s, recorded as absolute per-view KB/frame; failing
+  to beat the leaf baseline on these workloads FAILS the gate
+  regardless of other criteria. Stress variants and the chroma bound
+  are recorded alongside but do not gate.
+- Leaf-arm GATE BASELINES (frames mode, 8.3 pairs/s both arms):
+  - code  (line): arm-i 76.7/64.1/140.8 KB/frame -> arm-m
+    12.2/70.1/82.3 (aux = 85% of pair) [= codeline run above]
+  - scroll(line): arm-i 301.2/313.5/614.6 -> arm-m 109.7/326.3/436.0
+    (aux = 75% of pair; -29% pair vs arm-i)
+  - Consistency: arm-i per-frame cost is scroll-speed-INDEPENDENT
+    (301 vs 300 KB/frame at 1x and 10x speed — intra-always, as the
+    MB analysis predicts). arm-m main tracks line scroll partially on
+    full-width dense text (222 -> 110 KB/frame) vs near-fully on
+    code (12.2, background-dominated skip).
+  - FR-H264-8 must reduce arm-m aux (70.1 / 326.3 KB/frame) toward
+    its main-chain costs on the same content; these two rows are the
+    numbers to beat.
+
 ### Absolute numbers (owner directive: never percentages alone)
 
 - Steady-state wire rate, 1600x900, VAAPI CQP qp=20, 20 s windows:

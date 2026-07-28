@@ -7,12 +7,22 @@
 # stale session reads as zero traffic), then per arm attaches a client
 # and measures. Workloads (deterministic, see banner.sh):
 #   tick    sparse small UI update (1 Hz tick line)
-#   scroll  sustained mixed luma+chroma text scroll (~10 Hz)
+#   scroll  colored text, LINE-BY-LINE scroll (1 line/0.1 s) — typical
+#           scroll baseline, inside encoder motion-search range
 #   gray    full-screen luma motion, CONSTANT chroma (5 fps) — the
 #           FR-H264-8 discriminator: aux-refs-aux P is all-skip here,
 #           the FR-H264-7 all-intra leaf re-encodes every damaged MB
-#   chroma  full-screen chroma motion (5 fps) — aux worst case, any
-#           aux architecture must re-encode
+#   chroma  full-screen chroma motion (5 fps) — flat-band adversarial
+#           bound (intra-friendly), not typical chroma-rich content
+#   code    syntax-highlighted repo C (Solarized, subpixel AA),
+#           LINE-BY-LINE scroll — realistic developer payload
+#   scrollfast/codefast  10 lines/0.1 s ME-defeating stress bounds
+#
+# FR-H264-8 BANDWIDTH GATE (owner directive 2026-07-28): this bench,
+# MODE=frames on the line-scroll baselines (scroll, code), is the
+# benchmark harness for the aux-refs-aux optimization — its measured
+# per-view KB/frame vs the leaf arm GATES that feature's acceptance
+# (PRD FR-H264-8, gate item 5).
 #
 # Modes:
 #   default        steady-state wire rate: stock acking client
@@ -52,7 +62,7 @@ SIZE=${SIZE:-1600x900}
 WARMUP=${WARMUP_SECS:-12}
 WINDOW=${WINDOW_SECS:-20}
 MODE=${MODE:-steady}
-WORKLOADS=${WORKLOADS:-tick scroll gray chroma}
+WORKLOADS=${WORKLOADS:-tick scroll gray chroma code}
 RESTORE_KIND=${RESTORE_KIND:-xfce}
 NS=bisect-matrix
 D=$(cd "$(dirname "$0")" && pwd)
