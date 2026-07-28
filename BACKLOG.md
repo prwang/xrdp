@@ -2461,6 +2461,23 @@ Owner tested all four arms in one sitting (Mac, Windows App):
 - Acceptance gate items (1) and (3) updated accordingly (unit matrix
   green under make check; both-mode verification on fleet + T4
   captures).
+- SEMANTIC ROUNDTRIP PSNR HARNESS added to the spec (owner proposal,
+  same day): identity checks are decoder-vs-decoder and cannot flag a
+  corruption hitting both modes identically, nor quantify a
+  divergence. Planned tools/avc444_roundtrip_psnr.sh: synthetic
+  source -> real 444 packing -> real children -> FR-H264-8 splice ->
+  decode in BOTH modes -> per-frame per-plane (Y/U/V) PSNR vs SOURCE.
+  Pass = in-band absolute PSNR both modes + small inter-mode epsilon
+  + NO monotonic decay (DPB drift signature — the Mac corruption
+  grew until IDR); chroma planes tightest. Stressor sequences: IDR
+  restart, frame_num wrap >= 512, sparse/changing aux cadence
+  (Lever-2 shape), slot reassignment, resize re-key. Sensitivity
+  validation required before use (fault injection must go RED;
+  Tier-B inter-mode PSNR on the pre-fix t4_ps0 wire must reproduce
+  the known chroma collapse; leaf wire clean) — a checker that
+  cannot fail proves nothing. Leaf-arm PSNR band measured FIRST as
+  the fidelity reference: FR-H264-8 may improve bandwidth, must not
+  regress fidelity. Wired into acceptance gate item (1).
 
 ### Absolute numbers (owner directive: never percentages alone)
 
