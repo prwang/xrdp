@@ -2423,6 +2423,45 @@ Owner tested all four arms in one sitting (Mac, Windows App):
     its main-chain costs on the same content; these two rows are the
     numbers to beat.
 
+### FR-H264-8 unit-test spec + invariance contract UPGRADE (owner review, same day)
+
+- Owner asked whether unit tests were specified for the new change
+  surface (LTR pinning, frame_num slots, reference resolution vs
+  ground truth in 1-context/mstsc and 2-context/macOS modes). They
+  were NOT — the gate was integration-only. PRD FR-H264-8 now
+  carries a full unit-test specification (golden-byte-vector style
+  of tests/xrdp/test_avc444_h264.c, CI-runnable, no ffmpeg/HW):
+  1. emitter vectors: mmco6 self-mark, LTR list-modification, IDR
+     long_term_reference_flag, first-aux conversion — each bit-exact,
+     both views, CABAC payload verbatim; plus a ground-truth
+     cross-check parsing a REAL Win2022 aux slice header from the
+     committed capture and asserting our emitter produces the
+     identical syntax-element sequence;
+  2. frame_num slots: shared-counter golden sequences over synthetic
+     interleaves, 255->0 wrap vectors, sparse-aux cadence guards;
+  3. reference-resolution/pinning model: a pure-C DPB simulator
+     (sliding window + mmco6 + IDR LTR flag) fed the AU sequence in
+     BOTH feeding modes; asserts same-view resolution identical in
+     both modes, LT slots NEVER evicted by the sliding window across
+     >= 512 frames incl. the wrap, mmco6 reassignment replaces the
+     occupant, max_num_ref_frames accounting holds;
+  4. fail-loud negative vectors (unexpected slice shapes, existing
+     mmco/modification syntax, level-insufficient SPS).
+- Invariance contract UPGRADED (was: topology-3 expected-RED "like
+  Windows"): Windows' topology-3 failure is partly a QUIRK we don't
+  copy — its first aux references LT0 (main IDR). Ours is a
+  self-contained non-IDR I slice self-marking LT1, so the aux chain
+  never reaches into the main context. New requirement: BOTH decode
+  modes must PASS — 1-context bit-identical, 2-context main
+  bit-identical + aux PIXEL-identical by framemd5 (frame_num-gap
+  decoder warnings tolerated and recorded; gaps are unavoidable
+  syntax since the shared counter increments on unseen main frames,
+  but prediction flows only through LT slots). Topology-3 pixel
+  mismatch is RED again, not an accepted expectation.
+- Acceptance gate items (1) and (3) updated accordingly (unit matrix
+  green under make check; both-mode verification on fleet + T4
+  captures).
+
 ### Absolute numbers (owner directive: never percentages alone)
 
 - Steady-state wire rate, 1600x900, VAAPI CQP qp=20, 20 s windows:
