@@ -2748,9 +2748,72 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   any PR. Local system astyle is 3.1 and DISAGREES with 3.4.14;
   never use it for gate checks.
 - STILL OPEN (owner-blocked, FR-H264-8 stays EXPERIMENTAL, leaf
-  stays the shipped default): T4 nvenc capture (T4 redeploy
-  pending), macOS onscreen verdict (must include watching a re-key
-  boundary per the topology-3 epoch rule), owner sign-off.
+  stays the shipped default): ~~T4 nvenc capture~~ CLOSED 2026-07-28
+  (see "T4 nvenc GATE" below); macOS onscreen verdict — the owner
+  reported arm-n good on macOS AND Windows multimon on 2026-07-28,
+  but a re-key-boundary watch per the topology-3 epoch rule is still
+  outstanding; owner sign-off.
+
+### 2026-07-28 T4 nvenc GATE — PASSED (machine-side gate item CLOSED)
+
+The last machine-side gate before FR-H264-8 can drop EXPERIMENTAL:
+does the LTR aux-chain hold on REAL nvenc hardware (not VAAPI/x264)?
+Run on the T4 (EC2 Tesla T4, driver 580.173.02, ffmpeg 8.0.1),
+deployed from clean debs, captured from the real path.
+
+- PRE-CHECK (cheap, before any deploy): generated real h264_nvenc bytes
+  on the T4 with the SHIPPED gfx.toml args and ran
+  `tools/avc444_ltr_wire_audit.py --annexb`. All nine ltr_cache_ok()
+  conditions PASS — critically poc_type=2 (the one that could have
+  killed the feature outright), CABAC=1, weighted_pred=0,
+  num_ref_idx_l0_default_minus1=0. nvenc's own marking is
+  sliding-window, i.e. the benign kind the rewriter replaces.
+- DEPLOY: xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1 (branch HEAD)
+  + xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3, installed as
+  debs, pairing verified with dpkg -l after install. gfx.toml profiles
+  are now VERSIONED: PR-demo/t4_profile/gfx-t4-nvenc-{ltr,leaf}.toml.
+  -g 240 was KEPT on purpose so a mid-stream IDR fires every ~8 s,
+  exercising the aux-child respawn / LT1 re-seed path on real nvenc.
+- WIRE STRUCTURE (live captures, orbit-drag workload, archived under
+  PR-demo/mac_bisect_matrix/captures/t4_nvenc_ltr_20260728/):
+    1600x912 : 3062 pictures, 7 IDR epochs, 1524/1524 P->own slot per
+               view, 0 cross-view, 0 frame_num gaps
+    1024x768 : 2036 pictures, 5 epochs, 1013/1013 per view, 0 gaps
+    3840x2400: 1384 pictures, 3 epochs,  689/689  per view, 0 gaps
+  Zero gaps ACROSS epoch restarts is the important part: every main IDR
+  is followed by an aux seed-I that re-marks LT1 and the single shared
+  chain continues — the respawn path works on nvenc.
+- BANDWIDTH A/B (same box, same workload, leaf control captured in the
+  same session; per-picture bytes):
+    1600x912 : aux 66177 -> 463 B (-99.3%), main 1122 -> 873 B,
+               PAIR 67.3 KB -> 1.3 KB (-98.0%);  fps 34.9 -> 33.9
+    3840x2400: aux 83231 -> 2730 B (-96.7%), main 13449 -> 12230 B,
+               PAIR 96.7 KB -> 15.0 KB (-84.5%); fps 15.1 -> 14.2
+  Client decode backlog was queue_depth=0 for every frame in every run.
+  CAVEAT: the saving is workload-shaped — an orbit-drag over a mostly
+  static desktop is the best case for the chain (leaf re-encodes a full
+  intra aux EVERY frame regardless of how little changed). The VAAPI
+  arm-n line-scroll numbers (-76%/-69%) remain the conservative figure.
+- HONEST CORRECTION: the first two runs were labelled 1920x1080 and
+  3840x2400 but the client Xvfb was still 1600x900 from earlier work,
+  so both actually ran at 1600x912; captures were relabelled and 4K was
+  re-run on a 3904x2560 display (SPS confirms 3840x2400, level 61).
+  The 34 fps figure belongs to 1600x912; true 4K is 14.2 fps at 67.5 ms
+  encode p50.
+- PACK BENCH on the T4 reference CPU (mandated after every encoder-path
+  deb build), 3840x2400: vectorized packed views 7.81 ms/frame (scalar
+  negative example 47.26; old planar xorgxrdp half 6.11). 2000x1000:
+  1.53 ms. 500x200: 0.09 ms.
+- T4 left in the LTR state (aux_intra_leaf=false, aux_ltr_chain=true),
+  services active, session Xorg torn down with a clean sesman finish so
+  the owner's next login starts fresh.
+- NEW T4 GOTCHA (cost ~15 min this session, now scripted): a recreated
+  T4 comes back with cloud-init having RE-LOCKED the ubuntu account
+  (`passwd -S ubuntu` = "L") while /root/.ubuntu_cred survives in the
+  image, so RDP login fails with `pam_authenticate failed` that looks
+  like a broken deploy. `PR-demo/t4_profile/t4_restore_cred.sh` restores
+  the invariant idempotently (credential never leaves the box, never
+  printed, never an argv). /root/.t4_host was also stale — updated.
 
 ### 2026-07-28 post-fix wire audit — BOTH VIEWS INTER-CODED (re-confirmed)
 
