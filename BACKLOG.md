@@ -2296,6 +2296,58 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   live arm-m AVC444 pipeline (xfreerdp3 client on Xvfb, xwd):
   captures/bench_workloads_20260728/{tick,scroll,gray,chroma,code}.png
 
+### Text rendering backend + LCD subpixel AA (owner review, same day)
+
+- Backend: xterm `-fa` = Xft -> libXft -> freetype (not bitmap core
+  fonts). The container image ships fontconfig
+  `10-sub-pixel-none.conf`, which ASSIGNS rgba=none into every match
+  pattern — so the first code-workload runs rendered GRAYSCALE AA:
+  no LCD subpixel fringes, understressing the aux/chroma channel vs
+  a real LCD-tuned desktop. Measured, not assumed: off-blend-line
+  chroma residual of glyph-edge pixels in the line-number gutter
+  (single known fg/bg pair) on the RAW session framebuffer = 0.50/255
+  (pure grayscale blend). An Xft.rgba xrdb override alone did NOT
+  work (fontconfig pattern assignment preempts Xft defaults).
+- Fix (banner.sh code workload): user-level fontconfig
+  ~/.config/fontconfig/fonts.conf (loads via 50-user.conf AFTER the
+  10-* rules; mode="assign" overwrites) forcing rgba=rgb +
+  lcdfilter=lcddefault, plus the Xft resources. Verified: raw session
+  residual 0.50 -> 30.58 (real RGB fringes at the renderer); client-
+  side residual 26.71 — the fringes SURVIVE the AVC444 pipeline
+  end-to-end (committed zoom: code_subpixel_zoom.png). Pipeline
+  chroma noise floor at CQP qp=20: ~5/255 mean residual on
+  flat-blend edges (grayscale-AA content measured 5.67 client-side
+  vs 0.50 at source).
+- Subpixel re-bench: arm-i 1.584 MB/s, arm-m 1.509 MB/s (-4.7%).
+  Subpixel fringes cost ~21% extra traffic on BOTH arms vs grayscale
+  AA (1.308->1.584 / 1.231->1.509 MB/s) — the workload now measurably
+  stresses the chroma path. code.png updated to the subpixel render.
+
+### Absolute numbers (owner directive: never percentages alone)
+
+- Steady-state wire rate, 1600x900, VAAPI CQP qp=20, 20 s windows:
+
+  | workload            | arm-i      | arm-m      | delta abs   | delta % |
+  |---------------------|------------|------------|-------------|---------|
+  | tick                | 38.2 KB/s  | 7.5 KB/s   | -30.7 KB/s  | -81%    |
+  | gray                | 11.9 KB/s  | 5.8 KB/s   | -6.1 KB/s   | -51%    |
+  | chroma (flat bands) | 56.6 KB/s  | 80.6 KB/s  | +24.0 KB/s  | +42%    |
+  | code, grayscale AA  | 1308 KB/s  | 1231 KB/s  | -77 KB/s    | -5.9%   |
+  | code, subpixel AA   | 1584 KB/s  | 1509 KB/s  | -75 KB/s    | -4.7%   |
+  | scroll              | 6320 KB/s  | 5649 KB/s  | -671 KB/s   | -11%    |
+
+- Noise floor, so significance is explicit: idle (static content) is
+  0 B/s; run-to-run drift <1% of each rate (tick repeat ±0.2 KB/s,
+  chroma repeat ±0.8 KB/s, arm-i chroma byte-identical across runs).
+  All deltas above are therefore real MEASUREMENTS — but practical
+  significance differs by an order of magnitude: tick/gray/chroma
+  run at tens of KB/s absolute (<1% of a 100 Mbit link; they
+  characterize architecture mechanics, not user-visible load), while
+  code (~12 Mbit/s) and scroll (~48 Mbit/s) are the classes that
+  size real links; there the partitioning saves 0.6 and 5.4 Mbit/s
+  respectively, and the chroma +24 KB/s regression is 0.19 Mbit/s —
+  negligible in absolute terms.
+
 ### Chroma-regression root cause: MB-level analysis (same day) — CORRECTS the first-cut interpretation above
 
 - Owner asked why chroma regresses if VAAPI aux was "already

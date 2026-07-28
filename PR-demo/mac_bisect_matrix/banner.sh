@@ -84,6 +84,34 @@ code)
     # at 10 lines / 0.1 s. 3000 lines => a full pass takes 30 s, so no
     # frame content repeats within a bench window. Fails LOUD if the
     # corpus mount is missing — never silently benchmarks a fallback.
+    #
+    # LCD SUBPIXEL AA (freetype RGB decimation): the container image
+    # ships fontconfig 10-sub-pixel-none.conf, which ASSIGNS rgba=none
+    # into every pattern — that preempts Xft.rgba resources (measured:
+    # raw session residual 0.50 = pure grayscale AA), understressing
+    # the aux/chroma channel vs a real LCD-tuned desktop. Override at
+    # the user fontconfig layer (50-user.conf loads after 10-*, and
+    # mode="assign" overwrites), which the code workload needs for the
+    # colored subpixel fringes real desktops put on every glyph edge.
+    mkdir -p "$HOME/.config/fontconfig"
+    cat > "$HOME/.config/fontconfig/fonts.conf" <<'FCEOF'
+<?xml version="1.0"?>
+<!DOCTYPE fontconfig SYSTEM "fonts.dtd">
+<fontconfig>
+  <match target="pattern">
+    <edit name="rgba" mode="assign"><const>rgb</const></edit>
+    <edit name="lcdfilter" mode="assign"><const>lcddefault</const></edit>
+    <edit name="antialias" mode="assign"><bool>true</bool></edit>
+  </match>
+</fontconfig>
+FCEOF
+    xrdb -merge <<'XRDBEOF' || true
+Xft.antialias: 1
+Xft.rgba: rgb
+Xft.lcdfilter: lcddefault
+Xft.hinting: 1
+Xft.hintstyle: hintslight
+XRDBEOF
     exec "${XTERM[@]}" -bg '#002b36' -fg '#839496' -fs 14 -e bash -c '
         CORPUS=/usr/local/share/code_corpus.ansi
         if [ ! -s "$CORPUS" ]; then
