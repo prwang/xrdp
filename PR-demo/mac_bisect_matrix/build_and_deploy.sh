@@ -32,8 +32,10 @@ declare -A ARM_XORG_DEB=(
     [arm-k]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
     [arm-j]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
     [arm-l]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-m]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-n]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
+    # arm-m/arm-n: 251bc4d + shmem up-front reservation (SIGBUS ->
+    # loud connect-time refusal on undersized /dev/shm, 2026-07-28)
+    [arm-m]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
+    [arm-n]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
@@ -41,8 +43,8 @@ declare -A ARM_TAG=(
     [arm-h]=bd1ab35b791e-xfce [arm-i]=bd1ab35b791e-xfce
     [arm-j]=649b447c9f4d-xfce [arm-k]=8b8d17c2636a-xfce
     [arm-l]=459b66d5319f-xfce
-    [arm-m]=39bb08a48377-xfce
-    [arm-n]=34795577580b-xfce
+    [arm-m]=39bb08a48377.xx5b9650c-xfce
+    [arm-n]=34795577580b.xx5b9650c-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -54,6 +56,9 @@ declare -A TAG_DEB=(
     [459b66d5319f]="xrdp-dev_0.10.80+git20260727210620.459b66d5319f_amd64.deb"
     [39bb08a48377]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
     [34795577580b]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
+    # .xx<hash> = same xrdp deb, rebuilt image embedding xorgxrdp <hash>
+    [39bb08a48377.xx5b9650c]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
+    [34795577580b.xx5b9650c]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

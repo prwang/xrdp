@@ -2752,6 +2752,50 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   pending), macOS onscreen verdict (must include watching a re-key
   boundary per the topology-3 epoch rule), owner sign-off.
 
+### 2026-07-28 "arm-n multiscreen 0xd06" incident — RESOLVED, not LTR
+
+- Owner report: multiscreen (client 5Q77) session hangs with client
+  error 0xd06 "invalid data packet format" on window drag/resize;
+  reproduced: thunar window RESIZE kills the session instantly.
+- Root cause (confirmed by on-demand reproduction, NOT the LTR
+  rewriter): Xorg SIGBUS in a8r8g8b8_to_avc444_box.avx2 /
+  rdpCaptureGfxA2. g_alloc_shm_map_fd sizes the capture segment with
+  a sparse ftruncate; tmpfs pages allocate on FIRST WRITE, so on the
+  k8s default 64Mi /dev/shm the dual-monitor 3840x3840 layout
+  (77,414,400 B = two slots x [3840x2400 + 2560x1440] packed views)
+  crashed the X server the moment large damage (window resize,
+  reconnect invalidate) touched enough fresh pages. Drag survived
+  (already-touched pages); resize died. The client's 0xd06 dialog is
+  its rendering of the abrupt mid-stream teardown. Reproduced
+  single-monitor at /size:3840x3840 (88,473,600 B) + gray full-frame
+  workload: identical backtrace in seconds. Every fleet arm was
+  exposed, not just arm-n; arm-m leaf would crash identically.
+- Fix (owner directive: complain loudly at connect, never silently
+  accept then crash mid-session):
+  1. xorgxrdp 5b9650caf (fix/gfx-h264-multimon-shmem-split):
+     g_alloc_shm_map_fd posix_fallocates the whole segment (SIGBUS
+     now impossible for the capture shmem); allocation failure logs
+     ERROR naming the byte count + /dev/shm suspicion and REFUSES
+     the client connection (msg 104 + monitor-update propagation)
+     while the X session survives for a smaller-geometry reconnect.
+     Deb xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3 deployed to
+     arm-m/arm-n (image tags *.xx5b9650c-xfce).
+  2. Fleet manifests: every arm-*.yaml now mounts a 512Mi
+     memory-backed emptyDir at /dev/shm (k8s default is 64Mi).
+  3. xrdp common/os_calls.c g_alloc_shm_map_fd: same posix_fallocate
+     hardening (parity; non-Apple only), rides the next deb.
+- Verified live on arm-n: (a) 32Mi /dev/shm + 3840x3840 -> loud
+  ERROR "can not allocate 88473600 bytes ... /dev/shm is probably
+  too small", client refused, Xorg alive, session preserved;
+  (b) 512Mi + 3840x3840 gray full-frame 45 s -> zero Bus errors,
+  client connected throughout, aux_ltr_chain active. make check
+  322/322; astyle 3.4.14 clean on touched files.
+- Owner retest of the original multiscreen scenario on arm-n
+  (127.0.0.1:40013) is the remaining confirmation; the earlier
+  Signals-iMac single-monitor 12 s disconnect (17:38, clean
+  client-side EOF, no crash, no server error) remains unexplained —
+  watch for it during the macOS gate pass.
+
 - TIER-A INTEGRATED WITH THE LTR SPLICE (both implementations):
   roundtrip --splice cmd through ltr_splice_ref.py AND through the
   real C rewriter (driver adapter) both GREEN with IDENTICAL values

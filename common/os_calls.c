@@ -1677,6 +1677,24 @@ g_alloc_shm_map_fd(void **addr, int *fd, size_t size)
         close(lfd);
         return 2;
     }
+#if !defined(__APPLE__)
+    /* ftruncate only sets the file size: tmpfs pages are still allocated
+       lazily on first write, so an undersized /dev/shm (64MB in default
+       containers) surfaces later as SIGBUS on a write to an unbacked
+       page. Reserve every page now so a too-small /dev/shm fails this
+       call instead of crashing the process mid-session. */
+    {
+        int rv;
+        while ((rv = posix_fallocate(lfd, 0, size)) == EINTR)
+        {
+        }
+        if (rv != 0)
+        {
+            close(lfd);
+            return 4;
+        }
+    }
+#endif
     /* map fd to address space */
     laddr = mmap(NULL, size, PROT_READ | PROT_WRITE, MAP_SHARED, lfd, 0);
     if (laddr == MAP_FAILED)
