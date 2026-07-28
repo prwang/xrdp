@@ -17,7 +17,9 @@ modification and 7.3.3.3 dec_ref_pic_marking). Nothing is assumed about
 the encoder; a stream that does not match the guard shape is reported as
 such rather than silently mis-parsed.
 
-Usage: avc444_ltr_wire_audit.py <dump.bin> [label] [max_pictures]
+Usage: avc444_ltr_wire_audit.py [--annexb] <file> [label] [max_pictures]
+  --annexb: <file> is a RAW Annex-B elementary stream from a child
+  encoder; report its shape and whether ltr_cache_ok() accepts it.
 """
 import struct
 import sys
@@ -287,10 +289,102 @@ def describe(sh):
     return kind, refs, mark
 
 
+
+GUARD = """FR-H264-8 LTR guard (xrdp_h264_annexb.c ltr_cache_ok): the aux
+chain rewriter accepts a child encoder's stream only if every condition
+below holds. A single FAIL means the encoder's stream shape cannot be
+spliced and the chain stays off (leaf topology is used instead)."""
+
+
+def guard_report(sps, pps):
+    """Evaluate ltr_cache_ok()'s conditions against a parsed SPS/PPS."""
+    checks = [
+        ('log2_max_frame_num in 4..16', 4 <= sps['log2_max_frame_num'] <= 16,
+         sps['log2_max_frame_num']),
+        ('poc_type == 2', sps['poc_type'] == 2, sps['poc_type']),
+        ('frame_mbs_only == 1', sps['frame_mbs_only'] == 1,
+         sps['frame_mbs_only']),
+        ('sps scaling absent', True, 'ok (parse would have raised)'),
+        ('entropy CABAC == 1', pps['cabac'] == 1, pps['cabac']),
+        ('slice_groups == 0', pps['slice_groups'] == 1,
+         pps['slice_groups'] - 1),
+        ('weighted_pred == 0', pps['weighted_pred'] == 0,
+         pps['weighted_pred']),
+        ('num_ref_idx_l0_default_minus1 == 0',
+         pps['num_ref_idx_l0_default'] == 1,
+         pps['num_ref_idx_l0_default'] - 1),
+        ('redundant_pic_cnt absent', pps['redundant_pic_cnt_present'] == 0,
+         pps['redundant_pic_cnt_present']),
+    ]
+    print(GUARD)
+    print()
+    ok = True
+    for name, passed, val in checks:
+        print('  %-36s %-4s (value: %s)'
+              % (name, 'PASS' if passed else 'FAIL', val))
+        ok = ok and passed
+    return ok
+
+
+def audit_annexb(path, label, max_pics):
+    """Guard/shape audit of a RAW Annex-B elementary stream (one view)."""
+    buf = open(path, 'rb').read()
+    sps = pps = None
+    pics = []
+    for nal in nals_of(buf):
+        t = nal[0] & 0x1F
+        if t == 7:
+            sps = parse_sps(nal)
+        elif t == 8:
+            pps = parse_pps(nal)
+        elif t in (1, 5) and sps and pps and len(pics) < max_pics:
+            sh = parse_slice(nal, sps, pps)
+            if sh['first_mb'] != 0:
+                continue
+            sh['view'] = 'stream'
+            sh['bytes'] = len(nal)
+            pics.append(sh)
+    if sps is None or pps is None:
+        sys.exit('%s: no SPS/PPS found' % label)
+    print('=== %s (raw Annex-B) ===' % label)
+    print('SPS: %dx%d profile=%d level=%d max_num_ref_frames=%d '
+          'log2_max_frame_num=%d poc_type=%d gaps=%d'
+          % (sps['width'], sps['height'], sps['profile'], sps['level'],
+             sps['max_num_ref_frames'], sps['log2_max_frame_num'],
+             sps['poc_type'], sps['gaps_allowed']))
+    print('PPS: cabac=%d num_ref_idx_l0_default=%d weighted_pred=%d '
+          'slice_groups=%d redundant=%d'
+          % (pps['cabac'], pps['num_ref_idx_l0_default'],
+             pps['weighted_pred'], pps['slice_groups'] - 1,
+             pps['redundant_pic_cnt_present']))
+    print()
+    print('first %d pictures:' % min(8, len(pics)))
+    for sh in pics[:8]:
+        kind, refs, mark = describe(sh)
+        print('  fn=%-6d %-3s %-10s %-24s %7dB'
+              % (sh['frame_num'], kind, refs, mark, sh['bytes']))
+    print()
+    ok = guard_report(sps, pps)
+    print()
+    if ok:
+        print('GUARD VERDICT: PASS -- this encoder\'s stream shape is '
+              'splicable by the FR-H264-8 LTR rewriter.')
+        return 0
+    print('GUARD VERDICT: FAIL -- the LTR rewriter would refuse this '
+          'encoder (chain stays off; leaf topology used).')
+    return 1
+
 def main():
-    path = sys.argv[1]
-    label = sys.argv[2] if len(sys.argv) > 2 else path
-    max_pics = int(sys.argv[3]) if len(sys.argv) > 3 else 10 ** 9
+    argv = sys.argv[1:]
+    annexb = False
+    if argv and argv[0] == '--annexb':
+        annexb = True
+        argv = argv[1:]
+    path = argv[0]
+    label = argv[1] if len(argv) > 1 else path
+    max_pics = int(argv[2]) if len(argv) > 2 else 10 ** 9
+    if annexb:
+        sys.exit(audit_annexb(path, label, max_pics))
     sps_seen, sps, pps, pics = audit(path, label, max_pics)
     if not pics:
         sys.exit('%s: no pictures parsed' % label)
