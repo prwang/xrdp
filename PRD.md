@@ -764,6 +764,20 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
    unaligned tails fall back to an in-kernel copy — still never a
    user-space copy.
 
+### Concurrency state of the encode pipeline (measured 2026-07-28; the baseline FR-PROC-7 builds on)
+
+Verified in code, not assumed. Keep this table current — it is the map every performance decision starts from.
+
+| Stage pair | Concurrent? | Evidence |
+|---|---|---|
+| capture ‖ encode | **YES, shipped** (FR-CAPTURE-8) | `XUP_CAP_AVC444_SLOT_COUNT = 2`; `rdpClientConCapSlotIndex()` alternates on `rect_id`; `MaxOutstandingRects() = 2` for `CC_GFX_AVC444`. Measured: frame period **equals** encode duration (1600×912: both p50 27.9 ms) while `cap->enc_entry` adds a further 23.8 ms that never reaches the period — capture is fully hidden. Cost: up to one frame of added latency. |
+| monitor₁ ‖ monitor₂ | **NO** | `xrdp_encoder_create()` spawns exactly one worker (`tc_thread_create(proc_enc_msg, self)`) draining one FIFO; per-monitor state is only an array (`avc444_ffmpeg_handle[mon_index]`). |
+| encode_main ‖ encode_aux | **NO** | `encode_pair()` runs `encode_single(main)` to completion, then `encode_single(aux)`; each is a synchronous submit-then-block-for-packet round trip. |
+
+**The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
+
+`encode_single()` is already **submit-then-collect** internally (it pushes to the vmsplice iov queue, then blocks in `pump()`), so exposing `submit_single()` / `collect_single()` is a mechanical refactor rather than a redesign.
+
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 
 Supersedes NG-6's deferral. During motion, frames are sent luma-first
@@ -1392,6 +1406,22 @@ Pixel-level decode equivalence across the three topologies remains the integrati
 4. *Baseline first.* The harness runs against the FR-H264-7 leaf arm before the FR-H264-8 arm exists; the leaf PSNR band on identical content is the reference FR-H264-8 must match (bandwidth may improve; fidelity may not regress).
 
 Gate wiring: item (1) of the acceptance gate additionally requires the roundtrip harness green in both modes, including the stressor sequences, with the sensitivity validation recorded — before any live-arm deployment.
+
+**Correctness invariants (state them when touching this path).**
+
+- **I1 — one reference, always the immediately preceding same-view picture.** Enforced by `-refs 1` plus the guard `num_ref_idx_l0_default == 0`. This is load-bearing: the whole LTR relabeling is sound *only* because a child can never reach further back than one picture. A child with `refs > 1` would emit silently wrong pixels through a rewrite that parses as perfectly correct.
+- **I2 — the wire relabels that reference to the view's long-term slot**, and the slot always holds the immediately preceding same-view picture (mmco6 self-mark on every picture + list-modification idc = 2). Enforced by construction; an aux P with LT1 unseeded is a loud failure.
+- **I3 — bounded transitive dependency depth.** Direct reference age is always exactly one picture, so "staleness" is not about the slot; it is the distance back to the last picture in that view coded without a reference. Only the paired scheduled refresh of the revised FR-H264-6 bounds it, and it must be bounded in **both** views — a main-only refresh does not bound aux.
+
+**Gate status (2026-07-28).** Machine-side items are CLOSED:
+
+1. Unit matrix green under `make check` (322/322, incl. 116 in the xrdp suite); C rewriter and the independent Python reference splicer produce byte-identical output; roundtrip PSNR harness green in both decode modes with fault-injection sensitivity recorded.
+2. Drop-aux bit-identity verified on live captures; wire bit-identical in both modes.
+3. Both backends verified from real captures — VAAPI (fleet arm-n) and **NVENC (T4)**. T4 structure at three geometries (1024×768 / 1600×912 / 3840×2400): every P slice in both views retargets its own slot, zero cross-view references, and **zero frame_num gaps across 3–7 mid-stream IDR epochs**. A control run on the leaf arm through the same parser shows the opposite shape (aux 166/166 intra, 164 chain gaps), so the check discriminates topologies rather than confirming the expectation.
+4. Bandwidth gate PASSED. VAAPI line-scroll baselines (the gating workloads): aux 70.13 → 17.12 KB/frame (−76 %) on `code`, 326.29 → 101.85 (−69 %) on `scroll`, at equal delivered pairs/s. NVENC A/B on identical content, per picture: 1600×912 aux 66177 → 463 B (−99.3 %), pair −98.0 %; 3840×2400 aux 83231 → 2730 B (−96.7 %), pair −84.5 %; `queue_depth = 0` on every frame. Non-gating record: tick −98.6 %, gray −83 %, codefast −21 %, scrollfast −29 %, and an honest adversarial regression on flat saturated `chroma` bands (+224 %).
+5. Onscreen: owner reports the T4 renders correctly on **both Windows (incl. multimon) and macOS** (2026-07-28).
+
+Open before the default can change: a macOS observation across a **re-key boundary** (topology-3 epoch rule), the scheduled-paired-refresh work of the revised FR-H264-6 (until it lands, arms run `-g 30000`, which trades away the I3 bound — acceptable only as an interim), and owner sign-off.
 
 **Acceptance gate (to leave EXPERIMENTAL).** (1) The unit-test matrix above green under `make check`; the offline synthesized stream decodes bit-identical (framemd5) to each child’s own decode; and the semantic roundtrip PSNR harness green in BOTH decode modes including the stressor sequences, with its sensitivity validation (fault injection + pre-fix-capture RED) recorded; (2) drop-aux bit-identity on a live capture; (3) fleet arm (VAAPI) + T4 (nvenc) wire captures verified in BOTH decode modes per the invariance contract (topology 3 pixel-identity required, gap warnings recorded); (4) macOS onscreen verdict by owner; (5) **bandwidth gate (owner directive 2026-07-28): `PR-demo/mac_bisect_matrix/bandwidth_bench.sh` is the benchmark harness for this optimization, and its result GATES acceptance.** The line-by-line scroll baselines (`code` and `scroll` workloads, 1 line/0.1 s — the classes where main is properly inter-compressed and the leaf aux dominates the pair, measured 2026-07-28: code aux 70.1 KB/frame = 85% of an 82.3 KB pair on the leaf arm) must be run in MODE=frames against the FR-H264-8 arm and the leaf arm on identical content; acceptance requires a material reduction of the steady aux KB/frame versus the leaf baseline with delivered pairs/s equal between arms, recorded as absolute per-view KB/frame in `BACKLOG.md`. A result that does not beat the leaf baseline on these workloads FAILS the gate regardless of other criteria. The ME-defeating stress variants (`codefast`, `scrollfast`) and the flat-band `chroma` bound are recorded alongside but do not gate; (6) owner sign-off recorded in BACKLOG before any default change.
 
@@ -2245,6 +2275,153 @@ The MVP is complete when all of the following are true:
 - Optional shared-memory/libavcodec performance tier.
 
 ---
+
+### Clean-room upstream port — locked decisions and slice plan
+
+*Moved from BACKLOG 2026-07-28 (persistent decisions belong here). The task itself stays in BACKLOG as an open item.*
+
+Transition from the dev branch to a reviewable upstream PR against `devel`.
+The dev branch stays as-is (history + scaffold); the PR is rebuilt clean.
+
+#### Owner decisions (locked)
+- **Strip `XRDP_GFX_TRACE` diagnostics from the PR.** All three layers:
+  the send/ack trace in `xrdp_mm.c` (`gfx_trace_on`, the send/ack log lines)
+  and the damage-bbox + enc `submitted_seq/returned_seq/inflight/centerY`
+  trace in `xrdp_encoder.c` (`gfx_enc_trace_on`, `gfx_trace_rects`). Safe
+  because the invariant it revealed is already asserted deterministically at
+  the API: `test_avc444_ffmpeg.c` requires every encode call to return
+  `READY` with `desktop_sequence == submitted` and `flush_next` → `DONE`
+  (commit 4eb72b0c), and the fail-loud `sequence mismatch` / `restarting
+  encoder` ERROR path is exercised by the smoke gate. Stripping the trace
+  removes a debugging aid, **zero** regression coverage.
+- **Strip `tail_flush` from the PR.** It was only ever a workaround for the
+  runner desync that the synchronous encode fixed; it is now a structural
+  no-op (nothing is ever in flight). Remove the ini knob and both arming
+  sites: `xrdp_tconfig.{c,h}` (`avc444_ffmpeg_tail_flush` field + parse),
+  `xrdp_encoder.h` (`avc444_flush_enabled`), the arming blocks in
+  `xrdp_encoder.c`, and the `tail_flush` docs in `gfx.toml` / `gfx.toml.5`.
+  Keep `flush_next` — that is the teardown/resize drain, unrelated to the
+  spammer.
+
+#### Base the clean-room branch on `origin/devel`, not local `devel`
+Cut the clean branch from `origin/devel` (currently 8812646d, 2026-07-16;
+remote cache is synced — do not run `git fetch`, this env has no push/fetch
+creds). Against that ref our branch is **41 ours-only / 3 origin-only**,
+merge-base `3af31df3` (Jul 2). Do NOT use the local `devel` ref (21d38d0c,
+Jun 17) as the base or comparison — it is ~a month stale, and that staleness
+is why `git diff devel..HEAD` shows a set of changes that are **upstream, not
+ours**, and must NOT appear in the PR:
+- `libxrdp/xrdp_caps.c`, `xrdp_rdp.c`, `xrdp_sec.c` — upstream CVE fixes
+  (CVE-2026-55639 GCC OOB read, and merged fork hardening).
+- `vnc/vnc.c`, `vnc/vnc.h` — CVE-2026-41252 heap overflow + desktop-size
+  symbols.
+- `sesman/sesexec/session.c` — CVE-2026-55626 (Xvnc UDS TCP disable).
+- `librfxcodec` submodule pointer bump.
+Rebasing the AVC444 layers onto a freshly fetched `origin/devel` drops all of
+these automatically (they are already upstream). After fetch, sanity-check:
+the only non-AVC444 file the PR touches should be `common/xrdp_client_info.h`
+(`CC_GFX_AVC444 = 6`).
+
+#### Excluded from the PR (dev-branch scaffold, keep in dev branch only)
+`PR-demo/**`, `tests/xrdp/avc444/repro_mbparity/**`,
+`tests/xrdp/avc444/FINDINGS_*.md`, `repro_*.py`, `tools/gen_isoluma.py`,
+`PRD.md`, `BACKLOG.md`, `CLAUDE.md`, `*_config.md`, `scripts/build_dev_deb.sh`,
+`dist/` debs, and all untracked scratch (burr/partialGreen PNGs, `tester_key`,
+`xrdp-PR.tar`, `iptables.rules`, `*.Po`, …). Add a `.gitignore` hygiene pass.
+**Keep** `tests/xrdp/avc444/PROVENANCE.md` (the NUT independent-implementation
+/ licensing attestation) — fold it into the NUT slice and the PR cover letter;
+maintainers will ask.
+
+#### Divergence risk: none textual, one semantic touchpoint to verify
+The only commits on `origin/devel` past our merge-base (3af31df3..8812646d)
+are the 3-commit DYNVC multi-chunk reassembly fix (#3829), touching a single
+file, `libxrdp/xrdp_channel.c` — which our branch never touches. Zero conflict
+surface, so **do not rebase the dev branch to "derisk"**: there is nothing to
+resolve, and the clean-room slices apply onto `origin/devel` (which already
+has the fix) as a clean textual apply. One semantic note: large full-screen
+AVC444 frames are chunked over drdynvc, and #3829 corrects multi-chunk
+reassembly — a correctness fix we *inherit* by basing on `origin/devel`.
+Confirm during clean-room smoke that large AVC444 frames reassemble cleanly on
+the new base (expected: fine / better; not a risk, just a checkpoint).
+
+#### Acceptance
+- PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
+  AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
+- Every slice builds and `make check` passes on its own (bisectable).
+  Re-verified 2026-07-22 after the dump_extra rewrite for the four
+  rewritten commits (`04e43ee2` → tip `c74a09e7`): per-slice `make` +
+  `make check` green, plus the gated real-ffmpeg suite (64/64) against
+  ffmpeg 7.1 and 8.1 at every slice. Slices 1–6 are untouched by the
+  rewrite (identical hashes).
+- No `XRDP_GFX_TRACE`, no `tail_flush` anywhere in the diff.
+- astyle (pinned 3.4.14) + cppcheck clean; `/* */` comments only.
+
+### Commit reorganization plan (clean-room slices) — DRAFT (2026-07-17)
+
+Rebuild the feature as ~10 modular commits, each one subfeature, bottom-up so
+every commit compiles and tests green (leaf utilities first, wire integration
+last). Each slice carries its own `Makefile.am` / test-registration hunk so it
+is self-contained. Suggested order:
+
+1. **caps enum plumbing.** `common/xrdp_client_info.h` (`CC_GFX_AVC444`),
+   `xrdp/xrdp_types.h`. No behavior change; the capture-capability constant
+   everything else references.
+2. **RGB→NV12 dual-plane converter + 16/32 chroma alignment.**
+   `xrdp_avc444_convert.{c,h}` + `test_avc444_convert.c`. Pure/deterministic;
+   includes the mstsc chroma-split (“burr”) fix via `chroma_align` and its
+   `test_avc444_width_align` / `odd_dims` guards. Self-contained leaf.
+3. **H.264 Annex-B validator.** `xrdp_h264_annexb.{c,h}` +
+   `test_avc444_h264.c`. Pure leaf (NAL header / SPS-PPS-IDR checks).
+4. **NUT demuxer.** `xrdp_nut.{c,h}` + `test_avc444_nut.c` +
+   `fixture_4frame.nut` + `PROVENANCE.md`. Pure leaf; independent-impl note
+   ships with it.
+5. **AVC420/AVC444 metablock emission.** The `out_RFX_AVC420_METABLOCK` +
+   region-rect serialization in `xrdp_encoder.c` + `test_avc444_metablock.c`.
+   (If not cleanly separable from dispatch, fold into slice 8.)
+6. **AVC444/AVC420 caps negotiation.** `xrdp_avc444_caps.{c,h}` +
+   `test_avc444_caps.c`. Pure logic: pick v2 / 420 from the client capset.
+7. **External stock-ffmpeg runner (synchronous encode).**
+   `xrdp_encoder_ffmpeg.{c,h}` + `test_avc444_ffmpeg.c`. Spawn/argv incl.
+   one-frame `-probesize` and the `dump_extra,h264_mp4toannexb` bsf chain
+   (global-header muxer vs encoders with no in-band SPS/PPS repeat —
+   h264_nvenc; folded in 2026-07-22 after the T4 finding, branch rewritten,
+   slice now `04e43ee2`), NUT read loop, **synchronous** encode + sequence
+   verification, resize lifecycle. Built correct from the start (no desync/
+   deadlock to “fix later”); the test carries both regression guards plus
+   the global-header-encoder probe regression. Depends
+   on 2–4. **No tail_flush, no trace.**
+8. **Encoder integration / dispatch.** `xrdp_encoder.{c,h}`: select the ffmpeg
+   backend, feed converter output, emit metablock + bitstream. Depends on
+   2–7. **No trace.**
+9. **eGFX caps advertise + wire-to-surface send.** `xrdp_mm.c`: advertise the
+   AVC444 capset, connect-time encoder probe, send path. Depends on 6/8.
+   **No send/ack trace.**
+10. **Config + docs.** `xrdp_tconfig.{c,h}` (`[avc444_ffmpeg]` path/avc_mode/
+    encoder_args parse) + `test_tconfig.c` + `tests/xrdp/gfx/*.toml`,
+    `gfx.toml`, `xrdp.ini.in`, `docs/man/gfx.toml.5.in`. **No tail_flush.**
+
+Notes: build glue travels with its slice (do not defer Makefile edits to a
+trailing commit, or intermediate commits won’t build). The synchronous-encode
++ probesize design is baked into slice 7 as the *initial* implementation — the
+dev branch’s desync/deadlock/fix archaeology is intentionally not replayed;
+its rationale belongs in the PR description, with `PRD.md` §25 as the
+long-form reference.
+
+#### Slice-order amendment: latent upstream multimon fix FIRST (2026-07-25, owner directive)
+
+BOTH repos' clean-room slicing must put the **GFX H.264 multimon shmem-split
+fix first** (the per-monitor shmem offset fix for the latent UPSTREAM
+cross-monitor plane-overwrite bug — see "dual-monitor drag burr" item), and
+**rebase the real AVC444 feature work on top of it**, so the merged history
+attributes scope and ownership cleanly: the bugfix slice touches only
+upstream-reachable code paths (`CC_GFX_A2`/NV12 + the msg-62 offset field +
+`XUP_CLIENT_INFO_CURRENT_VERSION` bump) and stands alone as an upstreamable
+fix for the pre-existing AVC420-x264 GFX multimon hazard; the AVC444 slices
+then inherit the corrected layout instead of appearing to introduce/fix the
+bug themselves. Applies to xrdp (slices above renumber after it) AND
+xorgxrdp (`feat/avc444-yuv444-capture` rebases onto its fix slice). Keep the
+fix slice scoped to the real blast radius (GFX H.264 family), not narrowed
+to AVC444. Status: TODO, after the fix lands + owner onscreen PASS.
 
 ## 18. Review path used for this PRD
 
