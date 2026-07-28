@@ -2752,6 +2752,38 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   pending), macOS onscreen verdict (must include watching a re-key
   boundary per the topology-3 epoch rule), owner sign-off.
 
+### 2026-07-28 post-fix wire audit — BOTH VIEWS INTER-CODED (re-confirmed)
+
+Owner question after the good multimon/macOS retest: "are you sure this
+arm is already inter-compressing BOTH main and aux?" Answered with a
+fresh parse of the DEPLOYED image, not the pre-incident record.
+
+- New in-tree diagnostic `tools/avc444_ltr_wire_audit.py`: full
+  H.264 SPS/PPS/slice-header parse (7.3.2.1 / 7.3.2.2 / 7.3.3 incl.
+  ref_pic_list_modification and dec_ref_pic_marking) of an oracle
+  AVC444 dump. Reports, per view, how many pictures are P slices
+  retargeted to their OWN long-term slot, how many self-mark back
+  into it, whether any picture references the OTHER view's slot, and
+  whether the merged decode-order frame_num chain is contiguous.
+- arm-n FRESH capture (deployed image 34795577580b.xx5b9650c, probe444
+  session on the live pod, tester session untouched): main 13/13 P
+  -> LT0, aux 13/13 P -> LT1, 0 cross-view, 0 frame_num gaps, SPS
+  log2_max_frame_num=16 / max_num_ref_frames=3. Small sample (28
+  pictures) — the archived gate captures from the SAME xrdp deb give
+  the large-sample version: code 166+166 and scroll 166+166 pictures,
+  165/165 aux P -> LT1 in each, 0 cross-view, 0 gaps.
+- CONTROL (arm-m leaf, same parser, same captures): aux = 166/166
+  INTRA, ZERO P slices, no list modification anywhere, SPS
+  log2_max_frame_num=8 / max_num_ref_frames=1, and 164 frame_num gaps
+  (two independent per-view chains). The parser therefore discriminates
+  the two topologies rather than confirming the expected one.
+- Per-picture bytes, same workload, arm-n vs arm-m leaf:
+  code   aux 14.6K vs 66.6K (-78.1%), main 10.1K vs 10.1K (-0.2%)
+  scroll aux 98.0K vs 328.1K (-70.1%), main 104.0K vs 104.1K (-0.2%)
+  i.e. the aux view really is inter-compressed (not merely P-shaped),
+  and main is byte-for-byte unchanged — main was ALREADY inter-coded
+  under the leaf architecture; FR-H264-8's change is the aux view.
+
 ### 2026-07-28 "arm-n multiscreen 0xd06" incident — RESOLVED, not LTR
 
 - Owner report: multiscreen (client 5Q77) session hangs with client
