@@ -90,7 +90,8 @@ int
 xrdp_h264_strip_pic_struct(unsigned char *data, int *len);
 
 
-/* cached SPS/PPS fields needed to parse slice headers (strip_mmco) */
+/* cached SPS/PPS fields needed to parse slice headers (strip_mmco,
+ * aux_to_leaf) */
 struct xrdp_h264_param_cache
 {
     int have_sps;
@@ -98,12 +99,18 @@ struct xrdp_h264_param_cache
     int log2_max_poc_lsb;
     int poc_type;
     int frame_mbs_only;
+    int scaling_present;    /* SPS seq_scaling_matrix_present_flag       */
     int have_pps;
     int entropy_cabac;
     int slice_groups;
     int weighted_pred;
     int deblock_present;
     int redundant_present;
+    int pic_init_qp;        /* pic_init_qp_minus26 + 26                  */
+    int chroma_qp_offset;
+    int second_chroma_qp_offset;
+    int transform_8x8;
+    int pps_scaling_present;
 };
 
 /*
@@ -116,6 +123,29 @@ struct xrdp_h264_param_cache
 int
 xrdp_h264_strip_mmco(unsigned char *data, int *len,
                      struct xrdp_h264_param_cache *cache);
+
+/*
+ * AVC444 reference partitioning (BACKLOG 2026-07-27): rewrite an
+ * all-IDR auxiliary packet into non-reference, non-IDR I "leaf"
+ * frames so the aux view never enters the shared DPB and the main
+ * chain self-references only main frames at any aux cadence.
+ * Walks the MAIN packet first (read-only) to cache its SPS/PPS in
+ * *main_cache and read the frame_num of its last reference VCL NAL;
+ * then rewrites the AUX packet in place: SPS/PPS are cached into
+ * *aux_cache and dropped, SEI/AUD are dropped, and every IDR slice
+ * becomes a type-1 slice with nal_ref_idc 0, idr_pic_id and
+ * dec_ref_pic_marking removed, and frame_num = main frame_num + 1
+ * (the non-reference-picture rule). The CABAC payload is copied
+ * byte-verbatim after re-padding the alignment. Fails loudly (and
+ * leaves the caller to drop the packet) on any stream shape outside
+ * what our encoders emit, or if any parse-relevant SPS/PPS field
+ * differs between the two encoder children.
+ */
+int
+xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
+                      const unsigned char *main_data, int main_len,
+                      struct xrdp_h264_param_cache *main_cache,
+                      struct xrdp_h264_param_cache *aux_cache);
 
 #endif /* _XRDP_H264_ANNEXB_H */
 
