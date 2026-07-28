@@ -35,20 +35,14 @@ strip_pic_struct = true
 #   tools/avc444_ltr_wire_audit.py --annexb <nvenc.h264>
 # (all nine ltr_cache_ok conditions PASS: poc_type=2, CABAC,
 # sliding-window marking, num_ref_idx_l0_default_minus1=0).
-# -g 30000 (was 240): every main IDR forces an aux-child RESPAWN to
-# re-seed LT1, and a fresh ffmpeg+NVENC child costs ~630 ms before
-# its first packet (measured on this T4, 2026-07-28) -- inline in
-# encode_pair, so a small GOP stalls the pipeline ~0.65 s EVERY GOP
-# (~8 s at 34 fps). -g 240 was correct for the gate (it exercised
-# the epoch path on real nvenc, which PASSED); it is wrong for
-# onscreen use. 30000 matches the validated arm-n profile: IDRs
-# then occur only at session start / on demand.
-# The gate variant is kept as gfx-t4-nvenc-ltr-g240-gate.toml.
+# -g 240 is KEPT from the T4 record on purpose: it exercises a
+# mid-stream IDR every ~8s, i.e. the aux-child respawn / LT1
+# re-seed path, on real nvenc.
 aux_intra_leaf = false
 aux_ltr_chain = true
 encoder_args = [
   "-c:v", "h264_nvenc", "-profile:v", "high", "-preset", "p1", "-tune", "ll",
-  "-refs", "1", "-dpb_size", "1", "-rc", "constqp", "-qp", "20", "-bf", "0", "-delay", "0", "-g", "30000",
+  "-refs", "1", "-dpb_size", "1", "-rc", "constqp", "-qp", "20", "-bf", "0", "-delay", "0", "-g", "240",
 ]
 #
 # Hardware H.264 via VAAPI (Intel/AMD render node). ffmpeg runs as root under

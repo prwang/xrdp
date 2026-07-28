@@ -2754,6 +2754,54 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   but a re-key-boundary watch per the topology-3 epoch rule is still
   outstanding; owner sign-off.
 
+### 2026-07-28 aux-child RESPAWN COSTS ~630 ms — real defect for small GOPs
+
+Found while answering "is the main-IDR->aux dependency real or just
+numbering?". It is BOTH, and the recovery path is far more expensive than
+assumed — this is a LIVE issue in the current sequential code, not only a
+hazard for the future parallel design.
+
+- WHAT PROPAGATES (the real part): a main IDR empties the shared DPB, so
+  LT1 (the aux chain's anchor) is destroyed. The next aux picture therefore
+  cannot be a P slice at all — it must be INTRA and re-mark itself into
+  LT1. That is a genuine decoder-state dependency about CONTENT (P vs I),
+  not bookkeeping.
+- WHAT IS JUST NUMBERING (the easy part): the shared frame_num reset at the
+  IDR. The rewriter owns that counter outright, so it costs nothing.
+- WHY IT IS EXPENSIVE TODAY: we cannot ask a running ffmpeg child for an
+  intra picture (FR-H264-6: no runtime force-IDR), so encode_pair()
+  DELETES the aux child and spawn_second_child()s a new one inline, then
+  encodes aux. MEASURED on the T4: a fresh ffmpeg+NVENC child needs
+  ~630 ms before its first packet (spawn+1 frame 650 ms, +2 frames 634 ms,
+  +30 frames 1099 ms => ~630 ms fixed init, ~16.6 ms/frame after). With
+  picture_timeout_ms = 2000 it does NOT time out, so there is no encoder
+  restart and no corruption — it is a clean ~0.65 s STALL, once per IDR.
+- IMPACT BY PROFILE: at -g 240 and ~34 fps that is a ~0.65 s hitch every
+  ~7-8 s (the T4 gate profile; 22 "respawning aux child" events were
+  already logged there). At arm-n's -g 30000 an IDR essentially never
+  occurs after session start — which is exactly why arm-n looked smooth on
+  macOS and Windows multimon while the T4 gate profile would not.
+- ACTION TAKEN: PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml switched to
+  -g 30000 (installed on the T4 without restarting xrdp, so the live test
+  session was not dropped; binds at next login). The -g 240 variant is kept
+  as gfx-t4-nvenc-ltr-g240-gate.toml because it is the configuration that
+  exercised the epoch/respawn path for the gate.
+- PROPER FIXES, in increasing order of ambition (none done yet):
+  1. WARM SPARE aux child: keep a second child pre-spawned so the swap at
+     an IDR is a pointer assignment, not a 630 ms exec. Cheap, bounded, and
+     it also removes the hazard from the parallel design.
+  2. Do not let a mid-stream main IDR flush the DPB at all: rewrite it as a
+     NON-IDR intra picture that self-marks LT0 and leaves LT1 intact. The
+     machinery already exists — this is precisely what the aux seed picture
+     does today (non-IDR type-1 I slice self-marking LT1). Removes the
+     coupling entirely, so main||aux needs no special case. Risk to weigh:
+     a client that has lost state can only resync on a true IDR, so the
+     on-demand key-frame path must still emit a real one.
+  3. Only then does the parallel-submit discard-and-re-encode fallback
+     matter, and with (1) or (2) it may never be needed.
+- LESSON: "respawn the child" was treated as a cheap recovery step
+  throughout FR-H264-8 without anyone measuring it. It is ~630 ms.
+
 ### 2026-07-28 Parallelism inventory + main||aux design note (for task #40)
 
 Where concurrency EXISTS today, verified in code, not assumed:
