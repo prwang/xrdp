@@ -2117,3 +2117,15 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   REMAINING: Mac onscreen validation by owner (the decisive test);
   aux leaf bitrate (~60KB/frame all-intra) is the known cost — perf
   work only after Mac verdict.
+- OWNER VERDICT (2026-07-28): macOS Windows App renders the
+  aux_intra_leaf T4 build CLEAN — no chroma bleed, no wrong color.
+  The Mac wrong-color bisect is CLOSED: root cause cross-view inter
+  prediction in the single-context AVC444 interleave (mechanism proof
+  PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md), fix =
+  reference-partitioned single chain (aux as non-reference non-IDR I
+  leaves), validated offline (217/217 aux-drop bit-identity), on
+  xfreerdp (k=0, colors exact) and now onscreen on the Mac.
+  Follow-ups (separate items, not started): aux leaf bitrate
+  (all-intra ~60KB/frame) optimization; diagnostic knob retirement
+  (strip_pic_struct/fault_* arms no longer needed); upstream PR
+  clean-room slicing includes this fix.
