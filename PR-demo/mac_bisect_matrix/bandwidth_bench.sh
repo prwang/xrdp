@@ -52,6 +52,11 @@
 # argv, never printed. Arms are reverted to RESTORE_KIND (default
 # xfce, the git-declared fleet state) when the run ends.
 #
+# FR-H264-8 GATE INVOCATION: bandwidth_bench.sh arm-m arm-n with
+# MODE=frames WORKLOADS="code scroll" — the acceptance criterion is a
+# material steady AUX KB/frame reduction on arm-n vs the arm-m leaf
+# baseline at equal delivered pairs/s (PRD FR-H264-8 gate item 5).
+#
 # Usage: bandwidth_bench.sh [arm ...]          (default: arm-i arm-m)
 #        WORKLOADS="tick scroll gray chroma" WARMUP_SECS=12
 #        WINDOW_SECS=20 SIZE=1600x900 RESTORE_KIND=xfce to override.
@@ -87,7 +92,7 @@ fi
 declare -A PORT=( [arm-a]=40000 [arm-b]=40001 [arm-c]=40002 [arm-d]=40003
                   [arm-e]=40004 [arm-f]=40005 [arm-g]=40006 [arm-h]=40007
                   [arm-i]=40008 [arm-j]=40009 [arm-k]=40010 [arm-l]=40011
-                  [arm-m]=40012 )
+                  [arm-m]=40012 [arm-n]=40013 )
 
 DEPLOYS=()
 for arm in "${ARMS[@]}"; do
