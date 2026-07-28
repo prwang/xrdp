@@ -2130,7 +2130,7 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   (strip_pic_struct/fault_* arms no longer needed); upstream PR
   clean-room slicing includes this fix.
 
-## Reference partitioning UNCONDITIONAL + topology-invariance regression (owner directive, 2026-07-28) — IN PROGRESS
+## Reference partitioning UNCONDITIONAL + topology-invariance regression (owner directive, 2026-07-28) — DONE
 
 - Owner directive (chat, 2026-07-28): (1) option 4b (aux-refs-aux two-chain
   merge) is REJECTED as low-ROI — Lever 2 / sparse aux diminishes its
@@ -2168,3 +2168,31 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   new build) live on :40012; oracle wire capture passes
   avc444_topology_check.sh; main P-frame sizes on VAAPI recorded
   (bandwidth saving evidence); results recorded here.
+- DONE (2026-07-28, code+PRD commit 39bb08a48377). Results:
+  - tools/avc444_topology_check.sh validated BOTH directions before
+    use: GREEN on the T4 leaf wire (217/217 main + 217/217 aux
+    bit-identical), RED on the pre-fix nvenc wire t4_ps0 (105/106
+    main, 106/106 aux diverge) AND on the Mac-CLEAN arm-i VAAPI wire
+    (3/3 aux diverge in a per-view decoder) — measured proof that the
+    old VAAPI interleave was never topology-invariant either; its Mac
+    pass was purely the client's feeding pattern (sand confirmed).
+  - arm-m live on 127.0.0.1:40012 (image 39bb08a48377-xfce + xorgxrdp
+    251bc4d, gfx/arm-m.toml = arm-i's Mac-clean VAAPI CQP 444 config,
+    NO leaf knob — the build has none). Pod log: probe OK 185 ms,
+    "aux_intra_leaf active (aux child pid 335)".
+  - Oracle wire captures/armm_leaf_20260728/armm.bin (1600x900):
+    topology check GREEN 3/3 main + 3/3 aux; leaves are type-1 nri=0
+    fn=main+1 (byte-verified); reset shape [SPS,PPS,SEI,IDR].
+  - VAAPI main-bandwidth saving, SAME 1600x900 oracle content as the
+    arm-i capture: main P 27.2/33.4 KB (old interleave, cross-view
+    refs useless) -> 1.16/0.48 KB (partitioned) — the nvenc-class
+    collapse. Aux: 23.7 KB P -> 33.0 KB all-intra leaf (known cost);
+    net per pair still smaller (~51 KB -> ~34 KB) on this content.
+  - T4 NOTE (strict honesty): the T4 still runs the OLD deb
+    (9539565594e3) whose gfx.toml line aux_intra_leaf=true is
+    LOAD-BEARING there — do NOT remove that line until the T4 is
+    redeployed with >= 39bb08a48377 (which ignores the key).
+  - Local astyle is 3.1 (CI pins 3.4.14): scripts/run_astyle.sh
+    reformatted unrelated tracked files and was reverted; only
+    hand-formatted edits shipped. Style verdict rests with CI.
+
