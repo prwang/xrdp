@@ -152,3 +152,28 @@ heisenbug.** Acceptance is the ground-truth robustness test on OUR
 wire at full 1:1 main/aux alternation: drop all aux AUs (and,
 separately, per-view decode) → main frames bit-identical to the
 interleaved decode.
+
+## Status addendum (2026-07-28): fix mandatory, constraint promoted to PRD
+
+The reference-partitioning fix (main child + all-IDR leaf child,
+`xrdp_h264_aux_to_leaf`) is owner-validated on macOS (bisect CLOSED,
+BACKLOG 2026-07-28) and is now UNCONDITIONAL: the `aux_intra_leaf`
+gfx.toml knob is removed and the AVC444 ffmpeg pair path always
+partitions (PRD FR-H264-7, "decode-topology invariance"). Option 4b
+(aux-refs-aux merged chains) is rejected as low-ROI — see FR-H264-7's
+"Rejected alternative".
+
+The "accidental immunity" claim about VAAPI above is now also
+*measured* rather than argued: `tools/avc444_topology_check.sh` (the
+FR-H264-7 regression, GREEN on the T4 leaf wire 217/217+217/217) goes
+RED on BOTH pre-fix wires —
+
+- t4_ps0 nvenc interleave: 105/106 main and 106/106 aux frames diverge
+  from the single-decoder decode (the Mac-bleed class, as proven);
+- arm-i VAAPI interleave (the Mac-CLEAN arm): 3/3 aux frames diverge
+  in a per-view decoder. The old VAAPI wire was never topology
+  invariant either — it merely happened not to get caught by the Mac's
+  feeding pattern on the tested content.
+
+Both encoders therefore REQUIRE the partitioned architecture; no
+encoder is grandfathered on accidental immunity.

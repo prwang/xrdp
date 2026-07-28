@@ -2129,3 +2129,42 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   (all-intra ~60KB/frame) optimization; diagnostic knob retirement
   (strip_pic_struct/fault_* arms no longer needed); upstream PR
   clean-room slicing includes this fix.
+
+## Reference partitioning UNCONDITIONAL + topology-invariance regression (owner directive, 2026-07-28) — IN PROGRESS
+
+- Owner directive (chat, 2026-07-28): (1) option 4b (aux-refs-aux two-chain
+  merge) is REJECTED as low-ROI — Lever 2 / sparse aux diminishes its
+  bandwidth win, and it forfeits structural topology invariance (per-frame
+  PicNum/ref-list-modification arithmetic with silent-wrong-pixels as the
+  failure mode). (2) The main-child + all-IDR-leaf-child architecture is
+  REQUIRED GLOBALLY for the AVC444 ffmpeg backend: remove the
+  aux_intra_leaf gfx.toml knob and hardcode the architecture, VAAPI
+  included — VAAPI's Mac-clean result was accidental immunity (100% intra
+  MBs, a Mesa mode-decision quirk; "building on sand") and it also gains
+  the main-view bandwidth saving (cross-view refs made inter useless).
+  (3) PRD must REQUIRE decode-topology invariance and the regression
+  suite gains a two-decoder (macOS-emulating) bit-identity check.
+  (4) Deploy as the next containerd fleet arm (arm-m, 127.0.0.1:40012).
+- Preflight measurements (dev box, 2026-07-28): h264_vaapi accepts the
+  leaf child's appended args verbatim (-forced-idr 1 -force_key_frames
+  expr:gte(t,0); rc=0, no stderr) and emits 30/30 IDR either way
+  (idr_interval=0 default makes every forced I an IDR). VAAPI SPS/PPS vs
+  the rewriter's compat guard: profile 100, poc_type=2, CABAC,
+  frame_mbs_only=1, no scaling matrices, slice_groups=0,
+  deblock_present=0, redundant=0, pic_init_qp=26, chroma offsets 0,
+  transform_8x8=0, log2_max_frame_num=8 — all in-range. No per-encoder
+  recipe or new knob needed.
+- Scope: remove aux_intra_leaf from tconfig/types/encoder.h/mm plumbing;
+  AVC444 cfg site in xrdp_encoder.c sets the (now internal) cfg flag
+  unconditionally; the cross-view interleave branch in encode_pair stays
+  in-tree but unreachable from xrdp — its removal folds into the
+  diagnostic-knob-retirement item (one reviewed slice). PRD: §6.5
+  design-consequence rewrite (requirement is the WIRE — one chain, one
+  SPS, single-decoder — not process count), FR-PROC-7 items 5/10
+  reworded, new FR-H264-7 decode-topology invariance. New committed
+  regression tool tools/avc444_topology_check.sh (interleaved vs
+  drop-all-aux vs per-view two-decoder framemd5 bit-identity).
+- Acceptance: make check green + astyle clean; arm-m (VAAPI CQP 444,
+  new build) live on :40012; oracle wire capture passes
+  avc444_topology_check.sh; main P-frame sizes on VAAPI recorded
+  (bandwidth saving evidence); results recorded here.

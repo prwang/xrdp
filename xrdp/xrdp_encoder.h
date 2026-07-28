@@ -58,7 +58,6 @@ struct xrdp_encoder
     int avc444_strip_sei;  /* strip BP/PT SEI NALs (macOS interop)      */
     int avc444_sanitize_hrd; /* drop SPS VUI HRD (macOS interop)        */
     int avc444_strip_pic_struct; /* clear VUI pic_struct flag (macOS)   */
-    int avc444_aux_intra_leaf;   /* aux as non-ref I leaves (ref fix)   */
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip        */
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window   */
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
