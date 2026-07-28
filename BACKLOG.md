@@ -2754,6 +2754,66 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   but a re-key-boundary watch per the topology-3 epoch rule is still
   outstanding; owner sign-off.
 
+### 2026-07-28 Parallelism inventory + main||aux design note (for task #40)
+
+Where concurrency EXISTS today, verified in code, not assumed:
+
+1. capture || encode — YES, shipped (FR-CAPTURE-8). xorgxrdp keeps
+   XUP_CAP_AVC444_SLOT_COUNT=2 capture slots; rdpClientConCapSlotIndex()
+   alternates on rect_id and rdpClientConMaxOutstandingRects() allows 2
+   frames in flight for CC_GFX_AVC444, so frame N+1 packs into the other
+   slot while xrdp encodes frame N. Confirmed by measurement: the frame
+   period EQUALS the encode duration (1600x912: period p50 27.9 ms,
+   ENCODE p50 27.9, while cap->enc_entry is a further 23.8 ms that does
+   NOT add to the period) — capture is fully hidden behind encode.
+   Cost: up to one extra frame of latency, the usual pipelining trade.
+2. encode_screen1 || encode_screen2 — NO. xrdp_encoder_create() spawns
+   exactly ONE worker (tc_thread_create(proc_enc_msg, self), xrdp_encoder
+   .c:445) draining ONE fifo; per-monitor state is just an array
+   (avc444_ffmpeg_handle[mon_index]). Multi-monitor damage therefore
+   encodes strictly one monitor after another on that single thread.
+3. encode_main || encode_aux — NO. encode_pair() runs encode_single(main)
+   to completion, then encode_single(aux).
+
+What makes main||aux CHEAP to add (the good news):
+
+- encode_single() is ALREADY submit-then-collect internally: it pushes to
+  the vmsplice iov queue (in_iov_push + seq_push) and only then blocks in
+  pump() waiting for that picture. Splitting it into submit_single() /
+  collect_single() is a mechanical refactor, not a redesign — which is
+  exactly the construction task #40 (FR-PROC-7) calls for.
+- The two views are separate ffmpeg PROCESSES with separate pipes, so the
+  only shared resource is the poll loop; a pump() that polls both children's
+  fds (or one thread each) covers it.
+- Measured free on the reference hardware: two concurrent 4K NVENC encodes
+  sustain 53 fps EACH on the T4 (vs 51 fps for one alone).
+
+The two REAL couplings to handle (neither is a blocker):
+
+- ORDERED REWRITE: main and aux share self->ltr (one frame_num counter,
+  LT0/LT1 slots); main must be rewritten before aux (main takes fn=N, aux
+  fn=N+1). This is pure CPU bit-copy work on a few KB, so keep the ENCODES
+  concurrent and the REWRITES serial in the collect stage. Not a hazard,
+  just an ordering rule.
+- IDR/RESPAWN RACE (new in FR-H264-8, does not exist under the leaf): today
+  we learn main produced an IDR only AFTER encoding it, and respawn the aux
+  child so its next packet re-seeds LT1. If both views are submitted
+  concurrently, the aux frame reaches the OLD child before the main IDR is
+  known, and its P slice would reference a flushed LT1 -- which the rewriter
+  correctly refuses (loud failure, by design). Bounded fix: on collecting a
+  main IDR, DISCARD that frame's aux packet, respawn the aux child, and
+  re-encode aux serially for that one frame. Cost is one extra aux encode
+  per IDR (every -g frames; ~none on the arm-n -g 30000 profile, every ~8 s
+  on the T4 -g 240 profile). Do NOT try to predict IDRs from the key-frame
+  request flag alone -- the child also self-triggers on its own GOP.
+
+Honest framing of "does aux-refs-aux make this easier": it does not make
+the ENCODES any more independent -- under aux_intra_leaf the aux child was
+already all-intra and thus independent too. FR-H264-8 is parallelism-
+NEUTRAL on the GPU side and ADDS the two couplings above. What makes
+main||aux easy is the existing submit/collect structure plus separate child
+processes; what FR-H264-8 buys is bandwidth, not concurrency.
+
 ### 2026-07-28 T4 4K fps — measured: SERIALISATION, not GPU limit
 
 Owner question after the nvenc gate: why does 4K fps look regressed, is the
