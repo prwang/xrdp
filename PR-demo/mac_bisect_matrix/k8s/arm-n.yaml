@@ -28,7 +28,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:LTRTAG-xfce
+          image: localhost/xrdp-bisect:34795577580b-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true

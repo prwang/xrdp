@@ -18,7 +18,7 @@ DIST=${DIST:-/work/dist}
 # (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
 # tweak content/config, roll ONE arm — never rebuilds or re-imports an
 # image (the ~1.5GB import + native-snapshotter unpack is the slow path).
-ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h arm-i arm-j arm-k arm-l arm-m}"
+ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h arm-i arm-j arm-k arm-l arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
 # but MUST be paired per-arm when the xrdp build speaks a newer xup
@@ -33,6 +33,7 @@ declare -A ARM_XORG_DEB=(
     [arm-j]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
     [arm-l]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
     [arm-m]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
+    [arm-n]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
@@ -41,6 +42,7 @@ declare -A ARM_TAG=(
     [arm-j]=649b447c9f4d-xfce [arm-k]=8b8d17c2636a-xfce
     [arm-l]=459b66d5319f-xfce
     [arm-m]=39bb08a48377-xfce
+    [arm-n]=34795577580b-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -51,6 +53,7 @@ declare -A TAG_DEB=(
     [8b8d17c2636a]="xrdp-dev_0.10.80+git20260727184103.8b8d17c2636a_amd64.deb"
     [459b66d5319f]="xrdp-dev_0.10.80+git20260727210620.459b66d5319f_amd64.deb"
     [39bb08a48377]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
+    [34795577580b]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
