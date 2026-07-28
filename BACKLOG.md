@@ -2239,6 +2239,40 @@ Owner tested all four arms in one sitting (Mac, Windows App):
      for the measurement, reverted to xfce afterwards — fleet state
      now matches git again).
 
+### Workload-generalized (same day, after owner review)
+
+- Owner correctly rejected the tick-only content as unrepresentative
+  and blind to the FR-H264-8 delta. banner.sh now dispatches FOUR
+  deterministic workload classes on SESSION_KIND (tick = sparse UI
+  update; scroll = ~10 Hz mixed text scroll; gray = full-screen luma
+  motion with CONSTANT chroma, the FR-H264-8 discriminator; chroma =
+  full-screen chroma motion, aux worst case). bandwidth_bench.sh
+  drives the whole matrix itself: per workload it sets SESSION_KIND,
+  force-rolls the arms (fresh-session guarantee), measures each arm,
+  and reverts to RESTORE_KIND (default xfce) at the end.
+- RESULTS (VAAPI CQP qp=20, 1600x900, 20 s windows, arm-i old chain
+  vs arm-m FR-H264-7):
+  - tick:   38.2 KB/s -> 7.1 KB/s   (-81%)
+  - scroll: 6.32 MB/s -> 5.65 MB/s  (-11%)
+  - gray:   11.9 KB/s -> 5.8 KB/s   (-51%)
+  - chroma: 56.6 KB/s -> 80.6/81.4 KB/s  (+42..44% — REGRESSION)
+  - Determinism proof: arm-i chroma runs 1 and 2 read byte-identical
+    rx deltas (1131539 B both); arm-m repeat within 1%.
+- Honest interpretation: partitioning wins big only where the old
+  cross-view refs poisoned an otherwise cheap chain (sparse/static
+  content); on real motion both architectures must code the delta
+  (-11%); on chroma-heavy motion the all-intra leaf premium EXCEEDS
+  the old inter-aux cost — the shipped FR-H264-7 default is a
+  measured bandwidth REGRESSION on that class (topology correctness
+  still mandates it; recorded, not hidden). This is the quantified
+  motivation for FR-H264-8: on gray, aux-refs-aux P should be
+  near-all-skip (aux ~0); on chroma it still codes a real delta but
+  P-frames should beat full intra. Re-run this exact bench against
+  the FR-H264-8 arm when it exists.
+- Caveat: gray is a GENTLE luma class (adjacent ANSI grayscale bands,
+  ~10/255 steps) — a motion-direction discriminator, not a stress
+  test; scroll is the stress-motion class (~6 MB/s saturation).
+
 
 ## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — TODO (owner directive, 2026-07-28)
 

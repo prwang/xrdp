@@ -1,40 +1,43 @@
 #!/bin/bash
-# bandwidth_bench.sh — repeatable AVC444 wire-bandwidth A/B across arms.
+# bandwidth_bench.sh — repeatable AVC444 wire-bandwidth A/B across arms
+# and workload classes.
 #
-# Two modes, both against the FIXED banner.sh content (static color
-# chart + 1 Hz tick) at a fixed geometry, so byte counts are directly
-# comparable between arms. Intended A/B: arm-i (pre-FR-H264-7
-# single-chain build) vs arm-m (unconditional reference partitioning)
-# on the identical VAAPI CQP config.
+# For every workload it flips the arms' SESSION_KIND (banner.sh
+# dispatch), force-rolls the pods (fresh session — reconnecting to a
+# stale session reads as zero traffic), then per arm attaches a client
+# and measures. Workloads (deterministic, see banner.sh):
+#   tick    sparse small UI update (1 Hz tick line)
+#   scroll  sustained mixed luma+chroma text scroll (~10 Hz)
+#   gray    full-screen luma motion, CONSTANT chroma (5 fps) — the
+#           FR-H264-8 discriminator: aux-refs-aux P is all-skip here,
+#           the FR-H264-7 all-intra leaf re-encodes every damaged MB
+#   chroma  full-screen chroma motion (5 fps) — aux worst case, any
+#           aux architecture must re-encode
 #
-#   default        steady-state wire rate: attach the stock acking
-#                  client (xfreerdp3), let login churn settle, then
-#                  read the TCP socket rx counter over a fixed window.
-#                  Measures real sustained traffic (incl. TLS framing,
-#                  identical across arms). Requires TICKING content.
+# Modes:
+#   default        steady-state wire rate: stock acking client
+#                  (xfreerdp3), warmup past login churn, then read the
+#                  TCP socket rx counter over a fixed window (real
+#                  sustained traffic; TLS framing identical across
+#                  arms).
 #   MODE=frames    per-frame payload split: oracle save-only client +
-#                  bandwidth_stats.py (per-view / IDR-vs-P sizes of the
-#                  H.264 GFX records). NOTE: the oracle client never
+#                  bandwidth_stats.py. NOTE: the oracle client never
 #                  acks, so xrdp's in-flight window fills after ~3
-#                  frames — this mode measures the initial-paint frames
-#                  only, never sustained traffic (learned 2026-07-28).
+#                  frames — initial-paint frames ONLY, never sustained
+#                  traffic (learned 2026-07-28).
 #
-# Preconditions the 2026-07-28 shakedown proved load-bearing:
-#   1. Arms must run SESSION_KIND=banner — the xfce arms idle static,
-#      so steady-state traffic is ~0 on ANY build. Flip + revert with:
-#        kubectl -n bisect-matrix set env deployment/xrdp-arm-i \
-#            deployment/xrdp-arm-m SESSION_KIND=banner   # then =xfce
-#   2. Each run needs a FRESH session: reconnecting to a stale probe444
-#      session (dead wm, static screen) reads as zero traffic. The
-#      SESSION_KIND flip above forces a pod roll, which guarantees it;
-#      otherwise `kubectl -n bisect-matrix rollout restart` the arms.
+# Intended A/B: arm-i (pre-FR-H264-7 single-chain build) vs arm-m
+# (unconditional reference partitioning) on the identical VAAPI CQP
+# config; reuse unchanged for the FR-H264-8 aux-refs-aux arm later.
 #
 # CLIENT SIDE STAYS ON THE HOST (owner directive). Credential comes
 # from root-only /root/.oracle_cred into the RDPARGS env var, never
-# argv, never printed.
+# argv, never printed. Arms are reverted to RESTORE_KIND (default
+# xfce, the git-declared fleet state) when the run ends.
 #
 # Usage: bandwidth_bench.sh [arm ...]          (default: arm-i arm-m)
-#        WARMUP_SECS=12 WINDOW_SECS=20 SIZE=1600x900 to override.
+#        WORKLOADS="tick scroll gray chroma" WARMUP_SECS=12
+#        WINDOW_SECS=20 SIZE=1600x900 RESTORE_KIND=xfce to override.
 set -u
 CRED=${PROBE_CRED_FILE:-/root/.oracle_cred}
 CLI=${VERIFY_DISPLAY:-:97}
@@ -42,9 +45,14 @@ SIZE=${SIZE:-1600x900}
 WARMUP=${WARMUP_SECS:-12}
 WINDOW=${WINDOW_SECS:-20}
 MODE=${MODE:-steady}
+WORKLOADS=${WORKLOADS:-tick scroll gray chroma}
+RESTORE_KIND=${RESTORE_KIND:-xfce}
+NS=bisect-matrix
 D=$(cd "$(dirname "$0")" && pwd)
 OUT=${BENCH_OUT:-/tmp/bandwidth_bench}
 mkdir -p "$OUT"
+
+ARMS=("${@:-arm-i}") ; [ $# -eq 0 ] && ARMS=(arm-i arm-m)
 
 [ -s "$CRED" ] || { echo "ABORT: no probe cred"; exit 1; }
 if [ "$MODE" = frames ]; then
@@ -64,6 +72,24 @@ declare -A PORT=( [arm-a]=40000 [arm-b]=40001 [arm-c]=40002 [arm-d]=40003
                   [arm-i]=40008 [arm-j]=40009 [arm-k]=40010 [arm-l]=40011
                   [arm-m]=40012 )
 
+DEPLOYS=()
+for arm in "${ARMS[@]}"; do
+    : "${PORT[$arm]:?unknown arm $arm}"
+    DEPLOYS+=("deployment/xrdp-$arm")
+done
+
+set_kind()
+{
+    # set env AND force-roll: an unchanged env value would otherwise
+    # skip the roll and leave a stale (dead-wm, static) session behind
+    kubectl -n $NS set env "${DEPLOYS[@]}" "SESSION_KIND=$1" >/dev/null
+    kubectl -n $NS rollout restart "${DEPLOYS[@]}" >/dev/null
+    for d in "${DEPLOYS[@]}"; do
+        kubectl -n $NS rollout status "$d" --timeout=120s >/dev/null || return 1
+    done
+    sleep 3
+}
+
 rx_bytes()
 {
     ss -tin "dport = :$1" | grep -o 'bytes_received:[0-9]*' \
@@ -71,51 +97,59 @@ rx_bytes()
 }
 
 fail=0
-for arm in "${@:-arm-i arm-m}"; do
-    port=${PORT[$arm]:?unknown arm $arm}
-    echo "=== $arm (127.0.0.1:$port) $MODE @ $SIZE ==="
-    pkill -9 -x "$(basename "$BIN")" 2>/dev/null; sleep 1
-    rm -f /tmp/oracle_avc_s*.bin
-    PW=$(cat "$CRED")
-    RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$port" "/u:probe444" "/p:$PW" \
-                            "/size:$SIZE" "/gfx:AVC444" "/cert:ignore" \
-                            "/log-level:WARN")
-    setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib \
-        FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" \
-        "$BIN" /args-from:env:RDPARGS </dev/null >"$OUT/$arm.client.log" 2>&1 &
-    unset PW RDPARGS
+for wl in $WORKLOADS; do
+    kind=$wl ; [ "$wl" = tick ] && kind=banner
+    set_kind "$kind" || { echo "ABORT: rollout failed for $kind"; exit 1; }
+    for arm in "${ARMS[@]}"; do
+        port=${PORT[$arm]}
+        echo "=== $wl / $arm (127.0.0.1:$port) $MODE @ $SIZE ==="
+        pkill -9 -x "$(basename "$BIN")" 2>/dev/null; sleep 1
+        rm -f /tmp/oracle_avc_s*.bin
+        PW=$(cat "$CRED")
+        RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$port" "/u:probe444" \
+                                "/p:$PW" "/size:$SIZE" "/gfx:AVC444" \
+                                "/cert:ignore" "/log-level:WARN")
+        setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib \
+            FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" \
+            "$BIN" /args-from:env:RDPARGS </dev/null \
+            >"$OUT/$wl.$arm.client.log" 2>&1 &
+        unset PW RDPARGS
 
-    if [ "$MODE" = frames ]; then
-        sleep "$WINDOW"
-        pkill -9 -x "$(basename "$BIN")" 2>/dev/null
-        dump=$(ls /tmp/oracle_avc_s*.bin 2>/dev/null | head -1)
-        if [ -z "$dump" ]; then
-            echo "  FAIL: no oracle dump (login or GFX failed)"
-            tail -3 "$OUT/$arm.client.log" | sed 's/^/  | /'
-            fail=1
-            continue
+        if [ "$MODE" = frames ]; then
+            sleep "$WINDOW"
+            pkill -9 -x "$(basename "$BIN")" 2>/dev/null
+            dump=$(ls /tmp/oracle_avc_s*.bin 2>/dev/null | head -1)
+            if [ -z "$dump" ]; then
+                echo "  FAIL: no oracle dump (login or GFX failed)"
+                tail -3 "$OUT/$wl.$arm.client.log" | sed 's/^/  | /'
+                fail=1
+                continue
+            fi
+            cp "$dump" "$OUT/$wl.$arm.bin"
+            python3 "$D/bandwidth_stats.py" "$OUT/$wl.$arm.bin" \
+                "$wl/$arm" | sed 's/^/  /'
+        else
+            sleep "$WARMUP"
+            b0=$(rx_bytes "$port")
+            sleep "$WINDOW"
+            b1=$(rx_bytes "$port")
+            pkill -9 -x "$(basename "$BIN")" 2>/dev/null
+            if [ -z "$b0" ] || [ -z "$b1" ]; then
+                echo "  FAIL: no client socket (login failed?)"
+                tail -3 "$OUT/$wl.$arm.client.log" | sed 's/^/  | /'
+                fail=1
+                continue
+            fi
+            rate=$(( (b1 - b0) / WINDOW ))
+            echo "  steady-state: $rate B/s over ${WINDOW}s (rx $b0 -> $b1)"
+            if [ "$rate" -eq 0 ]; then
+                echo "  WARNING: zero traffic — dead session content?"
+                fail=1
+            fi
         fi
-        cp "$dump" "$OUT/$arm.bin"
-        python3 "$D/bandwidth_stats.py" "$OUT/$arm.bin" "$arm" | sed 's/^/  /'
-    else
-        sleep "$WARMUP"
-        b0=$(rx_bytes "$port")
-        sleep "$WINDOW"
-        b1=$(rx_bytes "$port")
-        pkill -9 -x "$(basename "$BIN")" 2>/dev/null
-        if [ -z "$b0" ] || [ -z "$b1" ]; then
-            echo "  FAIL: no client socket (login failed?)"
-            tail -3 "$OUT/$arm.client.log" | sed 's/^/  | /'
-            fail=1
-            continue
-        fi
-        rate=$(( (b1 - b0) / WINDOW ))
-        echo "  steady-state: $rate B/s over ${WINDOW}s (rx $b0 -> $b1)"
-        if [ "$rate" -eq 0 ]; then
-            echo "  WARNING: zero traffic — stale session or non-banner" \
-                 "content (see preconditions in the script header)"
-            fail=1
-        fi
-    fi
+    done
 done
+
+set_kind "$RESTORE_KIND" || fail=1
+echo "arms reverted to SESSION_KIND=$RESTORE_KIND"
 exit $fail

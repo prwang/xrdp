@@ -1,38 +1,106 @@
 #!/bin/bash
-# Full-screen arm banner, color-diagnostic edition: every colour patch is
-# LABELED with its name, so a chroma/packing fault is self-evident to the
-# tester ("the bar that says RED is blue") without knowing what the
-# desktop should look like. The tick line keeps frames flowing (a stalled
-# tick = pipeline stall, black = ack starvation).
+# Deterministic session content for the bisect/bench fleet, selected by
+# SESSION_KIND (pod env -> /etc/session_kind via entrypoint; "xfce" is
+# dispatched by startwm.sh before this script runs).
+#
+#   banner   (default) labeled color chart + 1 Hz tick line. Color/
+#            packing faults are self-evident ("the bar that says RED is
+#            blue"); a stalled tick = pipeline stall, black = ack
+#            starvation. Bench class: sparse small UI update.
+#   scroll   colored text scrolling at ~10 Hz — sustained mixed
+#            luma+chroma damage (terminal/browser-scroll shape).
+#   gray     full-screen moving grayscale bands at 5 fps — large LUMA
+#            motion with CONSTANT CHROMA. The FR-H264-8 discriminator:
+#            an aux-refs-aux P frame is all-skip here, while the
+#            FR-H264-7 all-intra leaf re-encodes every damaged MB.
+#   chroma   full-screen moving color bands at 5 fps — large chroma
+#            motion, the aux path's honest worst case (any aux
+#            architecture must re-encode; FR-H264-8 gains least here).
+#
+# All four are deterministic (fixed sequences, fixed cadence) so wire
+# byte counts are comparable across arms and across runs.
 ARM=$(cat /etc/arm_label 2>/dev/null || echo "unknown arm")
+KIND=$(cat /etc/session_kind 2>/dev/null || echo banner)
 
 xsetroot -solid '#204060' || true
 
-exec xterm -maximized -fa 'DejaVu Sans Mono' -fs 22 \
-    -bg black -fg white -e bash -c '
-    ARM="'"$ARM"'"
-    i=0
-    tput civis 2>/dev/null
-    while true; do
-        clear
-        echo
-        echo "  ================================================="
-        echo "   BISECT ARM: $ARM"
-        echo "  ================================================="
-        echo
-        printf "   %-9s \e[41m%*s\e[0m\n"  "RED"     36 ""
-        printf "   %-9s \e[42m%*s\e[0m\n"  "GREEN"   36 ""
-        printf "   %-9s \e[44m%*s\e[0m\n"  "BLUE"    36 ""
-        printf "   %-9s \e[43m%*s\e[0m\n"  "YELLOW"  36 ""
-        printf "   %-9s \e[46m%*s\e[0m\n"  "CYAN"    36 ""
-        printf "   %-9s \e[45m%*s\e[0m\n"  "MAGENTA" 36 ""
-        printf "   %-9s \e[47m%*s\e[0m\n"  "WHITE"   36 ""
-        echo
-        printf "   fine red/blue stripes: "
-        for s in $(seq 1 18); do printf "\e[41m \e[44m "; done
-        printf "\e[0m\n"
-        echo
-        echo "   tick $i"
-        i=$((i + 1))
-        sleep 1
-    done'
+XTERM=(xterm -maximized -fa 'DejaVu Sans Mono' -fs 22 -bg black -fg white)
+
+case "$KIND" in
+scroll)
+    exec "${XTERM[@]}" -e bash -c '
+        i=0
+        tput civis 2>/dev/null
+        while true; do
+            for n in 1 2 3 4 5 6 7 8 9 10; do
+                c=$((31 + (i + n) % 7))
+                printf "\e[%dm%06d scroll workload: the quick brown fox jumps over the lazy dog 0123456789\e[0m\n" \
+                    "$c" $((i + n))
+            done
+            i=$((i + 10))
+            sleep 0.1
+        done'
+    ;;
+gray)
+    exec "${XTERM[@]}" -e bash -c '
+        i=0
+        tput civis 2>/dev/null
+        H=$(tput lines); W=$(tput cols)
+        while true; do
+            printf "\e[H"
+            r=0
+            while [ "$r" -lt "$H" ]; do
+                printf "\e[48;5;%dm%*s\e[0m" $((232 + (r + i) % 24)) "$W" ""
+                r=$((r + 1))
+            done
+            i=$((i + 1))
+            sleep 0.2
+        done'
+    ;;
+chroma)
+    exec "${XTERM[@]}" -e bash -c '
+        i=0
+        tput civis 2>/dev/null
+        H=$(tput lines); W=$(tput cols)
+        colors=(41 42 43 44 45 46)
+        while true; do
+            printf "\e[H"
+            r=0
+            while [ "$r" -lt "$H" ]; do
+                printf "\e[%dm%*s\e[0m" "${colors[$(((r + i) % 6))]}" "$W" ""
+                r=$((r + 1))
+            done
+            i=$((i + 1))
+            sleep 0.2
+        done'
+    ;;
+*)
+    exec "${XTERM[@]}" -e bash -c '
+        ARM="'"$ARM"'"
+        i=0
+        tput civis 2>/dev/null
+        while true; do
+            clear
+            echo
+            echo "  ================================================="
+            echo "   BISECT ARM: $ARM"
+            echo "  ================================================="
+            echo
+            printf "   %-9s \e[41m%*s\e[0m\n"  "RED"     36 ""
+            printf "   %-9s \e[42m%*s\e[0m\n"  "GREEN"   36 ""
+            printf "   %-9s \e[44m%*s\e[0m\n"  "BLUE"    36 ""
+            printf "   %-9s \e[43m%*s\e[0m\n"  "YELLOW"  36 ""
+            printf "   %-9s \e[46m%*s\e[0m\n"  "CYAN"    36 ""
+            printf "   %-9s \e[45m%*s\e[0m\n"  "MAGENTA" 36 ""
+            printf "   %-9s \e[47m%*s\e[0m\n"  "WHITE"   36 ""
+            echo
+            printf "   fine red/blue stripes: "
+            for s in $(seq 1 18); do printf "\e[41m \e[44m "; done
+            printf "\e[0m\n"
+            echo
+            echo "   tick $i"
+            i=$((i + 1))
+            sleep 1
+        done'
+    ;;
+esac
