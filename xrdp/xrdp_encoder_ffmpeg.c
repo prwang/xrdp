@@ -142,11 +142,21 @@ struct xrdp_ffmpeg_avc444
     struct xrdp_h264_param_cache leaf_main_cache;
     struct xrdp_h264_param_cache leaf_aux_cache;
 
+    /* aux_ltr_chain (EXPERIMENTAL, FR-H264-8): shared-chain rewrite
+     * state; ltr_aux_fresh = the aux child has not delivered a packet
+     * since (re)spawn, so its next packet is IDR-shaped */
+    struct xrdp_h264_ltr_state ltr;
+    int ltr_aux_fresh;
+    int rekey_pending;
+
     char errline[512];
     int errline_len;
 
     struct xrdp_ffmpeg_avc444_metrics metrics;
 };
+
+static int
+spawn_second_child(struct xrdp_ffmpeg_avc444 *self);
 
 /*****************************************************************************/
 void
@@ -212,6 +222,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->sanitize_hrd = 0;
     cfg->strip_pic_struct = 0;
     cfg->aux_intra_leaf = 0;
+    cfg->aux_ltr_chain = 0;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -1128,6 +1139,106 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
+    if (self->cfg.aux_ltr_chain)
+    {
+        /* EXPERIMENTAL FR-H264-8: both children encode normal refs=1
+         * chains; both views' slice headers are rewritten into ONE
+         * shared frame_num chain with per-view long-term slots. */
+        struct xrdp_avc444_encoded_pair ltr_result;
+        int budget;
+
+        if (self->ltr.started &&
+                self->ltr.frame_num >= (1 << 16) - 8)
+        {
+            /* backstop only: the caller must have re-keyed on
+             * rekey_pending long before the counter can reach the
+             * wrap a per-view decoder cannot survive (measured, see
+             * xrdp_h264_annexb.h) */
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain frame_num "
+                "%d at wrap backstop; forcing encoder restart",
+                self->ltr.frame_num);
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        st = xrdp_ffmpeg_avc444_encode_single(self, main_nv12, nv12_size,
+                                              desktop_sequence, result);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            return st;
+        }
+        budget = xrdp_h264_ltr_growth_budget(self->main_buf,
+                                             self->main_len);
+        if (grow(&self->main_buf, &self->main_cap,
+                 self->main_len + budget) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        if (xrdp_h264_ltr_rewrite_main(self->main_buf, &self->main_len,
+                                       self->main_cap, &self->ltr) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain main "
+                "rewrite failed; refusing to ship the pair");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        result->main_data = self->main_buf;
+        result->main_len = self->main_len;
+        if (!self->ltr.aux_seeded && !self->ltr_aux_fresh)
+        {
+            /* a mid-stream main IDR emptied the DPB (LT1 is gone);
+             * restart the aux child so its next packet is IDR-shaped
+             * and re-seeds LT1 (no runtime force-IDR, FR-H264-6) */
+            LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_ltr_chain main IDR: "
+                "respawning aux child to re-seed LT1");
+            xrdp_ffmpeg_avc444_delete(self->leaf);
+            self->leaf = NULL;
+            if (spawn_second_child(self) != 0)
+            {
+                return XRDP_FFMPEG_PAIR_ERROR;
+            }
+        }
+        st = xrdp_ffmpeg_avc444_encode_single(self->leaf, aux_nv12,
+                                              nv12_size, desktop_sequence,
+                                              &ltr_result);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain child did "
+                "not return the aux picture; restarting encoder");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        self->ltr_aux_fresh = 0;
+        budget = xrdp_h264_ltr_growth_budget(ltr_result.main_data,
+                                             ltr_result.main_len);
+        if (grow(&self->aux_buf, &self->aux_cap,
+                 ltr_result.main_len + budget) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        memcpy(self->aux_buf, ltr_result.main_data, ltr_result.main_len);
+        self->aux_len = ltr_result.main_len;
+        if (xrdp_h264_ltr_rewrite_aux(self->aux_buf, &self->aux_len,
+                                      self->aux_cap, &self->ltr) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain aux "
+                "rewrite failed; refusing to ship the pair");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        result->aux_data = self->aux_buf;
+        result->aux_len = self->aux_len;
+        if (self->ltr.frame_num >= XRDP_H264_LTR_FRAME_NUM_REKEY &&
+                !self->rekey_pending)
+        {
+            /* re-key BEFORE the shared counter can wrap (a per-view
+             * decoder silently stops at a frame_num wrap -- measured,
+             * xrdp_h264_annexb.h). The CURRENT pair still ships (its
+             * damage must not be lost); the caller polls
+             * xrdp_ffmpeg_avc444_rekey_pending() after shipping and
+             * rebuilds the encoder, so the NEXT frame is a fresh IDR.
+             * Roughly once an hour of continuous encoding. */
+            LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_ltr_chain frame_num "
+                "%d near wrap; re-key requested", self->ltr.frame_num);
+            self->rekey_pending = 1;
+        }
+        return XRDP_FFMPEG_PAIR_READY;
+    }
     if (self->cfg.aux_intra_leaf)
     {
         /* reference partitioning: the main child sees ONLY main frames
@@ -1343,7 +1454,9 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
         }
         self->flushing = 1;
     }
-    if (pk_available(self) < (self->cfg.aux_intra_leaf ? 1 : 2))
+    if (pk_available(self) <
+            ((self->cfg.aux_intra_leaf || self->cfg.aux_ltr_chain)
+             ? 1 : 2))
     {
         st = pump(self, now_ms() + self->cfg.pair_timeout_ms, 1);
         if (st == 1)
@@ -1351,15 +1464,34 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
             return XRDP_FFMPEG_PAIR_ERROR;
         }
     }
-    if (self->cfg.aux_intra_leaf)
+    if (self->cfg.aux_intra_leaf || self->cfg.aux_ltr_chain)
     {
-        /* the main child holds single pictures in leaf mode; the leaf
-         * child is synchronous per call and never has a tail */
+        /* the main child holds single pictures in leaf/LTR mode; the
+         * aux child is synchronous per call and never has a tail */
         if (pk_available(self) >= 1)
         {
             if (pop_single(self, result) != 0)
             {
                 return XRDP_FFMPEG_PAIR_ERROR;
+            }
+            if (self->cfg.aux_ltr_chain)
+            {
+                /* a tail main picture must still join the shared
+                 * chain -- never ship an unrewritten frame_num */
+                int budget = xrdp_h264_ltr_growth_budget(self->main_buf,
+                                                         self->main_len);
+
+                if (grow(&self->main_buf, &self->main_cap,
+                         self->main_len + budget) != 0 ||
+                        xrdp_h264_ltr_rewrite_main(self->main_buf,
+                                                   &self->main_len,
+                                                   self->main_cap,
+                                                   &self->ltr) != 0)
+                {
+                    return XRDP_FFMPEG_PAIR_ERROR;
+                }
+                result->main_data = self->main_buf;
+                result->main_len = self->main_len;
             }
             return XRDP_FFMPEG_PAIR_READY;
         }
@@ -1387,6 +1519,18 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
             actual_width < 1 || actual_height < 1 ||
             actual_width > 16384 || actual_height > 16384)
     {
+        return NULL;
+    }
+    if (cfg->aux_ltr_chain &&
+            (cfg->fault_aux_delay || cfg->fault_strip_mmco))
+    {
+        /* the LTR path never runs pop_pair (fault_aux_delay) and
+         * replaces all marking (fault_strip_mmco): the diagnostics
+         * would be silently inert, and a bisect arm run with them
+         * would report a green result that means nothing */
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain is not "
+            "compatible with fault_aux_delay/fault_strip_mmco "
+            "(diagnostic would be silently inert); refusing to start");
         return NULL;
     }
     self = (struct xrdp_ffmpeg_avc444 *)g_malloc(sizeof(*self), 1);
@@ -1427,31 +1571,49 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: spawned ffmpeg pid %d coded %dx%d "
         "generation %llu", self->pid, self->coded_width, self->coded_height,
         (unsigned long long)self->generation);
-    if (cfg->aux_intra_leaf)
+    if (cfg->aux_intra_leaf || cfg->aux_ltr_chain)
     {
-        /* second child for the aux view: same encoder block, every frame
-         * forced IDR; its packets are rewritten into non-reference I
-         * leaves by encode_pair. Diagnostic/rewrite knobs are cleared --
-         * the leaf rewrite drops the aux SPS/PPS/SEI itself. */
-        struct xrdp_ffmpeg_avc444_config leaf_cfg = *cfg;
-        static const char *const extra[] =
+        if (spawn_second_child(self) != 0)
         {
-            "-forced-idr", "1", "-force_key_frames", "expr:gte(t,0)"
-        };
-        int i;
+            xrdp_ffmpeg_avc444_delete(self);
+            return NULL;
+        }
+    }
+    return self;
+}
 
-        leaf_cfg.aux_intra_leaf = 0;
-        leaf_cfg.fault_aux_delay = 0;
-        leaf_cfg.fault_strip_mmco = 0;
-        leaf_cfg.sanitize_hrd = 0;
-        leaf_cfg.strip_pic_struct = 0;
-        leaf_cfg.strip_sei = 0;
+/*****************************************************************************/
+/* spawn the second (aux-view) child: all-IDR for the leaf architecture
+ * (FR-H264-7), a normal refs chain for the EXPERIMENTAL LTR aux-chain
+ * (FR-H264-8). Also the aux-child RESPAWN path: after a mid-stream
+ * main IDR empties the DPB, a fresh child's first packet is IDR-shaped
+ * and re-seeds LT1 (there is no runtime force-IDR control, FR-H264-6).
+ * Diagnostic/rewrite knobs are cleared -- the rewrites drop the aux
+ * SPS/PPS/SEI themselves. */
+static int
+spawn_second_child(struct xrdp_ffmpeg_avc444 *self)
+{
+    struct xrdp_ffmpeg_avc444_config leaf_cfg = self->cfg;
+    static const char *const extra[] =
+    {
+        "-forced-idr", "1", "-force_key_frames", "expr:gte(t,0)"
+    };
+    int i;
+
+    leaf_cfg.aux_intra_leaf = 0;
+    leaf_cfg.aux_ltr_chain = 0;
+    leaf_cfg.fault_aux_delay = 0;
+    leaf_cfg.fault_strip_mmco = 0;
+    leaf_cfg.sanitize_hrd = 0;
+    leaf_cfg.strip_pic_struct = 0;
+    leaf_cfg.strip_sei = 0;
+    if (!self->cfg.aux_ltr_chain)
+    {
         if (leaf_cfg.encoder_args.count + 4 > XRDP_AVC444_MAX_ENC_ARGS)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: no room to append the "
                 "aux_intra_leaf forced-IDR args");
-            xrdp_ffmpeg_avc444_delete(self);
-            return NULL;
+            return 1;
         }
         for (i = 0; i < 4; i++)
         {
@@ -1460,19 +1622,30 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
                       extra[i], XRDP_AVC444_ENC_ARG_LEN - 1);
         }
         leaf_cfg.encoder_args.count += 4;
-        self->leaf = xrdp_ffmpeg_avc444_create(&leaf_cfg, actual_width,
-                                               actual_height);
-        if (self->leaf == NULL)
-        {
-            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf child "
-                "failed to start");
-            xrdp_ffmpeg_avc444_delete(self);
-            return NULL;
-        }
-        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_intra_leaf active (aux "
-            "child pid %d)", self->leaf->pid);
     }
-    return self;
+    self->leaf = xrdp_ffmpeg_avc444_create(&leaf_cfg, self->actual_width,
+                                           self->actual_height);
+    if (self->leaf == NULL)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux child failed to start");
+        return 1;
+    }
+    self->ltr_aux_fresh = 1;
+    LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: %s active (aux child pid %d)",
+        self->cfg.aux_ltr_chain ? "aux_ltr_chain (EXPERIMENTAL)"
+        : "aux_intra_leaf", self->leaf->pid);
+    return 0;
+}
+
+/*****************************************************************************/
+/* aux_ltr_chain: the shared frame_num counter is near its wrap; the
+ * caller must delete and recreate the encoder AFTER shipping the
+ * current pair (never before -- the triggering frame's damage would
+ * be lost, the stuck-last-frame class) */
+int
+xrdp_ffmpeg_avc444_rekey_pending(struct xrdp_ffmpeg_avc444 *self)
+{
+    return self != NULL ? self->rekey_pending : 0;
 }
 
 /*****************************************************************************/
@@ -1672,6 +1845,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     long long last_pts = -1;
     enum xrdp_ffmpeg_probe_result res = XRDP_FFMPEG_PROBE_OK;
     const char *why = "";
+    struct xrdp_h264_ltr_state ltr_m;
+    struct xrdp_h264_ltr_state ltr_a;
     char errline[FF_PROBE_ERRLINE];
     int errline_len = 0;
     int child_status = -1;
@@ -1684,6 +1859,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
             "absolute or coded size below 16");
         return XRDP_FFMPEG_PROBE_BAD_CONFIG;
     }
+    memset(&ltr_m, 0, sizeof(ltr_m));
+    memset(&ltr_a, 0, sizeof(ltr_a));
     nv12_size = coded_width * coded_height + coded_width * (coded_height / 2);
     total = 4 * nv12_size;
     blob = (unsigned char *)malloc(total);
@@ -1867,6 +2044,57 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
                     why = "follow-up packet lacks a VCL NAL";
                     fail = 1;
                     break;
+                }
+                if (cfg->aux_ltr_chain)
+                {
+                    /* FR-H264-8: exercise BOTH LTR rewriters on the
+                     * probe packets. The LTR guard is strictly harder
+                     * than the leaf checks (CABAC, poc_type 2, no
+                     * weighted pred, level DPB budget...); a shape it
+                     * rejects must fail HERE, at the probe, never as
+                     * a per-frame encoder respawn loop live. */
+                    int blen = pkt.len;
+                    int bcap = pkt.len +
+                               xrdp_h264_ltr_growth_budget(pkt.data,
+                                                           pkt.len);
+                    unsigned char *scratch =
+                        (unsigned char *)malloc(bcap);
+
+                    if (scratch == NULL)
+                    {
+                        res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                        why = "out of memory";
+                        fail = 1;
+                        break;
+                    }
+                    memcpy(scratch, pkt.data, pkt.len);
+                    if (xrdp_h264_ltr_rewrite_main(scratch, &blen,
+                                                   bcap, &ltr_m) != 0)
+                    {
+                        free(scratch);
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "aux_ltr_chain guard rejects this "
+                              "encoder's stream shape (needs CABAC, "
+                              "poc_type 2, refs=1, no weighted pred, "
+                              "level with a 3-frame DPB budget)";
+                        fail = 1;
+                        break;
+                    }
+                    ltr_a.main_cache = ltr_m.main_cache;
+                    blen = pkt.len;
+                    memcpy(scratch, pkt.data, pkt.len);
+                    if (xrdp_h264_ltr_rewrite_aux(scratch, &blen,
+                                                  bcap, &ltr_a) != 0)
+                    {
+                        free(scratch);
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "aux_ltr_chain guard rejects this "
+                              "encoder's stream shape on the aux "
+                              "rewrite path";
+                        fail = 1;
+                        break;
+                    }
+                    free(scratch);
                 }
                 got++;
                 if (got >= 4)

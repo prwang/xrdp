@@ -4,7 +4,9 @@
 
 #include <string.h>
 
+#include "xrdp_h264_annexb.h"
 #include "test_xrdp.h"
+#include "test_avc444_ltr_vectors.h"
 
 /*
  * FR-H264-8 syntax ratchet (PRD "Unit-test specification", group 3):
@@ -874,6 +876,581 @@ START_TEST(test_ltr_frame_num_slots_golden)
 }
 END_TEST
 
+/*
+ * FR-H264-8 emitter golden-byte vectors (PRD unit-test group 1): the
+ * C rewriter's output must be BYTE-IDENTICAL to the independently
+ * implemented, ffmpeg-validated python reference splice
+ * (PR-demo/mac_bisect_matrix/ltr_splice_ref.py -- validated by
+ * 1-context / drop-aux / aux-only framemd5 bit-identity against the
+ * children's own decodes, explode-clean strict decode, and the
+ * Win2022 trace-histogram shape). Two independent implementations
+ * agreeing bit-for-bit is the cross-validation.
+ */
+
+/*****************************************************************************/
+static int
+ltr_run_vector(struct xrdp_h264_ltr_state *st, int view,
+               const unsigned char *in, int in_len,
+               const unsigned char *golden, int golden_len)
+{
+    static unsigned char buf[4096];
+    int len;
+    int cap;
+    int rv;
+
+    memcpy(buf, in, in_len);
+    len = in_len;
+    cap = in_len + xrdp_h264_ltr_growth_budget(buf, len);
+    ck_assert_int_le(cap, (int)sizeof(buf));
+    rv = (view == 0)
+         ? xrdp_h264_ltr_rewrite_main(buf, &len, cap, st)
+         : xrdp_h264_ltr_rewrite_aux(buf, &len, cap, st);
+    if (rv != 0)
+    {
+        return rv;
+    }
+    ck_assert_int_eq(len, golden_len);
+    ck_assert_mem_eq(buf, golden, golden_len);
+    return 0;
+}
+
+/*****************************************************************************/
+START_TEST(test_ltr_emitter_golden_sequence)
+{
+    struct xrdp_h264_ltr_state st;
+
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(st.started, 1);
+    ck_assert_int_eq(st.aux_seeded, 0);
+    ck_assert_int_eq(st.frame_num, 1);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(st.aux_seeded, 1);
+    ck_assert_int_eq(st.frame_num, 2);
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_1,
+                                    LTR_MAIN_IN_1_LEN, ltr_main_golden_1,
+                                    LTR_MAIN_GOLDEN_1_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_1,
+                                    LTR_AUX_IN_1_LEN, ltr_aux_golden_1,
+                                    LTR_AUX_GOLDEN_1_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_2,
+                                    LTR_MAIN_IN_2_LEN, ltr_main_golden_2,
+                                    LTR_MAIN_GOLDEN_2_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_2,
+                                    LTR_AUX_IN_2_LEN, ltr_aux_golden_2,
+                                    LTR_AUX_GOLDEN_2_LEN), 0);
+    ck_assert_int_eq(st.frame_num, 6);
+    /* the caches were populated from both children and pass the
+     * guard the rewrites enforced */
+    ck_assert_int_eq(st.main_cache.have_sps && st.main_cache.have_pps,
+                     1);
+    ck_assert_int_eq(st.aux_cache.have_sps && st.aux_cache.have_pps, 1);
+    ck_assert_int_eq(st.main_cache.poc_type, 2);
+}
+END_TEST
+
+/*
+ * Win2022 field-sequence cross-check (PRD unit-test group 1e): parse
+ * the marking/modification syntax elements of a REAL Win2022 aux P
+ * slice header from the committed capture and of our emitted aux P
+ * golden; the element-value sequence must be identical -- the
+ * measured recipe, not our reconstruction of it, is the reference.
+ */
+
+struct ltr_hdr_bits
+{
+    const unsigned char *buf;
+    int nbits;
+    int pos;
+    int err;
+};
+
+/*****************************************************************************/
+static unsigned int
+hdr_u(struct ltr_hdr_bits *b, int n)
+{
+    unsigned int v;
+
+    v = 0;
+    while (n-- > 0)
+    {
+        if (b->pos >= b->nbits)
+        {
+            b->err = 1;
+            return 0;
+        }
+        v = (v << 1) | ((b->buf[b->pos >> 3] >> (7 - (b->pos & 7))) & 1);
+        b->pos++;
+    }
+    return v;
+}
+
+/*****************************************************************************/
+static unsigned int
+hdr_ue(struct ltr_hdr_bits *b)
+{
+    int zeros;
+
+    zeros = 0;
+    while (hdr_u(b, 1) == 0 && !b->err && zeros < 31)
+    {
+        zeros++;
+    }
+    if (b->err)
+    {
+        return 0;
+    }
+    return (1u << zeros) - 1 + hdr_u(b, zeros);
+}
+
+struct ltr_p_hdr
+{
+    unsigned int frame_num;
+    unsigned int rplm_flag;
+    unsigned int mod_idc;
+    unsigned int ltpn;
+    unsigned int mod_end_idc;
+    unsigned int adaptive;
+    unsigned int mmco_a;
+    unsigned int ltfi;
+    unsigned int mmco_end;
+};
+
+/*****************************************************************************/
+/* parse a first_mb==0 P slice header of the LTR shape (poc_type 2, no
+ * emulation bytes in the header region of these vectors) */
+static void
+ltr_parse_p_hdr(const unsigned char *nal, int len, int log2_mfn,
+                struct ltr_p_hdr *h)
+{
+    struct ltr_hdr_bits b;
+
+    b.buf = nal + 1;
+    b.nbits = (len - 1) * 8;
+    b.pos = 0;
+    b.err = 0;
+    ck_assert_int_eq(hdr_ue(&b), 0);        /* first_mb_in_slice */
+    ck_assert_int_eq(hdr_ue(&b) % 5, 0);    /* slice_type P */
+    hdr_ue(&b);                             /* pps id */
+    h->frame_num = hdr_u(&b, log2_mfn);
+    ck_assert_int_eq(hdr_u(&b, 1), 0);      /* num_ref_idx override */
+    h->rplm_flag = hdr_u(&b, 1);
+    h->mod_idc = hdr_ue(&b);
+    h->ltpn = hdr_ue(&b);
+    h->mod_end_idc = hdr_ue(&b);
+    h->adaptive = hdr_u(&b, 1);
+    h->mmco_a = hdr_ue(&b);
+    h->ltfi = hdr_ue(&b);
+    h->mmco_end = hdr_ue(&b);
+    ck_assert_int_eq(b.err, 0);
+}
+
+/*****************************************************************************/
+START_TEST(test_ltr_win2022_field_sequence_cross_check)
+{
+    struct ltr_p_hdr win;
+    struct ltr_p_hdr ours;
+    const unsigned char *nal;
+
+    /* Win2022 later-aux P slice: log2_max_frame_num = 8 */
+    ck_assert_int_eq(win2022_aux_p_hdr[0], 0x61);  /* nri=3 type=1 */
+    ltr_parse_p_hdr(win2022_aux_p_hdr, WIN2022_AUX_P_HDR_LEN, 8, &win);
+    ck_assert_int_eq((int)win.frame_num, 13);
+    /* our aux P golden packet: skip the 4-byte start code; our chain
+     * carries the widened 16-bit frame_num */
+    nal = ltr_aux_golden_1 + 4;
+    ck_assert_int_eq(nal[0], 0x61);
+    ltr_parse_p_hdr(nal, LTR_AUX_GOLDEN_1_LEN - 4, 16, &ours);
+    /* the element-value sequence of the measured recipe */
+    ck_assert_int_eq((int)win.rplm_flag, 1);
+    ck_assert_int_eq((int)win.mod_idc, 2);
+    ck_assert_int_eq((int)win.ltpn, 1);
+    ck_assert_int_eq((int)win.mod_end_idc, 3);
+    ck_assert_int_eq((int)win.adaptive, 1);
+    ck_assert_int_eq((int)win.mmco_a, 6);
+    ck_assert_int_eq((int)win.ltfi, 1);
+    ck_assert_int_eq((int)win.mmco_end, 0);
+    ck_assert_int_eq((int)ours.rplm_flag, (int)win.rplm_flag);
+    ck_assert_int_eq((int)ours.mod_idc, (int)win.mod_idc);
+    ck_assert_int_eq((int)ours.ltpn, (int)win.ltpn);
+    ck_assert_int_eq((int)ours.mod_end_idc, (int)win.mod_end_idc);
+    ck_assert_int_eq((int)ours.adaptive, (int)win.adaptive);
+    ck_assert_int_eq((int)ours.mmco_a, (int)win.mmco_a);
+    ck_assert_int_eq((int)ours.ltfi, (int)win.ltfi);
+    ck_assert_int_eq((int)ours.mmco_end, (int)win.mmco_end);
+    /* the Windows first-aux quirk we deliberately do NOT copy: their
+     * first aux selects ltpn=0 (the main IDR); ours is a
+     * self-contained I (type 1 slice_type I, no list modification) */
+    ltr_parse_p_hdr(win2022_first_aux_p_hdr,
+                    WIN2022_FIRST_AUX_P_HDR_LEN, 8, &win);
+    ck_assert_int_eq((int)win.ltpn, 0);
+    ck_assert_int_eq((int)win.ltfi, 1);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_rejects_existing_list_modification)
+{
+    /* PRD group 4: a child P slice that already carries a ref-pic-list
+     * modification must hard-reject, never silently emit. Crafted by
+     * setting the rplm_l0 bit of a real child P slice at its true bit
+     * offset (parsed with the child SPS width). */
+    struct xrdp_h264_ltr_state st;
+    struct ltr_hdr_bits b;
+    static unsigned char buf[4096];
+    int len;
+    int pos;
+
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
+    len = LTR_MAIN_IN_1_LEN;
+    /* locate the rplm_l0 flag: first_mb ue, slice_type ue, pps ue,
+     * frame_num u(child log2), override u(1) -> next bit */
+    b.buf = buf + 5;               /* 4-byte start code + NAL header */
+    b.nbits = (len - 5) * 8;
+    b.pos = 0;
+    b.err = 0;
+    hdr_ue(&b);
+    hdr_ue(&b);
+    hdr_ue(&b);
+    hdr_u(&b, st.main_cache.log2_max_frame_num);
+    ck_assert_int_eq((int)hdr_u(&b, 1), 0);    /* override flag */
+    ck_assert_int_eq(b.err, 0);
+    pos = b.pos;
+    ck_assert_int_eq((buf[5 + (pos >> 3)] >> (7 - (pos & 7))) & 1, 0);
+    buf[5 + (pos >> 3)] |= (unsigned char)(0x80 >> (pos & 7));
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_rejects_unseeded_aux_p)
+{
+    /* an aux P while LT1 is unseeded (right after a main IDR) must
+     * fail loudly: the runner restarts the aux child instead */
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[4096];
+    int len;
+
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    /* simulate the mid-stream main IDR having just reset the chain */
+    st.aux_seeded = 0;
+    memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
+    len = LTR_AUX_IN_1_LEN;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
+                                               (int)sizeof(buf), &st),
+                     0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_rejects_main_start_without_idr)
+{
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[4096];
+    int len;
+
+    memset(&st, 0, sizeof(st));
+    memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
+    len = LTR_MAIN_IN_1_LEN;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_rejects_truncated_and_small_cap)
+{
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[4096];
+    int len;
+
+    /* truncated mid-slice */
+    memset(&st, 0, sizeof(st));
+    memcpy(buf, ltr_main_in_0, 200);
+    len = 200;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    /* an undersized caller buffer must fail, never overflow: the aux
+     * P rewrite GROWS (in 13 -> golden 17 bytes) */
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
+    len = LTR_AUX_IN_1_LEN;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
+                                               LTR_AUX_IN_1_LEN, &st),
+                     0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_emitter_high_counter_and_cadence)
+{
+    /* the real rewriter past the golden range: high shared-counter
+     * values (65000; and 256, whose 16-bit field is zero-run heavy --
+     * the emulation-prevention interplay case), and a sparse M,M,A
+     * cadence through the REAL code, verified by parsing the emitted
+     * headers (log2 = 16) rather than byte goldens */
+    struct xrdp_h264_ltr_state st;
+    struct ltr_p_hdr h;
+    static unsigned char buf[4096];
+    int len;
+
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    st.frame_num = 65000;
+    memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
+    len = LTR_MAIN_IN_1_LEN;
+    ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
+    ck_assert_int_eq((int)h.frame_num, 65000);
+    ck_assert_int_eq((int)h.ltpn, 0);
+    ck_assert_int_eq((int)h.ltfi, 0);
+    ck_assert_int_eq(st.frame_num, 65001);
+    /* sparse cadence: a second main picture with NO aux between */
+    memcpy(buf, ltr_main_in_2, LTR_MAIN_IN_2_LEN);
+    len = LTR_MAIN_IN_2_LEN;
+    ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
+    ck_assert_int_eq((int)h.frame_num, 65001);
+    /* then the aux, still resolving LT1 with the shared counter */
+    memcpy(buf, ltr_aux_in_2, LTR_AUX_IN_2_LEN);
+    len = LTR_AUX_IN_2_LEN;
+    ck_assert_int_eq(xrdp_h264_ltr_rewrite_aux(buf, &len,
+                                               (int)sizeof(buf), &st),
+                     0);
+    ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
+    ck_assert_int_eq((int)h.frame_num, 65002);
+    ck_assert_int_eq((int)h.ltpn, 1);
+    ck_assert_int_eq((int)h.ltfi, 1);
+    /* the zero-run frame_num (0x0100): 16-bit field 00000001 00000000
+     * feeds the re-escape with long zero runs */
+    st.frame_num = 256;
+    memcpy(buf, ltr_main_in_1, LTR_MAIN_IN_1_LEN);
+    len = LTR_MAIN_IN_1_LEN;
+    ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    ltr_parse_p_hdr(buf + 4, len - 4, 16, &h);
+    ck_assert_int_eq((int)h.frame_num, 256);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_emitter_epoch_restart_byte_exact)
+{
+    /* a mid-stream main IDR packet resets the chain; feeding the
+     * SAME child packets again must reproduce the SAME golden bytes
+     * (the re-key/respawn epoch is byte-deterministic), and an aux P
+     * before the re-seed must fail */
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[4096];
+    int len;
+
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_1,
+                                    LTR_MAIN_IN_1_LEN, ltr_main_golden_1,
+                                    LTR_MAIN_GOLDEN_1_LEN), 0);
+    /* epoch boundary: the IDR-carrying packet again */
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(st.aux_seeded, 0);
+    ck_assert_int_eq(st.frame_num, 1);
+    /* aux P before the re-seed: loud failure (runner respawns) */
+    memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
+    len = LTR_AUX_IN_1_LEN;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_aux(buf, &len,
+                                               (int)sizeof(buf), &st),
+                     0);
+    /* the fresh-child IDR re-seeds and the epoch replays byte-exact */
+    ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
+                                    LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
+                                    LTR_AUX_GOLDEN_0_LEN), 0);
+    ck_assert_int_eq(st.aux_seeded, 1);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_seed_i_pins_leaf_diff)
+{
+    /* PRD group 1(d): the seed I is the FR-H264-7 leaf conversion of
+     * the same aux IDR with only the NAL header (nri 0 -> 3) and the
+     * marking syntax as deltas; the CABAC payload tail must be
+     * byte-identical between the two conversions */
+    struct xrdp_h264_param_cache mc;
+    struct xrdp_h264_param_cache ac;
+    static unsigned char leaf[4096];
+    int leaf_len;
+    int tail;
+
+    memset(&mc, 0, sizeof(mc));
+    memset(&ac, 0, sizeof(ac));
+    memcpy(leaf, ltr_aux_in_0, LTR_AUX_IN_0_LEN);
+    leaf_len = LTR_AUX_IN_0_LEN;
+    ck_assert_int_eq(xrdp_h264_aux_to_leaf(leaf, &leaf_len,
+                                           ltr_main_in_0,
+                                           LTR_MAIN_IN_0_LEN,
+                                           &mc, &ac), 0);
+    /* leaf: non-reference type 1; seed: reference (nri 3) type 1 */
+    ck_assert_int_eq(leaf[4] & 0x1f, 1);
+    ck_assert_int_eq((leaf[4] >> 5) & 3, 0);
+    ck_assert_int_eq(ltr_aux_golden_0[4] & 0x1f, 1);
+    ck_assert_int_eq((ltr_aux_golden_0[4] >> 5) & 3, 3);
+    /* identical CABAC payload tail (both conversions copy the child
+     * payload byte-verbatim after their differing headers) */
+    tail = (leaf_len < LTR_AUX_GOLDEN_0_LEN
+            ? leaf_len : LTR_AUX_GOLDEN_0_LEN) - 64;
+    ck_assert_int_gt(tail, 100);
+    ck_assert_mem_eq(leaf + leaf_len - tail,
+                     ltr_aux_golden_0 + LTR_AUX_GOLDEN_0_LEN - tail,
+                     tail);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_main_golden_recipe_fields)
+{
+    /* the main view's constant recipe syntax, parsed from the golden
+     * (the aux view gets the independent Win2022 cross-check; this
+     * pins the main-view constants semantically, not just by python
+     * golden bytes) */
+    struct ltr_p_hdr h;
+
+    ck_assert_int_eq(ltr_main_golden_1[4], 0x61);
+    ltr_parse_p_hdr(ltr_main_golden_1 + 4, LTR_MAIN_GOLDEN_1_LEN - 4,
+                    16, &h);
+    ck_assert_int_eq((int)h.frame_num, 2);
+    ck_assert_int_eq((int)h.rplm_flag, 1);
+    ck_assert_int_eq((int)h.mod_idc, 2);
+    ck_assert_int_eq((int)h.ltpn, 0);
+    ck_assert_int_eq((int)h.mod_end_idc, 3);
+    ck_assert_int_eq((int)h.adaptive, 1);
+    ck_assert_int_eq((int)h.mmco_a, 6);
+    ck_assert_int_eq((int)h.ltfi, 0);
+    ck_assert_int_eq((int)h.mmco_end, 0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_win2022_sps_fields)
+{
+    /* turn the vector-header comments into assertions: the Win2022
+     * SPS the cross-check parse widths depend on (Main profile, no
+     * chroma block) */
+    struct ltr_hdr_bits b;
+
+    ck_assert_int_eq(win2022_sps[0], 0x67);
+    b.buf = win2022_sps + 1;
+    b.nbits = (WIN2022_SPS_LEN - 1) * 8;
+    b.pos = 0;
+    b.err = 0;
+    ck_assert_int_eq((int)hdr_u(&b, 8), 77);   /* profile Main */
+    hdr_u(&b, 8);                              /* constraints */
+    ck_assert_int_eq((int)hdr_u(&b, 8), 32);   /* level 3.2 */
+    ck_assert_int_eq((int)hdr_ue(&b), 0);      /* sps id */
+    ck_assert_int_eq((int)hdr_ue(&b) + 4, 8);  /* log2_max_frame_num */
+    ck_assert_int_eq((int)hdr_ue(&b), 2);      /* poc_type */
+    ck_assert_int_eq((int)hdr_ue(&b), 3);      /* max_num_ref_frames */
+    ck_assert_int_eq((int)hdr_u(&b, 1), 0);    /* gaps allowed */
+    ck_assert_int_eq(b.err, 0);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_rejects_b_slice_and_unknown_level)
+{
+    /* PRD group 4: unexpected slice_type and an SPS the level-DPB
+     * check cannot price must hard-reject -- and reject WITHOUT
+     * touching the caller's buffer or state (no half-rewrite) */
+    struct xrdp_h264_ltr_state st;
+    struct xrdp_h264_ltr_state st_snap;
+    static unsigned char buf[4096];
+    static unsigned char snap[4096];
+    int len;
+
+    /* synthetic B slice: hdr 0x41 then first_mb ue(0)=1,
+     * slice_type ue(1)=010 (B), pps ue(0)=1, frame_num u(4)=0001,
+     * padding; bits: 1 010 1 0001 ... -> 0xA8, 0x80 */
+    memset(&st, 0, sizeof(st));
+    ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
+                                    LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
+                                    LTR_MAIN_GOLDEN_0_LEN), 0);
+    st_snap = st;
+    buf[0] = 0;
+    buf[1] = 0;
+    buf[2] = 0;
+    buf[3] = 1;
+    buf[4] = 0x41;
+    buf[5] = 0xa8;
+    buf[6] = 0x80;
+    buf[7] = 0xff;
+    len = 8;
+    memcpy(snap, buf, len);
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    ck_assert_int_eq(len, 8);
+    ck_assert_mem_eq(buf, snap, 8);
+    ck_assert_int_eq(memcmp(&st, &st_snap, sizeof(st)), 0);
+    /* unknown level_idc: patch the SPS level byte of the IDR packet */
+    memset(&st, 0, sizeof(st));
+    memcpy(buf, ltr_main_in_0, LTR_MAIN_IN_0_LEN);
+    ck_assert_int_eq(buf[4] & 0x1f, 7);   /* first NAL is the SPS */
+    buf[7] = 99;                          /* level_idc: unknown */
+    len = LTR_MAIN_IN_0_LEN;
+    memcpy(snap, buf, len);
+    st_snap = st;
+    ck_assert_int_ne(xrdp_h264_ltr_rewrite_main(buf, &len,
+                                                (int)sizeof(buf), &st),
+                     0);
+    ck_assert_int_eq(len, LTR_MAIN_IN_0_LEN);
+    ck_assert_mem_eq(buf, snap, len);
+    /* the state must not have advanced (caches may have been read,
+     * but the chain counters/flags are untouched) */
+    ck_assert_int_eq(st.frame_num, st_snap.frame_num);
+    ck_assert_int_eq(st.started, st_snap.started);
+    ck_assert_int_eq(st.aux_seeded, st_snap.aux_seeded);
+}
+END_TEST
+
 /*****************************************************************************/
 Suite *
 make_suite_avc444_ltr(void)
@@ -892,6 +1469,18 @@ make_suite_avc444_ltr(void)
     tcase_add_test(tc, test_ltr_dpb_sliding_window_exempts_long_term);
     tcase_add_test(tc, test_ltr_dpb_range_violation_recorded_not_silent);
     tcase_add_test(tc, test_ltr_frame_num_slots_golden);
+    tcase_add_test(tc, test_ltr_emitter_golden_sequence);
+    tcase_add_test(tc, test_ltr_win2022_field_sequence_cross_check);
+    tcase_add_test(tc, test_ltr_rejects_existing_list_modification);
+    tcase_add_test(tc, test_ltr_rejects_unseeded_aux_p);
+    tcase_add_test(tc, test_ltr_rejects_main_start_without_idr);
+    tcase_add_test(tc, test_ltr_rejects_truncated_and_small_cap);
+    tcase_add_test(tc, test_ltr_emitter_high_counter_and_cadence);
+    tcase_add_test(tc, test_ltr_emitter_epoch_restart_byte_exact);
+    tcase_add_test(tc, test_ltr_seed_i_pins_leaf_diff);
+    tcase_add_test(tc, test_ltr_main_golden_recipe_fields);
+    tcase_add_test(tc, test_ltr_win2022_sps_fields);
+    tcase_add_test(tc, test_ltr_rejects_b_slice_and_unknown_level);
     suite_add_tcase(s, tc);
     return s;
 }

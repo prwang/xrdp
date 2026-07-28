@@ -2566,7 +2566,151 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   given. Re-run this exact bench against the FR-H264-8 arm.
 
 
-## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — TODO (owner directive, 2026-07-28)
+## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — IN PROGRESS (owner go, 2026-07-28)
+
+### Execution order (owner directive 2026-07-28: "ratchets first")
+
+1. Ratchets, reviewed and committed BEFORE any implementation:
+   - semantic: elevate tools/avc444_roundtrip_psnr.py to the full PRD
+     harness (Tier-A source roundtrip through the real packing + real
+     children + pluggable splice, fault-injection vectors, stressor
+     sequences), sensitivity-validated;
+     STATUS 2026-07-28: DONE in working tree (this ratchet).
+     - Tier-A implemented: seeded synthetic source (luma + iso-
+       luminant chroma index markers, 1px checker, hue gradients),
+       EXACT integer BT.709fr matrix, numpy v1 packer validated
+       BYTE-EXACT against the in-tree fill_main/fill_aux via new
+       tools/avc444_pack_selftest.c (70x34, 152x90, 64x64; inverse
+       proven lossless), two libx264 children per the frozen recipe,
+       leaf splice (spike logic, prevref+1) + --splice cmd contract
+       for the LTR splicer, 1-ctx vs 2-ctx decode + 444 PSNR verdict
+       (band / 0.01 dB mode-epsilon / decay / frame counts).
+     - MEASURED DEVIATION from the frozen recipe assumption: x264
+       core 164 pins log2_max_frame_num=4 regardless of -g/keyint/
+       stitchable ("raise -g until 8" does NOT work). Harness widens
+       SPS log2 4->8 + renumbers every slice frame_num bit-exactly
+       and PROVES the widening decode-identical per run before use.
+     - ffmpeg reference-decoder artifact: after a main-IDR restart
+       the keyframe-less aux-only feed's backwards frame_num mutes
+       ffmpeg output permanently (silent 29/60 swallow, 'Frame num
+       gap 1 255'); 2-ctx aux decode therefore restarts its context
+       at manifest-declared re-key points ('idr':1), matching real
+       client re-key + the LTR aux LT1 re-seed. In-segment
+       starvation still RED.
+     - Validation record (64x64 leaf arm): baseline 60f GREEN, band
+       recorded Y/U/V 32.83/31.54/32.83 dB (= min - 2 dB); wrap run
+       550f gop 600 GREEN with 2 real mod-256 frame_num wraps
+       verified in-stream; --idr-restart 30 GREEN; --aux-cadence 3
+       GREEN (trend check now excludes the min(5,n/10) crf IDR
+       warm-up transient that false-flagged decay); 70x34 GREEN.
+       Sensitivity: all 3 injected faults RED — dropaux (count
+       119/120 + Y/U/V 7.67/8.80/10.92 dB + 25.44 dB mode split),
+       swapfn (count 118/120 + 11.15/17.59/17.80 dB), corrupt-CABAC
+       (U/V 15.61/14.62 dB + 19.55 dB mode split; stand-in for LTR
+       retarget until the LTR splicer exists). Tier-B wire mode
+       regression-tested via synthetic capture, both CLI forms,
+       GREEN all-inf.
+   - syntax: pure-C DPB simulator (§8.2.5 sliding window + mmco6 +
+     IDR long_term_reference_flag) fed the recipe's AU sequences in
+     BOTH decode modes, long-term-pinning ≥512 frames across
+     frame_num wrap, slot-reassignment semantics, max_num_ref_frames
+     accounting; frame_num slot vectors; golden-vector generator.
+2. Implementation: LTR rewriters in xrdp/xrdp_h264_annexb.c
+   (main mmco6/LT0 + list-mod, aux self-seed I + mmco6/LT1 +
+   list-mod, shared frame_num counter, SPS max_num_ref_frames splice),
+   EXPERIMENTAL gfx.toml knob aux_ltr_chain (default off; FR-H264-7
+   leaf stays the shipped default), encoder wiring incl. aux-child
+   respawn on mid-stream main IDR. Emitter golden-byte tests +
+   Win2022 field-sequence cross-check land green with this commit.
+3. CI gates: make check, astyle, cppcheck — all green.
+4. Fleet arm-n (aux_ltr_chain=true, else identical to arm-m VAAPI
+   CQP), both-mode wire verification per the upgraded invariance
+   contract, then bandwidth_bench MODE=frames line-scroll baselines
+   (code, scroll) arm-m vs arm-n — the acceptance gate numbers.
+5. Remaining gate items that stay OWNER-BLOCKED after this pass:
+   T4 nvenc capture (T4 redeploy pending), macOS onscreen verdict,
+   owner sign-off. FR-H264-8 stays EXPERIMENTAL until those close.
+
+### Progress log (2026-07-28, this session)
+
+- Design-verify pass (6 parallel checks) before any code:
+  (a) mmco6-without-mmco4 legality: formally violates H.264 7.4.3.3
+  (long_term_frame_idx=1 > MaxLongTermFrameIdx=0) but ffmpeg does not
+  model MaxLongTermFrameIdx at all; the committed Win2022 capture
+  decodes 357/357 with -err_detect explode -xerror and ZERO
+  marking warnings. DECISION: copy Windows exactly, no mmco4;
+  deviation documented in code + contingency in PRD.
+  (b) Mesa VAAPI slice-shape inventory from committed captures:
+  High/CABAC, poc_type 2, 8-bit frame_num, 1 slice/pic even at 4K,
+  weighted_pred=0, deblock-control absent, marking = sliding window
+  OR [mmco1 diff=0, mmco0] — both accepted+replaced by the rewriter;
+  x264 fallback shape differs (CAVLC at ultrafast! weightp=1 at
+  default preset!) — guard reads everything from the real SPS/PPS.
+  (c) Win2022 golden field values extracted for the cross-check
+  vectors (SPS bytes, AU-13 aux P header bytes, frame_num == AU
+  index mod 256 verified over all 357 AUs).
+- SYNTAX RATCHET COMMITTED FIRST (owner order): pure-C DPB simulator
+  (8.2.5 sliding window + mmco6 + mmco4 + IDR ltr_flag) fed the
+  recipe in BOTH decode modes; 9 tests incl. ≥512-frame pinning
+  across wrap, slot-reassignment-replaces, sparse cadence, IDR
+  restart/reseed, unseeded-aux-P detection, 7.4.3.3 deviation
+  recorded-not-silent. Mutation-validated: window-evicts-longterm
+  mutation → adversarial test RED (recipe tests stay green: recipe
+  streams never invoke the window); mmco6-accumulates mutation →
+  6/9 RED. A checker that cannot fail proves nothing.
+- Golden-vector generator committed: ltr_splice_ref.py — an
+  INDEPENDENT python reference implementation of the full splice,
+  validated by explode-clean strict decode + framemd5 bit-identity
+  in all three topologies + Win2022-shape trace histogram +
+  fault-retarget sensitivity (ltpn 1→0 turns two checks RED) +
+  byte-determinism across independent runs. Emits
+  tests/xrdp/test_avc444_ltr_vectors.h.
+- IMPLEMENTATION: xrdp_h264_ltr_rewrite_main/aux in
+  xrdp_h264_annexb.c (SPS splice: max_num_ref_frames + VUI
+  max_dec_frame_buffering → 3, level DPB budget check, frame_num
+  field widened to 16 bits; slice splice: shared per-PICTURE counter,
+  constant per-view mmco6 + LTR list-mod, IDR ltr_flag, aux-IDR →
+  self-contained LT1-seeding I; full unescape→bit-copy→re-escape, no
+  in-place patching); EXPERIMENTAL gfx.toml knob aux_ltr_chain
+  (default off, leaf stays shipped); runner: aux-child respawn on
+  mid-stream main IDR, pre-wrap re-key, tail-flush routed through
+  the rewrite. C output is BYTE-IDENTICAL to the python reference
+  on the golden vectors (the two implementations were written
+  independently) and the Win2022 field-sequence cross-check passes.
+- MEASURED during implementation (offline smoke on real x264
+  streams through the real C rewriter): all three topologies decode
+  bit-identical over 300 pairs; wire histogram exactly the Windows
+  recipe. WRAP HAZARD FOUND AND FIXED: with an 8-bit frame_num the
+  2-context aux-only feed silently stopped decoding at the wrap
+  (129/300 frames, zero ffmpeg warnings; 1-ctx and drop-aux
+  survived). Fix: 16-bit field + re-key before wrap (structural —
+  no decoder ever sees a wrap; recorded in PRD). x264 log2 sizing
+  assumption in the earlier spec wording corrected (x264 has no
+  knob; splicer widens instead).
+- GENUINE VAAPI CHILDREN (local Mesa, exact arm args): all four
+  identities hold (12 pairs; mmco-chain parse path, nri=1, deblock-
+  control absent, log2=8 input). GOP MEASURED at 120 (vaapi default,
+  no -g in arm args) -> mid-stream IDR every ~12 s. 4-GOP run with
+  respawn emulation: 1-ctx 800/800 and drop-aux 400/400 bit-identical
+  ACROSS boundaries; aux-only bit-identical PER EPOCH (400/400) but a
+  CONTINUOUS stateful aux-only ffmpeg decode stalls at each boundary
+  (122/400) — the aux feed structurally cannot carry an IDR, so
+  topology-3 is per-epoch, with aux-context-reset-at-re-key as a
+  client-model assumption for the Mac gate (PRD epoch rule added).
+  arm-n config therefore runs -g 30000 (epochs = re-keys, ~hourly;
+  real Windows ships ONE IDR per session). A/B caveat: arm-m keeps
+  its default gop-120 main IDR cost — biases the PAIR total slightly
+  in arm-n's favor; the GATE metric (aux KB/frame) is unaffected.
+- TIER-A INTEGRATED WITH THE LTR SPLICE (both implementations):
+  roundtrip --splice cmd through ltr_splice_ref.py AND through the
+  real C rewriter (driver adapter) both GREEN with IDENTICAL values
+  (60f: min Y/U/V 34.83/33.75/34.19 dB both modes, max mode split
+  0.00 dB, inside the leaf band — fidelity does not regress);
+  550-frame run GREEN no decay; sparse cadence 3 GREEN. REAL
+  LTR-retarget sensitivity: ltr_splice_ref --fault-retarget (aux
+  ltpn 1->0) -> harness RED (chroma 6.66/7.18 dB, 5.24 dB mode
+  split) — replaces the corrupt-CABAC stand-in as the fault-class
+  proof.
 
 - Origin: owner challenged the 4b rejection ("if aux refs previous aux,
   you rewrite frame num, pin DPB eviction ... there can't be ambiguity

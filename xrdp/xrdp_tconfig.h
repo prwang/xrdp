@@ -131,6 +131,13 @@ struct xrdp_tconfig_gfx
      * timing SEI it announces; suspected VideoToolbox output-pacing
      * trigger for the measured one-frame aux/chroma lag. Default 0. */
     int avc444_ffmpeg_strip_pic_struct;
+    /* EXPERIMENTAL (PRD FR-H264-8): aux-refs-aux via Windows-style
+     * long-term reference slots -- the aux child encodes a normal
+     * refs=1 P chain and both views are rewritten into one shared
+     * frame_num chain (LT0 = main, LT1 = aux). Default 0: FR-H264-7
+     * all-intra leaves remain the shipped architecture until the
+     * FR-H264-8 acceptance gate (incl. the bandwidth gate) passes. */
+    int avc444_ffmpeg_aux_ltr_chain;
     /* NOTE: AVC444 reference partitioning (aux encoded by a second
      * all-IDR child and spliced in as non-reference, non-IDR I leaves)
      * is NOT configurable: it is a structural requirement of the

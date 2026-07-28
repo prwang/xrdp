@@ -57,6 +57,7 @@ test_xrdp_SOURCES = \
     test_avc444_metablock.c \
     test_avc444_h264.c \
     test_avc444_ltr.c \
+    test_avc444_ltr_vectors.h \
     test_avc444_nut.c \
     test_avc444_ffmpeg.c \
     test_avc444_multimon.c \

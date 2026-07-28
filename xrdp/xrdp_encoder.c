@@ -251,6 +251,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_strip_pic_struct = mm->avc444_strip_pic_struct;
         self->avc444_fault_aux_delay = mm->avc444_fault_aux_delay;
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
+        self->avc444_aux_ltr_chain = mm->avc444_aux_ltr_chain;
         LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: AVC444 %s",
             self->avc444_v2 ? "v2 (ChromaV2, 0x000F)" : "v1 (0x000E)");
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
@@ -1429,6 +1430,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
          * and shipped as non-reference, non-IDR I leaves, so main frames
          * never reference aux frames under any client decode topology */
         cfg.aux_intra_leaf = 1;
+        /* EXPERIMENTAL FR-H264-8 (gfx.toml aux_ltr_chain): takes
+         * precedence over the leaf path inside the runner */
+        cfg.aux_ltr_chain = self->avc444_aux_ltr_chain;
         cfg.fault_aux_delay = self->avc444_fault_aux_delay;
         cfg.fault_strip_mmco = self->avc444_fault_strip_mmco;
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
@@ -1555,6 +1559,18 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
                                     &dst_rect, s->data, bitmap_data_length);
     g_free(s->data);
     g_free(d_rects);
+    if (xrdp_ffmpeg_avc444_rekey_pending(ff))
+    {
+        /* aux_ltr_chain: the shared frame_num counter is near its
+         * wrap. The current pair HAS shipped (its damage is on the
+         * wire above); tearing the encoder down now makes the next
+         * damaged frame recreate it -> fresh IDR, counter reset --
+         * no frame is ever dropped for the re-key. */
+        LOG(LOG_LEVEL_INFO, "gfx_wiretosurface1_avc444: aux_ltr_chain "
+            "re-key: recreating the encoder pair after this frame");
+        xrdp_ffmpeg_avc444_delete(ff);
+        self->avc444_ffmpeg_handle[mon_index] = NULL;
+    }
     return rv;
 }
 

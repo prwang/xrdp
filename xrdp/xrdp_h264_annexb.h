@@ -103,6 +103,7 @@ struct xrdp_h264_param_cache
     int have_pps;
     int entropy_cabac;
     int slice_groups;
+    int num_ref_idx_l0_default; /* num_ref_idx_l0_default_active_minus1 */
     int weighted_pred;
     int deblock_present;
     int redundant_present;
@@ -146,6 +147,84 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
                       const unsigned char *main_data, int main_len,
                       struct xrdp_h264_param_cache *main_cache,
                       struct xrdp_h264_param_cache *aux_cache);
+
+/*
+ * FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows-style long-term
+ * reference slots. The two child streams (main: self-referencing P
+ * chain; aux: refs=1 P chain, IDR first) are rewritten into ONE
+ * frame_num chain where every picture is a reference (nri=3) that
+ * mmco6-self-marks into its view's long-term slot (LT0 = main,
+ * LT1 = aux) and every P slice list-modifies ref 0 to its OWN view's
+ * slot -- the reference topology measured byte-exactly from a real
+ * Win2022 server (PR-demo/win2022_ground_truth, LTR addendum).
+ * Deliberate deviation from Windows: the first aux after an IDR is
+ * converted to a self-contained non-IDR I slice that self-marks LT1
+ * referencing NOTHING (Windows references the main IDR instead), so
+ * a two-decoder client can decode the aux view standalone.
+ * Deliberate H.264 7.4.3.3 nonconformance, copied from Windows: no
+ * mmco4 is ever emitted, so mmco6 long_term_frame_idx=1 exceeds
+ * MaxLongTermFrameIdx (= 0 from the IDR long_term_reference_flag).
+ * Every deployed decoder accepts this shape daily from real Windows
+ * servers; ffmpeg does not track MaxLongTermFrameIdx at all.
+ * Contingency if a future decoder enforces the range: emit mmco4
+ * max_long_term_frame_idx_plus1=2 on the first non-IDR slice.
+ */
+/* the LTR chain's OUTPUT frame_num width: child fields are widened to
+ * 16 bits (log2_max_frame_num_minus4 = 12, the legal maximum).
+ * MEASURED (2026-07-28, ffmpeg 7.1.5): a per-view feed with +2
+ * frame_num gaps SILENTLY STOPS DECODING at the frame_num wrap (300
+ * aux pictures, 8-bit field: 129/300 frames output, zero warnings) --
+ * so the wire must never let a decoder see a wrap in ANY topology.
+ * The runner re-keys (encoder pair restart -> fresh IDR, counter
+ * reset) before the counter reaches the wrap. */
+#define XRDP_H264_LTR_LOG2_MAX_FRAME_NUM 16
+#define XRDP_H264_LTR_FRAME_NUM_REKEY \
+    ((1 << XRDP_H264_LTR_LOG2_MAX_FRAME_NUM) - 512)
+
+struct xrdp_h264_ltr_state
+{
+    struct xrdp_h264_param_cache main_cache;
+    struct xrdp_h264_param_cache aux_cache;
+    int frame_num;      /* shared counter: value for the NEXT picture */
+    int started;        /* a main IDR has been rewritten              */
+    int aux_seeded;     /* LT1 occupied (first aux converted)         */
+};
+
+/*
+ * Worst-case output growth of the LTR rewrite for an Annex-B packet
+ * (per-slice list-mod + marking insertion, SPS ue growth, escape
+ * bytes). The caller must provide a buffer of at least
+ * len + xrdp_h264_ltr_growth_budget(data, len) bytes.
+ */
+int
+xrdp_h264_ltr_growth_budget(const unsigned char *data, int len);
+
+/*
+ * Rewrite one MAIN-view packet in place (SPS: max_num_ref_frames and
+ * VUI max_dec_frame_buffering raised to 3, level DPB budget checked;
+ * IDR: long_term_reference_flag=1, resets the shared counter and
+ * marks LT1 unseeded; P: shared frame_num, LTR list-modification and
+ * mmco6/LT0 marking; all VCL nri=3; CABAC payload byte-verbatim).
+ * cap is the allocated size of data (see growth_budget). Fails loudly
+ * on any stream shape outside the compat guard; on failure the caller
+ * must drop the packet (never ship a half-rewrite).
+ */
+int
+xrdp_h264_ltr_rewrite_main(unsigned char *data, int *len, int cap,
+                           struct xrdp_h264_ltr_state *st);
+
+/*
+ * Rewrite one AUX-view packet in place (SPS/PPS cached + dropped,
+ * SEI/AUD dropped; IDR converted to the self-contained LT1-seeding
+ * non-IDR I slice; P: shared frame_num, LTR list-modification and
+ * mmco6/LT1 marking; nri=3). An aux P while LT1 is unseeded (e.g.
+ * right after a main IDR) is a loud failure -- the caller must
+ * restart the aux child so the next aux packet is IDR-shaped.
+ * Same cap and failure contract as the main rewrite.
+ */
+int
+xrdp_h264_ltr_rewrite_aux(unsigned char *data, int *len, int cap,
+                          struct xrdp_h264_ltr_state *st);
 
 #endif /* _XRDP_H264_ANNEXB_H */
 

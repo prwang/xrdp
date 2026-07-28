@@ -60,6 +60,7 @@ struct xrdp_encoder
     int avc444_strip_pic_struct; /* clear VUI pic_struct flag (macOS)   */
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip        */
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window   */
+    int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain  */
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;

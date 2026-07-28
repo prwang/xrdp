@@ -715,7 +715,9 @@ cache_sps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     bits_ue(&b);             /* sps id */
     if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 ||
             profile_idc == 244 || profile_idc == 44 || profile_idc == 83 ||
-            profile_idc == 86 || profile_idc == 118 || profile_idc == 128)
+            profile_idc == 86 || profile_idc == 118 || profile_idc == 128 ||
+            profile_idc == 138 || profile_idc == 139 || profile_idc == 134 ||
+            profile_idc == 135)
     {
         cfi = bits_ue(&b);
         if (cfi == 3)
@@ -809,7 +811,7 @@ cache_pps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     c->entropy_cabac = bits_u(&b, 1);
     bits_u(&b, 1);                        /* bottom_field_pic_order */
     c->slice_groups = bits_ue(&b);        /* num_slice_groups_minus1 */
-    bits_ue(&b);                          /* num_ref_idx_l0_default */
+    c->num_ref_idx_l0_default = bits_ue(&b);
     bits_ue(&b);                          /* num_ref_idx_l1_default */
     c->weighted_pred = bits_u(&b, 1);
     bits_u(&b, 2);                        /* weighted_bipred_idc */
@@ -1580,4 +1582,974 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
     }
     free(out);
     return rv;
+}
+
+/*
+ * FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows-style long-term
+ * reference slots. See the contract comment in xrdp_h264_annexb.h and
+ * PRD FR-H264-8. Everything below follows the file's one rule for
+ * modifying slice bits: full-NAL unescape -> bit-copy with the edits
+ * -> re-escape. No in-place patching of escaped bytes (a changed byte
+ * can create or destroy 00 00 03 emulation runs).
+ */
+
+/*****************************************************************************/
+/* MaxDpbMbs by level_idc (H.264 table A-1). 0 = unknown level.          */
+/* level 1b (level_idc 11 + constraint_set3_flag) has MaxDpbMbs 396,     */
+/* not 900: fail loud rather than price it as level 1.1.                 */
+static int
+ltr_max_dpb_mbs(int level_idc, int constraint_flags)
+{
+    switch (level_idc)
+    {
+        case 10:
+            return 396;
+        case 11:
+            return (constraint_flags & 0x10) ? 0 : 900;
+        case 12:
+        case 13:
+        case 20:
+            return 2376;
+        case 21:
+            return 4752;
+        case 22:
+        case 30:
+            return 8100;
+        case 31:
+            return 18000;
+        case 32:
+            return 20480;
+        case 40:
+        case 41:
+            return 32768;
+        case 42:
+            return 34816;
+        case 50:
+            return 110400;
+        case 51:
+        case 52:
+            return 184320;
+        case 60:
+        case 61:
+        case 62:
+            return 696320;
+        default:
+            return 0;
+    }
+}
+
+/*****************************************************************************/
+/* the compat guard for the LTR splice: every shape our rewrite depends  */
+/* on, verified from the ACTUAL SPS/PPS, never assumed                   */
+static int
+ltr_cache_ok(const struct xrdp_h264_param_cache *c)
+{
+    /* narrow child frame_num fields (x264 emits log2 = 4) are
+     * WIDENED to XRDP_H264_LTR_LOG2_MAX_FRAME_NUM (16) by the
+     * SPS/slice rewrites -- sparse aux cadences (FR-PROC-7) would
+     * alias a narrow per-view frame_num, and cadence-dependent
+     * correctness is forbidden */
+    return c->have_sps && c->have_pps &&
+           c->log2_max_frame_num >= 4 &&
+           c->log2_max_frame_num <= XRDP_H264_LTR_LOG2_MAX_FRAME_NUM &&
+           c->poc_type == 2 &&
+           c->frame_mbs_only == 1 &&
+           c->scaling_present == 0 &&
+           c->entropy_cabac == 1 &&
+           c->slice_groups == 0 &&
+           c->weighted_pred == 0 &&
+           c->num_ref_idx_l0_default == 0 &&
+           c->redundant_present == 0 &&
+           c->pps_scaling_present == 0;
+}
+
+/*****************************************************************************/
+static void
+copy_bit_range(const unsigned char *rbsp, int from, int to,
+               unsigned char *out, int *opos, int cap_bits, int *err)
+{
+    int i;
+    int bit;
+
+    for (i = from; i < to && !*err; i++)
+    {
+        bit = (rbsp[i >> 3] >> (7 - (i & 7))) & 1;
+        put_bit(out, opos, cap_bits, bit, err);
+    }
+}
+
+/*****************************************************************************/
+/* rewrite one SPS NAL for the LTR chain: max_num_ref_frames -> 3 and,   */
+/* when a VUI bitstream_restriction is present, max_dec_frame_buffering  */
+/* -> 3 (decoders that size the DPB from the VUI would otherwise evict   */
+/* LT1 -- the exact corruption class of the Mac bug). Verifies           */
+/* gaps_in_frame_num_allowed == 0 and the level's DPB budget >= 3.       */
+/* returns the new NAL length or -1 on any check/parse failure.          */
+static int
+sps_ltr_rewrite_nal(const unsigned char *nal, int nal_len,
+                    unsigned char *out, int out_cap)
+{
+    unsigned char rbsp[SPS_RBSP_MAX];
+    unsigned char newr[SPS_RBSP_MAX];
+    struct sps_bits b;
+    unsigned int profile_idc;
+    unsigned int cflags;
+    unsigned int level_idc;
+    unsigned int chroma_format_idc;
+    unsigned int poc_type;
+    unsigned int mnrf;
+    unsigned int mdfb;
+    unsigned int w_mbs;
+    unsigned int h_mbs;
+    int log2_mfn;
+    int lmfn_start;
+    int lmfn_end;
+    int mnrf_start;
+    int mnrf_end;
+    int mdfb_start;
+    int mdfb_end;
+    int nal_hrd;
+    int vcl_hrd;
+    int last_one;
+    int rlen;
+    int zeros;
+    int j;
+    int opos;
+    int oerr;
+    int olen;
+    int nbits;
+    int dpb;
+
+    if (nal_len < 4 || nal_len > SPS_RBSP_MAX)
+    {
+        return -1;
+    }
+    rlen = 0;
+    zeros = 0;
+    for (j = 1; j < nal_len; j++)
+    {
+        if (zeros == 2 && nal[j] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[j] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[j];
+    }
+    nbits = rlen * 8;
+    b.buf = rbsp;
+    b.nbits = nbits;
+    b.pos = 0;
+    b.err = 0;
+    mdfb_start = -1;
+    mdfb_end = -1;
+    mdfb = 0;
+
+    profile_idc = bits_u(&b, 8);
+    cflags = bits_u(&b, 8);
+    level_idc = bits_u(&b, 8);
+    bits_ue(&b);             /* seq_parameter_set_id */
+    chroma_format_idc = 1;
+    if (profile_idc == 100 || profile_idc == 110 || profile_idc == 122 ||
+            profile_idc == 244 || profile_idc == 44 || profile_idc == 83 ||
+            profile_idc == 86 || profile_idc == 118 || profile_idc == 128 ||
+            profile_idc == 138 || profile_idc == 139 || profile_idc == 134 ||
+            profile_idc == 135)
+    {
+        chroma_format_idc = bits_ue(&b);
+        if (chroma_format_idc == 3)
+        {
+            bits_u(&b, 1);
+        }
+        bits_ue(&b);         /* bit_depth_luma_minus8 */
+        bits_ue(&b);         /* bit_depth_chroma_minus8 */
+        bits_u(&b, 1);       /* qpprime_y_zero_transform_bypass_flag */
+        if (bits_u(&b, 1))   /* seq_scaling_matrix_present_flag */
+        {
+            return -1;       /* guard: scaling lists unsupported */
+        }
+    }
+    lmfn_start = b.pos;
+    log2_mfn = bits_ue(&b) + 4;
+    lmfn_end = b.pos;
+    if (log2_mfn < 4 || log2_mfn > XRDP_H264_LTR_LOG2_MAX_FRAME_NUM)
+    {
+        return -1;
+    }
+    poc_type = bits_ue(&b);
+    if (poc_type != 2)
+    {
+        return -1;           /* guard: only poc_type 2 slice headers */
+    }
+    mnrf_start = b.pos;
+    mnrf = bits_ue(&b);
+    mnrf_end = b.pos;
+    if (mnrf < 1 || mnrf > 3)
+    {
+        return -1;
+    }
+    if (bits_u(&b, 1) != 0)  /* gaps_in_frame_num_value_allowed_flag */
+    {
+        return -1;
+    }
+    w_mbs = bits_ue(&b) + 1;
+    h_mbs = bits_ue(&b) + 1;
+    if (bits_u(&b, 1) == 0)  /* frame_mbs_only_flag */
+    {
+        return -1;
+    }
+    bits_u(&b, 1);           /* direct_8x8_inference_flag */
+    if (bits_u(&b, 1))       /* frame_cropping_flag */
+    {
+        bits_ue(&b);
+        bits_ue(&b);
+        bits_ue(&b);
+        bits_ue(&b);
+    }
+    if (b.err || w_mbs == 0 || h_mbs == 0 || w_mbs > 16384 ||
+            h_mbs > 16384)
+    {
+        return -1;
+    }
+    /* level DPB budget: raising the reference count to 3 must fit */
+    dpb = ltr_max_dpb_mbs((int)level_idc, (int)cflags);
+    if (dpb <= 0)
+    {
+        return -1;           /* unknown level: fail loud, never guess */
+    }
+    dpb = dpb / (int)(w_mbs * h_mbs);
+    if (dpb > 16)
+    {
+        dpb = 16;
+    }
+    if (dpb < 3)
+    {
+        return -1;           /* level cannot hold LT0+LT1+current */
+    }
+    if (bits_u(&b, 1))       /* vui_parameters_present_flag */
+    {
+        if (bits_u(&b, 1))   /* aspect_ratio_info_present_flag */
+        {
+            if (bits_u(&b, 8) == 255)
+            {
+                bits_u(&b, 32);
+            }
+        }
+        if (bits_u(&b, 1))   /* overscan_info_present_flag */
+        {
+            bits_u(&b, 1);
+        }
+        if (bits_u(&b, 1))   /* video_signal_type_present_flag */
+        {
+            bits_u(&b, 4);
+            if (bits_u(&b, 1))
+            {
+                bits_u(&b, 24);
+            }
+        }
+        if (bits_u(&b, 1))   /* chroma_loc_info_present_flag */
+        {
+            bits_ue(&b);
+            bits_ue(&b);
+        }
+        if (bits_u(&b, 1))   /* timing_info_present_flag */
+        {
+            bits_u(&b, 64);
+            bits_u(&b, 1);
+        }
+        nal_hrd = bits_u(&b, 1);
+        if (nal_hrd)
+        {
+            skip_hrd_parameters(&b);
+        }
+        vcl_hrd = bits_u(&b, 1);
+        if (vcl_hrd)
+        {
+            skip_hrd_parameters(&b);
+        }
+        if (nal_hrd || vcl_hrd)
+        {
+            bits_u(&b, 1);   /* low_delay_hrd_flag */
+        }
+        bits_u(&b, 1);       /* pic_struct_present_flag */
+        if (bits_u(&b, 1))   /* bitstream_restriction_flag */
+        {
+            bits_u(&b, 1);   /* motion_vectors_over_pic_boundaries */
+            bits_ue(&b);     /* max_bytes_per_pic_denom */
+            bits_ue(&b);     /* max_bits_per_mb_denom */
+            bits_ue(&b);     /* log2_max_mv_length_horizontal */
+            bits_ue(&b);     /* log2_max_mv_length_vertical */
+            bits_ue(&b);     /* max_num_reorder_frames (kept) */
+            mdfb_start = b.pos;
+            mdfb = bits_ue(&b);
+            mdfb_end = b.pos;
+        }
+    }
+    if (b.err)
+    {
+        return -1;
+    }
+    last_one = rbsp_data_bits(rbsp, rlen);
+    if (last_one < mnrf_end || (mdfb_end > 0 && last_one < mdfb_end))
+    {
+        return -1;
+    }
+    memset(newr, 0, sizeof(newr));
+    opos = 0;
+    oerr = 0;
+    /* widen the frame_num field to the LTR output width: narrow
+     * fields alias under sparse aux cadences, and per-view feeds
+     * DIE at the wrap (see XRDP_H264_LTR_LOG2_MAX_FRAME_NUM) */
+    copy_bit_range(rbsp, 0, lmfn_start, newr, &opos, SPS_RBSP_MAX * 8,
+                   &oerr);
+    put_ue(newr, &opos, SPS_RBSP_MAX * 8,
+           (unsigned int)(XRDP_H264_LTR_LOG2_MAX_FRAME_NUM - 4), &oerr);
+    copy_bit_range(rbsp, lmfn_end, mnrf_start, newr, &opos,
+                   SPS_RBSP_MAX * 8, &oerr);
+    put_ue(newr, &opos, SPS_RBSP_MAX * 8, 3, &oerr);
+    if (mdfb_start >= 0)
+    {
+        copy_bit_range(rbsp, mnrf_end, mdfb_start, newr, &opos,
+                       SPS_RBSP_MAX * 8, &oerr);
+        put_ue(newr, &opos, SPS_RBSP_MAX * 8, (mdfb > 3) ? mdfb : 3,
+               &oerr);
+        copy_bit_range(rbsp, mdfb_end, last_one + 1, newr, &opos,
+                       SPS_RBSP_MAX * 8, &oerr);
+    }
+    else
+    {
+        copy_bit_range(rbsp, mnrf_end, last_one + 1, newr, &opos,
+                       SPS_RBSP_MAX * 8, &oerr);
+    }
+    if (oerr)
+    {
+        return -1;
+    }
+    rlen = (opos + 7) / 8;
+    out[0] = nal[0];
+    olen = 1;
+    zeros = 0;
+    for (j = 0; j < rlen; j++)
+    {
+        if (zeros == 2 && newr[j] <= 3)
+        {
+            if (olen >= out_cap)
+            {
+                return -1;
+            }
+            out[olen++] = 3;
+            zeros = 0;
+        }
+        if (olen >= out_cap)
+        {
+            return -1;
+        }
+        zeros = (newr[j] == 0) ? zeros + 1 : 0;
+        out[olen++] = newr[j];
+    }
+    return olen;
+}
+
+/*****************************************************************************/
+/* parse just first_mb_in_slice and slice_type from a slice NAL          */
+static int
+slice_peek(const unsigned char *nal, int nal_len, unsigned int *first_mb,
+           unsigned int *stype)
+{
+    unsigned char rbsp[64];
+    struct sps_bits b;
+    int rlen;
+    int zeros;
+    int i;
+
+    if (nal_len < 3)
+    {
+        return 1;
+    }
+    rlen = 0;
+    zeros = 0;
+    for (i = 1; i < nal_len && rlen < (int)sizeof(rbsp); i++)
+    {
+        if (zeros == 2 && nal[i] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[i] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[i];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    *first_mb = bits_ue(&b);
+    *stype = bits_ue(&b);
+    return b.err;
+}
+
+/*****************************************************************************/
+/* rewrite one VCL slice NAL into its LTR-chain form. view: 0 main,      */
+/* 1 aux. to_seed_i: convert an aux IDR into the self-contained          */
+/* LT1-seeding non-IDR I slice. fn: the shared frame_num to write.       */
+/* returns the new NAL length or -1 on failure.                          */
+static int
+slice_ltr_rewrite(const unsigned char *nal, int nal_len,
+                  unsigned char *out, int out_cap,
+                  const struct xrdp_h264_param_cache *c,
+                  int view, int to_seed_i, int fn)
+{
+    unsigned char *rbsp;
+    unsigned char *newr;
+    struct sps_bits b;
+    unsigned int first_mb;
+    unsigned int stype;
+    unsigned int pps_id;
+    unsigned int idr_pic_id;
+    unsigned int no_output;
+    unsigned int old_fn;
+    unsigned int op;
+    int is_idr;
+    int is_p;
+    int out_log2;
+    int rlen;
+    int zeros;
+    int i;
+    int hdr2_start;
+    int hdr_end;
+    int pay_byte;
+    int opos;
+    int oerr;
+    int olen;
+    int nbytes;
+    int cap_bits;
+
+    is_idr = (nal[0] & 0x1f) == 5;
+    if (nal_len < 4)
+    {
+        return -1;
+    }
+    rbsp = (unsigned char *)malloc(nal_len);
+    newr = (unsigned char *)malloc(nal_len + 16);
+    if (rbsp == NULL || newr == NULL)
+    {
+        free(rbsp);
+        free(newr);
+        return -1;
+    }
+    cap_bits = (nal_len + 16) * 8;
+    rlen = 0;
+    zeros = 0;
+    for (i = 1; i < nal_len; i++)
+    {
+        if (zeros == 2 && nal[i] == 3)
+        {
+            zeros = 0;
+            continue;
+        }
+        zeros = (nal[i] == 0) ? zeros + 1 : 0;
+        rbsp[rlen++] = nal[i];
+    }
+    b.buf = rbsp;
+    b.nbits = rlen * 8;
+    b.pos = 0;
+    b.err = 0;
+    first_mb = bits_ue(&b);
+    stype = bits_ue(&b);
+    pps_id = bits_ue(&b);
+    old_fn = bits_u(&b, c->log2_max_frame_num);  /* replaced below */
+    is_p = (stype % 5 == 0);
+    if (is_idr)
+    {
+        if (stype % 5 != 2)
+        {
+            goto unsupported;             /* IDR must carry I slices */
+        }
+        if (old_fn != 0)
+        {
+            goto unsupported;             /* 7.4.3: IDR frame_num = 0 */
+        }
+        idr_pic_id = bits_ue(&b);
+        no_output = bits_u(&b, 1);
+        bits_u(&b, 1);                    /* long_term_reference_flag */
+        hdr2_start = b.pos;
+    }
+    else if (is_p)
+    {
+        idr_pic_id = 0;
+        no_output = 0;
+        if (bits_u(&b, 1))                /* num_ref_idx override */
+        {
+            goto unsupported;
+        }
+        if (bits_u(&b, 1))                /* ref_pic_list_modification */
+        {
+            goto unsupported;             /* must not already exist */
+        }
+        /* dec_ref_pic_marking (nri != 0 enforced by caller) */
+        /* benign child marking -- sliding window or short-term mmco
+         * chains (Mesa emits [mmco1 diff=0, mmco0] on every P) -- is
+         * parsed and REPLACED by the constant LTR self-mark: the
+         * output chain holds no short-term references, so dropped
+         * mmco1/2/3 have nothing to act on, and a dropped mmco4 is
+         * safe because the child chain contains no long-term
+         * pictures for a lowered bound to unmark. mmco5 (full
+         * reference reset) changes decoder state the replacement
+         * cannot represent: hard-reject, matching the reference
+         * splicer. */
+        if (bits_u(&b, 1))                /* adaptive marking */
+        {
+            do
+            {
+                op = bits_ue(&b);
+                switch (op)
+                {
+                    case 0:
+                        break;
+                    case 1:
+                    case 2:
+                    case 4:
+                    case 6:
+                        bits_ue(&b);
+                        break;
+                    case 3:
+                        bits_ue(&b);
+                        bits_ue(&b);
+                        break;
+                    default:
+                        goto unsupported;  /* mmco5 / invalid ops */
+                }
+            }
+            while (op != 0 && !b.err);
+        }
+        hdr2_start = b.pos;               /* cabac_init_idc onwards */
+    }
+    else
+    {
+        goto unsupported;                 /* B/SP/SI or non-IDR I */
+    }
+    /* remaining header: [P: cabac_init_idc ue], slice_qp_delta se,
+     * [deblock fields when PPS declares them] -- copied verbatim */
+    if (is_p)
+    {
+        bits_ue(&b);                      /* cabac_init_idc */
+    }
+    bits_se(&b);                          /* slice_qp_delta */
+    if (c->deblock_present)
+    {
+        if (bits_ue(&b) != 1)             /* disable_deblocking_idc */
+        {
+            bits_se(&b);
+            bits_se(&b);
+        }
+    }
+    hdr_end = b.pos;
+    if (b.err || !c->entropy_cabac)
+    {
+        goto unsupported;
+    }
+    pay_byte = (hdr_end + 7) / 8;         /* CABAC payload after align */
+    if (pay_byte >= rlen)
+    {
+        goto unsupported;
+    }
+    memset(newr, 0, nal_len + 16);
+    opos = 0;
+    oerr = 0;
+    put_ue(newr, &opos, cap_bits, first_mb, &oerr);
+    put_ue(newr, &opos, cap_bits, stype, &oerr);
+    put_ue(newr, &opos, cap_bits, pps_id, &oerr);
+    out_log2 = XRDP_H264_LTR_LOG2_MAX_FRAME_NUM;
+    for (i = out_log2 - 1; i >= 0 && !oerr; i--)
+    {
+        put_bit(newr, &opos, cap_bits, (fn >> i) & 1, &oerr);
+    }
+    if (is_idr && !to_seed_i)
+    {
+        /* main IDR stays IDR: keep idr_pic_id and no_output, force
+         * long_term_reference_flag = 1 (seeds LT0) */
+        put_ue(newr, &opos, cap_bits, idr_pic_id, &oerr);
+        put_bit(newr, &opos, cap_bits, (int)no_output, &oerr);
+        put_bit(newr, &opos, cap_bits, 1, &oerr);
+    }
+    else
+    {
+        if (is_p)
+        {
+            /* P: override = 0, then the constant LTR selection */
+            put_bit(newr, &opos, cap_bits, 0, &oerr);
+            put_bit(newr, &opos, cap_bits, 1, &oerr);  /* rplm_l0 */
+            put_ue(newr, &opos, cap_bits, 2, &oerr);   /* idc: LT */
+            put_ue(newr, &opos, cap_bits, view, &oerr);
+            put_ue(newr, &opos, cap_bits, 3, &oerr);   /* idc: end */
+        }
+        /* constant self-mark into the view's slot (aux seed I and
+         * every P): adaptive = 1, mmco 6, ltfi = view, mmco 0 */
+        put_bit(newr, &opos, cap_bits, 1, &oerr);
+        put_ue(newr, &opos, cap_bits, 6, &oerr);
+        put_ue(newr, &opos, cap_bits, view, &oerr);
+        put_ue(newr, &opos, cap_bits, 0, &oerr);
+    }
+    copy_bit_range(rbsp, hdr2_start, hdr_end, newr, &opos, cap_bits,
+                   &oerr);
+    while ((opos & 7) != 0 && !oerr)      /* cabac_alignment_one_bit */
+    {
+        put_bit(newr, &opos, cap_bits, 1, &oerr);
+    }
+    nbytes = opos / 8;
+    if (oerr || nbytes + (rlen - pay_byte) > nal_len + 16)
+    {
+        goto unsupported;
+    }
+    memcpy(newr + nbytes, rbsp + pay_byte, rlen - pay_byte);
+    nbytes += rlen - pay_byte;
+    /* NAL header: nri = 3 always (Windows shape); type: IDR stays 5
+     * on main, everything else is 1 */
+    out[0] = (is_idr && !to_seed_i) ? 0x65 : 0x61;
+    olen = 1;
+    zeros = 0;
+    for (i = 0; i < nbytes; i++)
+    {
+        if (zeros == 2 && newr[i] <= 3)
+        {
+            if (olen >= out_cap)
+            {
+                goto unsupported;
+            }
+            out[olen++] = 3;
+            zeros = 0;
+        }
+        if (olen >= out_cap)
+        {
+            goto unsupported;
+        }
+        zeros = (newr[i] == 0) ? zeros + 1 : 0;
+        out[olen++] = newr[i];
+    }
+    if (zeros >= 2)
+    {
+        /* trailing cabac_zero_words: the child's wire ended 00 00 03;
+         * re-emit the escape so the NAL never ends in a zero byte
+         * (7.4.1) and the zeros cannot merge into the next start code */
+        if (olen >= out_cap)
+        {
+            goto unsupported;
+        }
+        out[olen++] = 3;
+    }
+    free(rbsp);
+    free(newr);
+    return olen;
+unsupported:
+    free(rbsp);
+    free(newr);
+    return -1;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_ltr_growth_budget(const unsigned char *data, int len)
+{
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nals;
+
+    if (data == NULL || len < 4 ||
+            !find_start_code(data, len, 0, &nal_start, &sc_prefix))
+    {
+        return 64;
+    }
+    nals = 0;
+    pos = nal_start;
+    while (pos < len && nals < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+
+        nals++;
+        if (!find_start_code(data, len, pos + 1, &next_start,
+                             &next_prefix))
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    return 64 + 24 * nals;
+}
+
+/*****************************************************************************/
+/* shared walker for both views. view 0: SPS rewritten, PPS/SEI/AUD      */
+/* copied, IDR stays IDR (LT0 seed), P -> LTR/LT0. view 1: SPS/PPS       */
+/* cached + dropped, SEI/AUD dropped, IDR -> seed I (LT1), P -> LTR/LT1. */
+static int
+ltr_rewrite_walk(unsigned char *data, int *len, int cap,
+                 struct xrdp_h264_ltr_state *st, int view)
+{
+    struct xrdp_h264_param_cache *own;
+    unsigned char *out;
+    unsigned int first_mb;
+    unsigned int stype;
+    int out_cap;
+    int out_len;
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nal_count;
+    int vcl_pics;
+    int idr_seen;
+    int cur_fn;
+    int rv;
+    int mfn_mask;
+
+    if (data == NULL || len == NULL || st == NULL || *len < 4)
+    {
+        return 1;
+    }
+    if (!find_start_code(data, *len, 0, &nal_start, &sc_prefix))
+    {
+        return 1;
+    }
+    own = (view == 0) ? &st->main_cache : &st->aux_cache;
+    out_cap = *len + xrdp_h264_ltr_growth_budget(data, *len);
+    out = (unsigned char *)malloc(out_cap);
+    if (out == NULL)
+    {
+        return 1;
+    }
+    rv = 0;
+    out_len = 0;
+    vcl_pics = 0;
+    idr_seen = 0;
+    cur_fn = 0;
+    pos = nal_start;
+    nal_count = 0;
+    while (pos < *len && nal_count < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+        int nal_end;
+        int nal_len;
+        int new_len;
+        int ntype;
+        int nri;
+
+        nal_count++;
+        if (find_start_code(data, *len, pos + 1, &next_start,
+                            &next_prefix))
+        {
+            nal_end = next_start - next_prefix;
+        }
+        else
+        {
+            nal_end = *len;
+            next_start = -1;
+        }
+        nal_len = nal_end - pos;
+        ntype = data[pos] & 0x1f;
+        nri = (data[pos] >> 5) & 3;
+        if (ntype == 7)
+        {
+            cache_sps(own, data + pos, nal_len);
+            if (view == 0)
+            {
+                if (out_len + 4 + nal_len + 8 > out_cap)
+                {
+                    rv = 1;
+                    break;
+                }
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 1;
+                new_len = sps_ltr_rewrite_nal(data + pos, nal_len,
+                                              out + out_len,
+                                              out_cap - out_len);
+                if (new_len < 0)
+                {
+                    rv = 1;
+                    break;
+                }
+                out_len += new_len;
+            }
+        }
+        else if (ntype == 8)
+        {
+            cache_pps(own, data + pos, nal_len);
+            if (view == 0)
+            {
+                if (out_len + 4 + nal_len > out_cap)
+                {
+                    rv = 1;
+                    break;
+                }
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 1;
+                memcpy(out + out_len, data + pos, nal_len);
+                out_len += nal_len;
+            }
+        }
+        else if (ntype == 6 || ntype == 9)
+        {
+            if (view == 0)
+            {
+                if (out_len + 4 + nal_len > out_cap)
+                {
+                    rv = 1;
+                    break;
+                }
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 0;
+                out[out_len++] = 1;
+                memcpy(out + out_len, data + pos, nal_len);
+                out_len += nal_len;
+            }
+        }
+        else if (ntype == 5 || ntype == 1)
+        {
+            int to_seed_i;
+
+            if (nri == 0)
+            {
+                rv = 1;         /* non-reference VCL: not our shape */
+                break;
+            }
+            if (!ltr_cache_ok(own))
+            {
+                rv = 1;
+                break;
+            }
+            if (view == 1 &&
+                    !leaf_caches_compatible(&st->main_cache,
+                                            &st->aux_cache))
+            {
+                rv = 1;
+                break;
+            }
+            if (slice_peek(data + pos, nal_len, &first_mb, &stype) != 0)
+            {
+                rv = 1;
+                break;
+            }
+            mfn_mask = (1 << XRDP_H264_LTR_LOG2_MAX_FRAME_NUM) - 1;
+            if (first_mb == 0)
+            {
+                if (vcl_pics > 0)
+                {
+                    /* one coded picture per packet is the child
+                     * contract (encode_pair pops per picture) */
+                    rv = 1;
+                    break;
+                }
+                vcl_pics = 1;
+                if (ntype == 5)
+                {
+                    idr_seen = 1;
+                    if (view == 0)
+                    {
+                        cur_fn = 0;   /* IDR resets the shared chain */
+                    }
+                    else
+                    {
+                        cur_fn = st->frame_num;
+                    }
+                }
+                else
+                {
+                    if (view == 0 && !st->started)
+                    {
+                        rv = 1;   /* main chain must start with IDR */
+                        break;
+                    }
+                    if (view == 1 && !st->aux_seeded)
+                    {
+                        /* aux P with LT1 unseeded: the caller must
+                         * restart the aux child instead */
+                        rv = 1;
+                        break;
+                    }
+                    cur_fn = st->frame_num;
+                }
+            }
+            else if (vcl_pics == 0)
+            {
+                rv = 1;           /* slices before the picture start */
+                break;
+            }
+            to_seed_i = (view == 1 && ntype == 5);
+            if (out_len + 4 + nal_len + 24 > out_cap)
+            {
+                rv = 1;
+                break;
+            }
+            out[out_len++] = 0;
+            out[out_len++] = 0;
+            out[out_len++] = 0;
+            out[out_len++] = 1;
+            new_len = slice_ltr_rewrite(data + pos, nal_len,
+                                        out + out_len,
+                                        out_cap - out_len, own, view,
+                                        to_seed_i, cur_fn & mfn_mask);
+            if (new_len < 0)
+            {
+                rv = 1;
+                break;
+            }
+            out_len += new_len;
+        }
+        else
+        {
+            rv = 1;               /* unexpected NAL type */
+            break;
+        }
+        if (next_start < 0)
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    if (rv == 0 && vcl_pics == 0)
+    {
+        rv = 1;
+    }
+    if (rv == 0 && out_len > cap)
+    {
+        rv = 1;                   /* caller buffer too small */
+    }
+    if (rv == 0)
+    {
+        mfn_mask = (1 << XRDP_H264_LTR_LOG2_MAX_FRAME_NUM) - 1;
+        memcpy(data, out, out_len);
+        *len = out_len;
+        st->frame_num = (cur_fn + 1) & mfn_mask;
+        if (view == 0 && idr_seen)
+        {
+            st->started = 1;
+            st->aux_seeded = 0;   /* the IDR emptied the DPB */
+        }
+        if (view == 1 && idr_seen)
+        {
+            st->aux_seeded = 1;   /* the seed I now occupies LT1 */
+        }
+    }
+    free(out);
+    return rv;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_ltr_rewrite_main(unsigned char *data, int *len, int cap,
+                           struct xrdp_h264_ltr_state *st)
+{
+    return ltr_rewrite_walk(data, len, cap, st, 0);
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_ltr_rewrite_aux(unsigned char *data, int *len, int cap,
+                          struct xrdp_h264_ltr_state *st)
+{
+    return ltr_rewrite_walk(data, len, cap, st, 1);
 }

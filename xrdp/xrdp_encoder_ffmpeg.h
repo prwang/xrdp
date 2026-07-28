@@ -92,6 +92,20 @@ struct xrdp_ffmpeg_avc444_config
     /* 0 only for single-view (AVC420)       */
     /* runners and, internally, for the leaf */
     /* child itself                          */
+    int aux_ltr_chain;              /* EXPERIMENTAL (PRD FR-H264-8):        */
+    /* aux-refs-aux via Windows-style long-  */
+    /* term reference slots. The second      */
+    /* child encodes a normal refs=1 P chain */
+    /* (no forced IDR) and BOTH views' slice */
+    /* headers are rewritten into one shared */
+    /* frame_num chain with constant mmco6   */
+    /* self-marking (LT0 = main, LT1 = aux)  */
+    /* and per-view LTR list modification    */
+    /* (xrdp_h264_ltr_rewrite_*). Takes      */
+    /* precedence over aux_intra_leaf.       */
+    /* Default 0: FR-H264-7 leaves remain    */
+    /* the shipped architecture until the    */
+    /* FR-H264-8 acceptance gate passes.     */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
@@ -247,6 +261,13 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
 
 int
 xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
+
+/* aux_ltr_chain (FR-H264-8): nonzero when the shared frame_num counter
+ * is near its wrap; the caller must delete + recreate the encoder
+ * AFTER shipping the current pair (a per-view decoder cannot survive
+ * a frame_num wrap -- see xrdp_h264_annexb.h) */
+int
+xrdp_ffmpeg_avc444_rekey_pending(struct xrdp_ffmpeg_avc444 *self);
 
 /**
  * Frames submitted but not yet returned = frames still held in the encoder's

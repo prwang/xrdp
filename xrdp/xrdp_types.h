@@ -445,6 +445,7 @@ struct xrdp_mm
     int avc444_strip_pic_struct; /* clear VUI pic_struct flag (macOS)     */
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip          */
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window     */
+    int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain   */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.
