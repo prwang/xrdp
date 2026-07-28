@@ -172,7 +172,7 @@ order: 4B then 2):
   encoder processes.** PRD §6.5: both sub-streams must come from the
   SAME encoder and decode as ONE stream ("never ... one FFmpeg process
   for main and another for auxiliary"). Ground truth
-  (`vm/GROUND_TRUTH_win2022_avc444.md`): one SPS/IDR per session, all
+  (`PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md`): one SPS/IDR per session, all
   views P-slices on a single shared reference chain / frame_num
   sequence. Two encoders = two chains interleaved into the client's
   single decoder = P-reference desync garbage, plus duplicate SPS
@@ -794,7 +794,7 @@ vGPU (hardware NVENC). GPO set by us: `AVC444ModePreferred=1`,
 `AVCHardwareEncodePreferred=1`. Captured 803 AVC444 frames with the patched
 FreeRDP dumper across two chroma-rich payloads (ChromaAnim isoluminant hue
 rotation; ChromaScroll scrolling saturated bars + colored text). Full analysis:
-`/work/vm/GROUND_TRUTH_win2022_avc444.md`.
+`/work/PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md`.
 
 **What real Windows actually emits (measured, 803 frames):**
 - codec **`0x000F` (AVC444v2) exclusively** — never v1 `0x000E`.
@@ -1996,7 +1996,7 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   validation last.
 - RECONCILIATION with the two-encoder rejection (owner challenge,
   2026-07-27): the rejected-thread note (this file, ~line 171; PRD
-  §6.5; vm/GROUND_TRUTH_win2022_avc444.md) stands and the "two
+  §6.5; PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md) stands and the "two
   independent encoder contexts" TODO above is WITHDRAWN — two
   processes = two frame_num chains + duplicate SPS into the client's
   single decoder = desync garbage on Windows/xfreerdp, exactly as
@@ -2196,3 +2196,122 @@ Owner tested all four arms in one sitting (Mac, Windows App):
     reformatted unrelated tracked files and was reverted; only
     hand-formatted edits shipped. Style verdict rests with CI.
 
+
+## FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows LTR slots — TODO (owner directive, 2026-07-28)
+
+- Origin: owner challenged the 4b rejection ("if aux refs previous aux,
+  you rewrite frame num, pin DPB eviction ... there can't be ambiguity
+  regardless of decoder topology") — and the ground-truth trace proved
+  the challenge right, more strongly than argued.
+
+### Measurement (2026-07-28, full methodology + numbers)
+
+- Source evidence: PR-demo/win2022_ground_truth/gfxwin_anim/ — 358
+  per-frame RFX_AVC444_BITMAP_STREAM wire dumps captured from the
+  REMOTE GPU Windows Server 2022 GRID host (43.98.187.122) via the
+  patched-FreeRDP dumper (capwin.sh), during the ChromaAnim.cs
+  animation. CHECKED IN with this commit alongside gfxwin_motion/,
+  gfxwin_probe/, gfxwin_scroll/.
+- Assembly: PR-demo/win2022_ground_truth/assemble_annexb.py (committed;
+  re-run 2026-07-28 and byte-identical to the traced stream) — walks
+  f*_c000F.bin in order, splits LC=0/1/2 into main/aux AVC420
+  sub-streams, concatenates every view's Annex-B payload in exact
+  wire/decode order. Result: 357 AUs, 9 aux at ordinals
+  [8, 13, 19, 20, 26, 97, 100, 217, 311], 3 slices per AU
+  => 356 P AUs x 3 = 1068 P slices.
+- Trace: ffmpeg -bsf:v trace_headers over the assembled stream,
+  aggregated field=value counts (exact):
+    1068 ref_pic_list_modification_flag_l0 = 1   (EVERY P slice)
+    1068 modification_of_pic_nums_idc = 2        (LTR select)
+    1068 modification_of_pic_nums_idc = 3        (terminator)
+    1044 long_term_pic_num = 0 | 24 long_term_pic_num = 1
+    1068 adaptive_ref_pic_marking_mode_flag = 1  (EVERY P slice)
+    1068 memory_management_control_operation = 6 (self-mark LT)
+    1068 memory_management_control_operation = 0 (terminator)
+    1041 long_term_frame_idx = 0 | 27 long_term_frame_idx = 1
+       3 long_term_reference_flag = 1            (IDR self-marks, x3 slices)
+    1068 num_ref_idx_active_override_flag = 0
+       2 max_num_ref_frames = 3 | 2 gaps_in_frame_num_allowed = 0
+- Count identities that pin the interpretation: 27 = 9 aux AUs x 3
+  (every aux marks itself into LT idx 1); 1041 = (357-9-1+... ) = 347
+  main P AUs x 3 + IDR-see-flag (main self-marks LT idx 0); 24 = 8 x 3
+  (aux P slices selecting LT1 = previous aux) vs 1044 = 348 x 3 —
+  i.e. 347x3 main selects LT0 PLUS the FIRST aux (AU 8) x 3 also
+  selects long_term_pic_num=0: the first aux after the IDR references
+  the MAIN IDR, not an aux.
+- Interpretation: Windows partitions references with NAMED LONG-TERM
+  SLOTS — LT0 = "last main", LT1 = "last aux"; every picture mmco6
+  self-marks into its view's slot (reassignment REPLACES the previous
+  occupant: no sliding window, no eviction pinning, no PicNum
+  arithmetic — marking and selection syntax are CONSTANTS per view);
+  every P slice list-modifies list0[0] to its own view's slot. This
+  also explains the previously-measured 348/348 drop-aux bit-identity
+  mechanically: main only ever selects LT0 and only main occupies LT0.
+- Invariance consequences: main-chain independence HOLDS; the STRONG
+  per-view invariant (FR-H264-7 topology 3) does NOT hold for the
+  Windows stream (first-aux refs LT0; frame_num gaps under
+  gaps_allowed=0) — yet every client incl. macOS VideoToolbox renders
+  it. Necessary client-compat condition = the WEAK invariant (main
+  independence + deterministic interleaved resolution).
+
+### Correction (strict honesty)
+
+- The earlier "4b REJECTED as low-ROI" rationale recorded 2026-07-28
+  above (and the PRD's since-replaced "Rejected alternative"
+  paragraph) was exaggerated: it priced a SHORT-TERM-reference
+  construction (per-frame abs_diff_pic_num arithmetic, wrap handling,
+  eviction pinning) that Windows does not use, and claimed a loss of
+  structural safety for a stream shape every RDP client decodes
+  daily. PRD paragraph rewritten; proof-doc correction appended.
+- Process note: the prior session turn reported this correction as
+  "recorded" before anything was committed — it lands here.
+
+### Spec + spike plan (PRD FR-H264-8, EXPERIMENTAL)
+
+- Recipe: one frame_num chain, all pictures nri=3, dpb 3; IDR
+  long_term_reference_flag=1; every P slice mmco6 self-mark (LT idx =
+  view) + LTR list-modification (long_term_pic_num = view); first-aux
+  quirk optional (may reference LT0 like Windows or start aux intra).
+- Implementation: same two children as FR-H264-7; aux child switches
+  all-IDR -> normal refs=1 P chain; splicer rewrites both views'
+  slice headers pre-CABAC with CONSTANT patterns + shared frame_num
+  counter; payloads byte-verbatim (each child's ref_idx 0 remaps via
+  the modification list); SPS splice raises max_num_ref_frames.
+- Expected win: aux 33.0 KB all-intra leaf (arm-m, 1600x900) ->
+  skip-sized P on static chroma (main P measured 0.48-1.16 KB same
+  content) — closes the "aux leaf bitrate" follow-up (~8 Mbps static
+  at 1:1 cadence today; smaller but nonzero win post-Lever-2).
+  Upstream story becomes "same reference topology as Windows".
+- Acceptance gate (PRD): offline framemd5 vs child decodes; drop-aux
+  bit-identity; VAAPI arm + T4 nvenc captures verified with
+  topology-3 expected-RED recorded; owner Mac verdict; bitrate/perf
+  vs leaf arm; owner sign-off before any default change.
+- Order: offline spike first; FR-H264-7 leaves remain the shipped
+  default everywhere until the gate passes.
+
+### Evidence relocation + qemu cleanup (owner directive, this commit)
+
+- /work/vm -> PR-demo/win2022_ground_truth/ (symlink /work/vm kept for
+  live tooling); curated set CHECKED IN: ground-truth docs
+  (GROUND_TRUTH_win2022_avc444.md incl. LTR addendum,
+  LC_payload_findings.md), all four gfxwin_* wire-dump dirs,
+  parsers (parse444.py, scan444.py, mk_pattern.py, assemble_annexb.py),
+  Windows-side probe apps (ChromaAnim/ChromaScroll/ChromaTest.cs,
+  chroma_strip_anim.c, chroma_task*.xml), cred-free capture scripts
+  (capwin.sh, cap_ours.sh, sshwin.sh, scpwin.sh, pfreerdp.sh).
+- Credential hygiene: the plaintext SSH askpass moved out of the work
+  tree to root-owned /root/.win_askpass.sh (mode 700); sshwin/scpwin
+  repointed; RDP cred stays in /root/.testvm_cred as before. Nothing
+  credential-bearing is committed.
+- qemu VM DELETED per owner directive (never produced value; its only
+  finding — WS2025 without a GPU refuses AVC444 LC=2 — is hereby
+  preserved as the record): win2025.raw (23G), ntfs.img (11G),
+  OVMF_VARS.fd, run_vm.sh, qmp.py, sshvm.sh, rdp_capture.sh,
+  qemu/serial logs, askpass.sh (relocated first). 34G freed.
+- Retained on disk, NOT committed (dir .gitignore): frdbuild/ (the
+  patched-FreeRDP dumper toolchain capwin.sh needs), lc_probe/,
+  perf_capture/, gfxdump*/gfxours*/ raw dirs, logs/pngs.
+- rdp.pcap (3.1G) DELETED (owner directive: the TLS was never
+  man-in-the-middled, so the encrypted capture has no forensic
+  value). All wire evidence lives in the decrypted per-frame
+  gfxwin_*/gfxdump_* dumps produced inside the patched client.

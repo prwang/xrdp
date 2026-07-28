@@ -1,0 +1,16 @@
+# On-disk-only bulk: live capture toolchain and superseded/raw material.
+# The committed set is the ground-truth EVIDENCE (gfxwin_* wire dumps),
+# the analysis docs, the parsers/assembler, the Windows-side probe apps
+# and the (cred-free) capture scripts. Credentials live in /root, never
+# here (owner directive 2026-07-28).
+frdbuild/
+lc_probe/
+perf_capture/
+gfxdump*/
+gfxours*/
+__pycache__/
+*.pcap
+*.log
+*.png
+chroma_strip_anim
+testout.txt

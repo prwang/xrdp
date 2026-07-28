@@ -11,7 +11,7 @@ gfx frame**, aud-less. Same H.264 bytes and traffic as the old single-PDU LC=0;
 only the framing differs. This is the macOS-Windows-App fix (Apple VideoToolbox
 rejects our former same-region LC=0; it accepts luma-first LC=1 + deferred LC=2,
 the real-Windows structure). Rationale + ground truth:
-`docs/avc444_lc_reframe_design.md`, `vm/GROUND_TRUTH_win2022_avc444.md`.
+`docs/avc444_lc_reframe_design.md`, `PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md`.
 
 Dev-branch commit to port: `aa894917` (re-authored, NOT cherry-picked — the clean
 branch is a re-slice with different structure).

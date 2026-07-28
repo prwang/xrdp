@@ -69,4 +69,4 @@ xrdp_accel_assist/xrdp-accel-assist
 *.deb
 
 # local test-VM harness (contains credentials + large binary dumps) — never commit
-vm/
+vm

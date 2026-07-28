@@ -83,4 +83,4 @@ multiple session sizes before any handoff.
 
 Local (uncommitted) artifacts: `vm/gfxwin_anim`, `vm/gfxwin_scroll` (real-Windows
 dumps), `vm/gfxdump_*` (our dumps), `vm/parse444.py`, `vm/scan444.py`,
-`vm/GROUND_TRUTH_win2022_avc444.md`.
+`PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md`.
