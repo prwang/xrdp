@@ -2754,6 +2754,36 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   but a re-key-boundary watch per the topology-3 epoch rule is still
   outstanding; owner sign-off.
 
+### 2026-07-28 GAP: the AVC444 path has NO runtime intra-refresh at all
+
+Found while justifying the "option 2" risk (rewriting mid-stream main IDRs
+as non-IDR intra). The risk I stated -- "a client that lost state can only
+resync on a true IDR" -- is real in principle but MISSTATES today's code:
+
+- `KEY_FRAME_REQUESTED` is honoured ONLY in the RFX path
+  (xrdp_encoder.c:715 -> RFX_FLAGS_PRO_KEY). The AVC444/h264 path reads
+  `flags` solely to extract mon_index. There is no runtime force-IDR
+  (FR-H264-6 forbids it) and no other refresh mechanism.
+- So in an AVC444 session the ONLY intra refreshes are: the first packet
+  after an encoder create, a child GOP (-g) IDR, and an encoder restart
+  (error / re-key / resize). A client that asks for a key frame gets
+  nothing.
+- Consequence for the -g 30000 profiles (arm-n, and now the T4): after the
+  opening IDR the stream has effectively NO further random-access points
+  already. Option 2 therefore regresses nothing relative to the
+  configuration the owner has validated -- it only makes small-GOP configs
+  behave like large-GOP ones.
+- The genuinely missing feature is a PAIRED INTRA REFRESH: emit main-I
+  (self-marking LT0) together with aux-I (self-marking LT1), plus SPS/PPS,
+  with NO IDR anywhere. A decoder can join at that point (both slots are
+  re-seeded by self-contained intra pictures and every later P references
+  only LT0/LT1), and nothing is flushed, so the aux chain never needs a
+  respawn. That is strictly better than an IDR for this topology: it gives
+  random access AND decoupling at once. The aux half of the machinery
+  already exists (the seed picture); the main half is the same rewrite.
+- Until that exists, "recovery" for a wedged client is an encoder restart,
+  which is what already happens on error/resize.
+
 ### 2026-07-28 aux-child RESPAWN COSTS ~630 ms — real defect for small GOPs
 
 Found while answering "is the main-IDR->aux dependency real or just
