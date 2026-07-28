@@ -23,6 +23,16 @@ The two are version-coupled: the `xrdp-dev` deb declares
 `Breaks: xorgxrdp (<< 1:0.10.80~)`, so an outdated xorgxrdp fails **loudly** at
 install rather than silently at login. Install both.
 
+> **Currently deployed on the T4 (2026-07-28)** — the reference pair for the
+> FR-H264-8 nvenc gate:
+> `xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1` +
+> `xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3`, with
+> `/etc/xrdp/gfx.toml` = `PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml`
+> (`aux_intra_leaf = false`, `aux_ltr_chain = true`). The xorgxrdp side of
+> that pair carries the capture-shmem up-front reservation (§2b(d)).
+> Whenever you change what is deployed, update this line — it is the only
+> place that records what a box is actually running.
+
 ---
 
 ## 1. Dependencies to install (runtime)
@@ -66,15 +76,53 @@ that means membership in the `render` group (owner of `/dev/dri/renderD128`).
 > a compute process (~200 MiB) — i.e. real GPU encode, not a CPU fallback.
 > Requires the dump_extra fix (§0/§3).
 
+### 1c. GPU environment check (run BEFORE deploying, takes 30 s)
+
+Verifies the box can actually hardware-encode, and gives you the baseline to
+compare against when performance looks wrong later.
+
+```sh
+# 1. driver + engine present
+nvidia-smi --query-gpu=name,driver_version,persistence_mode --format=csv
+ffmpeg -hide_banner -encoders | grep -E 'nvenc|vaapi'      # h264_nvenc / h264_vaapi
+vainfo | grep -i h264                                       # VAAPI boxes only
+
+# 2. the encoder really works with the EXACT args gfx.toml will use —
+#    catches "encoder exists but this arg combination fails" before a deploy
+ffmpeg -hide_banner -f lavfi -i testsrc=size=1920x1088:rate=30:duration=2 \
+  -pix_fmt yuv420p -c:v h264_nvenc -profile:v high -preset p1 -tune ll \
+  -refs 1 -dpb_size 1 -rc constqp -qp 20 -bf 0 -delay 0 -g 240 \
+  -f h264 -y /tmp/probe.h264 && ls -l /tmp/probe.h264
+
+# 3. stream SHAPE check (needed before enabling aux_ltr_chain, §3):
+python3 tools/avc444_ltr_wire_audit.py --annexb /tmp/probe.h264 "this box"
+#    -> prints every ltr_cache_ok() condition; all nine must PASS
+
+# 4. utilisation baseline under load (single most useful perf datum)
+nvidia-smi dmon -c 10        # columns: sm%, enc%, pclk MHz
+```
+
+Read `dmon` honestly: **`enc%` is the NVENC engine, `sm%` is the shader core**
+— H.264 encoding lives almost entirely in `enc`. A low `enc%` with low fps
+means the pipeline is *latency*-bound (serialised round-trips), NOT that the
+GPU is too slow; see §7. `pclk` well below `clocks.max.sm` under load is
+normal for a bursty duty cycle and is a symptom of the same thing.
+
 ---
 
 ## 2. Install the packages
 
+Install **both** packages in ONE transaction, non-interactively, keeping
+local conffiles:
+
 ```sh
-sudo apt-get install -y /work/dist/xorgxrdp-dev_0.10.80+gite86bff0+glamor_amd64.deb
-sudo apt-get install -y /work/dist/xrdp-dev_0.10.80+gitc74a09e7d000_amd64.deb
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    -o Dpkg::Options::=--force-confold \
+    /work/dist/xorgxrdp-dev_1%3a0.10.80+git<ts>.<hash>_amd64.deb \
+    /work/dist/xrdp-dev_0.10.80+git<ts>.<hash>_amd64.deb
 sudo systemctl enable --now xrdp xrdp-sesman
 systemctl is-active xrdp xrdp-sesman          # both -> active
+dpkg -l | grep -E '^ii +(xrdp-dev|xorgxrdp-dev)'   # BOTH must be 'ii'
 ```
 
 xrdp must stay **systemd-managed** and bound to `127.0.0.1:3389` (default) unless
@@ -136,6 +184,87 @@ you more — the front-end is already past its part when this appears):
    proprietary driver needs `nvidia-drm.modeset=1` for GBM/EGL. Look for
    glamor/EGL errors in the Xorg log.
 
+### 2b. Four install hazards that have each cost real time
+
+**(a) Conffile prompt hangs the install (2026-07-28, T4).** Any box whose
+`/etc/xrdp/cert.pem` (or `gfx.toml`, `xrdp.ini`, …) was locally modified makes
+dpkg prompt *"Modified (by you or by a script) since installation"*. Over a
+non-interactive ssh there is no stdin, so dpkg aborts with `end of file on
+stdin at conffile prompt` and leaves the package **unpacked but unconfigured**
+(`dpkg -l` shows `iU`, and the box is in a half-installed state):
+
+```sh
+sudo DEBIAN_FRONTEND=noninteractive dpkg -i --force-confold <deb>   # recover
+```
+Always pass `--force-confold` (keep the local file). Replacing the TLS
+`cert.pem` silently changes the box's certificate identity, and replacing
+`gfx.toml` silently reverts the encoder config the test depends on.
+
+**(b) Version strings must sort monotonically.** dpkg compares leading digit
+runs numerically, so a **bare commit hash** does not sort: `1:0.10.80+git5b9650…`
+is *older* than `1:0.10.80+git251bc4d…` (5 < 251). apt then refuses with
+`Packages were downgraded and -y was used without --allow-downgrades`, and a
+paired `Breaks:` guard can reject a genuinely newer build. `build_dev_deb.sh`
+already emits `+git<commit-timestamp>.<hash>` for xrdp; **package xorgxrdp the
+same way** (§4). Never reach for `--allow-downgrades` to paper over it — fix
+the version.
+
+**(c) `xrdp-dev` Breaks old `xorgxrdp`.** The xrdp deb carries
+`Breaks: xorgxrdp (<< 1:0.10.80~)`, so installing it can *remove* a stale
+xorgxrdp (and with it `/etc/X11/xrdp/xorg.conf`), which breaks every session
+creation. This is why the `dpkg -l` check above is mandatory **after** every
+install, not before.
+
+**(d) `/dev/shm` must fit the capture segment (containers).** The capture
+shmem is `2 slots × (main + aux packed views) × all monitors`; a dual-4K
+layout needs ~74 MB and a 3840×2400 single monitor ~88 MB, while Docker/k8s
+default `/dev/shm` to **64 MB**. Since 2026-07-28 xorgxrdp reserves the whole
+segment up front and fails the client connection with a loud
+`can not allocate N bytes of shared memory … /dev/shm is probably too small`
+instead of SIGBUSing Xorg mid-session. Size it explicitly:
+
+```sh
+df -h /dev/shm                    # bare metal: usually RAM/2, fine
+# k8s: emptyDir { medium: Memory, sizeLimit: 512Mi } mounted at /dev/shm
+# docker: --shm-size=512m
+```
+
+### 2c. Credentials — where they live, how to use them
+
+Binding rules (CLAUDE.md). A credential is **never** printed, never stored off
+the box it belongs to, never passed as an argv token (argv is world-readable in
+`/proc`), and never committed.
+
+| Credential | Lives in | Used for |
+|---|---|---|
+| T4 `ubuntu` RDP password | `/root/.ubuntu_cred` on the T4 (root, 0600) | onscreen + harness logins as the owner-equivalent account |
+| oracle/probe client password | `/root/.oracle_cred` on the dev box | automated `probe444` wire captures |
+| bisect-fleet `tester` hash | `/etc/xrdp-matrix/tester.hash` (copied from host `/etc/shadow`) | container arms reuse the host password without embedding it in an image |
+| WS2022 ground-truth VM | `/root/.testvm_cred`, `/root/.win_askpass.sh` (0700) | Windows reference captures |
+
+Correct use — read into a shell variable at the moment of use, hand it to the
+client through an **environment** file/var, then unset:
+
+```sh
+PW=$(ssh -i "$KEY" "$T4" 'sudo cat /root/.ubuntu_cred')     # never echoed
+RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:ubuntu" "/p:$PW" \
+                        "/size:1600x900" "/gfx:AVC444" "/cert:ignore")
+env RDPARGS="$RDPARGS" xfreerdp /args-from:env:RDPARGS
+unset PW RDPARGS
+```
+
+**Recreated cloud box gotcha (2026-07-28, cost ~15 min).** When the T4 is
+rebuilt from an AMI, cloud-init **re-locks** the default `ubuntu` account
+(`passwd -S ubuntu` → state `L`) while `/root/.ubuntu_cred` survives inside the
+image. RDP login then fails with `pam_authenticate failed: Authentication
+failure`, which reads exactly like a broken deploy. Restore the invariant:
+
+```sh
+bash PR-demo/t4_profile/t4_restore_cred.sh     # idempotent; prints L -> P only
+```
+Also re-check `/root/.t4_host` (the one place the instance address lives) — a
+recreated instance gets a new IP and the stale value sends every helper script
+at the wrong box.
 ---
 
 ## 3. Configure the encoder — `/etc/xrdp/gfx.toml`
@@ -185,6 +314,30 @@ the encoder withholds/reorders. Keep `-bf 0` and a zero-latency knob
 Config binds at **fresh login** (logoff→login), not TCP reconnect. Restart after
 editing: `sudo systemctl restart xrdp`.
 
+### 3a. The `[avc444_ffmpeg]` knobs, in full
+
+Everything below defaults OFF/absent, i.e. omitting the whole block keeps the
+pre-AVC444 behaviour. Versioned reference profiles live in
+`PR-demo/t4_profile/gfx-t4-nvenc-{ltr,leaf}.toml` (T4) and
+`PR-demo/mac_bisect_matrix/gfx/arm-*.toml` (fleet) — copy one rather than
+hand-writing a new file, and keep any box's live file in git.
+
+| Knob | Meaning / when to use |
+|---|---|
+| `path` | the ffmpeg binary to exec (`/usr/bin/ffmpeg`) |
+| `avc_mode` | `"auto"` (prefer AVC444, else AVC420) \| `"444"` \| `"420"`. Force `"420"` to exercise the 420 path on clients like mstsc that always advertise AVC444 |
+| `encoder_args` | verbatim argv tokens: `-c:v` + tuning only (see above) |
+| `dump_extra` | write SPS/PPS in-band for encoders that cannot repeat headers. **Required for nvenc** — without it the probe fails by design |
+| `strip_sei` | drop SEI NALs the client's decoder may reject |
+| `sanitize_hrd` | remove `nal_hrd` from the SPS (fixes macOS Windows App decode; see BACKLOG arm-e) |
+| `strip_pic_struct` | drop `pic_struct` from picture-timing SEI |
+| `aux_intra_leaf` | FR-H264-7: encode the aux view as non-referencing intra leaves. **Currently the shipped default topology** |
+| `aux_ltr_chain` | FR-H264-8 (**EXPERIMENTAL**): aux predicts from the previous aux via Windows-style long-term reference slots. Mutually exclusive with `aux_intra_leaf` — set that to `false`. Cuts aux bytes dramatically (−70…−99% depending on workload). Requires the child encoder to pass all nine `ltr_cache_ok()` conditions — clear it with the §1c step 3 check first; a rejected encoder silently stays on the leaf topology |
+
+`aux_ltr_chain` also logs a WARN at every connect
+(`gfx.toml aux_ltr_chain is ON: EXPERIMENTAL …`) so a box in the experimental
+topology is never mistaken for a default deployment.
+
 **Probe-failure signature.** At connect time xrdp test-runs the configured
 encoder. If `xrdp.log` shows
 `probing ffmpeg AVC444 … ffmpeg probe FAILED; removing external AVC candidate`
@@ -220,9 +373,25 @@ BUILDDIR=/work-PR OUTDIR=/work/dist scripts/build_dev_deb.sh
 
 # xorgxrdp GLAMOR deb (separate repo):
 ( cd /workUpdateXorgXrdp && ./bootstrap && ./configure --prefix=/usr \
-    --enable-glamor && make -j"$(nproc)" )
+    --enable-glamor && make -j"$(nproc)" CPPFLAGS='-I/work/common' )
 # then stage make install DESTDIR=… + DEBIAN/control (see build_config.md Part X).
 ```
+
+Two things the xorgxrdp build will bite you with:
+
+* **Build against the branch's `xup_client_info.h`, not the installed one.**
+  xorgxrdp includes that header from `/usr/include` (shipped by `xrdp-dev`).
+  If the branch has advanced the XUP contract, the build fails with
+  `XUP_CAP_AVC444_SLOT_COUNT undeclared` / `too many arguments to
+  xup_cap_h264_shmem_layout`. Pass `CPPFLAGS='-I/work/common'` (as above) so
+  it compiles against the tree you are deploying.
+* **Version the deb monotonically**, exactly like `build_dev_deb.sh` does for
+  xrdp — `Version: 1:0.10.80+git<commit-timestamp>.<hash>` (e.g.
+  `1:0.10.80+git20260728175938.5b9650cafbc3`). A bare hash does not sort; see
+  §2b(b). Verify before shipping it:
+  ```sh
+  dpkg --compare-versions "$NEW" gt "$OLD" && echo "sorts newer: OK"
+  ```
 
 ---
 
@@ -265,3 +434,71 @@ sudo systemctl restart xrdp xrdp-sesman
 ```
 `/etc/xrdp` edits are preserved as conffiles; keep a backup of `gfx.toml` before
 swapping packages.
+
+---
+
+## 7. Performance triage — "the GPU box feels slow"
+
+Before blaming the encoder, establish **which** resource is short. Measured on
+the T4 (Tesla T4, 4 vCPU, 3840×2400 session, orbit-drag load, 2026-07-28):
+
+| Signal | Reading | Verdict |
+|---|---|---|
+| `nvidia-smi dmon` `enc%` | 25–28 % (peak 43) | NVENC ~3/4 idle |
+| `dmon` `sm%` | 4–5 % | shader core idle |
+| `dmon` `pclk` | 585 MHz of 1590 max | never boosts — bursty duty cycle |
+| `top` ffmpeg children | ~6 % CPU each, load 0.22/4 cores | CPU idle |
+| `ENCODE duration` p50 | 67.5 ms/pair | the entire frame period |
+
+So nothing is saturated, yet the pair costs 67.5 ms. **The pipeline is
+latency-bound, not throughput-bound.** Two structural reasons:
+
+1. **main and aux encode strictly sequentially.** `encode_pair()`
+   (`xrdp/xrdp_encoder_ffmpeg.c`) calls `encode_single(main)` and only then
+   `encode_single(aux)`; each is a synchronous write-frame → block-for-packet
+   round trip to a separate ffmpeg child. One encode is in flight at a time.
+2. **`-delay 0` disables NVENC's internal pipelining** (correct for
+   interactivity — we must not buffer frames — but it means no overlap).
+
+Isolated measurements on the same box, same args, no xrdp involved:
+
+```
+single 4K stream, file input   fps= 51      (~19.6 ms/frame)
+single 4K stream, PIPE input   fps= 52      -> the pipe costs nothing
+TWO 4K streams in PARALLEL     fps= 53 each -> concurrency is FREE
+without -delay 0               fps= 99      -> batch-only artifact (see below)
+```
+
+Reading these correctly:
+
+- Two concurrent 4K encodes run at **full speed each** (53 fps), i.e. the T4
+  absorbs main+aux simultaneously at no cost. Serialising them is pure loss:
+  ~2 × 19.6 ms instead of ~19.6 ms, plus per-round-trip overhead — which is
+  the bulk of the 67.5 ms pair.
+- The `-delay 0` → 99 fps figure is **batch throughput only**. In the live
+  path frames arrive one at a time as damage occurs, so there is nothing to
+  pipeline within a single view; dropping `-delay 0` would add latency without
+  adding live fps. Do **not** "optimise" it away.
+- The fix that the measurements actually support is **overlapping main and
+  aux** — backlog FR-PROC-7 / Lever 2 (submit/collect with preempt/breadth/
+  depth policies), still TODO.
+
+Order-of-magnitude sanity check for any geometry: one 4K encode ≈ 20 ms, so a
+serialised pair ≈ 40 ms + overhead ≈ 14–15 fps; at 1600×912 (6.3× fewer
+pixels) the same structure gives ≈ 34 fps. A 4K session reporting ~14 fps is
+therefore the *expected* behaviour of the current serial design, not a fault —
+and it is identical on both `aux_intra_leaf` (66.3 ms) and `aux_ltr_chain`
+(67.5 ms), so it is not attributable to the FR-H264-8 topology.
+
+**Caveat when reading fps at all:** `frame period` only equals `ENCODE
+duration` while damage is arriving faster than the encoder drains it. On a
+quiet session the fps figure measures the *workload*, not the pipeline (a
+2026-07-28 run showed 5 fps with a 66.8 ms encode simply because the drag had
+stopped). Always check `enc_pair` rate against `ENCODE duration` before
+concluding anything.
+
+An older BACKLOG record (2026-07-26) shows 4K `ENCODE` at 30.1 ms vs today's
+67.5 ms. That delta is **not** explained here and was not bisected; candidates
+are a different EC2 instance after recreation, the `-refs 1 -dpb_size 1` args
+added during the 2026-07-27 nvenc bisect, and ffmpeg 8.0.1. It is recorded as
+open rather than guessed at.

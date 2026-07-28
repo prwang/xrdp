@@ -2754,6 +2754,49 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   but a re-key-boundary watch per the topology-3 epoch rule is still
   outstanding; owner sign-off.
 
+### 2026-07-28 T4 4K fps — measured: SERIALISATION, not GPU limit
+
+Owner question after the nvenc gate: why does 4K fps look regressed, is the
+GPU fully busy, and do main and aux run concurrently? Measured, not guessed.
+
+- IS THE GPU BUSY? No. Under a 3840x2400 orbit-drag session: NVENC engine
+  `enc` 25-28% (peak 43), `sm` 4-5%, pclk 585 MHz of 1590 max, ffmpeg
+  children ~6% CPU each, load 0.22 on 4 vCPU. Nothing is saturated while a
+  pair costs 67.5 ms.
+- DO MAIN AND AUX RUN CONCURRENTLY? No — strictly sequential, by
+  construction: encode_pair() calls encode_single(main) (xrdp_encoder_
+  ffmpeg.c:1162) and only then encode_single(aux) (:1198), each a
+  synchronous write-frame -> block-for-packet round trip to its own ffmpeg
+  child. One encode in flight at a time, in BOTH topologies (the leaf branch
+  at :1251/:1257 has the same shape).
+- HOW MUCH DOES THAT COST? Isolated on the T4, same args, no xrdp:
+    single 4K stream, file input   fps=51   (~19.6 ms/frame)
+    single 4K stream, PIPE input   fps=52   -> the pipe is not the cost
+    TWO 4K streams IN PARALLEL     fps=53 each -> concurrency is FREE
+    without -delay 0               fps=99   -> batch-only artifact
+  Two concurrent 4K encodes run at full speed each, so serialising main+aux
+  wastes ~20 ms per pair outright; the rest of the 67.5 ms is per-round-trip
+  overhead. This is direct measured justification for task #40 (FR-PROC-7 /
+  Lever 2, submit/collect): overlapping the two views is the fix, and the
+  hardware has already been shown to absorb it at no cost.
+  NOTE on -delay 0: the 99 fps figure is BATCH throughput. Live, frames
+  arrive one at a time as damage occurs, so there is nothing to pipeline
+  within one view; dropping -delay 0 would add latency without adding live
+  fps. It must stay.
+- NOT AN FR-H264-8 REGRESSION: leaf 66.3 ms vs LTR 67.5 ms per pair at 4K —
+  the two topologies are within noise of each other, so the serial ceiling
+  predates and is independent of the aux chain.
+- UNEXPLAINED, RECORDED NOT GUESSED: the 2026-07-26 record shows 4K ENCODE
+  at 30.1 ms vs today's 67.5 ms. Not bisected. Candidates: the T4 was
+  recreated (possibly different instance shape; it is g4dn-class 4 vCPU
+  now), the `-refs 1 -dpb_size 1` args added during the 2026-07-27 nvenc
+  bisect, ffmpeg 8.0.1. Do not quote either number without its date.
+- MEASUREMENT CAVEAT (bit me once this session): `frame period` equals
+  `ENCODE duration` only while damage arrives faster than the encoder
+  drains it. A quiet session reports the WORKLOAD, not the pipeline — one
+  run showed 5 fps with an unchanged 66.8 ms encode simply because the drag
+  had ended. Always read `enc_pair` rate together with `ENCODE duration`.
+
 ### 2026-07-28 T4 nvenc GATE — PASSED (machine-side gate item CLOSED)
 
 The last machine-side gate before FR-H264-8 can drop EXPERIMENTAL:
