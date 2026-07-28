@@ -208,6 +208,16 @@ Concretely:
   deployed on the host — do not containerize, rebuild or redeploy the client
   as part of a server bisect; a changed client invalidates the comparison
   (same class of lesson as the early xfreerdp rebuild incident).
+- **The live-flip diagnosis harnesses are GONE (2026-07-28).** With the
+  container fleet there is no reason to mutate one deployed instance to
+  compare configurations, so `PR-demo/tail_flush_ab/` (`reset_420.sh`,
+  `ab_harness.sh`, `repro_login.sh`, `setcfg*.py`, `diagnose_env.sh`,
+  `fill.sh`) was deleted rather than left to confuse. Those scripts
+  rewrote `/etc/xrdp/gfx.toml` in place and reset/bracketed sessions on a
+  single box — the exact workflow this section forbids. Do not restore
+  them from git history: build another arm instead. The one non-mutating
+  piece was kept as `PR-demo/ffmpeg_pipeline_depth_probe.py`.
+
 - General deb hazard (both boxes): xrdp-dev debs `Breaks:` old xorgxrdp —
   after ANY xrdp-dev install, verify with `dpkg -l` that the xorgxrdp-dev
   package is still installed, and reinstall it if not.

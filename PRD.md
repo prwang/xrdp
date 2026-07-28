@@ -2838,7 +2838,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   an earlier fftools-scheduler hypothesis): the withhold is a property of the
   **encoder pipeline DEPTH**, not the pipe or the scheduler. Feeding an encoder
   frames with stdin held open and counting emitted vs. withheld pictures
-  (`PR-demo/tail_flush_ab/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
+  (`PR-demo/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
   -async_depth N` withholds **N−1** frames on the tested GPU, and `libx264`
   frame-threading withholds its whole thread window. End-to-end A/B through real
   xrdp→FreeRDP with a *fresh login* (not just reconnect — config binds at login;
@@ -2874,7 +2874,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   normally a no-op (nothing left in flight). Diagnostics kept, all gated by
   `XRDP_GFX_TRACE=1`: per-frame send/ack, damage bbox, seq/luma enc trace
   (`xrdp_mm.c`, `xrdp_encoder.c`); keystroke harness in
-  `PR-demo/tail_flush_ab/` (`colorkey.sh`, `MSTSC_TRACE.md`).
+  `PR-demo/smoke_gate/` (`colorkey.sh`); the tail_flush A/B harness was removed 2026-07-28.
 
   **ADDENDUM (2026-07-17, same day) — second root cause: ffmpeg
   stream-analysis hold; fix: `-probesize` = one frame.** The synchronous
@@ -2968,7 +2968,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   muxer, never a stand-in; (2) codec A/B on a live client requires
   fresh-login brackets — a persistent Xorg session survives xrdp
   restart and a black baseline voids everything measured after it
-  (`PR-demo/tail_flush_ab/reset_420.sh`). **Clean-branch caveat:** the
+  (a `reset_420.sh` bracketing harness, REMOVED 2026-07-28 — superseded by one fresh container per arm). **Clean-branch caveat:** the
   clean branch still carries the *blanket* dump_extra (slice 7,
   `c74a09e7`); the slice-7 fold must be re-done with the adaptive form
   before any upstream push — tracked in `BACKLOG.md`.

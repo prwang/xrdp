@@ -94,36 +94,6 @@ in files this branch does not own (`xrdp_avc444_caps.c`, the rfx block of
 `tests/.../repro_mbparity/*`) must be resolved in that pass —
 `scripts/run_astyle.sh -v 3.4.14`, never the system astyle 3.1.
 
-## #47 — Reconnect after codec switch renders black (suspected, PARTLY RETESTED)
-
-**Origin (2026-07-23).** Not found by looking for it: it surfaced as a
-*contaminant* during the macOS Windows App codec-trial matrix. Codecs were
-being cycled (v2 → 444v1 → 420) on ONE persistent backend Xorg session on
-the dev box (VAAPI); the final reconnect on the known-good AVC420 path
-rendered black — which voided the whole macOS trial set, since restarting
-xrdp does not reset the Xorg session. That is why the "fresh login per
-trial, every trial bracketed by green AVC420 baselines" discipline
-(`PR-demo/tail_flush_ab/reset_420.sh`) exists. Suspects recorded at the
-time: (1) xorgxrdp capture-mode renegotiation (session created as
-`CC_GFX_AVC444`, reconnect negotiates a different capture/codec combo);
-(2) stale per-monitor encoder state across module reconnect; (3) egfx
-surface re-create vs xorgxrdp shmem framing mismatch. Never root-caused,
-and there is no record the repro recipe was ever run.
-
-**Retest 2026-07-28 (arm-m, VAAPI leaf, one persistent session, client-
-driven codec change):** AVC444 v2 → RFX → RFX → AVC444 v2 across four
-disconnect/reconnect cycles; the negotiated mode really did change each
-time (server log), and all four rendered content (stddev ~39, no blank).
-So the client-driven switch path does NOT reproduce on current code.
-
-**Still untested:** the admin-flips-`gfx.toml` variant (`avc_mode` 444 →
-420 → 444 mid-session), which is the closer match to the original. It
-cannot be exercised on the fleet: the gfx.toml volume uses a `subPath`
-mount, and subPath ConfigMap mounts do not live-update, so the flip needs
-a pod restart — which destroys the persistent session the bug requires.
-Either mount gfx.toml without subPath on one arm, or run it on a box with
-a real filesystem (the T4), then reproduce or retire this item.
-
 ---
 
 ## Owner-blocked

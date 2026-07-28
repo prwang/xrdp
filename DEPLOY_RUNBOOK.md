@@ -297,7 +297,7 @@ Owner-validated in addition (2026-07-22): **small session sizes work** and
 **no chroma fringe** was observed across multiple small width/height sessions
 on region-strict rendering — validation coverage orthogonal to the dump_extra
 fix (different defect classes: probesize hold, metablock alignment). The
-scripted multi-resolution smoke gate (`PR-demo/tail_flush_ab/smoke.sh`) is
+scripted multi-resolution smoke gate (`PR-demo/smoke_gate/smoke.sh`) is
 dev-box-specific and was NOT run on the T4. nvenc uploads the sysmem NV12
 itself, so no `hwupload`/`vaapi_device`:
 ```toml
@@ -399,7 +399,7 @@ Two things the xorgxrdp build will bite you with:
 
 ### 5a. Smoke gate (mandatory — run against the live binary+config)
 ```sh
-bash PR-demo/tail_flush_ab/smoke.sh
+bash PR-demo/smoke_gate/smoke.sh
 ```
 Drives `xfreerdp` keystroke-colour tests at **both** 1920×1080 and 1024×768
 (the ffmpeg probesize failure is resolution-keyed), asserting every keypress
