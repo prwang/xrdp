@@ -21,10 +21,17 @@
 #                  sustained traffic; TLS framing identical across
 #                  arms).
 #   MODE=frames    per-frame payload split: oracle save-only client +
-#                  bandwidth_stats.py. NOTE: the oracle client never
-#                  acks, so xrdp's in-flight window fills after ~3
-#                  frames — initial-paint frames ONLY, never sustained
-#                  traffic (learned 2026-07-28).
+#                  bandwidth_stats.py — reports delivered pairs/s and
+#                  steady KB/frame per view. This is the PRIMARY unit
+#                  (owner directive 2026-07-28): B/s conflates frame
+#                  cost with achieved delivery rate, which is CLIENT-
+#                  dependent (oracle ~8.3 pairs/s vs xfreerdp3 ~10 on
+#                  the same 10 Hz content). CORRECTION of an earlier
+#                  claim: the oracle client DOES ack and sustains
+#                  delivery; the 3-frame captures that suggested
+#                  otherwise were static xfce sessions with nothing to
+#                  encode. Cross-check: KB/frame x stock-client fps
+#                  reproduces the MODE=steady TCP rates within ~3%.
 #
 # Intended A/B: arm-i (pre-FR-H264-7 single-chain build) vs arm-m
 # (unconditional reference partitioning) on the identical VAAPI CQP
@@ -127,7 +134,7 @@ for wl in $WORKLOADS; do
             fi
             cp "$dump" "$OUT/$wl.$arm.bin"
             python3 "$D/bandwidth_stats.py" "$OUT/$wl.$arm.bin" \
-                "$wl/$arm" | sed 's/^/  /'
+                "$wl/$arm" "$WINDOW" | sed 's/^/  /'
         else
             sleep "$WARMUP"
             b0=$(rx_bytes "$port")

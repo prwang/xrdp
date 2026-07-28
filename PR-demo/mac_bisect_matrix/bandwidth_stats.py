@@ -9,8 +9,11 @@ Sizes are H.264 GFX payload bytes as delivered on the wire — the codec
 traffic a bandwidth comparison turns on (excludes TLS/transport framing,
 which is identical across arms).
 
-Usage: bandwidth_stats.py <dump.bin> [label]
-Output: one parseable line per view + a human summary.
+Usage: bandwidth_stats.py <dump.bin> [label] [window_secs]
+Output: one parseable line per view + a human summary. With
+window_secs, also reports achieved frames/s and steady KB/frame —
+the per-frame unit decouples frame cost from delivery rate (owner
+directive 2026-07-28: rates alone under-specify the damage rate).
 """
 import struct
 import sys
@@ -81,9 +84,18 @@ def main():
     report('main', m)
     report('aux ', a)
     ss = frames[len(frames) // 4:]
-    report('main-steady', [f for f in ss if f[0] == 'M'])
-    report('aux-steady ', [f for f in ss if f[0] == 'A'])
+    ss_m = [f for f in ss if f[0] == 'M']
+    ss_a = [f for f in ss if f[0] == 'A']
+    report('main-steady', ss_m)
+    report('aux-steady ', ss_a)
     report('TOTAL', frames)
+    if len(sys.argv) > 3:
+        secs = float(sys.argv[3])
+        kbf_m = sum(b for _, _, b in ss_m) / max(len(ss_m), 1) / 1024.0
+        kbf_a = sum(b for _, _, b in ss_a) / max(len(ss_a), 1) / 1024.0
+        print('%s PERFRAME: pairs/s=%.1f  main=%.2f KB/frame  '
+              'aux=%.2f KB/frame  pair=%.2f KB/frame'
+              % (label, len(m) / secs, kbf_m, kbf_a, kbf_m + kbf_a))
 
 
 if __name__ == '__main__':

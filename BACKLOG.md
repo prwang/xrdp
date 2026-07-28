@@ -2323,6 +2323,45 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   AA (1.308->1.584 / 1.231->1.509 MB/s) — the workload now measurably
   stresses the chroma path. code.png updated to the subpixel render.
 
+### Per-frame units (owner directive: rate under-specifies damage rate) + ack-claim CORRECTION
+
+- Owner is right that KB/s conflates two variables: bytes-per-frame
+  and achieved delivery rate. Measured proof the conflation matters:
+  the oracle dump client sustains ~8.3 pairs/s on the 10 Hz workloads
+  where stock xfreerdp3 sustains ~10 — same wire cost per frame,
+  different B/s. KB/frame (with delivered pairs/s stated) is now the
+  PRIMARY unit; bandwidth_stats.py prints both when given the window.
+- CORRECTION (strict honesty): the earlier pitfall entry "the oracle
+  save-only client never acks — in-flight window fills after ~3
+  frames" was WRONG. Those 3-frame captures were static xfce sessions
+  with nothing to encode; under animated content the oracle client
+  acks and sustains delivery indefinitely (35 AUs/10 s chroma, 166+
+  pairs/20 s scroll). Bench header updated.
+- PER-FRAME RESULTS (steady segment, delivered pairs/s IDENTICAL
+  between arms per workload — fair comparison; KB = KiB):
+
+  | workload   | pairs/s | arm-i M/A/pair KB    | arm-m M/A/pair KB    | pair delta |
+  |------------|---------|----------------------|----------------------|------------|
+  | tick       | 0.9     | 29.17 / 6.61 / 35.78 | 0.52 / 6.29 / 6.81   | -81%       |
+  | gray       | 4.2     | 1.63 / 0.37 / 2.00   | 0.50 / 0.29 / 0.79   | -60%       |
+  | chroma     | 4.2     | 3.83 / 6.84 / 10.67  | 9.31 / 6.00 / 15.31  | +43%       |
+  | code(subpx)| 8.2/8.3 | 86.7 / 72.0 / 158.7  | 74.2 / 78.7 / 152.9  | -3.7%      |
+  | scroll     | 8.3     | 300.3 / 313.1 / 613.4| 222.0 / 325.9 / 547.9| -10.7%     |
+
+- Cross-check against MODE=steady TCP rates: KB/frame x stock-client
+  ~10 pairs/s reproduces the TCP numbers within ~3% (code arm-m
+  152.9 KB x 10/s = 1.53 MB/s vs 1.51 measured; scroll arm-i
+  613.4 x 10.3 = 6.3 MB/s vs 6.32) — two independent clients, two
+  measurement methods, same per-frame cost.
+- Per-view reading: the leaf aux premium is real but small on
+  textured content (code aux 72.0 -> 78.7 KB/frame, +9%; scroll
+  +4%), NEGATIVE on flat chroma (6.84 -> 6.00, the old aux paid
+  P-slice overhead for intra MBs); main gains dominate everywhere
+  except flat-band chroma (the intra-friendly adversarial bound).
+- FR-H264-8 absolute stakes per frame, now precise: gray aux 0.29 KB
+  -> near-0 (immaterial); code aux 78.7 KB is the number an
+  aux-refs-aux P chain must beat on realistic content.
+
 ### Absolute numbers (owner directive: never percentages alone)
 
 - Steady-state wire rate, 1600x900, VAAPI CQP qp=20, 20 s windows:
