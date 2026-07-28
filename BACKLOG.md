@@ -2701,6 +2701,48 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   real Windows ships ONE IDR per session). A/B caveat: arm-m keeps
   its default gop-120 main IDR cost — biases the PAIR total slightly
   in arm-n's favor; the GATE metric (aux KB/frame) is unaffected.
+### GATE RESULTS (2026-07-28, arm-n live — machine-side gate items CLOSED)
+
+- arm-n deployed: commit 34795577580b deb -> container image ->
+  127.0.0.1:40013, VAAPI CQP 444 + aux_ltr_chain=true + -g 30000
+  (14th fleet pod; host install untouched).
+- WIRE VERIFICATION on live captures (archived
+  captures/ltr_gate_20260728/): Tier-B both-mode PSNR — code
+  167/167 and scroll 166/166 frame pairs, BOTH views, 1-context vs
+  2-context decode min Y/U/V = inf/inf/inf (bit-identical); strict
+  decode -err_detect explode clean; wire histogram field-exact to
+  the recipe: mmco {6 x333, 0 x333}, ltfi 0x166/1x167, ONE
+  long_term_reference_flag=1, ltpn 0x166/1x166, rplm idc [2,3] on
+  every P, max_num_ref_frames=3, max_dec_frame_buffering=3,
+  log2_max_frame_num_minus4=12 (16-bit), gaps=0.
+- BANDWIDTH GATE (PRD FR-H264-8 item 5): bandwidth_bench MODE=frames,
+  1600x900, steady KB/frame at EQUAL delivered pairs/s (8.3 both
+  arms, both workloads); arm-m leaf baselines reproduced their
+  recorded values exactly (12.21/70.13 code, 109.73/326.29 scroll):
+    code   arm-m 12.21/70.13/82.34  -> arm-n 11.57/17.12/28.69
+           AUX -75.6%  (pair -65.2%)                      GATE PASS
+    scroll arm-m 109.73/326.29/436.02 -> arm-n 107.79/101.85/209.63
+           AUX -68.8%  (pair -51.9%)                      GATE PASS
+- Non-gating record (same session, equal pairs/s per row):
+    tick       aux 6.29 -> 0.09  (-98.6%)  static leaf cost closed:
+               the ~8 Mbps all-intra aux on static content is gone
+    gray       aux 0.29 -> 0.05  (-83%)    the discriminator behaves
+               as designed (constant chroma -> all-skip aux P)
+    chroma     aux 6.00 -> 19.43 (+224%)   HONEST REGRESSION on the
+               flat-saturated-band ADVERSARIAL bound (documented
+               intra-friendly shape; VAAPI codes the moving flat
+               bands worse as P than as leaf intra); non-gating,
+               not typical content — record stands
+    codefast   aux 78.74 -> 61.90 (-21%)   ME-defeating stress
+    scrollfast aux 325.87 -> 231.19 (-29%) ME-defeating stress
+  Main KB/frame near-identical between arms everywhere (the small
+  main delta on code/scroll is arm-m's gop-120 IDR inside the
+  window, the recorded A/B caveat).
+- STILL OPEN (owner-blocked, FR-H264-8 stays EXPERIMENTAL, leaf
+  stays the shipped default): T4 nvenc capture (T4 redeploy
+  pending), macOS onscreen verdict (must include watching a re-key
+  boundary per the topology-3 epoch rule), owner sign-off.
+
 - TIER-A INTEGRATED WITH THE LTR SPLICE (both implementations):
   roundtrip --splice cmd through ltr_splice_ref.py AND through the
   real C rewriter (driver adapter) both GREEN with IDENTICAL values
