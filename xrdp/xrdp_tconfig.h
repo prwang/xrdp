@@ -131,13 +131,12 @@ struct xrdp_tconfig_gfx
      * timing SEI it announces; suspected VideoToolbox output-pacing
      * trigger for the measured one-frame aux/chroma lag. Default 0. */
     int avc444_ffmpeg_strip_pic_struct;
-    /* AVC444 reference partitioning (cross-view reference fix,
-     * PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md): encode
-     * the aux view in a second all-IDR child and splice its frames into
-     * the main chain as non-reference, non-IDR I leaves, so main frames
-     * never reference aux frames at any aux cadence. Default 0 (off,
-     * existing single-child interleave preserved). */
-    int avc444_ffmpeg_aux_intra_leaf;
+    /* NOTE: AVC444 reference partitioning (aux encoded by a second
+     * all-IDR child and spliced in as non-reference, non-IDR I leaves)
+     * is NOT configurable: it is a structural requirement of the
+     * backend (PRD FR-H264-7, decode-topology invariance) and is
+     * always on for the AVC444 pair path. A former gfx.toml knob
+     * ("aux_intra_leaf", bisect era) is ignored if present. */
     /* DIAGNOSTIC: rewrite non-IDR ref slices from explicit-MMCO
      * reference marking to sliding window (xrdp_h264_strip_mmco).
      * 2026-07-27 Mac k=1 bisect: the Mac-clean VAAPI wire uses MMCO,

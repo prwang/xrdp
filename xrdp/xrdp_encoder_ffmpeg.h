@@ -85,7 +85,13 @@ struct xrdp_ffmpeg_avc444_config
     /* spliced into the main child's chain,  */
     /* so the main chain self-references at  */
     /* any aux cadence (cross-view reference */
-    /* fix, CROSS_VIEW_REFERENCE_PROOF.md)   */
+    /* fix, CROSS_VIEW_REFERENCE_PROOF.md).  */
+    /* STRUCTURAL for pair encoding: the     */
+    /* AVC444 caller always sets 1 (PRD      */
+    /* FR-H264-7 decode-topology invariance);*/
+    /* 0 only for single-view (AVC420)       */
+    /* runners and, internally, for the leaf */
+    /* child itself                          */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */

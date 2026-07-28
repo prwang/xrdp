@@ -1373,14 +1373,6 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_sanitize_hrd;
             cfg.strip_pic_struct =
                 self->wm->gfx_config->avc444_ffmpeg_strip_pic_struct;
-            cfg.aux_intra_leaf =
-                self->wm->gfx_config->avc444_ffmpeg_aux_intra_leaf;
-            if (cfg.aux_intra_leaf)
-            {
-                LOG(LOG_LEVEL_INFO, "gfx.toml aux_intra_leaf is ON: aux "
-                    "view encoded all-IDR by a second child and shipped "
-                    "as non-reference I leaves (reference partitioning)");
-            }
             cfg.fault_aux_delay =
                 self->wm->gfx_config->avc444_ffmpeg_fault_aux_delay;
             cfg.fault_strip_mmco =
@@ -1410,8 +1402,6 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.sanitize_hrd;
             self->avc444_strip_pic_struct =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.strip_pic_struct;
-            self->avc444_aux_intra_leaf =
-                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_intra_leaf;
             self->avc444_fault_aux_delay =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_aux_delay;
             self->avc444_fault_strip_mmco =

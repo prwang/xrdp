@@ -243,9 +243,9 @@ The current GFX H.264 capture format is specifically **`XRDP_nv12_709fr`** — B
 
 ### 6.5 Microsoft AVC444 requirement
 
-MS-RDPEGFX defines an AVC444 bitmap stream as two AVC420-form structures. For `LC=0`, the first carries the main YUV420 picture and the second carries the Chroma420 picture. The two H.264 bitstreams must come from the same H.264 encoder and be decoded by a single decoder as one stream.
+MS-RDPEGFX defines an AVC444 bitmap stream as two AVC420-form structures. For `LC=0`, the first carries the main YUV420 picture and the second carries the Chroma420 picture. Both structures are consumed as ONE H.264 stream: exactly one SPS/PPS pair, one `frame_num` chain, monotonic decode order, acceptable to a single in-order decoder.
 
-**Design consequence:** “Two-process” means xrdp plus one FFmpeg child per logical H.264 stream. It never means one FFmpeg process for main and another for auxiliary.
+**Design consequence (amended 2026-07-28; supersedes the earlier “same encoder” reading):** the binding requirement is on the WIRE, not on the process count. How many encoder processes produce the bytes is an implementation detail, provided the merged output is one conformant chain with exactly one parameter-set pair. The shipped architecture (FR-H264-7) uses two FFmpeg children — a main child that owns the reference chain, and an all-IDR auxiliary child whose packets are rewritten into non-reference, non-IDR I leaves on that chain. What remains forbidden is what the original wording was actually protecting against, both measured failures: two *reference* chains and/or duplicated SPS/PPS fed to one decoder (desync garbage on Windows; parameter-set duplication blacks the macOS Windows App). In addition the stream must satisfy decode-topology invariance (FR-H264-7): the 2026-07 Mac bisect proved real clients do not all feed a single in-order decoder, so main frames must never reference aux frames.
 
 ### 6.6 Current compile-time guards that must change
 
@@ -795,12 +795,16 @@ threshold, NO "is the user active" policy anywhere in the pipeline.
    is deferred until aux N is **sent or preempted** — its slot holds
    the aux pixels until that decision. Worst case one extra aux-encode
    of slot hold; the two-slot budget still clears at full rate.
-5. Stream construction stays within §6.5 and the measured ground truth:
-   one encoder, one reference chain, monotonic interleave; `LC=2`
-   aux frames are P-slices on the established chain (never their own
-   IDR/SPS); the exactly-one-SPS session bound is unchanged. This is
-   the Windows-shaped LC=1 (~93%) / LC=2 cadence and the macOS
-   prerequisite.
+5. Stream construction stays within §6.5 (as amended) and FR-H264-7:
+   two encoder children (main + all-IDR aux leaf child), ONE reference
+   chain owned by the main child, monotonic interleave; `LC=2` aux
+   frames ship as non-reference, non-IDR I leaves on the established
+   chain (their own SPS/PPS never reach the wire); the exactly-one-SPS
+   session bound is unchanged. This is the Windows-shaped LC=1 (~93%)
+   / LC=2 cadence. Correctness does NOT depend on this cadence:
+   reference partitioning holds at any aux rate (owner directive
+   2026-07-27) — FR-PROC-7 is a bandwidth/perf lever, never a
+   correctness lever.
 6. A damage burst arriving while aux N encodes queues normally and
    waits at most one aux encode (~15 ms) — bounded, self-correcting,
    and that frame's aux is again preemptible.
@@ -868,10 +872,11 @@ threshold, NO "is the user active" policy anywhere in the pipeline.
     finalize-as-preempted on ffmpeg death / geometry change /
     teardown (an ack can never leak, a shmem slot can never wedge —
     FR-CAPTURE-8 §4's rect ack defers until aux sent-or-preempted).
-    §6.5 stands untouched: no new processes, no second reference
-    chain, one SPS, monotonic interleave — ALL concurrency lives in
-    submit scheduling against the existing children, never in stream
-    structure.
+    §6.5 (as amended) and FR-H264-7 stand untouched: no second
+    reference chain, one SPS, monotonic interleave — the two encoder
+    children (main + aux leaf) ARE the FR-H264-7 architecture, and
+    ALL concurrency lives in submit scheduling against the existing
+    children, never in stream structure.
 11. **Three policies, one machine.** (a) **PREEMPT** — clauses 1–9:
     aux as a deferred, credit-gated, supersede-able pending.
     (b) **BREADTH** — multi-monitor concurrent submits: submit each
@@ -1303,6 +1308,24 @@ MVP has no fine-grained child control channel and no runtime force-IDR request. 
 - auxiliary/pair completion default: 2 seconds after full auxiliary transfer.
 
 Timeout or failed NAL checks kill/reap the child and fail the generation. Values are configurable with hard upper bounds.
+
+### FR-H264-7: Decode-topology invariance (reference partitioning) — REQUIRED, not configurable (owner directive 2026-07-28)
+
+**Requirement.** The AVC444 wire stream must decode to bit-identical pixels under every client decode topology:
+
+1. a single in-order decoder consuming the full interleave (Windows/mstsc/xfreerdp shape);
+2. a decoder consuming the main view with ALL auxiliary NAL units dropped;
+3. two independent decoders, one fed the main view and one fed the auxiliary view (the macOS VideoToolbox shape observed in the 2026-07 bisect).
+
+Equivalently: no picture may ever use a cross-view reference. The main chain references only main frames; auxiliary frames read nothing (intra) and write nothing (non-reference, `nal_ref_idc = 0`, non-IDR so the DPB is never flushed). This must hold at ANY auxiliary cadence — a scheme that is only correct at a particular main:aux ratio is forbidden (heisenbug class; owner directive 2026-07-27).
+
+**Mandatory architecture.** The external backend implements this with two FFmpeg children per surface: the main child encodes only main frames (its chain self-references), and the auxiliary child encodes all-IDR; each aux packet is rewritten by `xrdp_h264_aux_to_leaf()` into non-reference, non-IDR I leaves on the main chain (aux SPS/PPS/SEI/AUD dropped; `frame_num` = main + 1 per the non-reference rule; CABAC payload byte-verbatim; loud failure on any stream shape outside the compat guard). This is NOT a configuration option: the former `aux_intra_leaf` gfx.toml knob is removed and the pair path always partitions. Rationale (measured, 2026-07-27/28): the single-child cross-view interleave corrupts any client that deviates from topology 1 (Mac chroma bleed, root cause cross-view inter prediction); VAAPI's clean result was accidental immunity (a Mesa all-intra mode-decision quirk), not a property to build on; partitioning also collapses main P-frame sizes (nvenc: 25–76 KB → 0.6–2.5 KB) because same-view references make inter prediction effective.
+
+**Rejected alternative (recorded 2026-07-28).** “Aux references previous aux” (two partitioned prediction chains merged into one stream) is rejected as low-ROI: with FR-PROC-7 shipping sparse aux, its bandwidth win over all-intra leaves shrinks toward zero, while it requires per-slice `ref_pic_list_modification` / MMCO-or-LTR splicing with per-frame PicNum arithmetic — silent wrong-pixel failure modes — and forfeits *structural* topology invariance (correctness would again depend on each client’s DPB/gap handling).
+
+**Regression test (macOS-emulating two-decoder check).** `tools/avc444_topology_check.sh` takes a captured interleaved wire stream and verifies, via `ffmpeg` framemd5, that topologies 1, 2 and 3 above produce bit-identical frames (main rows of the interleaved decode == the main-only decode; leaf rows == the aux-only decode through a second, separate decoder instance). It must be run — and pass — on a fresh wire capture for every change touching the encoder/conversion/rewrite path, alongside the existing smoke gate; a mismatch is a red result (strict honesty rule: no fallback, no cadence tweak to mask it).
+
+**Validation scope note (FR-H264-5 unchanged).** Startup/reset validation remains NAL-header-only. The reference-partitioning rewriter is a separate bounded slice-header splice in `xrdp/xrdp_h264_annexb.c` with its own fail-loud contract; it does not relax FR-H264-5’s “no slice parsing” rule for the validator.
 
 ---
 
