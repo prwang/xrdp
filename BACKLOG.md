@@ -2754,6 +2754,71 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   but a re-key-boundary watch per the topology-3 epoch rule is still
   outstanding; owner sign-off.
 
+### 2026-07-28 The actual invariants (owner review corrected two of my claims)
+
+Owner pushback on "main-I + aux-I substitutes for main-IDR + aux respawn"
+exposed two errors of mine and one real gap. Stated precisely:
+
+CORRECTION 1 -- "random access" was the wrong concept. RDP is live; there
+is no seeking and no mid-stream joining (a new connection always builds a
+NEW encoder, whose first packet is a real IDR). The property an IDR
+actually buys here is DIVERGENCE CONTAINMENT, not access. Retire the term.
+
+CORRECTION 2 -- I mischaracterised FR-H264-6 as "forbidding runtime
+force-IDR". Its actual text ("Timeout rather than runtime keyframe
+control") says the MVP has no child control channel, expects a NEW CHILD to
+begin with a keyframe, and applies bounded deadlines (2 s spawn / first
+packet / pair) that kill and reap on violation. It is a scope decision, not
+a prohibition -- and a SPAWN-TIME `-force_key_frames` schedule is not a
+runtime control channel, so it is not excluded by FR-H264-6 at all.
+
+THE INVARIANTS, as actually enforced today:
+
+  I1  Each child predicts from exactly ONE reference: its own immediately
+      preceding picture in that view. Enforced by `-refs 1` plus the guard
+      `num_ref_idx_l0_default == 0`. This is the load-bearing invariant --
+      the whole LTR relabeling is only sound because the child can never
+      reach further back than one picture. A child with refs>1 would
+      silently produce wrong pixels through a correct-looking rewrite.
+  I2  The wire relabels that single reference to the view's LT slot, and
+      the slot always holds the immediately preceding same-view picture
+      (mmco6 self-mark on EVERY picture + list-modification idc=2).
+      Enforced by construction; an aux P with LT1 unseeded fails loudly.
+  I3  BOUNDED TRANSITIVE DEPTH -- the missing one. Note the DIRECT
+      reference age is always exactly 1 picture, so "staleness" is not
+      about the slot. The real quantity is transitive dependency depth:
+      how many pictures back the current reconstruction depends on, i.e.
+      the distance to the last picture in that view coded WITHOUT a
+      reference. Pure P chain => unbounded.
+
+Why I3 matters on a reliable transport (the PRD asserts "periodic IDRs buy
+nothing on a reliable transport" -- true for LOSS, false for DIVERGENCE):
+if the decoder's reconstruction ever diverges from the encoder's (client
+decoder bug, a rewrite bug of ours, a frame the client skips under load),
+the error persists for the full transitive depth. Unbounded depth = visible
+corruption that never heals until reconnect. This is precisely the class of
+the T4 wrong-colour and macOS chroma-bleed incidents.
+
+WHAT THIS MEANS FOR "OPTION 2" (my own proposal, corrected):
+- main-I alone does NOT bound aux staleness. It cuts main's chain and
+  removes the aux respawn, but aux keeps depending transitively on its seed
+  from session start. I conflated DECOUPLING with REFRESH; they are
+  separate goals and only a PAIRED cut achieves the second.
+- A paired cut (main-I marking LT0 + aux-I marking LT1, same input index,
+  SPS/PPS alongside) does bound both chains without flushing anything --
+  but ONLY if both children genuinely emit intra at that index. That is a
+  property of the CHILDREN, which we must request (spawn-time
+  `-force_key_frames` on both, identical schedule => deterministic and
+  therefore also race-free for parallel submit) and then VERIFY at rewrite
+  (slice_type must be I; a P where we expected I is a loud failure, same
+  class as unseeded LT1). Request + verify + fail loudly, never assume.
+- HONEST TRADE I MADE: setting the T4 to -g 30000 removed the ~630 ms
+  stall by removing the only mechanism that currently bounds I3. It aligns
+  the T4 with the PRD's own configuration guidance for aux_ltr_chain arms
+  (long GOP so epochs coincide with the hourly re-key) -- the -g 240 gate
+  profile was the deviation -- but the divergence-containment consequence
+  should be weighed by the owner, not buried in a config comment.
+
 ### 2026-07-28 GAP: the AVC444 path has NO runtime intra-refresh at all
 
 Found while justifying the "option 2" risk (rewriting mid-stream main IDRs
@@ -2763,7 +2828,9 @@ resync on a true IDR" -- is real in principle but MISSTATES today's code:
 - `KEY_FRAME_REQUESTED` is honoured ONLY in the RFX path
   (xrdp_encoder.c:715 -> RFX_FLAGS_PRO_KEY). The AVC444/h264 path reads
   `flags` solely to extract mon_index. There is no runtime force-IDR
-  (FR-H264-6 forbids it) and no other refresh mechanism.
+  (FR-H264-6 chose bounded timeouts + child respawn INSTEAD of a control
+  channel -- it does not forbid a SPAWN-TIME keyframe schedule) and no
+  other refresh mechanism.
 - So in an AVC444 session the ONLY intra refreshes are: the first packet
   after an encoder create, a child GOP (-g) IDR, and an encoder restart
   (error / re-key / resize). A client that asks for a key frame gets
@@ -2799,7 +2866,7 @@ hazard for the future parallel design.
 - WHAT IS JUST NUMBERING (the easy part): the shared frame_num reset at the
   IDR. The rewriter owns that counter outright, so it costs nothing.
 - WHY IT IS EXPENSIVE TODAY: we cannot ask a running ffmpeg child for an
-  intra picture (FR-H264-6: no runtime force-IDR), so encode_pair()
+  intra picture (FR-H264-6 ships no child control channel), so encode_pair()
   DELETES the aux child and spawn_second_child()s a new one inline, then
   encodes aux. MEASURED on the T4: a fresh ffmpeg+NVENC child needs
   ~630 ms before its first packet (spawn+1 frame 650 ms, +2 frames 634 ms,
