@@ -1299,15 +1299,41 @@ For the immediately following auxiliary packet require at least one valid VCL NA
 
 Do not require AUD NAL units. This is not a full H.264 parser: split bounded Annex-B start codes and inspect only the one-byte NAL header's `nal_unit_type` field. Do not parse slice syntax, reference-picture semantics, or decode pixels.
 
-### FR-H264-6: Timeout rather than runtime keyframe control
+### FR-H264-6: Scheduled intra refresh + bounded deadlines (REVISED 2026-07-28)
 
-MVP has no fine-grained child control channel and no runtime force-IDR request. A new child is expected to begin with a keyframe. Apply bounded deadlines:
+**Superseded rationale.** The original FR-H264-6 ("Timeout rather than runtime keyframe control") stated that the MVP has no child control channel and no force-IDR request, so a *new child* is the only way to obtain a keyframe, backed by bounded deadlines. That was a scope decision, and downstream work (including FR-H264-8's aux respawn) hardened it into an assumed prohibition. Two 2026-07-28 measurements make it untenable:
+
+1. **Respawn is expensive.** A fresh ffmpeg+NVENC child needs **~630 ms** before its first packet (T4: 650 / 634 / 1099 ms for 1 / 2 / 30 frames ⇒ ~630 ms fixed init, ~16.6 ms/frame after). It sits inline in `encode_pair()`, so any configuration with a finite GOP stalls ~0.65 s per IDR — a ~7–8 s hitch cadence at `-g 240`.
+2. **The stock ffmpeg binary DOES accept a keyframe schedule**, on both backends. Measured with `-force_key_frames`, `-g 30000`, 30 fps:
+
+| encoder | option | result |
+|---|---|---|
+| `h264_nvenc` | `expr:gte(t,n_forced*0.5)` or `expr:eq(mod(n,15),0)` | intra at **exactly** frames 0,15,30,45 |
+| `h264_nvenc` | *without* `-forced-idr` | **non-IDR I** (nal type 1), `frame_num` CONTINUES — DPB not reset |
+| `h264_nvenc` | *with* `-forced-idr 1` | real IDR (nal 5), `frame_num` resets |
+| `h264_vaapi` | same expressions | intra at exactly 0,15,30,45; always a real **IDR** (nal 5) regardless of `-forced-idr` |
+
+Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed vs 55 / 51 / 58 fps at every 240 / 60 / 15 frames — all within noise); only bitstream size moves (294 KB → 294 / 367 / 734 KB). On real desktop content the added cost of a **paired** refresh is ≈ `((I_main−P_main)+(I_aux−P_aux))/N` per frame ⇒ **≈ +4 % at N=240**, +17 % at N=60.
+
+**Requirement (replaces the prohibition).** The runner MUST drive intra refresh by schedule, not by respawn:
+
+- Both children are spawned with an **identical frame-indexed** `-force_key_frames` schedule, so the refresh indices are deterministic and known before submission (this also makes the future `main‖aux` parallel submit race-free — see FR-PROC-7).
+- The rewriter converts the scheduled intra picture of **both** views into a **paired cut**: main → non-IDR I self-marking LT0, aux → non-IDR I self-marking LT1, SPS/PPS emitted alongside, **no IDR and no DPB flush anywhere**. Either child shape is acceptable input (nvenc's non-IDR I or VAAPI's IDR) because the rewriter relabels the header; what matters is only that the picture is intra-coded.
+- The session's **first** picture remains a real IDR (the decoder's entry point and the origin of LT0).
+- **Verify, never assume:** at a scheduled index the slice MUST parse as `slice_type == I`. A P where intra was expected is a loud failure of the same class as an aux P with LT1 unseeded — never a silent emit.
+- The aux-child respawn path is then dead code for this purpose and MUST be removed; a mid-stream main IDR ceases to exist by construction.
+
+**Invariant this exists to enforce (I3).** Direct reference age in the LTR topology is always exactly one picture, so "staleness" is *transitive dependency depth*: the distance back to the last picture in that view coded without a reference. A pure P chain leaves it unbounded, meaning any encoder/decoder divergence (client decoder bug, a rewrite bug, a frame the client skips under load) persists until reconnect. The refresh interval N is precisely the bound, and it must be bounded in **both** views — a main-only refresh does not bound aux. Note this is about *divergence containment*, not loss recovery and not seeking: an RDP stream is live and never seeks, and a fresh connection always builds a new encoder that opens with a real IDR.
+
+**Retained from the original FR.** Bounded deadlines remain the safety net, unchanged:
 
 - child spawn and NUT stream-ready default: 2 seconds;
 - first main packet default: 2 seconds after full main input transfer;
 - auxiliary/pair completion default: 2 seconds after full auxiliary transfer.
 
 Timeout or failed NAL checks kill/reap the child and fail the generation. Values are configurable with hard upper bounds.
+
+**Still absent (honest limit).** A stock ffmpeg binary offers no *on-demand* keyframe request: its interactive stdin commands address filters only, and our stdin carries the raw frame stream. On-demand refresh (e.g. honouring a client `KEY_FRAME_REQUESTED`, which the AVC444 path does not wire up today — it is handled only in the RFX path) therefore still requires either a child restart or a patched encoder, and is out of scope. A sufficiently dense schedule bounds staleness without it.
 
 ### FR-H264-7: Decode-topology invariance (reference partitioning) — REQUIRED, not configurable (owner directive 2026-07-28)
 
@@ -1347,7 +1373,7 @@ Equivalently: no picture may ever use a cross-view reference. The main chain ref
 
 **Implementation sketch.** Same two children as FR-H264-7; the aux child encodes a normal `refs=1` P chain instead of all-IDR. The splicer rewrites both views’ slice headers (pre-CABAC, existing machinery): shared frame_num counter, constant mmco6 self-mark, constant LTR list-modification; both children’s CABAC payloads stay byte-verbatim (each child’s `ref_idx 0` remaps to its LT slot via the modification list). SPS splice: raise `max_num_ref_frames` (and, when a VUI bitstream_restriction is present, `max_dec_frame_buffering` — decoders that size the DPB from the VUI would otherwise evict LT1) to 3, re-check level DPB limits. Fail-loud on any slice shape outside the guard, as today.
 
-**frame_num width + wrap re-key (added 2026-07-28, measured during implementation).** The rewrite WIDENS the frame_num field to 16 bits (`log2_max_frame_num_minus4 = 12`, the legal maximum) regardless of the child’s width — x264 emits a 4-bit field (sized from DPB+1, no knob; keyint does not change it, correcting an assumption in the earlier unit-test spec wording), and narrow fields alias per-view under sparse aux cadences. MEASURED wrap hazard (ffmpeg 7.1.5): a per-view feed whose frame_num steps by 2 (the 2-context shape) SILENTLY STOPS DECODING at the frame_num wrap — 300 aux pictures through an 8-bit field produced 129/300 output frames with zero warnings; the 1-context and drop-aux feeds survive the same wrap bit-identically. Note Windows itself wraps at 256 (gfxwin_anim AU 311 carries frame_num 55) and relies on decoder leniency; our upgraded topology-3 contract cannot. Therefore the wire must never let ANY decoder see a frame_num wrap: the runner re-keys (encoder-pair restart → fresh IDR, counter reset, ~1 s of state cost roughly once per hour of continuous encoding) when the shared counter reaches `XRDP_H264_LTR_FRAME_NUM_REKEY` (2^16 − 512). Wrap correctness is structural, not timing-dependent. A mid-stream main IDR (finite GOP) likewise empties the DPB including LT1; the runner respawns the aux child (no runtime force-IDR exists, FR-H264-6) so the next aux packet is IDR-shaped and re-seeds LT1; an aux P while LT1 is unseeded is a loud rewrite failure, never a silent emit.
+**frame_num width + wrap re-key (added 2026-07-28, measured during implementation).** The rewrite WIDENS the frame_num field to 16 bits (`log2_max_frame_num_minus4 = 12`, the legal maximum) regardless of the child’s width — x264 emits a 4-bit field (sized from DPB+1, no knob; keyint does not change it, correcting an assumption in the earlier unit-test spec wording), and narrow fields alias per-view under sparse aux cadences. MEASURED wrap hazard (ffmpeg 7.1.5): a per-view feed whose frame_num steps by 2 (the 2-context shape) SILENTLY STOPS DECODING at the frame_num wrap — 300 aux pictures through an 8-bit field produced 129/300 output frames with zero warnings; the 1-context and drop-aux feeds survive the same wrap bit-identically. Note Windows itself wraps at 256 (gfxwin_anim AU 311 carries frame_num 55) and relies on decoder leniency; our upgraded topology-3 contract cannot. Therefore the wire must never let ANY decoder see a frame_num wrap: the runner re-keys (encoder-pair restart → fresh IDR, counter reset, ~1 s of state cost roughly once per hour of continuous encoding) when the shared counter reaches `XRDP_H264_LTR_FRAME_NUM_REKEY` (2^16 − 512). Wrap correctness is structural, not timing-dependent. A mid-stream main IDR (finite GOP) likewise empties the DPB including LT1. The ORIGINAL mitigation — respawn the aux child so its next packet is IDR-shaped and re-seeds LT1 — is SUPERSEDED by the revised FR-H264-6 (2026-07-28): the respawn costs ~630 ms inline in the encode path, and stock ffmpeg accepts a deterministic `-force_key_frames` schedule on both nvenc and VAAPI. The runner MUST instead schedule a PAIRED intra refresh in both views (main-I self-marking LT0, aux-I self-marking LT1, no IDR, nothing flushed), which bounds transitive dependency depth in BOTH chains (invariant I3) and removes mid-stream main IDRs by construction. Until that lands, `aux_ltr_chain` arms run a long GOP (`-g 30000`) so the respawn is never triggered in practice, and an aux P while LT1 is unseeded remains a loud rewrite failure, never a silent emit.
 
 **Unit-test specification (required BEFORE the spike is called done; same golden-byte-vector style as the FR-H264-7 leaf tests in `tests/xrdp/test_avc444_h264.c`).** The change surface is pure bit-level logic plus reference semantics, all unit-testable in CI without ffmpeg or hardware:
 
