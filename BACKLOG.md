@@ -2478,6 +2478,24 @@ Owner tested all four arms in one sitting (Mac, Windows App):
   cannot fail proves nothing. Leaf-arm PSNR band measured FIRST as
   the fidelity reference: FR-H264-8 may improve bandwidth, must not
   regress fidelity. Wired into acceptance gate item (1).
+- PROTOTYPE COMMITTED + SENSITIVITY PROVEN (same day):
+  tools/avc444_roundtrip_psnr.py implements the Tier-B wire mode
+  (1-context decode as aligned ground truth vs 2-context per-view
+  decode; per-frame Y/U/V PSNR via ffmpeg psnr filter, no raw dumps;
+  chroma floor 40 dB + 3 dB drift-trend check; worst-frame
+  side-by-side evidence PNG export; per-view decode starvation is
+  itself a RED verdict, not a crash). Validated in BOTH directions:
+  - t4_ps0 (pre-fix nvenc): RED — main min Y/U/V 4.94/7.97/8.29 dB
+    (chroma collapse), aux 2-context decode 0/106 frames (starved:
+    no keyframe, refs point at absent main frames). Evidence frame
+    committed (captures/psnr_proto_20260728/, left = 1-ctx clean,
+    right = 2-ctx magenta/pink bleed — the onscreen Mac corruption
+    class, now caught offline by a number).
+  - t4_leaf (FR-H264-7): GREEN — 217/217 both views, all planes inf
+    (bit-identical across modes).
+  Prototype limits (to lift when elevated to CI): strict M,A
+  alternation assumed; Tier-A source-roundtrip and fault-injection
+  vectors not yet built; thresholds provisional.
 
 ### Absolute numbers (owner directive: never percentages alone)
 
