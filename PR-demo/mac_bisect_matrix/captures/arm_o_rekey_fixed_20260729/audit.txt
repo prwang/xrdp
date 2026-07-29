@@ -1,0 +1,154 @@
+== capture 1: oracle payload dump ==
+records with a slice: 4168
+IDR pictures at records: [0, 536, 1072, 1608, 2144, 2680, 3216, 3752]
+C: non-IDR pictures: 4160, of which not P-with-LTR-retarget: 8
+C: L0 retarget histogram (long-term slot -> count): {None: 8, 0: 2076, 1: 2076}
+C: (record parity, LT slot) -> count: {(0, 0): 2076, (1, 1): 2076}
+
+== capture 2: post-TLS transport dump (EGFX PDU order) ==
+8553 PDUs: {'CREATE_SURFACE': 8, 'MAP_SURFACE_TO_OUTPUT': 8, 'START_FRAME': 2085, 'WIRE_TO_SURFACE_1': 4360, 'END_FRAME': 2085, 'DELETE_SURFACE': 7}
+surface geometry used for the whole-surface test: 1024x768
+DELETE_SURFACE occurrences: 7
+AVC444 WIRE_TO_SURFACE_1 PDUs: 4168 (oracle records: 4168)
+
+== boundaries ==
+-- boundary 1: oracle record 536 --
+   previous picture: rec=535 frame_num=535 P
+   re-key picture  : rec=536 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=537 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #536 @8007311 bitmap_len=61610 vs oracle record len=61610 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @7990781    MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 15606}
+      @8006934    SINGLE    END_FRAME                {'frame_id': 268}
+      @8007059    SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 269}
+      @8007122    SINGLE    DELETE_SURFACE           {'surface': 0}
+      @8007179    SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @8007241    SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @8007311
+      @8007311    MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 61610}
+      @8070897    MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 57801}
+      @8130533    SINGLE    END_FRAME                {'frame_id': 269}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 2: oracle record 1072 --
+   previous picture: rec=1071 frame_num=535 P
+   re-key picture  : rec=1072 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=1073 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #1072 @15039298 bitmap_len=46680 vs oracle record len=46680 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @15028131   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 10427}
+      @15038921   SINGLE    END_FRAME                {'frame_id': 536}
+      @15039046   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 537}
+      @15039109   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @15039166   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @15039228   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @15039298
+      @15039298   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 46680}
+      @15087494   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 40307}
+      @15129084   SINGLE    END_FRAME                {'frame_id': 537}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 3: oracle record 1608 --
+   previous picture: rec=1607 frame_num=535 P
+   re-key picture  : rec=1608 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=1609 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #1608 @22162928 bitmap_len=63906 vs oracle record len=63906 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @22153293   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 8941}
+      @22162551   SINGLE    END_FRAME                {'frame_id': 804}
+      @22162676   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 805}
+      @22162739   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @22162796   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @22162858   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @22162928
+      @22162928   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 63906}
+      @22228856   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 52444}
+      @22282951   SINGLE    END_FRAME                {'frame_id': 805}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 4: oracle record 2144 --
+   previous picture: rec=2143 frame_num=535 P
+   re-key picture  : rec=2144 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=2145 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #2144 @29078127 bitmap_len=78760 vs oracle record len=78760 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @29057730   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 19379}
+      @29077748   SINGLE    END_FRAME                {'frame_id': 1072}
+      @29077873   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 1073}
+      @29077936   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @29077993   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @29078055   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @29078127
+      @29078127   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 78760}
+      @29159374   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 64721}
+      @29226160   SINGLE    END_FRAME                {'frame_id': 1073}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 5: oracle record 2680 --
+   previous picture: rec=2679 frame_num=535 P
+   re-key picture  : rec=2680 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=2681 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #2680 @36626334 bitmap_len=76490 vs oracle record len=76490 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @36609662   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 15746}
+      @36625955   SINGLE    END_FRAME                {'frame_id': 1340}
+      @36626080   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 1341}
+      @36626143   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @36626200   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @36626262   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @36626334
+      @36626334   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 76490}
+      @36705266   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 69559}
+      @36777033   SINGLE    END_FRAME                {'frame_id': 1341}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 6: oracle record 3216 --
+   previous picture: rec=3215 frame_num=535 P
+   re-key picture  : rec=3216 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=3217 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #3216 @44052543 bitmap_len=56704 vs oracle record len=56704 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @44035207   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 16412}
+      @44052166   SINGLE    END_FRAME                {'frame_id': 1608}
+      @44052291   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 1609}
+      @44052354   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @44052411   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @44052473   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @44052543
+      @44052543   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 56704}
+      @44111039   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 51188}
+      @44163878   SINGLE    END_FRAME                {'frame_id': 1609}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+
+-- boundary 7: oracle record 3752 --
+   previous picture: rec=3751 frame_num=535 P
+   re-key picture  : rec=3752 IDR=True frame_num=0 idr_pic_id=0
+   damage rects    : [(0, 0, 1024, 768)]
+   whole surface   : YES
+   paired aux      : rec=3753 P frame_num=1 L0->LTNone
+   correlation    : AVC444 W2S1 #3752 @52400688 bitmap_len=77515 vs oracle record len=77515 -> MATCH
+   PDU order around the re-key frame (byte offsets):
+      @52383027   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 16689}
+      @52400309   SINGLE    END_FRAME                {'frame_id': 1876}
+      @52400434   SINGLE    START_FRAME              {'timestamp': 0, 'frame_id': 1877}
+      @52400497   SINGLE    DELETE_SURFACE           {'surface': 0}
+      @52400554   SINGLE    CREATE_SURFACE           {'surface': 0, 'w': 1024, 'h': 768, 'pixel_format': 32}
+      @52400616   SINGLE    MAP_SURFACE_TO_OUTPUT    {'surface': 0, 'x': 0, 'y': 0}
+      >>> re-key H.264 payload bytes at @52400688
+      @52400688   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 77515}
+      @52480646   MULTIPART WIRE_TO_SURFACE_1        {'surface': 0, 'codec': 15, 'pixel_format': 32, 'dest': (0, 0, 1024, 768), 'bitmap_len': 65526}
+      @52548237   SINGLE    END_FRAME                {'frame_id': 1877}
+   B: DELETE < CREATE < MAP, no draw before the re-key payload: YES   (gap: END_FRAME START_FRAME DELETE_SURFACE CREATE_SURFACE MAP_SURFACE_TO_OUTPUT)
+

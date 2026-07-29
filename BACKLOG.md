@@ -228,7 +228,7 @@ in files this branch does not own (`xrdp_avc444_caps.c`, the rfx block of
 
 ---
 
-## #48 — Re-key as a protocol-defined boundary — CODE DONE, acceptance pending
+## #48 — Re-key as a protocol-defined boundary — WIRE ACCEPTANCE GREEN (onscreen still owner-blocked)
 
 Owner directive 2026-07-28: *"I'd rather let the session glitch for ~690 ms
 every hour than let xrdp have undefined behaviour every hour."* The old
@@ -273,10 +273,14 @@ eliminated rather than tested.
   (2026-07-28): passes, and en route it independently confirmed the #45
   step-1 gap by making the rewriter refuse a real non-IDR I. Treat the
   re-key timing as locally-evidenced, NOT CI-gated, until #49 lands.
+  Re-confirmed 2026-07-29: `XRDP_TEST_FFMPEG_PATH=/usr/bin/ffmpeg make
+  check -C tests/xrdp` → 121/121, **0 skips**. The same target without
+  that variable also reports 121/121 but logs 8 "SKIPPED (reported as
+  PASS, proves nothing)" warnings — which is exactly #49.
 
-**ARM-O RESULT 2026-07-29: RED — the boundary never fired. Two causes,
-both now understood; cause 1 is fixed, cause 2 is a config arithmetic
-error.**
+**ARM-O RESULT 2026-07-29 (run 1, xrdp-dev e928914a0e93): RED — the
+boundary never fired. Two causes, both now understood; cause 1 is fixed,
+cause 2 is a config arithmetic error.**
 
 *Cause 1 (FIXED) — the knob never reached the encoder.* The gfx.toml value
 travelled tconfig → `xrdp_mm.c:1382` → `:1415` → `xrdp_encoder.c:255` and
@@ -308,26 +312,80 @@ I slices after each main IDR.
 
 Artifacts: `PR-demo/mac_bisect_matrix/captures/arm_o_rekey_20260729/`
 (71 MB: oracle AVC444 capture, 50 MB post-TLS EGFX dump, audit, logs,
-deployed image/package manifests). New uncommitted tooling:
-`egfx_pdu_scan.py`, `rekey_boundary_audit.py`.
+deployed image/package manifests). Retained as the BEFORE control: the
+same arm and the same tooling, differing only in the binary.
 
-**Remaining acceptance (needs a redeploy with the fix, then the fleet + the owner's eyes):**
-- Deploy `arm-o` (`gfx/arm-o.toml`, `k8s/arm-o.yaml`, port 40014 —
-  `ltr_rekey_frame_num = 536`, boundary every ~268 frames). It is
-  deliberately NOT in `build_and_deploy.sh`'s default arm list: it needs an
-  xrdp deb built from this commit, so register its `ARM_TAG`/`TAG_DEB`
-  entries and deploy it by name.
-- Wire: DELETE/CREATE/MAP precede the re-key frame's first PDU, that frame's
-  damage covers the whole surface, and its main view is an IDR with the
-  shared counter reset — audited by `tools/avc444_ltr_wire_audit.py`.
-- Onscreen: many consecutive boundaries render normally on mstsc, mstsc
-  multimon and the macOS Windows App — no wedge, no colour break, no stuck
-  frame.
+**ARM-O RESULT 2026-07-29 (run 2, xrdp-dev c78895f607da): GREEN on the
+wire and GREEN on a real decoding client.**
+
+Two runs against the same arm, because one client cannot answer both
+questions. The oracle patch
+(`PR-demo/oracle_client/patch_gfx_oracle.py`) returns `CHANNEL_RC_OK`
+*before decode/present* — it records every AVC444 payload and renders
+nothing, so its window is black BY CONSTRUCTION. Sampling pixels from
+the oracle client proves nothing about a decoder; sampling bytes from a
+stock client is impossible. Hence `capture_arm_boundary.sh` now has
+`MODE=oracle` and `MODE=render`.
+
+*Byte half* (`MODE=oracle`, 200 s, `SESSION_KIND=code`, reproduced twice):
+7 boundaries at EXACTLY 536-record spacing (268 pairs — the shared
+counter advances by two per pair), i.e. the configured threshold, not the
+compiled-in 65024. At every one of the 7: `DELETE_SURFACE` →
+`CREATE_SURFACE` → `MAP_SURFACE_TO_OUTPUT` all land after the previous
+picture's payload and before the re-key payload, with no draw in
+between; the re-key picture is an IDR with `frame_num` reset to 0; its
+damage rect is the whole surface `(0,0,1024,768)`. Steady state between
+boundaries is unchanged: 4236 non-IDR pictures, every main P → LT0 and
+every aux P → LT1, the only 8 exceptions being the designed aux seed
+after each main IDR. BEFORE control, same tooling: `DELETE_SURFACE`
+occurrences **0**, and its only "boundaries" are the `-g 30000` GOP IDRs
+on the live surface with a 74×20 damage rect — the behaviour #48 replaces.
+
+*Pixel half* (`MODE=render`, 200 s, stock decode via VAAPI): 20 samples,
+**0 black, 0 frozen**, spanning 7 server-logged re-keys (counted from the
+pod's own log inside the sampling window, not inferred from the rate).
+A real client decoded through 7 surface teardowns without wedging.
+
+*Cost of a boundary, measured rather than estimated*
+(`rekey_stall_stats.py`): server-side "threshold reached" → "surface
+rebuilt" = **min 106 / median 208 / max 212 ms** over 6 clean events.
+The ~690 ms in the owner's framing was pessimistic by ~3×. One 7th event
+is excluded because xrdp's logger emitted the triple with BACKWARD
+timestamps (`02:07:44.607 → .659 → .268`) — a pre-existing logger
+artifact, reported not hidden, unrelated to #48.
+
+Scope of the pixel claim, stated precisely: 10 s sampling cannot see a
+~200 ms freeze, so this is NOT a claim that the boundary is invisible.
+It is a claim that the client never went black and never stopped
+advancing across 7 boundaries — the failure mode #48 exists to prevent,
+which is persistent, not momentary.
+
+New tooling (all committed): `egfx_pdu_scan.py`,
+`rekey_boundary_audit.py`, `xwd_render_check.py`,
+`rekey_stall_stats.py`, `capture_arm_boundary.sh`.
+
+*Audit-tool bug found and fixed while doing this:* check B judged
+ordering over a fixed window of PDUs preceding the re-key payload, whose
+last entry is always the PREVIOUS frame's `WIRE_TO_SURFACE_1` — so
+`DELETE < CREATE < MAP < WIRE` could never hold and the check read NO
+against a capture whose printed order was correct. It now judges the gap
+between the previous picture's payload and the re-key payload. Verified
+falsifiable: the fixed checker still returns NO on the BEFORE capture.
+
+**Remaining acceptance — client-compat only:**
+- mstsc, mstsc multimon and the macOS Windows App across several
+  boundaries. FreeRDP surviving does not transfer: the whole reason #48
+  exists is that VideoToolbox's 2-context lifecycle is unprovable from
+  the bitstream. This is a "connect to arm-o, leave it a few minutes,
+  confirm the session still paints" check — a glance, not a vigil, since
+  the failure mode is a persistent wedge and boundaries arrive every
+  ~27 s on this arm.
 
 Timing honesty: the default threshold is reached after ≈ 18 min of
 continuous 30 fps animation (32 512 pairs), ≈ 36 min at 15 fps — "once an
 hour" was optimistic. Frames encode only on damage, so an idle session may
-never re-key.
+never re-key. Measured on arm-o at `SESSION_KIND=xfce`: an IDLE desktop
+produced 8 AVC444 pairs in 90 s, i.e. it would take days.
 
 ## #49 — CI never runs the ffmpeg-path tests; nine of them report PASS anyway
 

@@ -203,6 +203,19 @@ def main():
         counts[CMD[c]] = counts.get(CMD[c], 0) + 1
     print('%d PDUs: %s' % (len(pdus), counts))
 
+    # surface geometry: take it from the stream itself unless overridden,
+    # so "whole surface" is a real test of the damage rect rather than a
+    # check that it merely starts at (0, 0)
+    for _o, _k, c, f in pdus:
+        if c == 0x0009:                      # CREATE_SURFACE
+            if sw is None:
+                sw = f.get('w')
+            if sh_ is None:
+                sh_ = f.get('h')
+            break
+    print('surface geometry used for the whole-surface test: %sx%s'
+          % (sw, sh_))
+
     dels = [i for i, (_o, _k, c, _f) in enumerate(pdus) if c == 0x000A]
     print('DELETE_SURFACE occurrences: %d' % len(dels))
     # AVC444 (codec 14 = v1, 15 = v2) surface commands, in wire order
@@ -257,17 +270,28 @@ def main():
         print('      >>> re-key H.264 payload bytes at @%d' % hit)
         for o, k, c, fl in after[:3]:
             print('      @%-10d %-9s %-24s %s' % (o, k, CMD[c], fl))
-        seq = [CMD[c] for _o, _k, c, _f in ctx]
+        # B is judged on the GAP: the PDUs between the PREVIOUS picture's
+        # payload and this re-key payload. Judging it on a fixed window of
+        # preceding PDUs was wrong -- that window always ends with the
+        # previous frame's WIRE_TO_SURFACE_1, which legitimately precedes
+        # DELETE_SURFACE, so the ordering test could never pass (it read
+        # NO against a capture whose printed order was correct).
+        prev_hit = pdus[avc_pdus[p['rec'] - 1]][0] if p['rec'] else -1
+        gap = [x for x in pdus if prev_hit < x[0] < hit]
+        gseq = [CMD[c] for _o, _k, c, _f in gap]
         try:
-            d_i = len(seq) - 1 - seq[::-1].index('DELETE_SURFACE')
-            c_i = len(seq) - 1 - seq[::-1].index('CREATE_SURFACE')
-            m_i = len(seq) - 1 - seq[::-1].index('MAP_SURFACE_TO_OUTPUT')
-            w_i = len(seq) - 1 - seq[::-1].index('WIRE_TO_SURFACE_1')
-            ok = d_i < c_i < m_i < w_i
+            d_i = gseq.index('DELETE_SURFACE')
+            c_i = gseq.index('CREATE_SURFACE')
+            m_i = gseq.index('MAP_SURFACE_TO_OUTPUT')
+            # nothing may be drawn to the surface between the re-map and
+            # the re-key picture itself
+            ok = (d_i < c_i < m_i
+                  and 'WIRE_TO_SURFACE_1' not in gseq[m_i:])
         except ValueError:
             ok = False
-        print('   B: DELETE < CREATE < MAP < first WIRE_TO_SURFACE_1: %s'
-              % ('YES' if ok else 'NO'))
+        print('   B: DELETE < CREATE < MAP, no draw before the re-key '
+              'payload: %s   (gap: %s)'
+              % ('YES' if ok else 'NO', ' '.join(gseq)))
         print()
 
 

@@ -1,0 +1,2 @@
+SESSION_KIND=code (10 fps line-scroll)
+MODE=oracle (records payloads, does NOT decode/render)
