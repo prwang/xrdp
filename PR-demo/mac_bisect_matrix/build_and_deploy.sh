@@ -41,8 +41,9 @@ declare -A ARM_XORG_DEB=(
     # loud connect-time refusal on undersized /dev/shm, 2026-07-28)
     [arm-m]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
     [arm-n]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
-    # arm-o: same xorgxrdp as arm-n; only the xrdp side carries #48
+    # arm-o/arm-p: same xorgxrdp as arm-n; only the xrdp side carries #48
     [arm-o]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
+    [arm-p]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
@@ -53,6 +54,7 @@ declare -A ARM_TAG=(
     [arm-m]=39bb08a48377.xx5b9650c-xfce
     [arm-n]=34795577580b.xx5b9650c-xfce
     [arm-o]=8f0994e20f5d.xx5b9650c-xfce
+    [arm-p]=6894d7de2202.xx5b9650c-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -72,6 +74,8 @@ declare -A TAG_DEB=(
     [c78895f607da.xx5b9650c]="xrdp-dev_0.10.80+git20260729013621.c78895f607da_amd64.deb"
     # BACKLOG #48 RED FIX: re-key no longer maps a blank surface
     [8f0994e20f5d.xx5b9650c]="xrdp-dev_0.10.80+git20260729023407.8f0994e20f5d_amd64.deb"
+    # BACKLOG #48: ltr_rekey_surface_reset — churn masked from the client
+    [6894d7de2202.xx5b9650c]="xrdp-dev_0.10.80+git20260729030225.6894d7de2202_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

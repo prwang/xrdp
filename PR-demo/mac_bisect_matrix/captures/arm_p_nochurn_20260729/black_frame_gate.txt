@@ -1,0 +1,9 @@
+oracle_avc_s0.bin
+  pictures in capture     : 4144
+  frames decoded          : 4144
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS

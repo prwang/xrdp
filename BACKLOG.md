@@ -466,8 +466,35 @@ longer true, because the owner is now testing on macOS and a boundary
 arrives every ~27 s. If that arm is clean, the surface-teardown
 mechanism is unnecessary and #48 collapses to the encoder restart.
 
+**ARM-P 2026-07-29 (churn masked, xrdp-dev 6894d7de2202): GATE PASSED,
+awaiting the owner's macOS check.**
+
+`ltr_rekey_surface_reset = false` (port 40015). Owner's decode gate:
+4144 pictures, **4144 decoded, 0 black frames**. Wire: exactly TWO
+surface lifecycle events in 200 s — the connect-time CREATE and MAP —
+and **zero** mid-session churn: no DELETE_SURFACE, no re-CREATE, no
+re-MAP. There is nothing left for a client to repaint on.
+
+The re-key still does its job, which is the whole point:
+
+    server "reached the re-key threshold" ....... 7
+    server surface rebuild/replace .............. 0
+    IDR records ... [0, 536, 1072, 1608, 2144, 2680, 3216, 3752]
+    spacing ....... 536 records = 268 pairs = exactly the threshold
+    counter reset . prev frame_num 535 -> IDR frame_num 0
+    damage ........ (0,0,1024,768) whole surface, every boundary
+    steady state .. 4136 non-IDR, 8 exceptions = the designed aux
+                    seed after each main IDR
+
+So the wrap is still prevented, by the encoder rebuild alone. If the
+owner's macOS check is clean, the surface-teardown half of #48 is dead
+weight and the default should flip to `false` — with sign-off, since
+that changes shipped behaviour.
+
 **Remaining acceptance — client-compat only:**
-- macOS re-check, gated behind a clean `oracle_black_frame_check.py`.
+- macOS check on **arm-p** (127.0.0.1:40015), gated behind a clean
+  `oracle_black_frame_check.py` (passed above). arm-o (40014) is
+  retained as the churn-ON control.
 - mstsc, mstsc multimon and the macOS Windows App across several
   boundaries. FreeRDP surviving does not transfer: the whole reason #48
   exists is that VideoToolbox's 2-context lifecycle is unprovable from
