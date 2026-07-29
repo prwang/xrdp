@@ -92,18 +92,49 @@ damaged in the same cycle, the single `proc_enc_msg` worker issues **one**
 by an instrumented per-cycle set-size counter asserted in the E3 run, never
 inferred from a wall-clock improvement.
 
-**E5 — the speed-up is measured locally on VAAPI, as frame period, WITH
-step 6 landed.** Dev-box VAAPI, E3 geometry and payload, reported as frame
-period (never encoder ms — PRD "Concurrency state of the encode pipeline"),
-against the recorded pre-#45 frame period for the identical arm, payload,
-geometry. Step 6 must be deployed in the same measurement, or the batching
+**E5 — the speed-up is measured locally on VAAPI as the ORACLE FRAME
+INTERVAL, WITH step 6 landed.** The quantity #45 chases is the oracle
+client's frame interval: the server-side interval between successive sends
+when the client acks before decode and present, so nothing but the server
+is in the number (never encoder ms — PRD "Concurrency state of the encode
+pipeline"; never the rendering client's rate, which is a client
+measurement). Dev-box VAAPI, E3 geometry and payload, against the recorded
+pre-#45 oracle frame interval for the identical arm, payload, geometry.
+**Baseline measured 2026-07-29, before any of steps 5–7:** 51.1 ms mean
+per send (p50 50 ms, p90 103 ms) = 19.57 sends/s = 9.79 pairs/s per
+monitor at 2560×1440 + 3840×2400
+(`PR-demo/mac_bisect_matrix/captures/ab_oracle_215330/`). **≥ 2.0×
+therefore means ≤ 25.6 ms mean per send** on that arm and payload.
+Step 6 must be deployed in the same measurement, or the batching
 gain is silently paid for out of lost capture overlap and the number is a
 lie (step 7 rationale). Prediction from the measured concurrency table
-(N=2 ≈ free, N=4 at 1.39×/1.64×): **≥ 2.0×** on the dual-monitor frame
-period. **Stop rule:** under 1.5× the item is RED and the remainder is
+(N=2 ≈ free, N=4 at 1.39×/1.64×): **≥ 2.0×** on the dual-monitor oracle
+frame interval. **Stop rule:** under 1.5× the item is RED and the remainder is
 attributed (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly)
 before anything ships — not re-tuned until it looks better, not reported as
 a partial win.
+**Why the oracle interval is the target and not the end-to-end rate —
+measured 2026-07-29.** Clean A/B on one fresh
+arm-q pod at E3 geometry, 60 s each, back to back
+(`PR-demo/mac_bisect_matrix/captures/ab_render_215222/`,
+`ab_oracle_215330/`): distro `xfreerdp3` decoding and presenting delivers
+**5.94 sends/s = 2.97 pairs/s per monitor** (send gap p50 103 ms, p90
+331 ms, mean 169 ms), the oracle client — which acks before decode and
+present — delivers **19.57 sends/s = 9.79 pairs/s per monitor** (p50
+50 ms, p90 103 ms, mean 51 ms). The session is **client-bound by 3.29×**:
+the client needs ~117 ms per surface frame on top of the server's 51 ms,
+the same software 4:4:4 reconstruction cost recorded on 2026-07-26 (~65 ms
+at the owner layout), now measured at target geometry. A 3.3× client
+ceiling swallows a 2× server improvement whole: chase the end-to-end rate
+and #45 would measure xfreerdp's YUV444 reconstruction, show ~1.0×, and
+call correct server work a failure. **So E5 chases the oracle frame
+interval.** The rendering client's rate is recorded beside it every time
+as the end-to-end figure — it is context, never the gate, and it will not
+move until the client side is addressed (out of #45 scope). Fidelity gates
+(E1, E2's black-frame check, E7) keep using the real rendering client — the
+oracle proves no fidelity and must never be smoke-gated on. Both runs sat
+at outstanding depth 2 for about half their sends, so the difference is
+pace, not budget contention.
 The non-concurrency remainder is characterised HERE, locally, before any
 cloud spend: the T4 pair cost 67.5 ms while two 4K encodes account for
 39.2 ms — a ~28 ms remainder that is NOT encode and that concurrency
@@ -313,7 +344,7 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
 | D6 | gfx.toml `intra_refresh_frames`; C field `avc444_ffmpeg_intra_refresh_frames`; **default 240**; range **[24, 4096]** (loader refuses, runner clamps); effective only when `aux_ltr_chain = true`. **No 0/off value** — an off switch would keep the deleted respawn path alive as a shadow fallback. |
 | D7 | **`-g` = `intra_refresh_frames`.** GOP boundaries coincide with scheduled indices; unscheduled IDR unreachable. |
 | D8 | Fault-injection recovery bound: **≤ `intra_refresh_frames` + 1 pairs** (241 at default) from the injected corruption; the `-g 30000` control must NOT converge. |
-| D9 | **E5 (dev-box VAAPI frame period) is the measurement gate.** The T4 pack-bench still runs per CLAUDE.md and is recorded, but T4 availability does not gate #45; T4 frame-period confirmation gates the `aux_ltr_chain` default flip (Owner-blocked). |
+| D9 | **E5 (dev-box VAAPI ORACLE frame interval — baseline 51.1 ms mean at E3 geometry, measured 2026-07-29) is the measurement gate.** The rendering client's end-to-end rate is recorded alongside but is not the gate: it is client-bound by 3.29× and would hide any server gain. The T4 pack-bench still runs per CLAUDE.md and is recorded, but T4 availability does not gate #45; T4 frame-period confirmation gates the `aux_ltr_chain` default flip (Owner-blocked). |
 | D10 | Four children reach one set via step 7's batching rule over per-monitor FIFO items (one event per monitor, fact section). |
 | D11 | **Both backend intra shapes ship in the same build**; neither is optional. |
 | D12 | **1:1 main/aux pairing is a precondition** of the shared schedule. FR-PROC-7's sparse aux cadence breaks it — **#40 may not land before #45** and must re-derive the aux schedule from the aux child's own index when it does. |
@@ -362,8 +393,8 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
     step lands.
   - Two observations from these runs, recorded because they are real and
     neither is a gate result: (a) the target-geometry session delivered
-    only **3.03 pairs/s per monitor** (6.06 sends/s) — the throughput E5
-    exists to move, measured here for the first time at that size;
+    only **3.03 pairs/s per monitor** (6.06 sends/s) — **attributed
+    2026-07-29: client-bound, not a server limit** (see the A/B below);
     (b) FreeRDP logged `YUV decoder: intersecting rectangles, aborting`
     48 times in the target run and 16 times at 2×1024×768, in both cases
     clustered in a few seconds around session start and then absent for

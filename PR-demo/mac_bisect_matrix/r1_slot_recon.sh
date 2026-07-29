@@ -90,12 +90,51 @@ DISPLAY=$CLI \
 tail -1 "$OUT/client-monitors.txt"
 
 # --- drive one multimon AVC444 login ------------------------------------
-pkill -9 -f "$FRDP.*:$PORT" 2>/dev/null; sleep 1
+# R1_CLIENT_MODE=render (default) drives the distro xfreerdp3, which
+# decodes and presents — the end-to-end path a human sees. =oracle drives
+# the save-only oracle build instead: it dumps each encoded AVC payload
+# and acks BEFORE decode/present, so the frame rate observed at the server
+# is the server ceiling with the client contributing ~nothing. Since the
+# capture budget is released by CLIENT frame acks
+# (xrdp_mm_update_module_frame_ack: frame_id_client + frames_in_flight >
+# frame_id_server), the two modes together say whether a measured rate is
+# a server limit or a client limit. TIMING INSTRUMENT ONLY: the oracle
+# client renders nothing and proves no fidelity — never smoke-gate on it.
+MODE=${R1_CLIENT_MODE:-render}
+ORACLE_BIN=${R1_ORACLE_BIN:-/opt/freerdp-vaapi/bin/xfreerdp}
+# Mark the pod's session log BEFORE connecting and extract only what comes
+# after. The session Xorg process outlives a client (a disconnected session
+# keeps its log), so a run that just greps the whole file reports every
+# earlier session's records as its own — which happened on 2026-07-29 and
+# turned a 60 s measurement into 2.2 h of accumulated lines.
+MARK=$(kubectl -n "$NS" exec "$POD" -- \
+    bash -lc "wc -l < /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
+    | tr -d ' \r')
+MARK=${MARK:-0}
+echo "session log mark: $MARK lines"
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \
                         "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
-setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
-    "$FRDP" /args-from:env:RDPARGS </dev/null >"$OUT/client.log" 2>&1 &
+if [ "$MODE" = oracle ]; then
+    [ -x "$ORACLE_BIN" ] || fail "oracle client missing at $ORACLE_BIN"
+    rm -f /tmp/oracle_avc_s*.bin
+    echo "client: ORACLE (save-only, no decode/present) — server-ceiling run"
+    setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib \
+        FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" \
+        "$ORACLE_BIN" /args-from:env:RDPARGS </dev/null \
+        >"$OUT/client.log" 2>&1 &
+else
+    echo "client: RENDERING $FRDP — end-to-end run"
+    setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
+        "$FRDP" /args-from:env:RDPARGS </dev/null >"$OUT/client.log" 2>&1 &
+fi
+# setsid makes the child a session leader, so its pid is its process-group
+# id and the whole group can be killed by pgid at teardown. Do NOT go back
+# to pkill -f "<client>.*:<port>": the port is passed through the
+# environment (/args-from:env:), never appears in argv, so that pattern
+# matches nothing and silently leaves the client running — it left one
+# alive for 2.2 h on 2026-07-29 and contaminated the next run.
+CLIENT_PGID=$!
 unset PW RDPARGS
 echo "connected; recording for ${SECS}s ..."
 
@@ -107,7 +146,17 @@ kubectl -n "$NS" exec "$POD" -- bash -c \
 SAMPLER=$!
 sleep "$SECS"
 wait $SAMPLER 2>/dev/null
-pkill -9 -f "$FRDP.*:$PORT" 2>/dev/null
+kill -9 -- -"$CLIENT_PGID" 2>/dev/null
+sleep 1
+if pgrep -g "$CLIENT_PGID" >/dev/null 2>&1; then
+    echo "WARNING: client process group $CLIENT_PGID survived teardown —" \
+         "the next run's window will be contaminated" >&2
+fi
+if [ "$MODE" = oracle ]; then
+    du -cb /tmp/oracle_avc_s*.bin 2>/dev/null | tail -1 \
+        > "$OUT/oracle_dump_bytes.txt"
+    rm -f /tmp/oracle_avc_s*.bin
+fi
 
 # --- collect the server-side log ----------------------------------------
 # sesman starts Xorg with -logfile ~/.xorgxrdp.<display>.log (sesman.ini).
@@ -115,12 +164,27 @@ XLOG=$(kubectl -n "$NS" exec "$POD" -- \
     bash -lc "ls -t /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1")
 [ -n "$XLOG" ] || fail "no session Xorg log in the pod — did the login fail? \
 see $OUT/client.log"
-kubectl -n "$NS" exec "$POD" -- cat "$XLOG" > "$OUT/session-xorg.log" \
+kubectl -n "$NS" exec "$POD" -- cat "$XLOG" > "$OUT/session-xorg.full.log" \
     || fail "could not fetch $XLOG"
+# only this run's window (see the MARK comment above)
+tail -n +$((MARK + 1)) "$OUT/session-xorg.full.log" > "$OUT/session-xorg.log"
 kubectl -n "$NS" logs "$POD" --tail=400 > "$OUT/pod.log" 2>&1
 grep -a R1SLOT "$OUT/session-xorg.log" > "$OUT/r1slot.txt"
 n=$(wc -l < "$OUT/r1slot.txt")
 echo "R1SLOT records: $n  ($OUT/r1slot.txt)"
+if [ "$n" -gt 0 ]; then
+    python3 - "$OUT/r1slot.txt" "$SECS" "$MODE" <<'PY' | tee "$OUT/RATE.txt"
+import re, sys
+t = [float(re.match(r"\[(\d+\.\d+)\]", l).group(1))
+     for l in open(sys.argv[1]) if re.match(r"\[", l)]
+span = t[-1] - t[0] if len(t) > 1 else 0.0
+print("=== send rate (client mode: %s) ===" % sys.argv[3])
+print("window %.1f s of a %s s run, %d sends" % (span, sys.argv[2], len(t)))
+if span > 0:
+    print("%.2f sends/s = %.2f frame-pairs/s per monitor (2 monitors)"
+          % (len(t) / span, len(t) / span / 2.0))
+PY
+fi
 [ "$n" -gt 0 ] || fail "no R1SLOT records — the session never sent an AVC444 \
 frame (check $OUT/client.log and $OUT/session-xorg.log)"
 
