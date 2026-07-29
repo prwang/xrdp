@@ -37,6 +37,8 @@ EXTRA_DIST = \
   gfx/gfx_avc444_empty_args.toml \
   gfx/gfx_avc444_rekey.toml \
   gfx/gfx_avc444_rekey_bad.toml \
+  gfx/gfx_avc444_intra_refresh.toml \
+  gfx/gfx_avc444_intra_refresh_bad.toml \
   gfx/gfx_avc444_rekey_nochurn.toml \
   gfx/gfx_avc444_rekey_churn.toml \
   gfx/fake_encoder_hang.sh \

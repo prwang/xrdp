@@ -51,6 +51,12 @@ avc_mode = "444"
 tail_flush = false
 # EXPERIMENTAL FR-H264-8: aux-refs-aux via long-term reference slots
 aux_ltr_chain = true
+# BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
+# pictures per view. The runner spawns BOTH children with the identical
+# frame-indexed -force_key_frames schedule and pins -g to the same value
+# (D7), so every intra picture lands on a scheduled index and the
+# rewriter can check observed against requested.
+intra_refresh_frames = 240
 # BACKLOG #48: lowered re-key threshold — TEST ARM ONLY. Shipped default
 # is 65024 (2^16-512). The server logs a WARNING whenever this is below
 # the default so a lowered value can never be mistaken for production.
@@ -69,14 +75,12 @@ encoder_args = [
   # shared counter 60000, below the 65024 default threshold, so the
   # re-key can never fire at the default. It fires here only because
   # ltr_rekey_frame_num is lowered to 536 (boundary at pair 268).
-  # FR-H264-8: long GOP. Mid-stream main IDRs empty the DPB (LT1 dies),
-  # forcing an aux-child respawn and starting a new topology-3 epoch
-  # every GOP (vaapi default gop=120 = every ~12 s). With a reliable
-  # transport periodic IDRs buy nothing (real Windows ships ONE IDR per
-  # session); -g 30000 makes epochs coincide with re-keys (~hourly).
-  # A/B caveat vs arm-m recorded in BACKLOG: arm-m still pays its
-  # per-120-frame main IDR; the gate metric (aux KB/frame) is unaffected.
-  "-g", "30000",
+  # BACKLOG #45 step 4 retires the `-g 30000` interim: with the
+  # scheduled paired intra refresh a mid-stream IDR no longer empties
+  # the DPB, so a long GOP is no longer the thing keeping LT1 alive.
+  # The runner PINS -g to intra_refresh_frames itself (D7) and appends
+  # it after this block, so any -g written here is overridden; it is
+  # left out rather than left misleading.
 ]
 [x264.default]
 # NOTE: x264 specifies bitrate in unit of kbps.

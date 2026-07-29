@@ -1711,6 +1711,89 @@ START_TEST(test_ltr_cut_midstream_idr_keeps_chain)
 }
 END_TEST
 
+/*****************************************************************************/
+/* feed one cut vector, return the rewriter's verdict */
+static int
+ltr_cut_feed(struct xrdp_h264_ltr_state *st, int k, unsigned char *buf,
+             int buf_size, int *len_out)
+{
+    const struct ltr_cut_vec *v = &ltr_cut_seq[k];
+    int len;
+    int cap;
+    int rv;
+
+    memcpy(buf, v->in, v->in_len);
+    len = v->in_len;
+    cap = v->in_len + xrdp_h264_ltr_growth_budget(buf, len);
+    ck_assert_int_le(cap, buf_size);
+    rv = (v->view == LTR_CUT_VIEW_MAIN)
+         ? xrdp_h264_ltr_rewrite_main(buf, &len, cap, st)
+         : xrdp_h264_ltr_rewrite_aux(buf, &len, cap, st);
+    if (len_out != NULL)
+    {
+        *len_out = len;
+    }
+    return rv;
+}
+
+/*****************************************************************************/
+START_TEST(test_ltr_schedule_observed_vs_requested)
+{
+    /* FR-H264-6 layer 3: the refresh is OBSERVED, never assumed. Both
+     * children are spawned with the same frame-indexed schedule, so at
+     * a scheduled ordinal an intra picture is DUE in that view; a P
+     * there means the encoder silently skipped the cut and the pair
+     * must fail instead of shipping a stream whose prediction chain is
+     * longer than the wire claims. An intra picture OFF schedule is
+     * equally a mismatch (an unscheduled IDR, or a de-phased child).
+     *
+     * The cut vector sequence has its intra pictures at view ordinals
+     * 0, 2 and 4, so a declared period of 2 matches it up to picture 8
+     * and then diverges: picture 9 is an aux P where the schedule says
+     * a cut is due. */
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[8192];
+    int k;
+    int fn_before;
+
+    memset(&st, 0, sizeof(st));
+    st.refresh_period = 2;
+    for (k = 0; k <= 8; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+    /* the aux picture where a cut was scheduled but a P arrived */
+    fn_before = st.frame_num;
+    ck_assert_int_ne(ltr_cut_feed(&st, 9, buf, (int)sizeof(buf), NULL), 0);
+    /* a rejected packet leaves the chain state untouched */
+    ck_assert_int_eq(st.frame_num, fn_before);
+    ck_assert_int_eq(st.pic_index[1], 4);
+
+    /* the other direction: an intra picture arriving OFF schedule.
+     * With a declared period of 3 the cut at view ordinal 2
+     * (picture 4) is unscheduled. */
+    memset(&st, 0, sizeof(st));
+    st.refresh_period = 3;
+    for (k = 0; k <= 3; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+    ck_assert_int_ne(ltr_cut_feed(&st, 4, buf, (int)sizeof(buf), NULL), 0);
+
+    /* and with NO period declared the check is inert: the same
+     * sequence that failed above is accepted, which is what keeps the
+     * unscheduled diagnostic arms and the byte-golden vectors working */
+    memset(&st, 0, sizeof(st));
+    for (k = 0; k <= 9; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+}
+END_TEST
+
 /*
  * The same schedule at the DPB level, in BOTH client decode modes.
  * This is a model check over the simulator above (it cannot fail
@@ -1871,6 +1954,7 @@ make_suite_avc444_ltr(void)
     tcase_add_test(tc, test_ltr_cut_sequence_byte_exact);
     tcase_add_test(tc, test_ltr_cut_nonidr_i_accepted_both_views);
     tcase_add_test(tc, test_ltr_cut_midstream_idr_keeps_chain);
+    tcase_add_test(tc, test_ltr_schedule_observed_vs_requested);
     tcase_add_test(tc, test_ltr_dpb_scheduled_paired_cut_both_modes);
     suite_add_tcase(s, tc);
     return s;

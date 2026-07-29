@@ -291,6 +291,45 @@ START_TEST(test_tconfig_gfx_avc444_rekey_out_of_range_refused)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_intra_refresh)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #45 D6 / PRD FR-H264-6: the scheduled paired refresh
+     * interval. Absent -> the shipped default; there is deliberately no
+     * 0/off value, because an off switch would keep the deleted aux
+     * respawn path alive as a shadow fallback. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_intra_refresh.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames, 48);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_MIN);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_MAX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* Below the minimum every frame would become a cut and the bandwidth
+     * gate would silently change meaning: the loader keeps the default
+     * rather than honouring it (#45 D6, "loader refuses"). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_intra_refresh_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -323,6 +362,10 @@ make_suite_tconfig_load_gfx(void)
                    test_tconfig_gfx_avc444_rekey_surface_reset);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_rekey_out_of_range_refused);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_intra_refresh);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_empty_args_fallback);
 

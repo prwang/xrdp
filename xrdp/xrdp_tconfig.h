@@ -147,6 +147,12 @@ struct xrdp_tconfig_gfx
      * animation; the MAX is a ceiling, since a higher value would let
      * a decoder meet the frame_num wrap. */
     int avc444_ffmpeg_ltr_rekey_frame_num;
+    /* scheduled paired intra refresh interval, in pictures per view
+     * (PRD FR-H264-6; gfx.toml [avc444_ffmpeg] intra_refresh_frames).
+     * Default XRDP_H264_INTRA_REFRESH_FRAMES, range
+     * [MIN,MAX] refused by the loader and clamped by the runner,
+     * effective only when aux_ltr_chain is on. No off value (#45 D6). */
+    int avc444_ffmpeg_intra_refresh_frames;
     /* Emit the EGFX surface delete/create/map teardown at a re-key.
      * Default 0 -- MASKED. The re-key exists only to keep the shared
      * frame_num counter away from its 2^16 wrap, and the encoder

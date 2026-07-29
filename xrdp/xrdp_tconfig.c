@@ -423,6 +423,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_ltr_rekey_surface_reset = 0;
     config->avc444_ffmpeg_ltr_rekey_frame_num =
         XRDP_H264_LTR_FRAME_NUM_REKEY;
+    config->avc444_ffmpeg_intra_refresh_frames =
+        XRDP_H264_INTRA_REFRESH_FRAMES;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
     {
@@ -440,6 +442,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t sp = toml_bool_in(avc, "strip_pic_struct");
             toml_datum_t lc = toml_bool_in(avc, "aux_ltr_chain");
             toml_datum_t rk = toml_int_in(avc, "ltr_rekey_frame_num");
+            toml_datum_t ir = toml_int_in(avc, "intra_refresh_frames");
             toml_datum_t rs = toml_bool_in(avc,
                                            "ltr_rekey_surface_reset");
             toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
@@ -506,6 +509,34 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                               "will fire far more often than in production "
                               "-- test arms only", (long long)rk.u.i);
                     }
+                }
+            }
+            if (ir.ok)
+            {
+                /* same contract as ltr_rekey_frame_num: out-of-range is
+                 * REFUSED here (the default stands) and the runner
+                 * clamps independently */
+                if (ir.u.i < XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+                        ir.u.i > XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "intra_refresh_frames %lld out of range "
+                          "[%d,%d]; keeping the default %d",
+                          (long long)ir.u.i,
+                          XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+                          XRDP_H264_INTRA_REFRESH_FRAMES_MAX,
+                          config->avc444_ffmpeg_intra_refresh_frames);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_intra_refresh_frames =
+                        (int)ir.u.i;
+                }
+                if (!config->avc444_ffmpeg_aux_ltr_chain)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "intra_refresh_frames is set but aux_ltr_chain "
+                          "is OFF: the scheduled refresh is inert");
                 }
             }
             if (fa.ok)

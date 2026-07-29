@@ -116,6 +116,22 @@ struct xrdp_ffmpeg_avc444_config
     /* keeps the wrap out of decoder sight.   */
     /* Lower it to exercise the boundary in a */
     /* test arm (BACKLOG #48).                */
+    int intra_refresh_frames;       /* aux_ltr_chain: scheduled paired      */
+    /* intra refresh interval in pictures     */
+    /* per view (gfx.toml                     */
+    /* intra_refresh_frames, PRD FR-H264-6).  */
+    /* Clamped by the runner to               */
+    /* [XRDP_H264_INTRA_REFRESH_FRAMES_MIN,   */
+    /*  ..._MAX]. No off value (#45 D6).      */
+    int intra_refresh_schedule;     /* RUNNER-INTERNAL: the interval to     */
+    /* actually put on both children's argv   */
+    /* (-force_key_frames + -g), or 0 for no  */
+    /* schedule. Separate from the knob above */
+    /* because the aux child's config has     */
+    /* aux_ltr_chain cleared, so build_argv   */
+    /* cannot key the schedule off that flag  */
+    /* -- and a schedule on the main child    */
+    /* only would de-phase the pair.          */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
@@ -145,13 +161,6 @@ struct xrdp_ffmpeg_avc444_config
     size_t max_encoded_pair_bytes;
 };
 
-/* aux_ltr_chain: the shared frame_num cap implied by the child's -g
- * (2 values per pair), or -1 when no explicit -g is configured. If the
- * cap is below ltr_rekey_frame_num the re-key can NEVER fire, because a
- * main IDR resets the counter first (BACKLOG #48, found on arm-o). */
-int
-xrdp_ffmpeg_avc444_ltr_counter_cap(
-    const struct xrdp_ffmpeg_avc444_config *cfg);
 
 /** Populate cfg with the MVP defaults (path left empty). */
 void

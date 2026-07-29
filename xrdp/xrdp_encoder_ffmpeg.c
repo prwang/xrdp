@@ -143,10 +143,9 @@ struct xrdp_ffmpeg_avc444
     struct xrdp_h264_param_cache leaf_aux_cache;
 
     /* aux_ltr_chain (EXPERIMENTAL, FR-H264-8): shared-chain rewrite
-     * state; ltr_aux_fresh = the aux child has not delivered a packet
-     * since (re)spawn, so its next packet is IDR-shaped */
+     * state, including the scheduled-refresh period and per-view
+     * picture ordinals */
     struct xrdp_h264_ltr_state ltr;
-    int ltr_aux_fresh;
     int rekey_pending;
 
     char errline[512];
@@ -212,65 +211,6 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
 }
 
 /*****************************************************************************/
-/* aux_ltr_chain: is the configured re-key threshold actually REACHABLE?
- * A main-child IDR resets the shared counter (xrdp_h264_annexb.c: "IDR
- * resets the shared chain"), and the counter advances by TWO per pair
- * (one value per view). So a child GOP of g pairs caps the counter at
- * 2g: if 2g < threshold the re-key can NEVER fire, and the frame_num
- * wrap ends up prevented by the GOP IDR by accident rather than by the
- * mechanism built for it.
- *
- * Found the expensive way on arm-o (2026-07-29): `-g 30000` caps the
- * counter at 60000 against a 65024 default, so 72698 pairs produced zero
- * boundaries and the only signal was ~20 min of silence. Silence is not
- * a diagnosis -- say it at startup instead. */
-int
-xrdp_ffmpeg_avc444_ltr_counter_cap(
-    const struct xrdp_ffmpeg_avc444_config *cfg)
-{
-    int i;
-    int gop = -1;
-
-    for (i = 0; i + 1 < cfg->encoder_args.count; i++)
-    {
-        if (strcmp(cfg->encoder_args.arg[i], "-g") == 0)
-        {
-            gop = atoi(cfg->encoder_args.arg[i + 1]);
-        }
-    }
-    return gop > 0 ? 2 * gop : -1;
-}
-
-static void
-warn_if_rekey_unreachable(const struct xrdp_ffmpeg_avc444_config *cfg)
-{
-    int cap;
-
-    if (!cfg->aux_ltr_chain)
-    {
-        return;
-    }
-    cap = xrdp_ffmpeg_avc444_ltr_counter_cap(cfg);
-    if (cap < 0)
-    {
-        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: aux_ltr_chain with no explicit "
-            "-g: the encoder default GOP is far below the re-key threshold "
-            "%d, so a main IDR will reset the shared counter first and the "
-            "re-key will never fire", cfg->ltr_rekey_frame_num);
-        return;
-    }
-    if (cap < cfg->ltr_rekey_frame_num)
-    {
-        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: aux_ltr_chain re-key is "
-            "UNREACHABLE: -g %d caps the shared frame_num at %d, below the "
-            "threshold %d (a main IDR resets the counter). The re-key will "
-            "never fire; the wrap is being avoided by the GOP IDR instead. "
-            "Use -g > %d or lower ltr_rekey_frame_num", cap / 2, cap,
-            cfg->ltr_rekey_frame_num, cfg->ltr_rekey_frame_num / 2);
-    }
-}
-
-/*****************************************************************************/
 void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
 {
@@ -283,6 +223,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->aux_intra_leaf = 0;
     cfg->aux_ltr_chain = 0;
     cfg->ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+    cfg->intra_refresh_frames = XRDP_H264_INTRA_REFRESH_FRAMES;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -440,6 +381,29 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
             ADD(cfg->encoder_args.arg[i]);
         }
     }
+    /* Scheduled paired intra refresh (PRD FR-H264-6, #45 steps 2 and 4):
+     * an identical FRAME-INDEXED schedule on both children, so a cut
+     * lands on the same picture ordinal in each view and the rewriter
+     * can check observed against requested. -g is pinned to the same
+     * value (D7) so every GOP boundary coincides with a scheduled index
+     * and an "unscheduled IDR" is unreachable by construction; it comes
+     * AFTER the admin encoder block deliberately, because ffmpeg takes
+     * the last occurrence and D7 is not negotiable while the chain is
+     * on. -forced-idr is NOT set: nvenc's non-IDR I at a forced key
+     * frame is exactly the shape this refresh wants. */
+    if (cfg->intra_refresh_schedule > 0)
+    {
+        ADD("-force_key_frames");
+        /* NO backslash before the comma: the argv reaches execve
+         * directly, and ffmpeg hands everything after "expr:" to
+         * av_expr_parse, which rejects "mod(n\,240)" outright
+         * (verified 2026-07-29: the escaped form fails with "Missing
+         * ')' or too many args", the plain form keys correctly at
+         * n = 0, N, 2N). The escape is a SHELL convention. */
+        ADDNUM("expr:not(mod(n,%d))", cfg->intra_refresh_schedule);
+        ADD("-g");
+        ADDNUM("%d", cfg->intra_refresh_schedule);
+    }
     /* NUT is a global-header muxer: encoders with no in-band repeat knob
      * (h264_nvenc and others) put SPS/PPS in extradata only, which fails
      * the probe's reset-keyframe check and would ship an undecodable
@@ -511,7 +475,7 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     int errpipe[2];
     int pid;
     char *argv[FF_MAX_ARGV];
-    char num_store[128];
+    char num_store[192];
 
     if (build_argv(cfg, cw, ch, argv, num_store, sizeof(num_store)) < 0)
     {
@@ -1241,20 +1205,13 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
         }
         result->main_data = self->main_buf;
         result->main_len = self->main_len;
-        if (!self->ltr.aux_seeded && !self->ltr_aux_fresh)
-        {
-            /* a mid-stream main IDR emptied the DPB (LT1 is gone);
-             * restart the aux child so its next packet is IDR-shaped
-             * and re-seeds LT1 (no runtime force-IDR, FR-H264-6) */
-            LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_ltr_chain main IDR: "
-                "respawning aux child to re-seed LT1");
-            xrdp_ffmpeg_avc444_delete(self->leaf);
-            self->leaf = NULL;
-            if (spawn_second_child(self) != 0)
-            {
-                return XRDP_FFMPEG_PAIR_ERROR;
-            }
-        }
+        /* #45 step 4: there is no aux respawn here any more. A
+         * main-view cut no longer empties the DPB, so LT1 cannot go
+         * missing mid-chain; if it ever does, the aux rewrite below
+         * refuses the packet ("aux P with LT1 unseeded") and the pair
+         * fails loudly. Respawning the aux child instead would restart
+         * that child's frame index while the main child keeps counting,
+         * de-phasing the shared schedule -- one fault made permanent. */
         st = xrdp_ffmpeg_avc444_encode_single(self->leaf, aux_nv12,
                                               nv12_size, desktop_sequence,
                                               &ltr_result);
@@ -1264,7 +1221,6 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
                 "not return the aux picture; restarting encoder");
             return XRDP_FFMPEG_PAIR_ERROR;
         }
-        self->ltr_aux_fresh = 0;
         budget = xrdp_h264_ltr_growth_budget(ltr_result.main_data,
                                              ltr_result.main_len);
         if (grow(&self->aux_buf, &self->aux_cap,
@@ -1617,7 +1573,37 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
             ? XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
             : XRDP_H264_LTR_FRAME_NUM_REKEY_MAX;
     }
-    warn_if_rekey_unreachable(&self->cfg);
+    if (self->cfg.intra_refresh_frames <
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+            self->cfg.intra_refresh_frames >
+            XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: intra_refresh_frames %d out "
+            "of range [%d,%d]; clamped", self->cfg.intra_refresh_frames,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MAX);
+        self->cfg.intra_refresh_frames =
+            self->cfg.intra_refresh_frames <
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            ? XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            : XRDP_H264_INTRA_REFRESH_FRAMES_MAX;
+    }
+    /* the schedule reaches BOTH children through this runner-internal
+     * field: the aux child's config has aux_ltr_chain cleared, so
+     * build_argv cannot key off that flag, and a schedule on the main
+     * child alone would de-phase the pair. spawn_second_child copies it
+     * verbatim. */
+    if (self->cfg.aux_ltr_chain)
+    {
+        self->cfg.intra_refresh_schedule = self->cfg.intra_refresh_frames;
+    }
+    /* else: keep whatever the caller set. The aux child is created with
+     * aux_ltr_chain cleared and the schedule already filled in by
+     * spawn_second_child; recomputing it here would silently unschedule
+     * exactly one of the two children. */
+    /* the rewriter checks OBSERVED against REQUESTED with the same
+     * number the children were spawned with -- one source of truth */
+    self->ltr.refresh_period = self->cfg.intra_refresh_schedule;
     self->in_fd = -1;
     self->out_fd = -1;
     self->err_fd = -1;
@@ -1639,7 +1625,9 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
         g_free(self);
         return NULL;
     }
-    if (spawn_child(cfg, self->coded_width, self->coded_height,
+    /* &self->cfg, not cfg: the clamps above and the schedule field are
+     * what must reach the argv */
+    if (spawn_child(&self->cfg, self->coded_width, self->coded_height,
                     &self->in_fd, &self->out_fd, &self->err_fd,
                     &self->pid) != 0)
     {
@@ -1663,10 +1651,11 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
 
 /*****************************************************************************/
 /* spawn the second (aux-view) child: all-IDR for the leaf architecture
- * (FR-H264-7), a normal refs chain for the EXPERIMENTAL LTR aux-chain
- * (FR-H264-8). Also the aux-child RESPAWN path: after a mid-stream
- * main IDR empties the DPB, a fresh child's first packet is IDR-shaped
- * and re-seeds LT1 (there is no runtime force-IDR control, FR-H264-6).
+ * (FR-H264-7), a normal refs chain with the SAME scheduled paired
+ * refresh as the main child for the LTR aux-chain (FR-H264-8). Called
+ * exactly once per encoder, at create: there is no aux respawn any more
+ * (#45 step 4 -- a scheduled refresh no longer empties the DPB, so LT1
+ * never needs re-seeding mid-stream).
  * Diagnostic/rewrite knobs are cleared -- the rewrites drop the aux
  * SPS/PPS/SEI themselves. */
 static int
@@ -1686,6 +1675,9 @@ spawn_second_child(struct xrdp_ffmpeg_avc444 *self)
     leaf_cfg.sanitize_hrd = 0;
     leaf_cfg.strip_pic_struct = 0;
     leaf_cfg.strip_sei = 0;
+    /* the identical frame-indexed schedule (step 2): 1:1 pairing means
+     * a cut must land on the same picture ordinal in both views */
+    leaf_cfg.intra_refresh_schedule = self->cfg.intra_refresh_schedule;
     if (!self->cfg.aux_ltr_chain)
     {
         if (leaf_cfg.encoder_args.count + 4 > XRDP_AVC444_MAX_ENC_ARGS)
@@ -1709,7 +1701,6 @@ spawn_second_child(struct xrdp_ffmpeg_avc444 *self)
         LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux child failed to start");
         return 1;
     }
-    self->ltr_aux_fresh = 1;
     LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: %s active (aux child pid %d)",
         self->cfg.aux_ltr_chain ? "aux_ltr_chain (EXPERIMENTAL)"
         : "aux_intra_leaf", self->leaf->pid);

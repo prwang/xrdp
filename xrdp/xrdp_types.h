@@ -447,6 +447,8 @@ struct xrdp_mm
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window     */
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain   */
     int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)     */
+    int avc444_intra_refresh_frames; /* scheduled paired refresh interval */
+    /*                                  (PRD FR-H264-6, #45)             */
     int avc444_ltr_rekey_surface_reset; /* emit surface churn (#48)      */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;

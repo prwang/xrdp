@@ -2635,6 +2635,30 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                     rv = 1;
                     break;
                 }
+                if (st->refresh_period > 0 && st->started)
+                {
+                    /* OBSERVED vs REQUESTED (FR-H264-6): the child was
+                     * spawned with a frame-indexed -force_key_frames
+                     * schedule, so an intra picture is due exactly on
+                     * the scheduled ordinals of this view. A picture
+                     * that parses P where intra was scheduled means the
+                     * encoder silently skipped the refresh -- fail the
+                     * pair rather than ship a stream whose prediction
+                     * chain is longer than the wire claims. An intra
+                     * picture arriving OFF schedule is equally a
+                     * mismatch: it is either an unscheduled GOP IDR
+                     * (which D7 makes unreachable) or a de-phased
+                     * child, and both invalidate the depth bound. */
+                    int expect_intra;
+
+                    expect_intra = (st->pic_index[view] %
+                                    st->refresh_period) == 0;
+                    if (expect_intra != intra_seen)
+                    {
+                        rv = 1;
+                        break;
+                    }
+                }
                 if (view == 0 && !st->started && ntype != 5)
                 {
                     /* the main chain must START with a real IDR: it is
@@ -2728,6 +2752,15 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         {
             st->aux_seeded = 1;   /* the seed I now occupies LT1 */
         }
+        /* the schedule ordinal advances only for a packet that SHIPPED,
+         * and only here in the commit epilogue: a rejected packet must
+         * leave the state untouched */
+        if (view == 0 && intra_seen && !convert_intra)
+        {
+            st->pic_index[0] = 0; /* epoch entry restarts the schedule */
+            st->pic_index[1] = 0;
+        }
+        st->pic_index[view]++;
     }
     free(out);
     return rv;

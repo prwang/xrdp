@@ -1409,6 +1409,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_aux_ltr_chain;
             cfg.ltr_rekey_frame_num =
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_frame_num;
+            cfg.intra_refresh_frames =
+                self->wm->gfx_config->avc444_ffmpeg_intra_refresh_frames;
             if (cfg.fault_strip_mmco)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml fault_strip_mmco is ON: "
@@ -1441,13 +1443,18 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             self->avc444_aux_ltr_chain =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_ltr_chain;
             self->avc444_ltr_rekey_frame_num = cfg.ltr_rekey_frame_num;
+            self->avc444_intra_refresh_frames = cfg.intra_refresh_frames;
             self->avc444_ltr_rekey_surface_reset =
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
             if (self->avc444_aux_ltr_chain)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "
                     "EXPERIMENTAL FR-H264-8 aux-refs-aux via long-term "
-                    "reference slots (leaf architecture bypassed)");
+                    "reference slots (leaf architecture bypassed); "
+                    "scheduled paired intra refresh every %d pictures "
+                    "per view, re-key at frame_num %d",
+                    self->avc444_intra_refresh_frames,
+                    self->avc444_ltr_rekey_frame_num);
             }
             if (pres == XRDP_FFMPEG_PROBE_OK)
             {

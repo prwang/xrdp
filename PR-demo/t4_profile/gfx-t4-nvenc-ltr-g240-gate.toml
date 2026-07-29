@@ -40,9 +40,18 @@ strip_pic_struct = true
 # re-seed path, on real nvenc.
 aux_intra_leaf = false
 aux_ltr_chain = true
+# BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
+# pictures per view. The runner spawns BOTH children with the identical
+# frame-indexed -force_key_frames schedule and pins -g to the same value
+# (D7), so every intra picture lands on a scheduled index and the
+# rewriter can check observed against requested.
+intra_refresh_frames = 240
+# -g is NOT listed in encoder_args: the runner pins it to
+# intra_refresh_frames itself (#45 D7) and appends it after the admin
+# block, so a -g written here would be silently overridden.
 encoder_args = [
   "-c:v", "h264_nvenc", "-profile:v", "high", "-preset", "p1", "-tune", "ll",
-  "-refs", "1", "-dpb_size", "1", "-rc", "constqp", "-qp", "20", "-bf", "0", "-delay", "0", "-g", "240",
+  "-refs", "1", "-dpb_size", "1", "-rc", "constqp", "-qp", "20", "-bf", "0", "-delay", "0",
 ]
 #
 # Hardware H.264 via VAAPI (Intel/AMD render node). ffmpeg runs as root under

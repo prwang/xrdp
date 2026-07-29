@@ -253,6 +253,8 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
         self->avc444_aux_ltr_chain = mm->avc444_aux_ltr_chain;
         self->avc444_ltr_rekey_frame_num = mm->avc444_ltr_rekey_frame_num;
+        self->avc444_intra_refresh_frames =
+            mm->avc444_intra_refresh_frames;
         /* cache the EGFX surface origins the re-key reset re-maps with;
          * mirrors xrdp_mm_egfx_create_surfaces (BACKLOG #48) */
         {
@@ -1334,6 +1336,7 @@ xrdp_avc444_cfg_from_encoder(const struct xrdp_encoder *self,
      * precedence over the leaf path inside the runner */
     cfg->aux_ltr_chain = self->avc444_aux_ltr_chain;
     cfg->ltr_rekey_frame_num = self->avc444_ltr_rekey_frame_num;
+    cfg->intra_refresh_frames = self->avc444_intra_refresh_frames;
     cfg->fault_aux_delay = self->avc444_fault_aux_delay;
     cfg->fault_strip_mmco = self->avc444_fault_strip_mmco;
     g_strncpy(cfg->path, self->avc444_path, sizeof(cfg->path) - 1);
