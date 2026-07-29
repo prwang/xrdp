@@ -256,15 +256,16 @@ mechanism exists to prevent.
 \fBltr_rekey_surface_reset\fR = \fItrue\fR | \fIfalse\fR
 Applies only when \fBaux_ltr_chain\fR is enabled. Whether the re\(hykey also
 deletes and recreates the affected EGFX surface, in addition to rebuilding the
-encoder pair. Default: \fBtrue\fR.
+encoder pair. Default: \fBfalse\fR.
 
 The surface teardown is a protocol\(hydefined decoder reset, and was intended as
 belt\(hyand\(hybraces on top of the fresh IDR. It is not what the re\(hykey is for:
-the counter reset comes from the encoder rebuild alone. Some clients repaint
-the output when a mapped surface is replaced, which is seen as a brief black
-flash at every boundary; set this to \fBfalse\fR to keep the re\(hykey entirely
-inside the bitstream, so the client sees only a full\(hysurface repaint from a
-fresh IDR and no surface lifecycle event at all.
+the counter reset comes from the encoder rebuild alone. Clients that repaint
+the output when a mapped surface is replaced show a black flash at every
+boundary \(em observed on macOS, and observed to stop when the teardown is
+masked \(em so the default keeps the re\(hykey entirely inside the bitstream and
+the client sees only a full\(hysurface repaint from a fresh IDR. Set this to
+\fBtrue\fR only to reproduce the old behaviour deliberately.
 
 .TP
 \fBencoder_args\fR = \fI<array of strings>\fR

@@ -45,6 +45,10 @@ aux_ltr_chain = true
 # is 65024 (2^16-512). The server logs a WARNING whenever this is below
 # the default so a lowered value can never be mistaken for production.
 ltr_rekey_frame_num = 536
+# BACKLOG #48 CONTROL: opt back IN to the EGFX surface teardown, which
+# is the known-bad behaviour (macOS flashes black at every boundary).
+# Retained deliberately so arm-o vs arm-p is a one-knob A/B.
+ltr_rekey_surface_reset = true
 encoder_args = [
   "-vaapi_device", "/dev/dri/renderD128",
   "-vf", "format=nv12,hwupload",

@@ -420,7 +420,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_sanitize_hrd = 0;
     config->avc444_ffmpeg_strip_pic_struct = 0;
     config->avc444_ffmpeg_aux_ltr_chain = 0;
-    config->avc444_ffmpeg_ltr_rekey_surface_reset = 1;
+    config->avc444_ffmpeg_ltr_rekey_surface_reset = 0;
     config->avc444_ffmpeg_ltr_rekey_frame_num =
         XRDP_H264_LTR_FRAME_NUM_REKEY;
     config->avc444_ffmpeg_fault_aux_delay = 0;

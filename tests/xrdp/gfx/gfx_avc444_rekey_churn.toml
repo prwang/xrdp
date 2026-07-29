@@ -1,0 +1,11 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+ltr_rekey_frame_num = 536
+# BACKLOG #48: opt back IN to the EGFX surface teardown. Known to make
+# macOS flash black at every boundary; kept settable so that behaviour
+# can be reproduced deliberately rather than only remembered.
+ltr_rekey_surface_reset = true
