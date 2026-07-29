@@ -228,7 +228,7 @@ in files this branch does not own (`xrdp_avc444_caps.c`, the rfx block of
 
 ---
 
-## #48 — Re-key as a protocol-defined boundary — WIRE ACCEPTANCE GREEN (onscreen still owner-blocked)
+## #48 — Re-key as a protocol-defined boundary — WIRE GREEN after the blank-surface fix; macOS re-check owed
 
 Owner directive 2026-07-28: *"I'd rather let the session glitch for ~690 ms
 every hour than let xrdp have undefined behaviour every hour."* The old
@@ -372,7 +372,57 @@ against a capture whose printed order was correct. It now judges the gap
 between the previous picture's payload and the re-key payload. Verified
 falsifiable: the fixed checker still returns NO on the BEFORE capture.
 
+**RED 2026-07-29 (run 3, owner on macOS): the boundary flashed black.**
+Reported at code-workload lines ~270 and ~540 — one encoded frame per
+line, so pair 268 and 536, i.e. boundaries 1 and 2. Not a client quirk;
+a server defect the whole harness was blind to.
+
+*Cause.* The re-key emitted, on ONE surface id,
+`DELETE(0) → CREATE(0) → MAP(0) → pixels`. `CREATE_SURFACE` yields a
+zero-filled surface, and it was mapped to output BEFORE the pixels, so
+any client that composites when the mapping changes shows blank until
+the re-key IDR arrives and decodes — the ~200 ms measured above plus
+decode of a ~70 KB IDR. The code comment claiming the surface "is never
+left blank waiting for the next damage" reasoned about the gap until the
+NEXT frame and ignored the gap inside this one.
+
+*Fix (8f0994e2)* — double-buffer the surface id:
+`CREATE(new) → pixels(new) → MAP(new) → DELETE(old)`. Output stays on
+the old, fully painted surface until the replacement holds the whole
+repaint. Ordering matters both ways: mapping before the pixels shows
+blank; deleting the old before mapping the new leaves output with
+nothing mapped. Ids alternate base ↔ base+16; xorgxrdp keeps addressing
+the base id so the encoder translates once per frame, and the live id is
+published under the encoder mutex for `xrdp_mm_egfx_delete_surfaces()`,
+which would otherwise delete the base id and orphan the renamed surface
+on resize.
+
+*Verified on the wire* (`captures/arm_o_rekey_noblank_20260729/`,
+xrdp-dev 8f0994e20f5d): 7 boundaries, each
+`CREATE(16) → W2S1(16) → W2S1(16) → MAP(16) → DELETE(0)`; D passes with
+0 violations; B YES ×7; whole-surface damage ×7; steady state unchanged
+(2053 main P → LT0, 2053 aux P → LT1).
+
+**Why the harness could not have caught it — the real lesson.**
+FreeRDP's `gdi_MapSurfaceToOutput` only sets `outputMapped`;
+presentation happens in `gdi_UpdateSurfaces` from `gdi_EndFrame`, and
+`gdi_interFrameUpdate` skips it while `inGfxFrame`. All four PDUs sit
+inside one frame, so FreeRDP composites exactly once, after the IDR
+decodes — it is structurally incapable of showing the fault, at any
+sampling rate. Worse, check B **asserted the buggy order as correct**
+(`DELETE < CREATE < MAP < pixels`) and printed YES seven times: the
+validator encoded the wrong mental model, so it confirmed the bug rather
+than finding it. Replaced by the invariant that actually matters —
+*never MAP a surface that has received no pixels since its CREATE* —
+which reports 7 violations against the archived pre-fix capture, bytes
+that were on disk before the owner ever connected.
+
+*Still owed:* a CI unit test on the PDU sequence `gfx_emit_surface_create`
+/ `gfx_emit_surface_swap` emit, so this is gated without a live client,
+GPU or fleet. Currently the invariant runs only in the capture audit.
+
 **Remaining acceptance — client-compat only:**
+- macOS re-check on the fixed build: the black flash must be gone.
 - mstsc, mstsc multimon and the macOS Windows App across several
   boundaries. FreeRDP surviving does not transfer: the whole reason #48
   exists is that VideoToolbox's 2-context lifecycle is unprovable from

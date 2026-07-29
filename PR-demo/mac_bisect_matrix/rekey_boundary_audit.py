@@ -25,6 +25,7 @@ first bitmap bytes are compared literally.
 
 Usage: rekey_boundary_audit.py <oracle.bin> <transport.dump> [surface_w] [surface_h]
 """
+import re
 import struct
 import sys
 
@@ -154,14 +155,55 @@ def oracle_records(path):
         idx += 1
 
 
+def ordered_oracle_records(paths, dump_pdus):
+    """Interleave per-surface oracle dumps back into WIRE order.
+
+    Since the re-key alternates surface ids (BACKLOG #48), the oracle
+    harness writes one file per surface -- /tmp/oracle_avc_s0.bin and
+    /tmp/oracle_avc_s16.bin. Each file is in order for ITS surface, but
+    the relative order across files is only recoverable from the
+    transport dump, where every AVC444 WIRE_TO_SURFACE_1 names its
+    surface. Walk those PDUs and pop the next record from the matching
+    file.
+    """
+    per_surface = {}
+    for path in paths:
+        m = re.search(r'_s(\d+)\.bin$', path)
+        sid = int(m.group(1)) if m else 0
+        per_surface[sid] = list(oracle_records(path))
+    cursor = {sid: 0 for sid in per_surface}
+    idx = 0
+    for _off, _k, c, f in dump_pdus:
+        if c != 0x0001 or f.get('codec') not in (14, 15):
+            continue
+        sid = f.get('surface')
+        recs = per_surface.get(sid)
+        if recs is None or cursor[sid] >= len(recs):
+            continue
+        _i, rec, es, rects, lc, ln = recs[cursor[sid]]
+        cursor[sid] += 1
+        yield idx, rec, es, rects, lc, ln
+        idx += 1
+
+
 def main():
     oracle, dump = sys.argv[1], sys.argv[2]
     sw = int(sys.argv[3]) if len(sys.argv) > 3 else None
     sh_ = int(sys.argv[4]) if len(sys.argv) > 4 else None
+    oracle_paths = [p for p in oracle.split(',') if p]
+
+    dump_data = open(dump, 'rb').read()
+    dump_pdus = scan(dump_data)
 
     print('== capture 1: oracle payload dump ==')
+    if len(oracle_paths) > 1:
+        print('interleaving %d per-surface dumps into wire order'
+              % len(oracle_paths))
+        source = ordered_oracle_records(oracle_paths, dump_pdus)
+    else:
+        source = oracle_records(oracle)
     pics = []
-    for idx, rec, es, rects, lc, ln in oracle_records(oracle):
+    for idx, rec, es, rects, lc, ln in source:
         info = None
         for nal in nals(es):
             info = slice_info(nal) or info
@@ -196,8 +238,7 @@ def main():
 
     print()
     print('== capture 2: post-TLS transport dump (EGFX PDU order) ==')
-    data = open(dump, 'rb').read()
-    pdus = scan(data)
+    pdus = dump_pdus
     counts = {}
     for _o, _k, c, _f in pdus:
         counts[CMD[c]] = counts.get(CMD[c], 0) + 1

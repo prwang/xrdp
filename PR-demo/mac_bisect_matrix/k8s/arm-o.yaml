@@ -35,7 +35,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:c78895f607da.xx5b9650c-xfce
+          image: localhost/xrdp-bisect:8f0994e20f5d.xx5b9650c-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true

@@ -52,7 +52,7 @@ declare -A ARM_TAG=(
     [arm-l]=459b66d5319f-xfce
     [arm-m]=39bb08a48377.xx5b9650c-xfce
     [arm-n]=34795577580b.xx5b9650c-xfce
-    [arm-o]=c78895f607da.xx5b9650c-xfce
+    [arm-o]=8f0994e20f5d.xx5b9650c-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -70,6 +70,8 @@ declare -A TAG_DEB=(
     # BACKLOG #48: re-key = EGFX surface delete/create + settable threshold
     # BACKLOG #48 FIX: threshold now actually reaches the encoder
     [c78895f607da.xx5b9650c]="xrdp-dev_0.10.80+git20260729013621.c78895f607da_amd64.deb"
+    # BACKLOG #48 RED FIX: re-key no longer maps a blank surface
+    [8f0994e20f5d.xx5b9650c]="xrdp-dev_0.10.80+git20260729023407.8f0994e20f5d_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
