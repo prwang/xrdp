@@ -91,9 +91,18 @@ struct xup_client_info
  * page-aligned (XUP_CAP_REGION_ALIGN 64 -> XUP_CAP_PAGE_ALIGN 4096).
  * 20260727: CC_GFX_AVC444 per-monitor regions hold TWO slots (PRD
  * FR-CAPTURE-8 two-slot pipelined capture); the slot for a frame is
- * selected by the parity of its rect_id and carried in the existing
- * per-frame shmem_offset field, so capture of frame N+1 can overlap
- * the synchronous encode of frame N. Single-slot modes unchanged. */
+ * carried in the existing per-frame shmem_offset field, so capture of
+ * frame N+1 can overlap the synchronous encode of frame N. Single-slot
+ * modes unchanged.
+ * The slot is chosen by the capture side alone and is NEVER derived
+ * from rect_id: it advances per monitor on that monitor's own send
+ * (xup_cap_budget below). The rect_id-parity rule this entry
+ * originally described is dead — with m monitors rect_id advances by m
+ * between one monitor's consecutive sends, so parity pinned each
+ * monitor to a single slot (measured: the same slot on 1079 of 1079
+ * full-pass sends). That is a capture-side rule only, shmem_offset was
+ * always explicit on the wire, and both daemons compare this version
+ * for EXACT equality, so the number below does NOT move for it. */
 #define XUP_CLIENT_INFO_CURRENT_VERSION 20260727
 
 /*
@@ -301,6 +310,186 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
                                                    mwidth, mheight));
     }
     return total;
+}
+
+/*
+ * Per-monitor outstanding-capture accounting for CC_GFX_AVC444
+ * (PRD FR-CAPTURE-8, restated per monitor).
+ *
+ * The capture budget is m INDEPENDENT caps of at most
+ * XUP_CAP_AVC444_SLOT_COUNT outstanding frames each, never a global
+ * pool: a pool lets one damaged monitor take all of it, which is extra
+ * raw inventory and slot aliasing rather than pipelining. The aggregate
+ * is a consequence of the m caps and is never a quantity to gate on.
+ *
+ * Per monitor this carries a ring of the rect_ids it has sent and not
+ * yet seen acked, plus the slot the monitor's NEXT capture writes.
+ * rect_id_ack is CUMULATIVE (every rect_id at or below it is acked),
+ * which is exactly why a ring of XUP_CAP_AVC444_SLOT_COUNT ascending
+ * entries is sufficient: retiring is "drop every entry the ack covers",
+ * never a per-id match.
+ *
+ * The slot advances in xup_cap_budget_record_send() only, i.e. exactly
+ * once per send and strictly after that send is committed. The slot of
+ * a frame in flight is read several times before the send (it goes on
+ * the wire as the frame's shmem_offset, and it selects which slot's
+ * missing region a capture refreshed), so an earlier advance would
+ * point the encoder at the sibling of the slot just captured.
+ *
+ * All-zero is the valid initial state: nothing outstanding, slot 0.
+ */
+struct xup_cap_budget
+{
+    /* ascending rect_ids sent and not yet retired, per monitor */
+    int ids[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS][XUP_CAP_AVC444_SLOT_COUNT];
+    /* how many of ids[mon][] are live */
+    int count[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    /* slot the monitor's next capture writes */
+    int slot[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+};
+
+static inline void
+xup_cap_budget_reset(struct xup_cap_budget *budget)
+{
+    int mon;
+    int index;
+
+    if (budget == NULL)
+    {
+        return;
+    }
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        for (index = 0; index < XUP_CAP_AVC444_SLOT_COUNT; ++index)
+        {
+            budget->ids[mon][index] = 0;
+        }
+        budget->count[mon] = 0;
+        budget->slot[mon] = 0;
+    }
+}
+
+/* a monitor index outside the contract's range is not addressable */
+static inline int
+xup_cap_budget_mon_ok(const struct xup_cap_budget *budget, int mon)
+{
+    return budget != NULL && mon >= 0 &&
+           mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+}
+
+/* the depth the layout can actually hold; single-slot modes pass 1 */
+static inline int
+xup_cap_budget_clamp_cap(int cap)
+{
+    if (cap < 1)
+    {
+        return 1;
+    }
+    if (cap > XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        return XUP_CAP_AVC444_SLOT_COUNT;
+    }
+    return cap;
+}
+
+/* drop every entry the cumulative ack covers and return the monitor's
+ * surviving outstanding count */
+static inline int
+xup_cap_budget_retire(struct xup_cap_budget *budget, int mon,
+                      int rect_id_ack)
+{
+    int index;
+    int live;
+    int kept;
+
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    live = budget->count[mon];
+    if (live < 0)
+    {
+        live = 0;
+    }
+    if (live > XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        live = XUP_CAP_AVC444_SLOT_COUNT;
+    }
+    kept = 0;
+    for (index = 0; index < live; ++index)
+    {
+        if (budget->ids[mon][index] > rect_id_ack)
+        {
+            budget->ids[mon][kept] = budget->ids[mon][index];
+            ++kept;
+        }
+    }
+    budget->count[mon] = kept;
+    return kept;
+}
+
+/* can this monitor take one more outstanding frame? Retires first, so
+ * a stale ring never denies capacity. An unaddressable monitor fails
+ * closed. */
+static inline int
+xup_cap_budget_has_capacity(struct xup_cap_budget *budget, int mon,
+                            int rect_id_ack, int cap)
+{
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    return xup_cap_budget_retire(budget, mon, rect_id_ack) <
+           xup_cap_budget_clamp_cap(cap);
+}
+
+/* count a send of rect_id for mon and advance that monitor's slot.
+ * Returns 0 normally, non-zero when the monitor was ALREADY at cap:
+ * that send is a third outstanding capture for a two-slot layout, which
+ * the caller must report loudly. The ring then keeps the newest ids —
+ * the oldest is the first a cumulative ack retires anyway. */
+static inline int
+xup_cap_budget_record_send(struct xup_cap_budget *budget, int mon,
+                           int rect_id, int rect_id_ack, int cap)
+{
+    int limit;
+    int index;
+    int over;
+
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 1;
+    }
+    limit = xup_cap_budget_clamp_cap(cap);
+    over = xup_cap_budget_retire(budget, mon, rect_id_ack) >= limit;
+    while (budget->count[mon] >= limit && budget->count[mon] > 0)
+    {
+        for (index = 1; index < budget->count[mon]; ++index)
+        {
+            budget->ids[mon][index - 1] = budget->ids[mon][index];
+        }
+        --budget->count[mon];
+    }
+    budget->ids[mon][budget->count[mon]] = rect_id;
+    ++budget->count[mon];
+    budget->slot[mon] = (budget->slot[mon] + 1) % limit;
+    return over;
+}
+
+/* slot the monitor's next capture must write */
+static inline int
+xup_cap_budget_slot(const struct xup_cap_budget *budget, int mon)
+{
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    if (budget->slot[mon] < 0 ||
+            budget->slot[mon] >= XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        return 0;
+    }
+    return budget->slot[mon];
 }
 
 #endif // XUP_CLIENT_INFO_H

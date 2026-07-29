@@ -2,6 +2,8 @@
 #include "config_ac.h"
 #endif
 
+#include <limits.h>
+
 #include "xrdp.h"
 #include "xrdp_client_info.h"
 #include "xup_client_info.h"
@@ -22,6 +24,21 @@
  * capture of frame N+1 can overlap the synchronous encode of frame N;
  * slot_bytes[] reports the per-monitor slot stride. Single-slot modes
  * (CC_GFX_A2) are unchanged and report a zero stride.
+ *
+ * Finally exercises xup_cap_budget: the PER-MONITOR outstanding-capture
+ * accounting the capture side runs over those slots. Two properties are
+ * ratcheted here because both were wrong in production before:
+ *   - the budget is m independent caps of 2, never a global pool, so
+ *     each monitor reaches depth 2 and never 3; retiring is against the
+ *     CUMULATIVE rect_id_ack, which is why a 2-entry ring suffices;
+ *   - the slot a frame lands in comes from a PER-MONITOR counter. The
+ *     dead rule derived it from global rect_id parity, and since
+ *     rect_id advances by the monitor count between one monitor's
+ *     consecutive sends, that pinned each monitor to a single slot at
+ *     an even monitor count (measured on the fleet: the same slot on
+ *     1079 of 1079 full-pass sends, two-slot pipelining fired once in
+ *     1100). The alternation test below replays such a trace and is
+ *     RED against the parity rule.
  */
 
 static void
@@ -329,6 +346,225 @@ START_TEST(test_cap_layout_two_slot_strides)
 }
 END_TEST
 
+START_TEST(test_cap_budget_starts_empty)
+{
+    struct xup_cap_budget b;
+    int mon;
+
+    xup_cap_budget_reset(&b);
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, 0), 0);
+        ck_assert_int_eq(xup_cap_budget_slot(&b, mon), 0);
+        ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon, 0, 2), 1);
+    }
+    /* an unaddressable monitor fails closed and never advances a slot */
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, -1, 0, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(
+                         &b, CLIENT_MONITOR_DATA_MAXIMUM_MONITORS, 0, 2), 0);
+    ck_assert_int_ne(xup_cap_budget_record_send(&b, -1, 1, 0, 2), 0);
+}
+END_TEST
+
+START_TEST(test_cap_budget_cap1_is_serial)
+{
+    struct xup_cap_budget b;
+
+    /* single-slot modes (every capture code but CC_GFX_AVC444) pass a
+     * cap of 1: one outstanding rect, and the slot never leaves 0 */
+    xup_cap_budget_reset(&b);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 0, 1), 1);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 1, 0, 1), 0);
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 0), 0);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 0, 1), 0);
+    /* the ack for rect 1 frees it again */
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 1, 1), 1);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 2, 1, 1), 0);
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 0), 0);
+}
+END_TEST
+
+START_TEST(test_cap_budget_cap2_reaches_depth_two)
+{
+    struct xup_cap_budget b;
+
+    /* CC_GFX_AVC444 passes a cap of 2: the second send is what the
+     * pipeline is for, the third is refused */
+    xup_cap_budget_reset(&b);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 0, 2), 1);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 1, 0, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 0, 0), 1);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 0, 2), 1);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 2, 0, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 0, 0), 2);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 0, 2), 0);
+    /* a cumulative ack of rect 1 frees exactly one entry */
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 0, 1), 1);
+    ck_assert_int_eq(xup_cap_budget_has_capacity(&b, 0, 1, 2), 1);
+}
+END_TEST
+
+START_TEST(test_cap_budget_third_capture_is_signalled)
+{
+    struct xup_cap_budget b;
+
+    /* the overflow is RETURNED, never silent: the caller has to be able
+     * to log it loudly (there is no third slot to land in) */
+    xup_cap_budget_reset(&b);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 1, 1, 0, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 1, 2, 0, 2), 0);
+    ck_assert_int_ne(xup_cap_budget_record_send(&b, 1, 3, 0, 2), 0);
+    /* the ring keeps the newest ids, so it stays bounded and the ack
+     * for rect 2 still retires everything at or below it */
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 1, 0), 2);
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 1, 2), 1);
+    ck_assert_int_eq(xup_cap_budget_retire(&b, 1, 3), 0);
+    /* the same cap of 1 signals on the SECOND send */
+    xup_cap_budget_reset(&b);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 1, 0, 1), 0);
+    ck_assert_int_ne(xup_cap_budget_record_send(&b, 0, 2, 0, 1), 0);
+}
+END_TEST
+
+START_TEST(test_cap_budget_two_monitors_never_reach_three)
+{
+    struct xup_cap_budget b;
+    int rect_id;
+    int rect_id_ack;
+    int pass;
+    int mon;
+
+    /* the real dual-monitor trace: one send per monitor per pass, one
+     * global ascending rect_id, CUMULATIVE acks. Each monitor must be
+     * able to hold two outstanding frames (that is the pipeline) and
+     * must never hold three (there is no third slot). The aggregate 4
+     * is a consequence of the two caps and is never tested for. */
+    xup_cap_budget_reset(&b);
+    rect_id = 0;
+    rect_id_ack = 0;
+    for (pass = 0; pass < 2; ++pass)
+    {
+        for (mon = 0; mon < 2; ++mon)
+        {
+            ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon,
+                             rect_id_ack, 2), 1);
+            ++rect_id;
+            ck_assert_int_eq(xup_cap_budget_record_send(&b, mon, rect_id,
+                             rect_id_ack, 2), 0);
+        }
+    }
+    /* both monitors are now at depth 2 and both are capped */
+    for (mon = 0; mon < 2; ++mon)
+    {
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, rect_id_ack), 2);
+        ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon,
+                         rect_id_ack, 2), 0);
+    }
+    /* one cumulative ack covering the first pass frees exactly one
+     * entry in EACH monitor's ring */
+    rect_id_ack = 2;
+    for (mon = 0; mon < 2; ++mon)
+    {
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, rect_id_ack), 1);
+        ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon,
+                         rect_id_ack, 2), 1);
+    }
+    /* a third pass fits, and still nobody exceeds two */
+    for (mon = 0; mon < 2; ++mon)
+    {
+        ++rect_id;
+        ck_assert_int_eq(xup_cap_budget_record_send(&b, mon, rect_id,
+                         rect_id_ack, 2), 0);
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, rect_id_ack), 2);
+    }
+}
+END_TEST
+
+START_TEST(test_cap_budget_slot_alternates_per_monitor)
+{
+    struct xup_cap_budget b;
+    int seen[2][4];
+    int rect_id;
+    int rect_id_ack;
+    int pass;
+    int mon;
+
+    /* THE R1 RATCHET. Same dual-monitor full-pass trace, this time
+     * recording the slot each frame lands in. Per monitor the slots
+     * must alternate 0,1,0,1.
+     *
+     * This test is RED against the dead global rule slot =
+     * (rect_id + 1) & 1: on this trace rect_id advances by 2 between a
+     * monitor's consecutive sends, so that rule yields a CONSTANT slot
+     * per monitor (monitor 0 always 1, monitor 1 always 0) and the
+     * second slot of a monitor is never written -- exactly what R1
+     * measured on the fleet. */
+    xup_cap_budget_reset(&b);
+    rect_id = 0;
+    rect_id_ack = 0;
+    for (pass = 0; pass < 4; ++pass)
+    {
+        for (mon = 0; mon < 2; ++mon)
+        {
+            ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon,
+                             rect_id_ack, 2), 1);
+            /* the slot is read BEFORE the send: it goes on the wire as
+             * the frame's shmem_offset and it selects which slot the
+             * capture refreshed */
+            seen[mon][pass] = xup_cap_budget_slot(&b, mon);
+            ++rect_id;
+            ck_assert_int_eq(xup_cap_budget_record_send(&b, mon, rect_id,
+                             rect_id_ack, 2), 0);
+            /* and it advances exactly once, on the send */
+            ck_assert_int_eq(xup_cap_budget_slot(&b, mon),
+                             (seen[mon][pass] + 1) % 2);
+        }
+        rect_id_ack = rect_id;
+    }
+    for (mon = 0; mon < 2; ++mon)
+    {
+        ck_assert_int_eq(seen[mon][0], 0);
+        ck_assert_int_eq(seen[mon][1], 1);
+        ck_assert_int_eq(seen[mon][2], 0);
+        ck_assert_int_eq(seen[mon][3], 1);
+    }
+    /* a monitor that sends alone (partial pass) alternates too */
+    xup_cap_budget_reset(&b);
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 0), 0);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 1, 0, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 0), 1);
+    ck_assert_int_eq(xup_cap_budget_record_send(&b, 0, 2, 1, 2), 0);
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 0), 0);
+    /* and a monitor that never sends stays on slot 0 */
+    ck_assert_int_eq(xup_cap_budget_slot(&b, 1), 0);
+}
+END_TEST
+
+START_TEST(test_cap_budget_ack_everything_retires_all)
+{
+    struct xup_cap_budget b;
+    int mon;
+
+    /* rect_id_ack == INT_MAX is the "ack everything" the client region
+     * message may send; every monitor's ring must empty */
+    xup_cap_budget_reset(&b);
+    for (mon = 0; mon < 3; ++mon)
+    {
+        ck_assert_int_eq(xup_cap_budget_record_send(&b, mon, mon * 2 + 1,
+                         0, 2), 0);
+        ck_assert_int_eq(xup_cap_budget_record_send(&b, mon, mon * 2 + 2,
+                         0, 2), 0);
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, 0), 2);
+    }
+    for (mon = 0; mon < 3; ++mon)
+    {
+        ck_assert_int_eq(xup_cap_budget_retire(&b, mon, INT_MAX), 0);
+        ck_assert_int_eq(xup_cap_budget_has_capacity(&b, mon, INT_MAX, 2),
+                         1);
+    }
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_multimon(void)
@@ -350,6 +586,13 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc, test_cap_layout_unaligned_dims_stay_disjoint);
     tcase_add_test(tc, test_cap_layout_degenerate_monitor_zero_bytes);
     tcase_add_test(tc, test_cap_layout_two_slot_strides);
+    tcase_add_test(tc, test_cap_budget_starts_empty);
+    tcase_add_test(tc, test_cap_budget_cap1_is_serial);
+    tcase_add_test(tc, test_cap_budget_cap2_reaches_depth_two);
+    tcase_add_test(tc, test_cap_budget_third_capture_is_signalled);
+    tcase_add_test(tc, test_cap_budget_two_monitors_never_reach_three);
+    tcase_add_test(tc, test_cap_budget_slot_alternates_per_monitor);
+    tcase_add_test(tc, test_cap_budget_ack_everything_retires_all);
     suite_add_tcase(s, tc);
     return s;
 }
