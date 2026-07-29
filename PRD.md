@@ -831,6 +831,29 @@ N=2 is free at both resolutions (marginally FASTER per stream — concurrent sub
 | two isolated 4K encodes in parallel | ~19 ms each (53 fps each) | — |
 | unattributed remainder (67.5 − 2 × 19.6 ≈ 28 ms) | **not yet attributed** | **no, if it is per-pair rather than per-child** |
 
+**MEASURED OUTCOME of the multimon batching (2026-07-29, BACKLOG #45
+steps 0–7 deployed, arm-r, 2560×1440 + 3840×2400, oracle client, 1688
+pairs per view).** The prediction above did NOT hold and the reason is
+now measured rather than guessed: the oracle frame interval went from
+51.1 ms to **52.5 ms mean (0.97×)** while its **p50 halved, 50 → 28 ms**,
+and p90 improved 103 → 88 ms. The batching mechanism works — the worker
+demonstrably armed four children in one poll set — but it fired in only
+**21 of 3346 worker cycles (0.6 %)**, because the CAPTURE side serialises
+the monitors: consecutive sends of different monitors are 26 ms apart
+(p50) while a pair's encode-and-emit finishes in ~26 ms, so the second
+monitor's item arrives after the first is already done. What binds at
+this geometry is the **per-monitor send period of ~105 ms against ~26 ms
+of encode** — the encoder worker is idle about half the time, and the
+limit is capture/ack-side. This is the same "remainder that is NOT
+encode" recorded below, now measured as the majority of the period rather
+than a ~28 ms residue. Corroboration: with a slower consumer (the
+rendering client) the batch fired in 11 % of cycles, and the end-to-end
+rate was unchanged at 2.96 pairs/s per monitor against 2.97 before the
+work. **Consequence for anyone planning further encoder-side
+concurrency: there is nothing left to overlap until the producer hands
+both monitors over together, or the per-monitor capture period is
+attacked directly.**
+
 So the honest bound is: best case ≈ 48 ms (one encode term removed) ⇒ ~21 fps; the advertised "~20 ms ⇒ ~40 fps" only follows if the 28 ms remainder is itself per-child work. **Attributing that 28 ms with `PR-demo/t4_profile/frame_accounting.sh` is a prerequisite to quoting any speed-up**, not a follow-up. Two further ceilings sit above it: the frame period is `max(capture, encode_pair)` under FR-CAPTURE-8, so a capture stage that is currently hidden can become the new bottleneck and absorb the whole win; and the *client* can be the binding constraint entirely — xfreerdp's software 4:4:4 reconstruction measured ~65 ms/frame at the owner layout, capping end-to-end at ~15 fps regardless of server speed (§FR-PROC-7 clause 9). **Confirmed at dual-monitor 2560×1440 + 3840×2400 on 2026-07-29** (BACKLOG #45; one arm, 60 s each, back to back): the rendering client delivered 5.94 sends/s (2.97 pairs/s per monitor, send-gap mean 169 ms) against the oracle client's 19.57 sends/s (9.79 pairs/s per monitor, mean **51.1 ms**) — **client-bound by 3.29×**, the client costing ~117 ms per surface frame on top of the server's 51 ms. Consequence: a server-side speed-up is chased and gated on the **oracle frame interval** (the send-to-send interval with a client that acks before decode/present); the rendering client's rate is reported beside it as the end-to-end figure but cannot show a server gain until the client side moves. Report the T4 gain per client (mstsc / macOS / xfreerdp), each as a frame period, and say which of the two instruments produced each number.
 
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
@@ -1382,7 +1405,7 @@ Do not require AUD NAL units. This is not a full H.264 parser: split bounded Ann
 | `h264_nvenc` | *with* `-forced-idr 1` | real IDR (nal 5), `frame_num` resets |
 | `h264_vaapi` | same expressions | intra at exactly 0,15,30,45; always a real **IDR** (nal 5) regardless of `-forced-idr` |
 
-Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed vs 55 / 51 / 58 fps at every 240 / 60 / 15 frames — all within noise); only bitstream size moves (294 KB → 294 / 367 / 734 KB). On real desktop content the added cost of a **paired** refresh is ≈ `((I_main−P_main)+(I_aux−P_aux))/N` per frame ⇒ **≈ +4 % at N=240**, +17 % at N=60.
+Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed vs 55 / 51 / 58 fps at every 240 / 60 / 15 frames — all within noise); only bitstream size moves (294 KB → 294 / 367 / 734 KB). On real desktop content the added cost of a **paired** refresh is ≈ `((I_main−P_main)+(I_aux−P_aux))/N` per frame ⇒ **≈ +4 % at N=240**, +17 % at N=60. **MEASURED 2026-07-29 on the shipped path** (arm-r, VAAPI CQP 444, the code-scroll corpus at 2560×1440 + 3840×2400, 1688 pairs per view with 8 paired cuts): a P pair is 47 614 B (main 18 593 + aux 29 021) and a paired cut adds (140 206 − 18 593) + (117 716 − 29 021) = 210 308 B, i.e. **876 B/pair = +1.84 % at N = 240** — under half the predicted figure on this corpus.
 
 **Requirement (replaces the prohibition).** The runner MUST drive intra refresh by schedule, not by respawn:
 
