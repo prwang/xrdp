@@ -40,170 +40,328 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 > threshold. The frame_num wrap is therefore being prevented by the GOP
 > IDR *by accident*, not by the re-key mechanism designed for it — change
 > `-g` and that protection silently changes character. The re-key only
-> fires first if `-g > 32512`. MUST be reverted to a sane GOP once #45
-> lands.
+> fires first if `-g > 32512`. **Revert target is fixed** (#45 D7): `-g` =
+> `intra_refresh_frames` = 240, so GOP boundaries coincide exactly with
+> scheduled refresh indices and an unscheduled IDR ceases to be reachable.
 
 ---
 
-## #45 — Scheduled paired intra refresh + race-free `main‖aux` (NEXT)
+## #45 — Scheduled paired intra refresh, one-thread 4-view `pump_set`, per-monitor capture budget (NEXT)
 
-Immediate next step. Implements the revised **FR-H264-6** (PRD) and unblocks
-the parallel encode. Steps are ORDERED: 1–4 are correctness and ship on their own; 5 is
-pure throughput and must come last, because the IDR race it would otherwise
-inherit is only removed by 1–4.
+ONE plan across two repos: xrdp (steps 0–5, 7) and xorgxrdp (step 6).
+Implements the revised **FR-H264-6** (PRD) and the multimon
+encode-and-capture concurrency together, because measuring one without the
+other produces a false number (step 6/7 rationale). The former #51
+(`pump_set`) and the short-lived #52 (capture budget) are absorbed here and
+no longer exist as items.
 
-**0. Ratchets first** (must FAIL against today's code before step 1):
-   extend the pure-C DPB simulator in `tests/xrdp/test_avc444_ltr.c` with a
+Everything below is either a **decision** (D1–D17, binding), a **fact**
+(verified in source or git history, with the location), or a **required
+recon gate** (R1–R2: fleet measurements that must reach their acceptance
+gate BEFORE the step that uses the property lands). Nothing in this item
+is open.
+
+### End state — all SEVEN hold on ONE deployed pair (xrdp deb + xorgxrdp deb)
+
+**E1 — the non-IDR-I wire format is fully functional and smoke-gated.**
+`PR-demo/smoke_gate/smoke.sh` passes at BOTH its sizes against the
+package-installed binaries and config, with `aux_ltr_chain = true` and the
+schedule live. Same build, not a separate config or arm.
+
+**E2 — a long payload renders, ≥ 1000 frames.** The code/scroll corpus
+(`SESSION_KIND=code`, the FR-H264-8 gate baseline) for **≥ 1000 consecutive
+encoded pairs** at `intra_refresh_frames = 240`, i.e. **≥ 4 scheduled cuts**
+in one uninterrupted stream. All four required:
+  - `oracle_black_frame_check.py`: every picture decodes, **zero** black
+    frames anywhere (the owner's decode gate, 2026-07-29 — nothing is
+    handed over onscreen before it passes);
+  - `tools/avc444_ltr_wire_audit.py --assert` exits non-zero on any
+    violation (step 0 gives it teeth);
+  - server log: zero rewrite failures, zero `unsupported`, zero pair aborts;
+  - at each cut index both views parse `slice_type == I`.
+
+**E3 — offscreen dual monitor at the real target geometry.** The E2 run at
+**2560×1440 + 3840×2400**, headless on the dev box
+(`PR-demo/multimon_offline/`, parameterised from its hardcoded 2×1024×768;
+its fail-loud "exactly 2 monitors or abort" behaviour kept). Both monitors
+audited independently.
+
+**E4 — ONE thread drives FOUR views concurrently.** With both monitors
+damaged in the same cycle, the single `proc_enc_msg` worker issues **one**
+`pump_set(kids[], 4, deadline)` covering main₁, aux₁, main₂, aux₂. Proven
+by an instrumented per-cycle set-size counter asserted in the E3 run, never
+inferred from a wall-clock improvement.
+
+**E5 — the speed-up is measured locally on VAAPI, as frame period, WITH
+step 6 landed.** Dev-box VAAPI, E3 geometry and payload, reported as frame
+period (never encoder ms — PRD "Concurrency state of the encode pipeline"),
+against the recorded pre-#45 frame period for the identical arm, payload,
+geometry. Step 6 must be deployed in the same measurement, or the batching
+gain is silently paid for out of lost capture overlap and the number is a
+lie (step 7 rationale). Prediction from the measured concurrency table
+(N=2 ≈ free, N=4 at 1.39×/1.64×): **≥ 2.0×** on the dual-monitor frame
+period. **Stop rule:** under 1.5× the item is RED and the remainder is
+attributed (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly)
+before anything ships — not re-tuned until it looks better, not reported as
+a partial win.
+The non-concurrency remainder is characterised HERE, locally, before any
+cloud spend: the T4 pair cost 67.5 ms while two 4K encodes account for
+39.2 ms — a ~28 ms remainder that is NOT encode and that concurrency
+cannot touch. Run a fleet arm at fixed resolution against the 6.97 ms
+dev-box raw-encode floor and attribute the difference (capture, vmsplice
+feed, NUT demux, LTR rewrite, EGFX assembly) BEFORE re-provisioning a GPU
+box; this attribution is the number the stop rule reaches for if the
+speed-up lands short.
+
+**E6 — nothing else regressed.** `make check` green; topology 1/2/3
+identity unchanged; FR-H264-8 bandwidth gate re-run so the refresh cost is
+recorded, not assumed (predicted ≈ +4 % at N=240, PRD FR-H264-6).
+
+**E7 — the dual-monitor drag gate.** Extend the orbiting-thunar load
+driver (`PR-demo/t4_profile/profile_owner_load.sh`, xdotool windowmove)
+with an **up/down sweep that crosses the monitor boundary**, driven inside
+the offscreen xfreerdp dual-monitor rig (E3's rig, on the dev box) — the
+drag pattern of the `251bc4d` incident, made deterministic. The gate
+asserts **per-monitor frame progress** — each monitor's rect stream
+advances during the sweep; overall liveness is not sufficient, because the
+original bug froze one monitor while the other flowed and a whole-session
+check would have passed it.
+
+### The capture-side state machine (facts; the frame for step 6)
+
+Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
+
+- **One `dirtyRegion` for the whole virtual desktop** — damage from all
+  monitors lands in one region. `rect_id`/`rect_id_ack` are **global**
+  counters: `rect_id++` per send, one send = one monitor's frame, the ack
+  is cumulative.
+- **One event per monitor per frame, carrying BOTH views.** xorgxrdp emits
+  one `STARTFRAME+WIRETOSURFACE_1+ENDFRAME` per monitor (`:3357`); the
+  shmem slot holds `[main NV12][aux NV12]` packed (FR-CAPTURE-6) and xrdp
+  splits it (`xrdp_encoder.c` `main_view`/`aux_view = main_view +
+  aux_offset`). Queue states like "m1C1main, m1C1aux" are not
+  representable; m monitors damaged = m FIFO items.
+- **The scan** (`rdpDeferredUpdateCallback`): snapshot `rotation =
+  rect_id`; visit each monitor once in rotation order; per monitor,
+  intersect its rect with `dirtyRegion` — empty ⇒ no send, else capture ⇒
+  send ⇒ `rect_id++`; subtract the served region; **BREAK when the budget
+  gate trips**. After the loop, **only if every monitor was visited**
+  (`monitor_index == monitor_count`), `dirtyRegion` is cleared — the
+  "nothing left that any monitor covers" clear. A pass that breaks early
+  leaves the remainder in `dirtyRegion` and reschedules.
+- **The load-bearing invariant:** any path that reaches the completed-scan
+  clear while some monitor was NOT visited destroys that monitor's damage.
+  That is exactly the `251bc4d` incident (live rotation base revisited the
+  just-sent monitor, skipped another, clear ate its damage — frozen bottom
+  4K monitor during dual-monitor drags). Any change to this loop is judged
+  against this invariant first.
+- **Today's budget is global 2** (`MaxOutstandingRects`, `:130`) over
+  per-monitor slots (`cap_offsets[mon] + slotIndex * cap_slot_bytes[mon]`).
+  Consequences at m = 2: (a) the two-slot alternation is inert — `rect_id`
+  advances by m between one monitor's consecutive sends, so `(rect_id+1)&1`
+  is constant per monitor and each monitor is pinned to one slot (R1);
+  (b) a batched 4-view encode holds both budget slots for its whole
+  duration, so no capture can overlap it. The overlap that exists today at
+  m = 2 is *cross-monitor* interleaving via the per-item ack
+  (`xrdp_mm.c:4088`), not the two-slot mechanism. FR-CAPTURE-8 was designed
+  and measured at m = 1 (PRD clause 3 has no `monitorCount` term); multimon
+  was never covered, so this is a gap being closed, not a regression being
+  repaired.
+
+### Steps (ordered; 0–4 correctness, 5–7 throughput; 6 lands before E5 is measured)
+
+**0. Ratchets first — must FAIL against today's code before step 1.**
+   Extend the pure-C DPB simulator in `tests/xrdp/test_avc444_ltr.c` with a
    scheduled paired-cut AU sequence in both 1-context and 2-context decode
-   modes; add byte-exact goldens from `ltr_splice_ref.py`; add an assertion
-   mode to `tools/avc444_ltr_wire_audit.py` — it already parses every fact
-   needed (slice type, nal type, frame_num, rplm target, mmco6 slot, per
-   view) but asserts none of them and always exits 0. What each
-   verification layer can and cannot prove is in PRD FR-H264-6, "Verify,
-   never assume".
+   modes; byte-exact goldens from `ltr_splice_ref.py`; an assertion mode
+   for `tools/avc444_ltr_wire_audit.py` (it parses every needed fact —
+   slice type, nal type, frame_num, rplm target, mmco6 slot, per view —
+   and today asserts none and always exits 0). Each ratchet is demonstrated
+   RED against the current build and the RED output recorded in the commit
+   message. A validator that cannot fail is worthless; one of ours asserted
+   a bug as correct (2026-07-29, `rekey_boundary_audit.py` check B).
 
-**1. Rewriter must accept BOTH intra input shapes, in both views.**
-   `slice_ltr_rewrite()` today handles exactly two inputs: IDR-carrying-I,
-   and P. Both scheduled shapes are rejected as `unsupported`:
-   - **non-IDR I** (what `h264_nvenc` emits at a forced key frame without
-     `-forced-idr`) hits the `B/SP/SI or non-IDR I` reject at
-     `xrdp_h264_annexb.c:2128`. Needs a third branch: parse the child's
-     `dec_ref_pic_marking`, emit no `ref_pic_list_modification` (I slices
-     have none), replace marking with the constant mmco6 self-mark, skip
-     `cabac_init_idc` (P-only).
-   - **mid-stream IDR** (what `h264_vaapi` emits, always) is accepted but
-     mishandled for the main view: `ltr_rewrite_walk` resets `cur_fn = 0`
-     and clears `aux_seeded` (`:2447–2457`, `:2527–2531`) — the DPB flush
-     we are trying to abolish. Generalize the existing `to_seed_i`
-     conversion (proven in production for the aux seed) to view 0 whenever
-     `st->started`, so the shared counter continues and LT1 survives.
-   Both backends must be supported; neither shape is optional.
+**1. Rewriter accepts BOTH intra input shapes, in BOTH views.**
+   `slice_ltr_rewrite()` today handles exactly IDR-carrying-I and P:
+   - **non-IDR I** (`h264_nvenc` at a forced key frame without
+     `-forced-idr`) hits the reject at `xrdp_h264_annexb.c:2128`. Third
+     branch: parse the child's `dec_ref_pic_marking`, emit no
+     `ref_pic_list_modification` (I slices have none), replace marking with
+     the constant mmco6 self-mark, skip `cabac_init_idc` (P-only).
+   - **mid-stream IDR** (`h264_vaapi`, always) is accepted but mishandled
+     on the main view: `ltr_rewrite_walk` resets `cur_fn = 0` and clears
+     `aux_seeded` (`:2447–2457`, `:2527–2531`) — the DPB flush this FR
+     abolishes. Generalise the production-proven `to_seed_i` conversion to
+     view 0 whenever `st->started`, so the shared counter continues and LT1
+     survives.
+   Both backends ship in the same build or neither does (D11): the dev box
+   (VAAPI) and the T4 (nvenc) each exercise exactly one shape, so a
+   single-shape build passes half the fleet silently.
 
-**2. Schedule + observed-vs-requested check.** Both children spawned with
-   an identical frame-indexed `-force_key_frames`; interval from a new
-   gfx.toml knob. `xrdp_h264_ltr_state` carries the expected refresh index;
-   a picture that parses P where intra was scheduled fails the pair loudly
-   (same class as an aux P with LT1 unseeded) — this is the runtime ratchet,
-   the only check that runs before the client sees the frame.
+**2. Schedule + observed-vs-requested check.** Both children spawn with an
+   identical frame-indexed `-force_key_frames` schedule derived from
+   `intra_refresh_frames` (D6). `xrdp_h264_ltr_state` carries the expected
+   refresh index; a picture parsing P where intra was scheduled **fails the
+   pair loudly** (same class as an aux P with LT1 unseeded). The only check
+   that runs before the client sees the frame; it fails the pair rather
+   than shipping it.
 
-**3. Drop the SPS/PPS-alongside clause from FR-H264-6** unless a reason
-   appears. A non-IDR I is not a decoder entry point, the stream never
-   seeks, and EGFX is reliable — repeated parameter sets buy nothing and
-   cost bytes at every refresh. Child-emitted SPS/PPS must still pass
-   through on the main view (already handled, `:2350–2392`).
+**3. No parameter sets at a cut** (D5, unconditional). A non-IDR I is not a
+   decoder entry point, the stream never seeks, EGFX is reliable.
+   Child-emitted SPS/PPS still passes through on the main view (`:2350–2392`).
 
-**4. Delete the aux respawn path** (`encode_pair` `:1184–1197`,
-   `ltr_aux_fresh`) and restore a sane refresh interval on the T4 profile
-   and arm-n (≈240 costs ≈ +4 % bandwidth; PRD FR-H264-6).
+**4. Delete the aux respawn path; retire the `-g 30000` interim.** Remove
+   `encode_pair` `:1184–1197` and `ltr_aux_fresh`. Set `-g` equal to
+   `intra_refresh_frames` (D7) on the T4 profile, arm-n and arm-p — every
+   intra picture lands on a scheduled index by construction, "unscheduled
+   IDR" is unreachable, and the frame_num-wrap re-key becomes the live wrap
+   mechanism instead of being masked by the GOP IDR.
 
-**5. `main‖aux` — MOVED to #51** (converged with monitor concurrency; the
-   two are the same serialization and the same fix). Retained here for the
-   ordering constraint only: #51 needs steps 1-4 first. Original analysis:
-   submit both, collect both — the two children are
-   independent processes and genuinely encode concurrently. The ONE
-   constraint (and the whole of the correction to PRD's "mechanical
-   refactor"): **`submit` must transfer, not merely enqueue.**
-   `in_iov_push()` performs no I/O — it appends to an iov array — and
-   `feed_vmsplice()` has exactly one caller, inside `pump()`
-   (`xrdp_encoder_ffmpeg.c:730`, `:794`, `:856`). So a split where
-   `submit_single()` is just the push half sends nothing to the aux child
-   until `collect_aux()` pumps it, and the pair stays serial.
-   `submit_single()` must therefore pump until `!in_iov_pending()`,
-   without waiting for output.
+**5. `pump_set` (xrdp).**
+   1. Factor `pump()` into `pump_arm()` (build this child's pollfd slots) +
+      `pump_service()` (dispatch revents: `feed_vmsplice`/stderr/stdout).
+      `pump()` keeps its signature; existing callers untouched
+      (`pump_set(&self, 1, ...)`).
+   2. `pump_set(kids[], n, deadline)`: arm all, poll once, service all.
+      The CALLER owns the completion predicate — `n=1` LC=1, `n=2` a pair,
+      `n=4` two monitors. Never `pump2()`: pair-shaped hard-wires "two
+      issue, two retire" and breaks under FR-PROC-7's variable shape.
+   3. `submit_single()` **pumps until `!in_iov_pending()`**, not merely
+      `in_iov_push()` — `feed_vmsplice()`'s only caller is inside `pump()`
+      (`xrdp_encoder_ffmpeg.c:730`, `:794`, `:856`); a push-only submit
+      sends nothing and the pair stays serial.
+   4. **ONE shared deadline** across the set (D3) — else a stalled child
+      costs `n × pair_timeout_ms` — and the FR-PROC-6 borrowed-pointer
+      contract re-checked per child at collect.
+   5. `kids[]` rebuilt every cycle from live `avc444_ffmpeg_handle[]`,
+      never memoized — a monitor dropped mid-session (UWP windowed mode)
+      simply stops contributing a child.
 
-   With that, sequential writes already buy most of the win, because a
-   write is cheap against an encode: serial `2(w+e)` becomes `2w+e`
-   (4K: `e` = 19.6 ms measured, `w` = a ~15 MB vmsplice ⇒ ~43 ms → ~24 ms).
+**6. Per-monitor capture budget, depth 2 (xorgxrdp; lands before E5).**
+   In sub-order:
+   - **6a. Make the completed-scan clear structurally safe FIRST.** Replace
+     "clear `dirtyRegion` when all monitors were visited" with the thing it
+     actually means: `dirtyRegion ∩= union(all monitor rects)`, computed
+     independently of the scan. Damage no monitor covers (layout gaps) is
+     dropped explicitly; damage a monitor covers can never be destroyed by
+     any scan-order bug again — the entire `251bc4d` hazard class is
+     removed structurally rather than avoided. Own commit, gated by E7's
+     harness, before any budget change.
+   - **6b. Budget becomes PER MONITOR: ≤ 2 outstanding per monitor, never
+     any global pool** (D13). Accounting: per monitor, a ring of its ≤ 2
+     sent-and-unacked rect_ids, checked against the cumulative
+     `rect_id_ack` (the ack already being cumulative is what makes a
+     2-entry ring sufficient). The in-loop gate tests the capacity of **the
+     monitor about to be served** and **BREAKs** when it is at cap (D15) —
+     identical stall behaviour to today's global gate (today the whole pass
+     returns), so no fairness regression, and with 6a landed the early exit
+     cannot cost damage. The top-of-callback gate returns only when **no**
+     monitor has capacity. Never skip-and-continue past a capped monitor
+     (D15): a skipped monitor reaching a completed-scan state is the
+     `251bc4d` shape by a second route.
+   - **6c. Slot index becomes per monitor** (D17): a per-monitor counter
+     incremented on that monitor's send replaces global `rect_id` parity.
+     Restores two-slot alternation at even m; the two outstanding frames of
+     a monitor always land in different slots again. **No layout or
+     contract change**: the layout is already 2 slots per monitor and the
+     slot rides the explicit per-frame `shmem_offset`, so the encoder side
+     is untouched.
+   - **6d. Overflow stays drop-never-queue, restated per monitor** (D14).
+     At a monitor's cap, its next change coalesces into `dirtyRegion`
+     (union + extents collapse) and the next capture packs the union —
+     newest state wins, the intermediate frame is dropped before it exists
+     (FR-CAPTURE-8 clause 4, currently global wording). The loud budget
+     assertion and "no third capture" are asserted per monitor, or the
+     global assertion fires on every legal multimon frame.
+   - Re-derive the `/dev/shm` floor at 2560×1440 + 3840×2400 and record it
+     (R2). No new shmem is expected (cap 2 = existing 2 slots/monitor), but
+     the 512 Mi figure is re-checked, never assumed — an undersized tmpfs
+     SIGBUSes Xorg mid-session (2026-07-28 incident).
 
-   The union poll must be **set-shaped, not pair-shaped**:
-   `pump_set(kids[], n, deadline)` with the caller owning the completion
-   predicate, so `n = 1` (LC=1 main-only) and `n = 2` (pair) are the same
-   code — a `pump2(main, aux)` would hard-wire "two issue, two retire" and
-   break under FR-PROC-7's variable shape. Do NOT thread main/aux: see PRD
-   "Threads: not on the main/aux axis". Under ONE shared deadline, it is a
-   robustness upgrade, NOT a prerequisite — it is not needed to avoid a deadlock,
-   since the parent is never blocked on the child it is not draining.
-   What it buys: `F_SETPIPE_SZ` is applied only to the INPUT pipe (1 MB,
-   `:528`); the output pipe keeps the 64 KB default, and a 4K intra packet
-   is several times that, so an undrained child stalls mid-write and
-   erodes the overlap exactly when packets are largest. Measure the simple
-   form first and only add the union poll if the measurement demands it.
-   Re-check the FR-PROC-6 borrowed-pointer contract per child at collect.
+**7. Batch both monitors into one set (xrdp).** At the top of each worker
+   cycle, drain the input FIFO **non-blockingly**; group queued AVC444
+   `WIRETOSURFACE_1` items into one set, **at most one per `mon_index`** —
+   a second item for a `mon_index` already in the set belongs to the next
+   frame and ends the batch. The worker **never waits** for a monitor that
+   has not queued damage: `n = 2` when one monitor is damaged, `n = 4` when
+   both are; no timer, no speculative wait (it would add latency on the
+   common single-monitor path and cannot be bounded correctly). Each item
+   keeps its own STARTFRAME/ENDFRAME framing, ack and shmem lifetime —
+   batching changes when children are FED, never per-monitor PDU order.
+   Scale the `fifo_to_proc_depth > 2` bound in `server_egfx_cmd`
+   (`xrdp_mm.c:4819`) to `2m`, or it is a permanent false ERROR in every
+   dual-monitor log.
+   **Why 6 must precede the E5 measurement:** a batched set holds each
+   monitor at 1 outstanding for the whole 4-view encode; under the global
+   budget of 2 that saturates the gate and no capture overlaps the encode —
+   frame period degrades from `max(capture, encode)` toward
+   `capture + encode_set`. With 6b's per-monitor depth 2, each monitor has
+   exactly one free slot during the set, capture overlap survives, and E5
+   measures the real gain.
 
-Acceptance:
-- **Ratchets verify the schedule is OBSERVED, not requested** — at every
-  scheduled index both views parse `slice_type == I`; a silent skip fails
-  the test, never degrades quietly.
+### Decisions (binding; the previously ambiguous language they replace is dead)
+
+| # | Decision |
+|---|---|
+| D1 | **Zero threads.** Exactly one encoder worker (`proc_enc_msg`) before and after. Main/aux AND multimon are poll-set problems. A future threading proposal must first show a measurement `pump_set` cannot reach. |
+| D2 | **`pump_set` is required.** E4 (`n=4`) is the end state; sequential-submit-only is not an acceptable stopping point. |
+| D3 | **One shared deadline** across the set. `F_SETPIPE_SZ` is INPUT-pipe-only (1 MB, `:528`); the 64 KB output pipe stalls an undrained child exactly when packets are largest. |
+| D4 | **#51 and #52 are folded in here.** One item, one approval. |
+| D5 | **No SPS/PPS at a cut**, unconditionally. |
+| D6 | gfx.toml `intra_refresh_frames`; C field `avc444_ffmpeg_intra_refresh_frames`; **default 240**; range **[24, 4096]** (loader refuses, runner clamps); effective only when `aux_ltr_chain = true`. **No 0/off value** — an off switch would keep the deleted respawn path alive as a shadow fallback. |
+| D7 | **`-g` = `intra_refresh_frames`.** GOP boundaries coincide with scheduled indices; unscheduled IDR unreachable. |
+| D8 | Fault-injection recovery bound: **≤ `intra_refresh_frames` + 1 pairs** (241 at default) from the injected corruption; the `-g 30000` control must NOT converge. |
+| D9 | **E5 (dev-box VAAPI frame period) is the measurement gate.** The T4 pack-bench still runs per CLAUDE.md and is recorded, but T4 availability does not gate #45; T4 frame-period confirmation gates the `aux_ltr_chain` default flip (Owner-blocked). |
+| D10 | Four children reach one set via step 7's batching rule over per-monitor FIFO items (one event per monitor, fact section). |
+| D11 | **Both backend intra shapes ship in the same build**; neither is optional. |
+| D12 | **1:1 main/aux pairing is a precondition** of the shared schedule. FR-PROC-7's sparse aux cadence breaks it — **#40 may not land before #45** and must re-derive the aux schedule from the aux child's own index when it does. |
+| D13 | **Capture budget is ≤ 2 outstanding PER MONITOR — never a global pool of `2m`.** A pool lets one damaged monitor take all of it: 4-deep on 2 slots at m = 2, i.e. bufferbloat, +2 frames of latency, and slot aliasing. The aggregate 2m is a consequence of m independent caps, never a drawable quantity. |
+| D14 | **Beyond a monitor's cap: drop-and-coalesce, never queue.** Newest state wins via the dirty region; frames are dropped before they exist. Depth 2 is the pipeline itself (one encoding + one capturing, the recorded ≤ 1 frame of latency), not a queue. Accepted bounded cost: at most ONE stale frame can be encoded (C2 already sent when C3 arrives); C2 cannot be dropped after send — its enc item holds borrowed pointers into the slot (FR-PROC-6), and overwriting under a queued item is the content/region-desync class that froze mstsc. |
+| D15 | **BREAK on a capped monitor; skip-and-continue is forbidden.** A skipped monitor that lets the scan complete re-creates the `251bc4d` damage-destruction shape by a second route. Fairness comes from the rotation snapshot plus the bounded ack (same stall as today's global gate), not from skipping. |
+| D16 | **The completed-scan clear is replaced by an explicit coverage intersect** (`dirtyRegion ∩= union(monitor rects)`), landed first with its own E7-harness gate (step 6a). |
+| D17 | **Per-monitor slot index** replaces global `rect_id` parity. No shmem layout change, no xup contract bump (`shmem_offset` is explicit per frame). |
+
+### Recon gates (required; each reaches its gate BEFORE the property is used)
+
+- **R1 — even-m slot pinning, measured on the fleet.** The pinning is
+  source-derived; before 6c changes the arithmetic, run one m = 2
+  fleet-arm session logging the slot index per monitor per frame.
+  **Gate:** the log confirms neither monitor ever changes slot (recorded
+  as the "before" evidence for 6c). If it refutes the derivation instead,
+  6c's rationale is re-examined before any code changes — the measurement
+  wins over the arithmetic. **6c may not land before this gate.**
+- **R2 — the `/dev/shm` floor at 2560×1440 + 3840×2400, measured on the
+  fleet.** Derive and record the actual capture shmem footprint at the
+  target geometry (two slots × two views × both monitors). **Gate:** the
+  recorded floor fits the configured tmpfs with the margin stated, before
+  the first E3/E5 session at that geometry boots — an undersized tmpfs
+  SIGBUSes Xorg mid-session (2026-07-28 incident), which mid-run would be
+  indistinguishable from the bugs this item hunts.
+
+### Out of scope
+
+- Threads of any kind (D1).
+- The frame_num-wrap re-key mechanism (shipped 2026-07-29; PRD FR-H264-8).
+- FR-PROC-7's three policies (#40), subject to D12.
+- Instrumenting the ~1 s re-key pause (owner: not a priority).
+
+### Acceptance
+
+E1–E7, each with its evidence recorded in the commit message or `PRD.md` —
+not asserted. Plus:
+
+- **The schedule is OBSERVED, not requested**: at every scheduled index
+  both views parse `slice_type == I`; a silent skip fails the test.
 - No IDR mid-stream; frame_num strictly +1 per picture across a refresh;
   every P's list-modification resolves to its own view's LT slot; both
-  chains' transitive depth ≤ the configured interval.
-- **Fault-injection recovery check (client harness, dev box only):** an
-  oracle-client run drops/corrupts exactly one P, then measures pixel
-  re-convergence — must heal within ≤ N frames on the scheduled-cut
-  stream and must NOT converge on a `-g 30000` control. This is the only
-  test that makes I3 *observable* (a healthy screen shows identical
-  pixels either way); the wire ratchets remain the proof of the
-  invariant itself.
-- `make check` green; topology 1/2/3 identity unchanged; bandwidth gate
-  re-run so the refresh cost is recorded, not assumed.
-- T4 re-measured as **frame period**, not encoder ms — see the gain model
-  in PRD "Concurrency state of the encode pipeline".
+  chains' transitive depth ≤ `intra_refresh_frames`.
+- **Fault-injection recovery (dev-box client harness):** an oracle-client
+  run drops/corrupts exactly one P and measures pixel re-convergence —
+  heals within D8's bound on the scheduled-cut stream, does NOT converge on
+  a `-g 30000` control. The only test that makes I3 observable; the wire
+  ratchets remain the proof of the invariant itself.
 
 ---
-
-## #51 — Converge `main‖aux` + monitor concurrency into ONE `pump_set`
-
-Supersedes #45 step 5 as a standalone item: the two are the SAME
-serialization with the same fix, and splitting them would build the
-mechanism twice. Everything is serialized behind one worker thread
-blocking in `pump()` on one child — main before aux, monitor 1 before
-monitor 2 — so m monitors cost `2m(w+e)`.
-
-**Justified by measurement, not assumption** (dev-box VAAPI, 2026-07-29,
-`PR-demo/vaapi_concurrency_bench.sh`; full table in PRD):
-N=2 concurrent encodes are FREE (0.90×/0.94× per stream), N=4 costs only
-1.39×/1.64×. At 4K that is 13.9 ms → 6.5 ms for one monitor (2.1×) and
-27.9 ms → 11.4 ms for two (2.4×). The local N=2 ratio (0.94×) independently
-corroborates the T4's recorded 0.96×, so "two concurrent encodes are free"
-now holds on two vendors' hardware.
-
-Scope:
-1. Factor `pump()` into `pump_arm()` (build this child's pollfd slots)
-   and `pump_service()` (dispatch revents: `feed_vmsplice` / stderr /
-   stdout). `pump()` keeps its signature — every existing caller is
-   untouched.
-2. `pump_set(kids[], n, deadline)`: arm all, poll once, service all. The
-   CALLER owns the completion predicate, so shape lives with policy —
-   `n=1` LC=1, `n=2` a pair, `n=2m` m monitors. NOT `pump2()`: a
-   pair-shaped helper breaks under FR-PROC-7's variable shape.
-3. `submit_single()` must PUMP until `!in_iov_pending()`, not merely
-   `in_iov_push()` — `feed_vmsplice()` has one caller, inside `pump()`,
-   so a push-only submit sends nothing and the pair stays serial.
-4. ONE shared deadline across the set (otherwise a stalled child gets
-   `n × pair_timeout_ms`), and the FR-PROC-6 borrowed-pointer check per
-   child at collect.
-5. `kids[]` is REBUILT every cycle from live `avc444_ffmpeg_handle[]`, never
-   memoized — a monitor dropped mid-session (UWP windowed mode) must
-   simply stop contributing a child.
-
-Ordering: needs #45 steps 1-4 first. Until the aux-respawn path is gone,
-whether the aux child must be REPLACED depends on main's rewrite result
-(`encode_pair` `:1184`), so aux cannot be submitted before main is
-collected — a data dependency no poll restructuring removes.
-
-Do NOT thread main/aux (shared `ltr`, pair contract, zero CPU to win).
-Threading monitors is safe but unnecessary once `pump_set` lands — the
-per-monitor state is already partitioned; they just join the set. This
-is FR-PROC-7's BREADTH policy.
-
-**Cheap local measurement to do FIRST, before any cloud spend:** the T4
-pair cost 67.5 ms while two 4K encodes account for 39.2 ms — a ~28 ms
-remainder that is NOT encode and that concurrency cannot touch. The dev
-box can attribute it for free: run a fleet arm at a fixed resolution and
-compare its frame period against the 6.97 ms raw-encode floor measured
-here. Whatever the difference is (capture, vmsplice feed, NUT demux, LTR
-rewrite, EGFX assembly) is the real ceiling, and it should be attributed
-BEFORE re-provisioning a GPU box, not after.
 
 ## #40 — FR-PROC-7 preemptive aux (sparse aux cadence)
 
@@ -211,6 +369,14 @@ Submit/collect construction plus all three policies (preempt, breadth,
 depth) with per-policy unit tests. Spec: `PRD.md` FR-PROC-7. Prerequisite
 FR-CAPTURE-8 is shipped; the submit/collect split is shared with #45, so
 sequence #45 first.
+
+**Hard ordering, not a preference (#45 D12).** #45's paired refresh gives
+both children an IDENTICAL frame-indexed `-force_key_frames` schedule, which
+assumes 1:1 main/aux pairing. A sparse aux cadence breaks that assumption:
+the aux child no longer sees the same frame indices, so its schedule must be
+re-derived from its own index or its cuts land on the wrong pictures — and
+the observed-vs-scheduled runtime check would then fail every pair. #40 may
+NOT land before #45, and this FR's spec must be amended when it does.
 
 ## #41 — Deploy FR-PROC-7 + measure
 
