@@ -416,6 +416,32 @@ def parse_child_marking(r):
                 die('invalid mmco %d in child stream' % op)
 
 
+def au_is_intra(au):
+    """the AU's coded picture is intra (IDR or non-IDR I)"""
+    for n in au:
+        t = n[0] & 0x1F
+        if t in (1, 5):
+            if t == 5:
+                return True
+            r = R(unescape(n[1:16]))
+            r.ue()                 # first_mb_in_slice
+            return r.ue() % 5 == 2
+    return False
+
+
+def ps_drop_ok(cached, nal, kind):
+    """D18: a converted cut drops the child's repeated parameter set,
+    but ONLY when it is byte-identical to the one already on the wire.
+    A CHANGED set is a fatal stream shape, never silently swallowed."""
+    if cached is None:
+        return False               # nothing to compare: keep it
+    if cached == nal:
+        return True
+    die('%s changed at a scheduled cut (%d -> %d bytes): a converted '
+        'cut may not carry a new parameter set'
+        % (kind, len(cached), len(nal)))
+
+
 def rewrite_slice(nal, new_fn, log2, pps, view, lt1_seeded,
                   fault_ltpn=None, started=False):
     """Rewrite one child VCL NAL per the FR-H264-8 recipe. Returns the
@@ -701,12 +727,15 @@ def splice(main_aus, aux_aus, sps_f, pps_f, sps_nal, pps_nal,
     aux_pkts = []
     order = []
     aux_i = 0
+    sps_cached = None
+    pps_cached = None
     for k, au in enumerate(main_aus):
         vcl = [n for n in au if (n[0] & 0x1F) in (1, 5)]
         if not vcl:
             die('main AU %d has no VCL NAL' % k)
         is_idr = (vcl[0][0] & 0x1F) == 5
         started = counter is not None
+        convert = started and au_is_intra(au)
         if is_idr and not started:
             fn = 0
         else:
@@ -717,9 +746,20 @@ def splice(main_aus, aux_aus, sps_f, pps_f, sps_nal, pps_nal,
         for n in au:
             t = n[0] & 0x1F
             if t == 7:
-                pkt += SC4 + sps_rw
-            elif t in (6, 8, 9):
-                pkt += SC4 + n     # main PPS/SEI/AUD pass through
+                drop = convert and ps_drop_ok(sps_cached, n, 'SPS')
+                sps_cached = n
+                if not drop:
+                    pkt += SC4 + sps_rw
+            elif t == 8:
+                drop = convert and ps_drop_ok(pps_cached, n, 'PPS')
+                pps_cached = n
+                if not drop:
+                    pkt += SC4 + n
+            elif t in (6, 9):
+                # D18: the SEI a child repeats with its cut parameter
+                # sets goes with them; the AUD is not a parameter set
+                if not (convert and t == 6):
+                    pkt += SC4 + n
             else:
                 pkt += SC4 + rewrite_slice(n, fn, log2, pps_f, 'M',
                                            lt1, started=started)
@@ -1000,6 +1040,8 @@ def build_cut_sequence(main_aus, aux_aus, sps_f, pps_f, sps_nal,
     counter = 0
     lt1 = False
     started = False
+    sps_cached = None
+    pps_cached = None
     for k, (view, kind, au, marking) in enumerate(plan):
         if kind == CUT_KIND_NONIDR_I:
             nal = synth_nonidr_i(vcl_of(au), log2, pps_f, counter & 0xF,
@@ -1008,6 +1050,7 @@ def build_cut_sequence(main_aus, aux_aus, sps_f, pps_f, sps_nal,
         else:
             in_nals = list(au)
         inb = b''.join(SC4 + n for n in in_nals)
+        convert = ((view == 'A') or started) and au_is_intra(in_nals)
         gold = bytearray()
         for n in in_nals:
             t = n[0] & 0x1F
@@ -1015,10 +1058,20 @@ def build_cut_sequence(main_aus, aux_aus, sps_f, pps_f, sps_nal,
                 if t in (6, 7, 8, 9):
                     continue       # aux SPS/PPS/SEI/AUD dropped
             elif t == 7:
-                gold += SC4 + sps_rw
+                drop = convert and ps_drop_ok(sps_cached, n, 'SPS')
+                sps_cached = n
+                if not drop:
+                    gold += SC4 + sps_rw
                 continue
-            elif t in (6, 8, 9):
-                gold += SC4 + n    # main PPS/SEI/AUD pass through
+            elif t == 8:
+                drop = convert and ps_drop_ok(pps_cached, n, 'PPS')
+                pps_cached = n
+                if not drop:
+                    gold += SC4 + n
+                continue
+            elif t in (6, 9):
+                if not (convert and t == 6):
+                    gold += SC4 + n
                 continue
             gold += SC4 + rewrite_slice(n, counter, log2, pps_f, view,
                                         lt1, started=started)

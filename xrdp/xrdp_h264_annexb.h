@@ -90,6 +90,11 @@ int
 xrdp_h264_strip_pic_struct(unsigned char *data, int *len);
 
 
+/* bound on a raw parameter-set copy: real SPS/PPS NALs on this path
+ * are tens of bytes (measured: SPS 29, PPS 4 on the shipped VAAPI
+ * stream) */
+#define XRDP_H264_PS_RAW_MAX 256
+
 /* cached SPS/PPS fields needed to parse slice headers (strip_mmco,
  * aux_to_leaf) */
 struct xrdp_h264_param_cache
@@ -112,6 +117,18 @@ struct xrdp_h264_param_cache
     int second_chroma_qp_offset;
     int transform_8x8;
     int pps_scaling_present;
+    /* the parameter sets as the child emitted them, byte for byte.
+     * Kept only so a scheduled refresh can DROP the child's repeat of
+     * them (BACKLOG #45 D18: a converted cut is not a decoder entry
+     * point, so parameter sets there cost bytes and buy nothing) while
+     * proving they are the same sets already on the wire -- swallowing
+     * a CHANGED SPS would be silent whole-picture corruption. A set
+     * too large to copy leaves the length 0, which means "cannot
+     * prove identical" and keeps the pass-through. */
+    unsigned char sps_raw[XRDP_H264_PS_RAW_MAX];
+    int sps_raw_len;
+    unsigned char pps_raw[XRDP_H264_PS_RAW_MAX];
+    int pps_raw_len;
 };
 
 /*
@@ -209,14 +226,27 @@ int
 xrdp_h264_ltr_growth_budget(const unsigned char *data, int len);
 
 /*
- * Rewrite one MAIN-view packet in place (SPS: max_num_ref_frames and
- * VUI max_dec_frame_buffering raised to 3, level DPB budget checked;
- * IDR: long_term_reference_flag=1, resets the shared counter and
- * marks LT1 unseeded; P: shared frame_num, LTR list-modification and
- * mmco6/LT0 marking; all VCL nri=3; CABAC payload byte-verbatim).
- * cap is the allocated size of data (see growth_budget). Fails loudly
- * on any stream shape outside the compat guard; on failure the caller
- * must drop the packet (never ship a half-rewrite).
+ * Rewrite one MAIN-view packet in place. Three input shapes, all of
+ * which a shipped child encoder produces:
+ *   - the EPOCH ENTRY IDR (the chain has not started): stays an IDR,
+ *     long_term_reference_flag=1 seeds LT0, the shared counter starts
+ *     at 0 and LT1 is marked unseeded; the SPS is rewritten
+ *     (max_num_ref_frames and VUI max_dec_frame_buffering raised to 3,
+ *     level DPB budget checked) and PPS/SEI/AUD pass through;
+ *   - a SCHEDULED REFRESH once the chain has started, arriving either
+ *     as a mid-stream IDR (h264_vaapi) or as a non-IDR I (h264_nvenc
+ *     at a forced key frame without -forced-idr): both become the
+ *     self-contained non-IDR I whose mmco6 REPLACES the occupant of
+ *     LT0, so the shared counter keeps running and the aux view's LT1
+ *     is untouched (FR-H264-6). The child's repeated SPS/PPS/SEI are
+ *     dropped there (#45 D18) and a CHANGED parameter set fails the
+ *     packet rather than being swallowed;
+ *   - P: shared frame_num, LTR list-modification and mmco6/LT0
+ *     marking.
+ * All VCL nri=3, CABAC payload byte-verbatim. cap is the allocated
+ * size of data (see growth_budget). Fails loudly on any stream shape
+ * outside the compat guard; on failure the caller must drop the packet
+ * (never ship a half-rewrite).
  */
 int
 xrdp_h264_ltr_rewrite_main(unsigned char *data, int *len, int cap,
@@ -224,11 +254,13 @@ xrdp_h264_ltr_rewrite_main(unsigned char *data, int *len, int cap,
 
 /*
  * Rewrite one AUX-view packet in place (SPS/PPS cached + dropped,
- * SEI/AUD dropped; IDR converted to the self-contained LT1-seeding
- * non-IDR I slice; P: shared frame_num, LTR list-modification and
- * mmco6/LT1 marking; nri=3). An aux P while LT1 is unseeded (e.g.
- * right after a main IDR) is a loud failure -- the caller must
- * restart the aux child so the next aux packet is IDR-shaped.
+ * SEI/AUD dropped; ANY intra picture -- IDR or non-IDR I -- converted
+ * to the self-contained LT1-seeding non-IDR I slice; P: shared
+ * frame_num, LTR list-modification and mmco6/LT1 marking; nri=3). An
+ * aux P while LT1 is unseeded is a loud failure: only an aux INTRA
+ * picture can seed LT1, and with the scheduled refresh (FR-H264-6) a
+ * main-view cut no longer takes LT1 away, so this state means the
+ * schedule was not honoured and the pair must not ship.
  * Same cap and failure contract as the main rewrite.
  */
 int

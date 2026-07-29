@@ -1273,16 +1273,47 @@ START_TEST(test_ltr_emitter_high_counter_and_cadence)
 END_TEST
 
 /*****************************************************************************/
+/* the first VCL NAL of an annex-b packet (4-byte start codes) */
+static int
+ltr_first_vcl(const unsigned char *p, int len)
+{
+    int i;
+
+    for (i = 0; i + 4 < len; i++)
+    {
+        if (p[i] == 0 && p[i + 1] == 0 && p[i + 2] == 0 && p[i + 3] == 1)
+        {
+            if ((p[i + 4] & 0x1f) == 1 || (p[i + 4] & 0x1f) == 5)
+            {
+                return i + 4;
+            }
+        }
+    }
+    return -1;
+}
+
+/*****************************************************************************/
 START_TEST(test_ltr_emitter_epoch_restart_byte_exact)
 {
-    /* a mid-stream main IDR packet resets the chain; feeding the
-     * SAME child packets again must reproduce the SAME golden bytes
-     * (the re-key/respawn epoch is byte-deterministic), and an aux P
-     * before the re-seed must fail */
+    /* An EPOCH restart is the frame_num-wrap re-key: the runner
+     * destroys and recreates the encoder, so the rewriter starts from a
+     * zeroed state and the same child packets must reproduce the same
+     * golden bytes, byte for byte, including the real IDR and the LT1
+     * re-seed.
+     *
+     * RE-SCOPED for BACKLOG #45 step 2 (recorded as C7). This test used
+     * to feed the IDR-carrying packet MID-STREAM and assert
+     * st.aux_seeded == 0 with st.frame_num == 1 -- i.e. it asserted the
+     * DPB flush that FR-H264-6 abolishes. That case is now a scheduled
+     * refresh and is covered by test_ltr_cut_midstream_idr_keeps_chain;
+     * the second half below pins the difference explicitly so the two
+     * paths can never be confused again. */
     struct xrdp_h264_ltr_state st;
     static unsigned char buf[4096];
     int len;
+    int cap;
     int rv;
+    int vcl;
 
     memset(&st, 0, sizeof(st));
     ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
@@ -1294,23 +1325,43 @@ START_TEST(test_ltr_emitter_epoch_restart_byte_exact)
     ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_1,
                                     LTR_MAIN_IN_1_LEN, ltr_main_golden_1,
                                     LTR_MAIN_GOLDEN_1_LEN), 0);
-    /* epoch boundary: the IDR-carrying packet again */
+    /* the re-key: the encoder object is gone, so the state is fresh */
+    memset(&st, 0, sizeof(st));
     ck_assert_int_eq(ltr_run_vector(&st, 0, ltr_main_in_0,
                                     LTR_MAIN_IN_0_LEN, ltr_main_golden_0,
                                     LTR_MAIN_GOLDEN_0_LEN), 0);
     ck_assert_int_eq(st.aux_seeded, 0);
     ck_assert_int_eq(st.frame_num, 1);
-    /* aux P before the re-seed: loud failure (runner respawns) */
+    /* aux P before the fresh epoch's LT1 seed: loud failure */
     memcpy(buf, ltr_aux_in_1, LTR_AUX_IN_1_LEN);
     len = LTR_AUX_IN_1_LEN;
     rv = xrdp_h264_ltr_rewrite_aux(buf, &len, (int)sizeof(buf),
                                    &st);
     ck_assert_int_ne(rv, 0);
-    /* the fresh-child IDR re-seeds and the epoch replays byte-exact */
+    /* the fresh-epoch aux IDR re-seeds and replays byte-exact */
     ck_assert_int_eq(ltr_run_vector(&st, 1, ltr_aux_in_0,
                                     LTR_AUX_IN_0_LEN, ltr_aux_golden_0,
                                     LTR_AUX_GOLDEN_0_LEN), 0);
     ck_assert_int_eq(st.aux_seeded, 1);
+    /* and the contrast that step 2 introduced: the SAME packet fed
+     * MID-STREAM is a refresh, not an epoch restart -- the counter
+     * keeps running, LT1 survives, the picture ships as a non-IDR I,
+     * and the child's repeated parameter sets are dropped (D18), so it
+     * is strictly shorter than the epoch-entry golden */
+    memcpy(buf, ltr_main_in_0, LTR_MAIN_IN_0_LEN);
+    len = LTR_MAIN_IN_0_LEN;
+    cap = len + xrdp_h264_ltr_growth_budget(buf, len);
+    ck_assert_int_le(cap, (int)sizeof(buf));
+    ck_assert_int_eq(xrdp_h264_ltr_rewrite_main(buf, &len, cap, &st), 0);
+    ck_assert_int_eq(st.frame_num, 3);
+    ck_assert_int_eq(st.aux_seeded, 1);
+    ck_assert_int_lt(len, LTR_MAIN_GOLDEN_0_LEN);
+    vcl = ltr_first_vcl(buf, len);
+    ck_assert_int_ge(vcl, 0);
+    ck_assert_int_eq(buf[vcl] & 0x1f, 1);
+    /* the first NAL of the packet IS the picture: no SPS, no PPS, no
+     * SEI ahead of it */
+    ck_assert_int_eq(vcl, 4);
 }
 END_TEST
 
@@ -1501,26 +1552,6 @@ ltr_parse_i_hdr(const unsigned char *nal, int len, int log2_mfn,
     h->ltfi = hdr_ue(&b);
     h->mmco_end = hdr_ue(&b);
     ck_assert_int_eq(b.err, 0);
-}
-
-/*****************************************************************************/
-/* the first VCL NAL of an annex-b packet (4-byte start codes) */
-static int
-ltr_first_vcl(const unsigned char *p, int len)
-{
-    int i;
-
-    for (i = 0; i + 4 < len; i++)
-    {
-        if (p[i] == 0 && p[i + 1] == 0 && p[i + 2] == 0 && p[i + 3] == 1)
-        {
-            if ((p[i + 4] & 0x1f) == 1 || (p[i + 4] & 0x1f) == 5)
-            {
-                return i + 4;
-            }
-        }
-    }
-    return -1;
 }
 
 /*****************************************************************************/

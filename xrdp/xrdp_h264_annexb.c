@@ -694,6 +694,14 @@ cache_sps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     int zeros;
     int j;
 
+    /* keep the bytes for the D18 drop guard (0 length = too big to
+     * prove identical, so the set keeps passing through) */
+    c->sps_raw_len = 0;
+    if (nal_len > 0 && nal_len <= XRDP_H264_PS_RAW_MAX)
+    {
+        memcpy(c->sps_raw, nal, nal_len);
+        c->sps_raw_len = nal_len;
+    }
     rlen = 0;
     zeros = 0;
     for (j = 1; j < nal_len && rlen < SPS_RBSP_MAX; j++)
@@ -790,6 +798,12 @@ cache_pps(struct xrdp_h264_param_cache *c, const unsigned char *nal,
     int zeros;
     int j;
 
+    c->pps_raw_len = 0;              /* see cache_sps: D18 drop guard */
+    if (nal_len > 0 && nal_len <= XRDP_H264_PS_RAW_MAX)
+    {
+        memcpy(c->pps_raw, nal, nal_len);
+        c->pps_raw_len = nal_len;
+    }
     rlen = 0;
     zeros = 0;
     for (j = 1; j < nal_len && rlen < SPS_RBSP_MAX; j++)
@@ -1988,15 +2002,59 @@ slice_peek(const unsigned char *nal, int nal_len, unsigned int *first_mb,
 }
 
 /*****************************************************************************/
+/* dec_ref_pic_marking() of a non-IDR reference child slice: sliding
+ * window (flag 0) or an adaptive mmco chain. Parsed only to be
+ * discarded and replaced by the constant LTR self-mark -- see the
+ * reasoning at the call sites. Returns 0 on success, 1 on mmco5 or an
+ * invalid op (which the replacement cannot represent). */
+static int
+parse_child_marking(struct sps_bits *b)
+{
+    unsigned int op;
+
+    if (bits_u(b, 1))                     /* adaptive marking */
+    {
+        do
+        {
+            op = bits_ue(b);
+            switch (op)
+            {
+                case 0:
+                    break;
+                case 1:
+                case 2:
+                case 4:
+                case 6:
+                    bits_ue(b);
+                    break;
+                case 3:
+                    bits_ue(b);
+                    bits_ue(b);
+                    break;
+                default:
+                    return 1;              /* mmco5 / invalid ops */
+            }
+        }
+        while (op != 0 && !b->err);
+    }
+    return 0;
+}
+
+/*****************************************************************************/
 /* rewrite one VCL slice NAL into its LTR-chain form. view: 0 main,      */
-/* 1 aux. to_seed_i: convert an aux IDR into the self-contained          */
-/* LT1-seeding non-IDR I slice. fn: the shared frame_num to write.       */
+/* 1 aux. to_intra_i: emit this intra picture as the self-contained      */
+/* non-IDR I that self-marks the view's own long-term slot -- always     */
+/* for the aux view, and for the main view at a scheduled refresh once   */
+/* the chain has started (FR-H264-6; an IDR there would flush the DPB).  */
+/* fn: the shared frame_num to write.                                    */
+/* Accepts three input shapes: IDR-carrying-I, non-IDR I (h264_nvenc at  */
+/* a forced key frame without -forced-idr) and P.                        */
 /* returns the new NAL length or -1 on failure.                          */
 static int
 slice_ltr_rewrite(const unsigned char *nal, int nal_len,
                   unsigned char *out, int out_cap,
                   const struct xrdp_h264_param_cache *c,
-                  int view, int to_seed_i, int fn)
+                  int view, int to_intra_i, int fn)
 {
     unsigned char *rbsp;
     unsigned char *newr;
@@ -2007,9 +2065,9 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     unsigned int idr_pic_id;
     unsigned int no_output;
     unsigned int old_fn;
-    unsigned int op;
     int is_idr;
     int is_p;
+    int is_i;
     int out_log2;
     int rlen;
     int zeros;
@@ -2058,6 +2116,7 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     pps_id = bits_ue(&b);
     old_fn = bits_u(&b, c->log2_max_frame_num);  /* replaced below */
     is_p = (stype % 5 == 0);
+    is_i = (stype % 5 == 2);
     if (is_idr)
     {
         if (stype % 5 != 2)
@@ -2096,36 +2155,33 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
          * reference reset) changes decoder state the replacement
          * cannot represent: hard-reject, matching the reference
          * splicer. */
-        if (bits_u(&b, 1))                /* adaptive marking */
+        if (parse_child_marking(&b) != 0)
         {
-            do
-            {
-                op = bits_ue(&b);
-                switch (op)
-                {
-                    case 0:
-                        break;
-                    case 1:
-                    case 2:
-                    case 4:
-                    case 6:
-                        bits_ue(&b);
-                        break;
-                    case 3:
-                        bits_ue(&b);
-                        bits_ue(&b);
-                        break;
-                    default:
-                        goto unsupported;  /* mmco5 / invalid ops */
-                }
-            }
-            while (op != 0 && !b.err);
+            goto unsupported;
         }
         hdr2_start = b.pos;               /* cabac_init_idc onwards */
     }
+    else if (is_i)
+    {
+        /* non-IDR I: the scheduled-refresh shape h264_nvenc emits at a
+         * forced key frame without -forced-idr. Between frame_num and
+         * dec_ref_pic_marking there is nothing to skip under the guard
+         * ltr_cache_ok() enforces (poc_type 2, frame_mbs_only, no
+         * redundant_pic_cnt), and an I slice carries neither a
+         * num_ref_idx override nor a ref_pic_list_modification. The
+         * child's marking is parsed and discarded exactly as on the P
+         * path. */
+        idr_pic_id = 0;
+        no_output = 0;
+        if (parse_child_marking(&b) != 0)
+        {
+            goto unsupported;
+        }
+        hdr2_start = b.pos;               /* slice_qp_delta onwards */
+    }
     else
     {
-        goto unsupported;                 /* B/SP/SI or non-IDR I */
+        goto unsupported;                 /* B/SP/SI */
     }
     /* remaining header: [P: cabac_init_idc ue], slice_qp_delta se,
      * [deblock fields when PPS declares them] -- copied verbatim */
@@ -2163,7 +2219,7 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     {
         put_bit(newr, &opos, cap_bits, (fn >> i) & 1, &oerr);
     }
-    if (is_idr && !to_seed_i)
+    if (is_idr && !to_intra_i)
     {
         /* main IDR stays IDR: keep idr_pic_id and no_output, force
          * long_term_reference_flag = 1 (seeds LT0) */
@@ -2204,7 +2260,7 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     nbytes += rlen - pay_byte;
     /* NAL header: nri = 3 always (Windows shape); type: IDR stays 5
      * on main, everything else is 1 */
-    out[0] = (is_idr && !to_seed_i) ? 0x65 : 0x61;
+    out[0] = (is_idr && !to_intra_i) ? 0x65 : 0x61;
     olen = 1;
     zeros = 0;
     for (i = 0; i < nbytes; i++)
@@ -2278,9 +2334,86 @@ xrdp_h264_ltr_growth_budget(const unsigned char *data, int len)
 }
 
 /*****************************************************************************/
-/* shared walker for both views. view 0: SPS rewritten, PPS/SEI/AUD      */
-/* copied, IDR stays IDR (LT0 seed), P -> LTR/LT0. view 1: SPS/PPS       */
-/* cached + dropped, SEI/AUD dropped, IDR -> seed I (LT1), P -> LTR/LT1. */
+/* Bounded pre-scan: will this packet's coded picture be emitted as the
+ * converted self-contained intra (and therefore have the child's
+ * repeated parameter sets dropped, D18)? Reads the first VCL NAL with
+ * first_mb_in_slice == 0 and nothing else; an unreadable or
+ * non-intra picture answers 0, and the slice loop then re-derives the
+ * same answer and refuses the packet on any disagreement. */
+static int
+packet_intra_is_converted(const unsigned char *data, int len,
+                          const struct xrdp_h264_ltr_state *st, int view)
+{
+    unsigned int first_mb;
+    unsigned int stype;
+    int pos;
+    int nal_start;
+    int sc_prefix;
+    int nal_count;
+
+    if (!find_start_code(data, len, 0, &nal_start, &sc_prefix))
+    {
+        return 0;
+    }
+    pos = nal_start;
+    nal_count = 0;
+    while (pos < len && nal_count < XRDP_H264_MAX_NALS)
+    {
+        int next_start;
+        int next_prefix;
+        int nal_end;
+        int ntype;
+
+        nal_count++;
+        if (find_start_code(data, len, pos + 1, &next_start, &next_prefix))
+        {
+            nal_end = next_start - next_prefix;
+        }
+        else
+        {
+            nal_end = len;
+            next_start = -1;
+        }
+        ntype = data[pos] & 0x1f;
+        if (ntype == 5 || ntype == 1)
+        {
+            if (slice_peek(data + pos, nal_end - pos, &first_mb,
+                           &stype) != 0)
+            {
+                return 0;
+            }
+            if (first_mb != 0)
+            {
+                return 0;     /* not the start of the picture */
+            }
+            if (ntype != 5 && stype % 5 != 2)
+            {
+                return 0;     /* P: nothing to convert */
+            }
+            return (view == 1) || st->started;
+        }
+        if (next_start < 0)
+        {
+            break;
+        }
+        pos = next_start;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+/* shared walker for both views.                                         */
+/* view 0: at the stream/epoch entry the SPS is rewritten, PPS/SEI/AUD    */
+/* copied and the IDR stays an IDR (LT0 seed); at a SCHEDULED REFRESH     */
+/* once the chain has started the intra picture becomes the              */
+/* self-contained non-IDR I that re-marks LT0 and the child's repeated   */
+/* SPS/PPS/SEI are dropped (D18: not a decoder entry point), while a     */
+/* CHANGED parameter set fails the packet instead of being swallowed;    */
+/* P -> LTR/LT0.                                                         */
+/* view 1: SPS/PPS cached + dropped, SEI/AUD dropped, any intra picture  */
+/* (IDR or non-IDR I) -> seed I (LT1), P -> LTR/LT1.                     */
+/* Both views accept the two child intra shapes: IDR-carrying-I          */
+/* (h264_vaapi) and non-IDR I (h264_nvenc without -forced-idr).          */
 static int
 ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                  struct xrdp_h264_ltr_state *st, int view)
@@ -2296,7 +2429,8 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
     int sc_prefix;
     int nal_count;
     int vcl_pics;
-    int idr_seen;
+    int intra_seen;
+    int convert_intra;
     int cur_fn;
     int rv;
     int mfn_mask;
@@ -2319,8 +2453,15 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
     rv = 0;
     out_len = 0;
     vcl_pics = 0;
-    idr_seen = 0;
+    intra_seen = 0;
     cur_fn = 0;
+    /* The packet's coded picture decides whether the child's parameter
+     * sets are dropped, and that decision has to be made BEFORE the
+     * first NAL is emitted -- the sets precede the slice in the access
+     * unit. So the picture's kind is read in a bounded pre-scan, and
+     * the slice loop below re-derives the same value and refuses the
+     * packet if the two disagree. */
+    convert_intra = packet_intra_is_converted(data, *len, st, view);
     pos = nal_start;
     nal_count = 0;
     while (pos < *len && nal_count < XRDP_H264_MAX_NALS)
@@ -2349,8 +2490,31 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         nri = (data[pos] >> 5) & 3;
         if (ntype == 7)
         {
+            int drop_ps;
+
+            /* D18: at a converted cut the child's repeat of the
+             * parameter sets is dropped -- the cut is not a decoder
+             * entry point, so it costs bytes at every refresh and buys
+             * nothing. Only a set PROVEN identical to the one already
+             * on the wire may be dropped; a CHANGED set fails the
+             * packet, because swallowing it would be silent
+             * whole-picture corruption. */
+            drop_ps = 0;
+            if (convert_intra && own->sps_raw_len > 0)
+            {
+                if (nal_len == own->sps_raw_len &&
+                        memcmp(own->sps_raw, data + pos, nal_len) == 0)
+                {
+                    drop_ps = 1;
+                }
+                else
+                {
+                    rv = 1;
+                    break;
+                }
+            }
             cache_sps(own, data + pos, nal_len);
-            if (view == 0)
+            if (view == 0 && !drop_ps)
             {
                 if (out_len + 4 + nal_len + 8 > out_cap)
                 {
@@ -2374,8 +2538,24 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         }
         else if (ntype == 8)
         {
+            int drop_ps;
+
+            drop_ps = 0;                       /* see the SPS case */
+            if (convert_intra && own->pps_raw_len > 0)
+            {
+                if (nal_len == own->pps_raw_len &&
+                        memcmp(own->pps_raw, data + pos, nal_len) == 0)
+                {
+                    drop_ps = 1;
+                }
+                else
+                {
+                    rv = 1;
+                    break;
+                }
+            }
             cache_pps(own, data + pos, nal_len);
-            if (view == 0)
+            if (view == 0 && !drop_ps)
             {
                 if (out_len + 4 + nal_len > out_cap)
                 {
@@ -2392,7 +2572,11 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         }
         else if (ntype == 6 || ntype == 9)
         {
-            if (view == 0)
+            /* D18: the SEI a child repeats with its cut parameter sets
+             * goes with them (173 B of the 206 B measured per cut on
+             * the VAAPI shape). The AUD is not a parameter set and the
+             * Windows wire carries one on every frame, so it stays. */
+            if (view == 0 && !(convert_intra && ntype == 6))
             {
                 if (out_len + 4 + nal_len > out_cap)
                 {
@@ -2409,8 +2593,6 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         }
         else if (ntype == 5 || ntype == 1)
         {
-            int to_seed_i;
-
             if (nri == 0)
             {
                 rv = 1;         /* non-reference VCL: not our shape */
@@ -2444,29 +2626,35 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                     break;
                 }
                 vcl_pics = 1;
-                if (ntype == 5)
+                intra_seen = (ntype == 5) || (stype % 5 == 2);
+                /* the pre-scan decided the picture's fate; every slice
+                 * of a multi-slice picture must agree with it */
+                if (convert_intra !=
+                        (intra_seen && ((view == 1) || st->started)))
                 {
-                    idr_seen = 1;
-                    if (view == 0)
-                    {
-                        cur_fn = 0;   /* IDR resets the shared chain */
-                    }
-                    else
-                    {
-                        cur_fn = st->frame_num;
-                    }
+                    rv = 1;
+                    break;
+                }
+                if (view == 0 && !st->started && ntype != 5)
+                {
+                    /* the main chain must START with a real IDR: it is
+                     * the stream's only decoder entry point. A non-IDR
+                     * I here (nvenc's first picture without
+                     * -forced-idr) is refused, not silently accepted as
+                     * an entry point it cannot be. */
+                    rv = 1;
+                    break;
+                }
+                if (intra_seen)
+                {
+                    cur_fn = convert_intra ? st->frame_num : 0;
                 }
                 else
                 {
-                    if (view == 0 && !st->started)
-                    {
-                        rv = 1;   /* main chain must start with IDR */
-                        break;
-                    }
                     if (view == 1 && !st->aux_seeded)
                     {
-                        /* aux P with LT1 unseeded: the caller must
-                         * restart the aux child instead */
+                        /* aux P with LT1 unseeded: the pair fails --
+                         * only an aux INTRA picture can seed LT1 */
                         rv = 1;
                         break;
                     }
@@ -2478,7 +2666,6 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                 rv = 1;           /* slices before the picture start */
                 break;
             }
-            to_seed_i = (view == 1 && ntype == 5);
             if (out_len + 4 + nal_len + 24 > out_cap)
             {
                 rv = 1;
@@ -2491,7 +2678,8 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
             new_len = slice_ltr_rewrite(data + pos, nal_len,
                                         out + out_len,
                                         out_cap - out_len, own, view,
-                                        to_seed_i, cur_fn & mfn_mask);
+                                        convert_intra,
+                                        cur_fn & mfn_mask);
             if (new_len < 0)
             {
                 rv = 1;
@@ -2524,12 +2712,19 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         memcpy(data, out, out_len);
         *len = out_len;
         st->frame_num = (cur_fn + 1) & mfn_mask;
-        if (view == 0 && idr_seen)
+        if (view == 0 && intra_seen)
         {
             st->started = 1;
-            st->aux_seeded = 0;   /* the IDR emptied the DPB */
+            if (!convert_intra)
+            {
+                /* a REAL IDR shipped: it emptied the DPB and LT1 with
+                 * it. A converted refresh does not -- its mmco6
+                 * REPLACES the occupant of LT0 and never touches LT1,
+                 * which is the whole point of FR-H264-6 */
+                st->aux_seeded = 0;
+            }
         }
-        if (view == 1 && idr_seen)
+        if (view == 1 && intra_seen)
         {
             st->aux_seeded = 1;   /* the seed I now occupies LT1 */
         }
