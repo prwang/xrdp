@@ -48,7 +48,8 @@ struct xrdp_encoder
     struct fifo *fifo_processed;
     /* items currently in fifo_to_proc (mutex-guarded); the xorgxrdp
      * producer gate bounds it to the outstanding-rect budget for the
-     * AVC444 two-slot capture (PRD FR-CAPTURE-8 mandated assertion) */
+     * AVC444 two-slot capture, which is PER MONITOR (#45 D13), so the
+     * legal bound is 2 * monitorCount (PRD FR-CAPTURE-8 assertion) */
     int fifo_to_proc_depth;
     tbus mutex;
     int (*process_enc)(struct xrdp_encoder *self, struct xrdp_enc_data *enc);
@@ -103,6 +104,24 @@ struct xrdp_encoder
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;
     unsigned long long avc444_seq;
+    /* #45 step 7 -- per-CYCLE batch state, keyed by monitor index. The
+     * worker submits every damaged monitor's pair, drives the whole set
+     * through ONE pump, and collects every pair BEFORE the first PDU is
+     * emitted; the emit pass then finds this monitor's pair already in
+     * hand instead of encoding synchronously. have[] is 0 for "encode as
+     * before", 1 for "pair[] holds this monitor's pair" and -1 for "this
+     * monitor's pair failed in this cycle, ship nothing". Written and
+     * read by the encoder thread only, and cleared at both ends of a
+     * cycle so nothing can survive into the next one. */
+    int avc444_batch_have[16];
+    unsigned long long avc444_batch_seq[16];
+    struct xrdp_avc444_encoded_pair avc444_batch_pair[16];
+    /* E4 counters: E4 must be assertable from a deployed log, never
+     * inferred from a wall-clock improvement */
+    unsigned long long avc444_batch_cycles;
+    unsigned long long avc444_batch_items;
+    int avc444_batch_max_kids;
+    int avc444_batch_e4_logged;
     void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
     int avc444_actual_w[16];         /* per-surface visible dims for  */
     int avc444_actual_h[16];         /* resize detection (FR-RESIZE)  */
@@ -211,6 +230,32 @@ void
 xrdp_encoder_delete(struct xrdp_encoder *self);
 THREAD_RV THREAD_CC
 proc_enc_msg(void *arg);
+
+/* #45 step 7 -- the two PURE halves of the multimon batching rule,
+ * exposed for unit testing (nothing else in step 7 can be tested without
+ * a live capture and two ffmpeg children).
+ *
+ * gfx_egfx_batch_peek_mon(): returns the monitor index 0..15 if and only
+ * if the blob is EXACTLY the xorgxrdp AVC444 shape -- STARTFRAME (0x000B)
+ * + WIRETOSURFACE_1 (0x0001, codec 0x000E/0x000F) + ENDFRAME (0x000C),
+ * every length accounting for itself byte for byte -- and -1 otherwise.
+ * The blob is client-influenced, so every field is length-checked before
+ * it is read: an out-of-bounds read here would be client-triggerable.
+ *
+ * gfx_egfx_batch_group(): groups the head of a drained FIFO run into ONE
+ * set holding AT MOST ONE item per monitor index. A second item for a
+ * monitor already in the set belongs to that monitor's next frame and
+ * ENDS the batch; a non-batchable item ENDS the batch, and if it is the
+ * first item the set is that one item alone (processed exactly as before
+ * this step). Returns the number of input items consumed, so the caller
+ * knows what is left over. set[] and set_mon[] must hold at least
+ * CLIENT_MONITOR_DATA_MAXIMUM_MONITORS (16) entries; set_mon[i] is -1 for
+ * the single non-batchable item and the monitor index otherwise. */
+int
+gfx_egfx_batch_peek_mon(const char *cmd, int cmd_bytes);
+int
+gfx_egfx_batch_group(XRDP_ENC_DATA **in, int n_in,
+                     XRDP_ENC_DATA **set, int *set_mon, int *set_n);
 
 struct xrdp_egfx_rect;
 struct stream;

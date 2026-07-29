@@ -4821,13 +4821,33 @@ server_egfx_cmd(struct xrdp_mod *mod,
     mm->encoder->fifo_to_proc_depth++;
     /* FR-CAPTURE-8: the two-slot producer gate bounds the queue to the
        outstanding-rect budget; more means a leaked ack or a broken
-       gate on the xorgxrdp side (loud, mandated local assertion) */
-    if (mm->encoder->avc444_ffmpeg &&
-            mm->encoder->fifo_to_proc_depth > 2)
+       gate on the xorgxrdp side (loud, mandated local assertion).
+       The budget is PER MONITOR (#45 D13, step 6b): each monitor caps
+       itself at 2 outstanding frames and there is never a global pool,
+       so the aggregate legal depth here is 2 * monitorCount. The 2m is a
+       CONSEQUENCE of m independent caps, never a drawable quantity -- a
+       pool would let one damaged monitor take all of it (bufferbloat and
+       slot aliasing). Hard-coding 2 instead would be a permanent false
+       ERROR on every dual-monitor frame once step 6 deploys, and E2's
+       "zero errors in the server log" would be unreachable. */
     {
-        LOG(LOG_LEVEL_ERROR, "server_egfx_cmd: encoder input fifo depth "
-            "%d exceeds the two-slot outstanding budget",
-            mm->encoder->fifo_to_proc_depth);
+        int mon_count = (int)wm->client_info->display_sizes.monitorCount;
+        if (mon_count < 1)
+        {
+            mon_count = 1;
+        }
+        if (mon_count > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+        {
+            mon_count = CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+        }
+        if (mm->encoder->avc444_ffmpeg &&
+                mm->encoder->fifo_to_proc_depth > 2 * mon_count)
+        {
+            LOG(LOG_LEVEL_ERROR, "server_egfx_cmd: encoder input fifo depth "
+                "%d exceeds the per-monitor two-slot outstanding budget "
+                "(2 x %d monitors)", mm->encoder->fifo_to_proc_depth,
+                mon_count);
+        }
     }
     tc_mutex_unlock(mm->encoder->mutex);
     /* signal xrdp_encoder thread */
