@@ -45,8 +45,15 @@ declare -A ARM_XORG_DEB=(
     # frame_num-wrap re-key knobs (PRD FR-H264-8)
     [arm-p]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
     # arm-q: arm-n's xrdp deb with the RECON xorgxrdp (5b9650c + the
-    # R1SLOT log line) — xrdp BACKLOG #45 recon gate R1
+    # R1SLOT log line) — xrdp BACKLOG #45 recon gate R1. RETIRED with the
+    # gate (2026-07-29): R1 and R2 are answered, step 6c landed, and the
+    # recon instrumentation is reverted. Kept registered only so an old
+    # capture can be reproduced; not in the default arm list.
     [arm-q]="xorgxrdp-dev_1%3a0.10.80+git20260729190443.957fa794ebdc_amd64.deb"
+    # arm-r: the BACKLOG #45 arm — step 6's per-monitor capture budget,
+    # coverage intersect and per-monitor slot (xorgxrdp d77d05463e52),
+    # paired with the xrdp deb carrying steps 0-7
+    [arm-r]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2

@@ -69,7 +69,26 @@ DISPLAY=$CLI \
     || { cat "$OUT/client-monitors.txt"; fail "client did not present 2 monitors"; }
 tail -1 "$OUT/client-monitors.txt"
 
-MARK_P=$(kubectl -n "$NS" logs "$POD" 2>/dev/null | wc -l | tr -d ' ')
+# xrdp logs to /var/log/xrdp.log INSIDE the pod (xrdp.ini LogFile), not to
+# the container's stdout: kubectl logs carries only the entrypoint's own
+# output, which is why a first version of this harness reported zero
+# GFX_TRACE records on a session that was in fact running.
+MARK_P=$(kubectl -n "$NS" exec "$POD" -- \
+    bash -lc 'wc -l < /var/log/xrdp.log 2>/dev/null' | tr -d ' \r')
+MARK_P=${MARK_P:-0}
+# A COLD session, by default: xrdp reconnects to an EXISTING session, and
+# a fleet pod that has been up for hours may have one whose scrolling
+# xterm is long dead -- a 25 s control run on such a session produced 28
+# pictures (1.1 sends/s) and would have made E2's >= 1000 pairs
+# impossible. This is a disposable probe444 session in a test pod, never
+# the owner's: log it off and let sesman build a fresh one.
+if [ "${E_COLD:-1}" = 1 ]; then
+    kubectl -n "$NS" exec "$POD" -- bash -lc \
+        "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" >/dev/null 2>&1
+    kubectl -n "$NS" exec "$POD" -- bash -lc \
+        "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null || break; \
+         sleep 1; done" >/dev/null 2>&1
+fi
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \
                         "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
@@ -120,7 +139,7 @@ wait $SWEEP 2>/dev/null
 kill -9 -- -"$CLIENT_PGID" 2>/dev/null
 sleep 1
 
-kubectl -n "$NS" logs "$POD" 2>/dev/null \
+kubectl -n "$NS" exec "$POD" -- cat /var/log/xrdp.log 2>/dev/null \
     | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
 grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
 head -3 "$OUT/sweep.log"

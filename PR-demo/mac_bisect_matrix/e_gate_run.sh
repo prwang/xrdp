@@ -46,6 +46,13 @@
 # /root/.oracle_cred, is read into a variable and handed to the client
 # through the environment, never as an argument and never printed.
 #
+# THE ARM MUST BE SESSION_KIND=code. Measured 2026-07-29 while validating
+# this harness: two control runs against arm-n (SESSION_KIND=xfce, a
+# static desktop) produced 28 pictures in 25 s and 10 in 30 s -- the
+# session simply had nothing to damage, and E2's >= 1000 pairs would be
+# unreachable no matter how long the run. The scrolling code corpus is
+# what generates continuous damage on both monitors. arm-r sets it.
+#
 # Usage: e_gate_run.sh [seconds]     (default 120; E2 wants >= 1000 pairs)
 #   E_ARM=arm-r E_PORT=40017 E_MODE=oracle E_REFRESH=240 e_gate_run.sh 120
 set -u
@@ -118,9 +125,28 @@ MARK_X=$(kubectl -n "$NS" exec "$POD" -- \
     bash -lc "wc -l < /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
     | tr -d ' \r')
 MARK_X=${MARK_X:-0}
-MARK_P=$(kubectl -n "$NS" logs "$POD" 2>/dev/null | wc -l | tr -d ' ')
+# xrdp logs to /var/log/xrdp.log INSIDE the pod (xrdp.ini LogFile), not to
+# the container's stdout: kubectl logs carries only the entrypoint's own
+# output, which is why a first version of this harness reported zero
+# GFX_TRACE records on a session that was in fact running.
+MARK_P=$(kubectl -n "$NS" exec "$POD" -- \
+    bash -lc 'wc -l < /var/log/xrdp.log 2>/dev/null' | tr -d ' \r')
+MARK_P=${MARK_P:-0}
 echo "log marks: session-xorg $MARK_X lines, pod $MARK_P lines"
 
+# A COLD session, by default: xrdp reconnects to an EXISTING session, and
+# a fleet pod that has been up for hours may have one whose scrolling
+# xterm is long dead -- a 25 s control run on such a session produced 28
+# pictures (1.1 sends/s) and would have made E2's >= 1000 pairs
+# impossible. This is a disposable probe444 session in a test pod, never
+# the owner's: log it off and let sesman build a fresh one.
+if [ "${E_COLD:-1}" = 1 ]; then
+    kubectl -n "$NS" exec "$POD" -- bash -lc \
+        "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" >/dev/null 2>&1
+    kubectl -n "$NS" exec "$POD" -- bash -lc \
+        "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null || break; \
+         sleep 1; done" >/dev/null 2>&1
+fi
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \
                         "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
@@ -167,7 +193,7 @@ XLOG=$(kubectl -n "$NS" exec "$POD" -- \
 see $OUT/client.log"
 kubectl -n "$NS" exec "$POD" -- cat "$XLOG" \
     | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
-kubectl -n "$NS" logs "$POD" 2>/dev/null \
+kubectl -n "$NS" exec "$POD" -- cat /var/log/xrdp.log 2>/dev/null \
     | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
 grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
 
