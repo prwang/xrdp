@@ -1,7 +1,9 @@
-# ARM P (host port 40015) — BACKLOG #48, the CHURN-MASKED re-key.
-# Identical to arm-o (LTR aux-chain, ltr_rekey_frame_num = 536, so a
-# boundary every ~268 encoded frames) except that the re-key emits NO
-# EGFX surface lifecycle event at all: ltr_rekey_surface_reset = false.
+# ARM P (host port 40015) — the frame_num-wrap re-key arm (PRD
+# FR-H264-8). arm-n's LTR aux-chain config with ltr_rekey_frame_num
+# lowered from the shipped 65024 to 536, so a boundary arrives every
+# ~268 encoded frames instead of after ~18 min of continuous animation.
+# This is the SHIPPED re-key shape: bitstream-only, no EGFX surface
+# lifecycle event (ltr_rekey_surface_reset defaults to false).
 #
 # Why this arm exists. The re-key is needed for exactly ONE reason: to
 # keep the shared frame_num counter away from its 2^16 wrap, which is

@@ -18,62 +18,39 @@ DIST=${DIST:-/work/dist}
 # (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
 # tweak content/config, roll ONE arm — never rebuilds or re-imports an
 # image (the ~1.5GB import + native-snapshotter unpack is the slow path).
-# arm-o (BACKLOG #48 re-key boundary) is registered below but deliberately
-# NOT in the default list: it runs a deliberately lowered re-key threshold
-# (ltr_rekey_frame_num = 536), so it is a boundary-exercising test arm, not
-# a member of the steady-state matrix. Deploy it by name:
-#   build_and_deploy.sh arm-o
-ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h arm-i arm-j arm-k arm-l arm-m arm-n}"
+# arm-p (the frame_num-wrap re-key, PRD FR-H264-8) is registered below but
+# deliberately NOT in the default list: it runs a lowered re-key threshold
+# (ltr_rekey_frame_num = 536) so a boundary arrives every ~268 encoded
+# frames instead of every ~18 min. It is a boundary-exercising test arm,
+# not a member of the steady-state matrix. Deploy it by name:
+#   build_and_deploy.sh arm-p
+ARMS="${*:-arm-e arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
 # but MUST be paired per-arm when the xrdp build speaks a newer xup
-# contract: arm-h (xrdp bd1ab35b, contract 20260727) requires the T4's
-# xorgxrdp 251bc4d — with ee1ec01 sesman rejects logins with a contract
-# version mismatch (caught live 2026-07-27, port 40007).
+# contract: with a mismatched pair sesman rejects logins with a contract
+# version complaint (caught live 2026-07-27).
 XORGXRDP_DEB="xorgxrdp-dev_1%3a0.10.80+gitee1ec01eed50_amd64.deb"
 declare -A ARM_XORG_DEB=(
-    [arm-h]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-i]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-k]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-j]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
-    [arm-l]="xorgxrdp-dev_1%3a0.10.80+git251bc4d3db8d_amd64.deb"
     # arm-m/arm-n: 251bc4d + shmem up-front reservation (SIGBUS ->
     # loud connect-time refusal on undersized /dev/shm, 2026-07-28)
     [arm-m]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
     [arm-n]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
-    # arm-o/arm-p: same xorgxrdp as arm-n; only the xrdp side carries #48
-    [arm-o]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
+    # arm-p: same xorgxrdp as arm-n; only the xrdp side carries the
+    # frame_num-wrap re-key knobs (PRD FR-H264-8)
     [arm-p]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
 )
 declare -A ARM_TAG=(
-    [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
-    [arm-e]=c693eeab5ec2 [arm-f]=52099149 [arm-g]=52099149-xfce
-    [arm-h]=bd1ab35b791e-xfce [arm-i]=bd1ab35b791e-xfce
-    [arm-j]=649b447c9f4d-xfce [arm-k]=8b8d17c2636a-xfce
-    [arm-l]=459b66d5319f-xfce
+    [arm-e]=c693eeab5ec2
     [arm-m]=39bb08a48377.xx5b9650c-xfce
     [arm-n]=34795577580b.xx5b9650c-xfce
-    [arm-o]=8f0994e20f5d.xx5b9650c-xfce
     [arm-p]=6894d7de2202.xx5b9650c-xfce
 )
 declare -A TAG_DEB=(
-    [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
-    [e96e655416dc]="xrdp-dev_0.10.80+gite96e655416dc_amd64.deb"
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
-    [bd1ab35b791e]="xrdp-dev_0.10.80+git20260727002823.bd1ab35b791e_amd64.deb"
-    [649b447c9f4d]="xrdp-dev_0.10.80+git20260726151325.649b447c9f4d_amd64.deb"
-    [8b8d17c2636a]="xrdp-dev_0.10.80+git20260727184103.8b8d17c2636a_amd64.deb"
-    [459b66d5319f]="xrdp-dev_0.10.80+git20260727210620.459b66d5319f_amd64.deb"
-    [39bb08a48377]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
-    [34795577580b]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
     # .xx<hash> = same xrdp deb, rebuilt image embedding xorgxrdp <hash>
     [39bb08a48377.xx5b9650c]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
     [34795577580b.xx5b9650c]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
-    # BACKLOG #48: re-key = EGFX surface delete/create + settable threshold
-    # BACKLOG #48 FIX: threshold now actually reaches the encoder
-    [c78895f607da.xx5b9650c]="xrdp-dev_0.10.80+git20260729013621.c78895f607da_amd64.deb"
-    # BACKLOG #48 RED FIX: re-key no longer maps a blank surface
-    [8f0994e20f5d.xx5b9650c]="xrdp-dev_0.10.80+git20260729023407.8f0994e20f5d_amd64.deb"
     # BACKLOG #48: ltr_rekey_surface_reset — churn masked from the client
     [6894d7de2202.xx5b9650c]="xrdp-dev_0.10.80+git20260729030225.6894d7de2202_amd64.deb"
 )

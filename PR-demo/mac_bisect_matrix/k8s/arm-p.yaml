@@ -1,12 +1,11 @@
-# Arm P (BACKLOG #48): the CHURN-MASKED re-key -- arm-o with
-# config with ltr_rekey_frame_num lowered to 536, so the EGFX surface
-# delete/create/map re-key boundary arrives every ~268 encoded frames.
-# The image tag MUST be the #48 build (c78895f607da): the arm-n image
-# does not contain gfx_emit_surface_reset or the settable threshold, and
-# the first #48 build (e928914a0e93) carried the threshold in xrdp_encoder
-# but never copied it into the per-frame encoder config -- it encoded
-# 72698 pairs with ZERO boundaries. build_and_deploy.sh cross-checks this
-# line against ARM_TAG and aborts on a mismatch.
+# Arm P: the frame_num-wrap re-key arm (PRD FR-H264-8) -- arm-n's LTR
+# config with ltr_rekey_frame_num lowered to 536, so a re-key boundary
+# arrives every ~268 encoded frames instead of after ~18 min. The re-key
+# is bitstream-only: encoder pair rebuilt, fresh IDR, shared counter
+# reset, full-surface damage, and NO EGFX surface lifecycle event.
+# The image tag must carry the re-key knobs; build_and_deploy.sh
+# cross-checks this line against ARM_TAG and aborts on a mismatch
+# (which it did, live, when this file was copied from another arm).
 # RDP endpoint on the host: 127.0.0.1:40015 (tester / host tester password).
 # Image tag pins the xrdp-dev commit; gfx.toml comes from the committed
 # gfx/arm-p.toml via ConfigMap xrdp-gfx-arm-p (created by build_and_deploy.sh).
