@@ -40,7 +40,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:ARM_R_TAG
+          image: localhost/xrdp-bisect:f7acb5979788.xxd77d054
           imagePullPolicy: Never
           securityContext:
             privileged: true

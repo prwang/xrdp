@@ -23,7 +23,8 @@ with `git log -p -- BACKLOG.md`.
 | Box | Packages | Encoder config | Status |
 |---|---|---|---|
 | T4 (EC2, Tesla T4 / NVENC) | `xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1`, `xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3` | `PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml` — `aux_ltr_chain = true`, `-g 30000` | **Renders correctly onscreen on both Windows (incl. multimon) and macOS** (owner-tested) |
-| bisect fleet arm-n | image `34795577580b.xx5b9650c-xfce` | `gfx/arm-n.toml` — `aux_ltr_chain = true`, `-g 30000` | good on Windows multimon + macOS |
+| bisect fleet arm-n | image `34795577580b.xx5b9650c-xfce` | `gfx/arm-n.toml` — `aux_ltr_chain = true`, no `-g` (the runner pins it) | good on Windows multimon + macOS |
+| bisect fleet arm-r (2026-07-29) | image `f7acb5979788.xxd77d054` = xrdp #45 steps 0–7 + xorgxrdp step 6 | `gfx/arm-r.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | **#45 gates E1/E2/E3/E6/E7 PASS, E5 RED at 0.97×** (see #45 GATE RESULTS) |
 
 FR-H264-8 remains **EXPERIMENTAL**; `aux_intra_leaf` remains the shipped
 default. Gate status and evidence: `PRD.md` FR-H264-8.
@@ -514,6 +515,79 @@ means:**
   screen) and it removes a pre-existing permanent-reschedule loop — but
   it IS a behaviour change outside `CC_GFX_AVC444`, so it is stated
   rather than folded into "replacing the clear".
+
+### GATE RESULTS — measured 2026-07-29 on the deployed pair
+
+Pair under test: xrdp-dev `f7acb5979788` (steps 0–7) + xorgxrdp-dev
+`d77d05463e52` (step 6), arm-r, `aux_ltr_chain = true`,
+`intra_refresh_frames = 240`, VAAPI CQP 444, offscreen 2560×1440 +
+3840×2400. Evidence:
+`PR-demo/mac_bisect_matrix/captures/e_gate_oracle_20260729_233749/`
+(+ `e_gate_render_*`, `e7_drag_20260729_234903/`).
+
+| gate | result |
+|---|---|
+| **E1** smoke gate | **PASS** at BOTH sizes against the package-installed pair: 8/8 keypresses rendered the right colour, zero lag, edge fidelity 0.994 / 0.992 (floor 0.50), zero encoder errors. Run with the new `SMOKE_TARGET=pod` path — **the T4 is gone** (no `/root/.t4_host`, no key), so this is a fleet-pod pass, NOT a T4 pass. |
+| **E2** ≥ 1000 pairs | **PASS**: 1688 pairs per view, **8 scheduled cuts** at ordinals 0/240/…/1680, wire audit `--assert` 7/7 clean, black-frame check 3376/3376 decoded with **zero** black frames, and zero rewrite failures / `unsupported` / pair aborts / budget assertions / fifo-depth errors in either server log. |
+| **E3** target geometry | **PASS** — the E2 run IS the E3 run; both monitors audited independently. |
+| **E4** one thread, four views | **Mechanism PROVEN, premise rare.** The worker armed 4 children in ONE poll set 21 times (asserted counter + a once-per-run INFO line), so the construction demonstrably works — but that is **21 of 3346 cycles (0.6 %)**. See E5. |
+| **E5** oracle frame interval | **RED — 0.97×** (52.5 ms mean vs the 51.1 ms baseline). p50 **halved** (50 → 28 ms) and p90 improved (103 → 88 ms), but the mean did not move. **The stop rule applies; nothing is being re-tuned.** |
+| **E6** no regression | `make check` green: xrdp 152/152, libcommon 157, libipm 35, libxrdp 13, memtest 1, zero failures. Refresh cost measured on the gate corpus: a paired cut adds 210 308 B over a 47 614 B pair, i.e. **+1.84 % at N = 240** (PRD predicted ≈ +4 %). The arm-n/arm-m `bandwidth_bench.sh` A/B was NOT re-run: arm-n is `SESSION_KIND=xfce`, a different payload, so it is not comparable to this corpus. |
+| **E7** dual-monitor drag | **PASS** on the sweep window: 551 and 812 sends over 60 s of sweeping across the boundary, worst per-monitor gap 702 ms / 406 ms (threshold 2000 ms). |
+
+**Why E5 is red — the attribution the stop rule demands** (all from the
+same capture):
+
+- **The batching premise almost never held.** 3325 of 3346 cycles had
+  ONE monitor's item in hand. Batching cannot overlap work the producer
+  hands over sequentially.
+- **The producer serialises the monitors.** Consecutive sends of
+  *different* monitors are **26 ms apart (p50)** while a pair's
+  encode-and-emit finishes in ~26 ms, so by the time monitor B's item
+  arrives, monitor A is already done.
+- **What actually binds is the per-monitor send period: ~105 ms**
+  (p50 102 ms, both monitors) against ~26 ms of encode — the worker is
+  idle about half the time. The limit is capture/ack-side, not encoder
+  side. That is the same class as the PRD's recorded "~28 ms remainder
+  that is NOT encode", and it is now the measured majority of the period
+  at this geometry.
+- **The tail is not the refresh.** 130 gaps > 150 ms account for 16 % of
+  the window and only 2 of them sit at a scheduled cut; excluding them
+  the mean is 46.0 ms = 1.11×. So even a tail-free run is far from 2.0×.
+- **Corroboration from the other side:** with the rendering client
+  (slower consumer) the batch fired in 11 % of cycles instead of 0.6 %,
+  and the end-to-end rate was **2.96 pairs/s per monitor** against 2.97
+  before #45 — unchanged, as predicted for a client-bound session.
+
+**What this means for the item.** Steps 0–7 are implemented, tested and
+deployed, and E1/E2/E3/E6/E7 pass on the deployed pair; E4's mechanism is
+proven. **#45 is NOT done**: E5 is red, so the item stays open with the
+attribution above, and the next work is on the CAPTURE side (the ~105 ms
+per-monitor period), not on more encoder batching. Two concrete
+follow-ups the evidence points at, neither of them started:
+1. why a monitor's next capture waits ~105 ms when its encode takes
+   ~26 ms — the deferred-update pacing, the ack path and the FR-CAPTURE-8
+   re-pack (which step 6c switched on, see above) are the candidates, and
+   the re-pack is the one this campaign added;
+2. whether the producer can hand both monitors over together (one xup
+   message per pass, or a pass that captures both before sending) — that
+   is what would make step 7's set-of-4 the common case instead of 0.6 %.
+
+**One residual coupling recorded from step 7's review, not fixed:** with
+the shared deadline across a set (D3), a child that withholds its picture
+delays the HEALTHY monitor's frame — and so its ack and capture-slot
+release — by up to `pair_timeout_ms`. The healthy monitor does not LOSE
+the frame (each handle is collected on its own merits and only failing
+handles are torn down), so this is added latency, not frame loss. D3
+specified one deadline for the two views of ONE frame; extending it
+across monitors couples independent frames, and E7 is the gate that
+would catch it.
+
+**One startup transient recorded, not investigated:** at session start the
+3840×2400 monitor sends ONE frame and then nothing for ~4.7 s while the
+2560×1440 monitor streams — its encoder pair is spawned later. E7 scores
+the sweep window only and reports this separately; a first version of the
+gate scored it as a stall, which is how it was found.
 
 ### Corrections to this item, found by reading the source (2026-07-29)
 

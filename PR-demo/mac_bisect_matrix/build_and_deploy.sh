@@ -61,6 +61,7 @@ declare -A ARM_TAG=(
     [arm-n]=34795577580b.xx5b9650c-xfce
     [arm-p]=6894d7de2202.xx5b9650c-xfce
     [arm-q]=34795577580b.xx957fa79
+    [arm-r]=f7acb5979788.xxd77d054
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -71,6 +72,9 @@ declare -A TAG_DEB=(
     [6894d7de2202.xx5b9650c]="xrdp-dev_0.10.80+git20260729030225.6894d7de2202_amd64.deb"
     # arm-q: arm-n's xrdp deb, image rebuilt on the recon xorgxrdp
     [34795577580b.xx957fa79]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
+    # arm-r: BACKLOG #45 steps 0-7 (xrdp) paired with step 6 (xorgxrdp
+    # d77d05463e52). This is the pair every #45 gate is measured on.
+    [f7acb5979788.xxd77d054]="xrdp-dev_0.10.80+git20260729233553.f7acb5979788_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

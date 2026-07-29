@@ -1,0 +1,7 @@
+Desired=Unknown/Install/Remove/Purge/Hold
+| Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+|/ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||/ Name           Version                                Architecture Description
++++-==============-======================================-============-=============================================================
+ii  xorgxrdp-dev   1:0.10.80+git5b9650cafbc3              amd64        xorgxrdp Xorg drivers (developer build from git 5b9650cafbc3)
+ii  xrdp-dev       0.10.80+git20260729003200.e928914a0e93 amd64        xrdp RDP server (developer build from git e928914a0e93)

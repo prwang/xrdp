@@ -153,8 +153,11 @@ fi
 [ -z "$SD" ] && { echo "FAIL: no fresh Xorg session"; exit 1; }
 echo "session display=$SD client=$CLI target=$TGT_NAME via :$LPORT"
 if [ "$TARGET" = pod ]; then
-    sess() { t4 "su -s /bin/bash $SU -c 'DISPLAY=$SD \
-        XAUTHORITY=/home/$SU/.Xauthority $*'"; }
+    # three levels of quoting (kubectl exec -> bash -lc -> su -c), so the
+    # inner payload is wrapped in DOUBLE quotes: callers pass single
+    # quotes of their own (pkill -f 'xterm.*colorkey') and redirections.
+    sess() { t4 "su -s /bin/bash $SU -c \"DISPLAY=$SD \
+XAUTHORITY=/home/$SU/.Xauthority $*\""; }
 else
     sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
 fi

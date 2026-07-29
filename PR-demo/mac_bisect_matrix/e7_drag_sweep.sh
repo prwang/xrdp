@@ -97,6 +97,14 @@ setsid env DISPLAY=$CLI RDPARGS="$RDPARGS" \
 CLIENT_PGID=$!
 unset PW RDPARGS
 sleep 8
+# The gate's subject is per-monitor progress DURING THE SWEEP. Session
+# startup is a different phenomenon and must not be scored as a stall:
+# measured 2026-07-29, the 3840x2400 monitor's encoder pair spawns after
+# the 2560x1440 one and its second frame lands ~4.7 s after connect while
+# the small monitor is already streaming. That transient is REPORTED
+# separately below rather than discarded, and the assertion runs on
+# sends after this mark.
+SWEEP_T0=$(date -u +%H:%M:%S.%N | awk -F: '{print $1*3600 + $2*60 + $3}')
 
 # --- the sweep, inside the session --------------------------------------
 # One non-interactive exec (CLAUDE.md: no bash-over-ssh heredoc
@@ -144,12 +152,15 @@ kubectl -n "$NS" exec "$POD" -- cat /var/log/xrdp.log 2>/dev/null \
 grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
 head -3 "$OUT/sweep.log"
 
-python3 - "$OUT/gfx_trace.txt" "$STALL_MS" <<'PY' | tee "$OUT/VERDICT.txt"
+python3 - "$OUT/gfx_trace.txt" "$STALL_MS" "$SWEEP_T0" <<'PY' | tee "$OUT/VERDICT.txt"
 import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
-SURF = re.compile(r"GFX_TRACE \S+ surface=(-?\d+)")
+# the trace line is "GFX_TRACE avc dmg surface=N num_rects=..." -- two
+# tokens before the field, and other GFX_TRACE lines (ack, batch) carry
+# no surface at all. Match the field itself, not a token count.
+SURF = re.compile(r"GFX_TRACE avc dmg surface=(\d+)")
 
 
 def secs(line):
@@ -169,7 +180,20 @@ for line in open(sys.argv[1], errors="replace"):
     per.setdefault(int(m.group(1)), []).append(t)
 
 stall_ms = float(sys.argv[2])
+t0 = float(sys.argv[3]) if len(sys.argv) > 3 else 0.0
 print("=== E7 — per-monitor progress during the boundary sweep ===")
+print("sweep window starts at %.3f (session startup before it is reported "
+      "separately, not scored)" % t0)
+startup = {}
+for surf in sorted(per):
+    early = [t for t in per[surf] if t < t0]
+    gaps = [b - a for a, b in zip(sorted(early), sorted(early)[1:])]
+    startup[surf] = (len(early), max(gaps) * 1000.0 if gaps else 0.0)
+    per[surf] = [t for t in per[surf] if t >= t0]
+for surf in sorted(startup):
+    print("  startup: surface %d %d sends, worst gap %.0f ms"
+          % (surf, startup[surf][0], startup[surf][1]))
+per = dict((k, v) for k, v in per.items() if len(v) > 1)
 if len(per) < 2:
     print("RED: only %d surface(s) sent anything (%s). E7 needs BOTH "
           "monitors' streams; a whole-session check would have passed "

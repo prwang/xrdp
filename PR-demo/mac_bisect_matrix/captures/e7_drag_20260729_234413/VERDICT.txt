@@ -1,0 +1,2 @@
+=== E7 — per-monitor progress during the boundary sweep ===
+RED: only 0 surface(s) sent anything ([]). E7 needs BOTH monitors' streams; a whole-session check would have passed this.
