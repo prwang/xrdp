@@ -74,13 +74,19 @@ spec:
               subPath: code_corpus.ansi
       volumes:
         - name: dshm
-          # k8s defaults /dev/shm to 64Mi; the packed-view AVC444
-          # capture shmem (two slots x two views, all monitors) needs
-          # ~74MB for a dual-4K layout -- an undersized tmpfs SIGBUSes
-          # Xorg mid-session (2026-07-28 multimon incident)
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
           emptyDir:
             medium: Memory
-            sizeLimit: 512Mi
+            sizeLimit: 1Gi
         - name: dri
           hostPath:
             path: /dev/dri

@@ -349,16 +349,46 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
     m = 2. The overlap the session does get is cross-monitor, and the
     global budget is saturated — max (`rect_id − rect_id_ack`) = 2, with
     543 of 1100 sends issued at depth 2.
+  - **Re-run at the E3 TARGET geometry (2560×1440 + 3840×2400), same
+    conclusion** — `r1r2_target_geometry.sh 90`, evidence
+    `captures/r1r2_target_20260729_193624/`. 528 sends over 87 s:
+    full-pass same-slot **479/479**, monitor 1 again pinned to a single
+    slot all run, per-monitor two-slot pipelining **2 of 528 (0.38 %)**,
+    max depth 2 with 244/528 sends at depth 2. Slot offsets confirm the
+    layout arithmetic exactly (monitor 0: 0 and 11 059 200 =
+    2560·1440·1.5·2 views; monitor 1 based at 22 118 400).
   - **6c may proceed on this basis.** The recon instrumentation is not
     part of step 6: revert xorgxrdp `957fa79` and retire arm-q when the
     step lands.
+  - Two observations from these runs, recorded because they are real and
+    neither is a gate result: (a) the target-geometry session delivered
+    only **3.03 pairs/s per monitor** (6.06 sends/s) — the throughput E5
+    exists to move, measured here for the first time at that size;
+    (b) FreeRDP logged `YUV decoder: intersecting rectangles, aborting`
+    48 times in the target run and 16 times at 2×1024×768, in both cases
+    clustered in a few seconds around session start and then absent for
+    the rest of the run. Not investigated here; it belongs to whoever
+    picks up the region-construction path, and it is not caused by the
+    recon build (the instrumentation is a log statement).
 - **R2 — the `/dev/shm` floor at 2560×1440 + 3840×2400, measured on the
-  fleet.** Derive and record the actual capture shmem footprint at the
-  target geometry (two slots × two views × both monitors). **Gate:** the
-  recorded floor fits the configured tmpfs with the margin stated, before
-  the first E3/E5 session at that geometry boots — an undersized tmpfs
-  SIGBUSes Xorg mid-session (2026-07-28 incident), which mid-run would be
-  indistinguishable from the bugs this item hunts.
+  fleet. GATE REACHED 2026-07-29: PASS at a flat 1 GiB.** Measured on the
+  same target-geometry session as R1 (`captures/r1r2_target_20260729_193624/`),
+  by sampling the pod's tmpfs for the whole run and reading back the
+  arena xorgxrdp actually reserved at connect:
+  - **capture arena reserved: 77 414 400 B (73.8 MiB)** — exactly
+    `w·h·1.5 × 2 views × 2 slots` summed over monitors (22 118 400 +
+    55 296 000). The model is confirmed, not assumed: the same log line
+    read 9 437 184 B at 2×1024×768, also exact.
+  - **peak `/dev/shm` used across the session: 77 414 400 B** — the
+    capture arena is the only consumer; nothing else in the session
+    touched the tmpfs.
+  - **tmpfs configured: 1 GiB → 13.9× headroom**, 950 MiB unused at peak,
+    no SIGBUS, no budget-exceeded log. **Owner directive 2026-07-29: 1 GiB
+    flat, no micro-tuning.** The failure mode is a hard mid-session SIGBUS
+    and the value is a tmpfs *ceiling* rather than an allocation, so
+    headroom costs nothing and a tight bound buys nothing. `k8s/arm-q.yaml`
+    carries it with the arithmetic in the comment; other arms keep 512Mi
+    (6.9× at this geometry) until they run E3-sized sessions.
 
 ### Out of scope
 
