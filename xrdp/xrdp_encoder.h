@@ -69,6 +69,7 @@ struct xrdp_encoder
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window   */
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain  */
     int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)    */
+    int avc444_ltr_rekey_surface_reset; /* 0 = mask the churn (#48)     */
     /* aux_ltr_chain re-key (BACKLOG #48): when the shared frame_num
      * counter hits the threshold the encoder pair is destroyed, and the
      * NEXT frame for that monitor rebuilds the client's decoder by

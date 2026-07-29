@@ -420,6 +420,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_sanitize_hrd = 0;
     config->avc444_ffmpeg_strip_pic_struct = 0;
     config->avc444_ffmpeg_aux_ltr_chain = 0;
+    config->avc444_ffmpeg_ltr_rekey_surface_reset = 1;
     config->avc444_ffmpeg_ltr_rekey_frame_num =
         XRDP_H264_LTR_FRAME_NUM_REKEY;
     config->avc444_ffmpeg_fault_aux_delay = 0;
@@ -439,6 +440,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t sp = toml_bool_in(avc, "strip_pic_struct");
             toml_datum_t lc = toml_bool_in(avc, "aux_ltr_chain");
             toml_datum_t rk = toml_int_in(avc, "ltr_rekey_frame_num");
+            toml_datum_t rs = toml_bool_in(avc,
+                                           "ltr_rekey_surface_reset");
             toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
             toml_datum_t fm = toml_bool_in(avc, "fault_strip_mmco");
             if (tf.ok)
@@ -464,6 +467,18 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             if (lc.ok)
             {
                 config->avc444_ffmpeg_aux_ltr_chain = lc.u.b ? 1 : 0;
+            }
+            if (rs.ok)
+            {
+                config->avc444_ffmpeg_ltr_rekey_surface_reset =
+                    rs.u.b ? 1 : 0;
+                if (!rs.u.b)
+                {
+                    LOG(LOG_LEVEL_INFO, "TConfig: avc444_ffmpeg "
+                        "ltr_rekey_surface_reset is OFF: the re-key "
+                        "restarts the encoder (fresh IDR, counter reset) "
+                        "without any EGFX surface lifecycle event");
+                }
             }
             if (rk.ok)
             {

@@ -37,6 +37,7 @@ EXTRA_DIST = \
   gfx/gfx_avc444_empty_args.toml \
   gfx/gfx_avc444_rekey.toml \
   gfx/gfx_avc444_rekey_bad.toml \
+  gfx/gfx_avc444_rekey_nochurn.toml \
   gfx/fake_encoder_hang.sh \
   avc444/fixture_4frame.nut \
   avc444/PROVENANCE.md \

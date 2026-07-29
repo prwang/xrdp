@@ -1555,14 +1555,31 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         d_rects[0].x2 = twidth;
         d_rects[0].y2 = theight;
         num_rects_d = 1;
-        /* alternate base <-> base+16 so the replacement never reuses the
-         * id whose decoder state we are discarding, and so this frame's
-         * pixels can be addressed to it while the OLD surface is still
-         * the one mapped to output */
-        do_rekey = 1;
-        surface_id = (old_surface_id == base_surface_id)
-                     ? base_surface_id + XRDP_AVC444_SURFACE_ALT
-                     : base_surface_id;
+        if (self->avc444_ltr_rekey_surface_reset)
+        {
+            /* alternate base <-> base+16 so the replacement never reuses
+             * the id whose decoder state we are discarding, and so this
+             * frame's pixels can be addressed to it while the OLD surface
+             * is still the one mapped to output */
+            do_rekey = 1;
+            surface_id = (old_surface_id == base_surface_id)
+                         ? base_surface_id + XRDP_AVC444_SURFACE_ALT
+                         : base_surface_id;
+        }
+        else
+        {
+            /* Churn MASKED from the client (BACKLOG #48, 2026-07-29).
+             * The re-key exists for exactly one reason -- to keep the
+             * shared frame_num counter away from its wrap -- and the
+             * encoder restart alone achieves that: the replacement child
+             * opens with a real IDR and the counter resets. The surface
+             * lifecycle event was only ever a belt-and-braces decoder
+             * teardown, and it is what macOS renders as a black flash
+             * (measured in BOTH emission orders). The client sees an
+             * ordinary full-surface repaint from a fresh IDR and no
+             * surface event at all. */
+            self->avc444_surface_reset_pending[mon_index] = 0;
+        }
     }
 
     nv12_bytes = xup_cap_avc444_nv12_bytes(twidth, theight,

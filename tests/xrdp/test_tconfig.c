@@ -249,6 +249,27 @@ START_TEST(test_tconfig_gfx_avc444_rekey_threshold)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_rekey_surface_reset)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #48 (2026-07-29): the surface teardown is separable from
+     * the re-key. It defaults ON (the shipped mechanism), and can be
+     * masked so the client sees only a full-surface repaint from a fresh
+     * IDR -- macOS renders the surface swap itself as a black flash. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 1);
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 1);
+    /* masked, and the threshold it travels with is still honoured */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey_nochurn.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 0);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num, 536);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
 START_TEST(test_tconfig_gfx_avc444_rekey_out_of_range_refused)
 {
     struct xrdp_tconfig_gfx gfxconfig;
@@ -294,6 +315,8 @@ make_suite_tconfig_load_gfx(void)
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_override);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_rekey_threshold);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_surface_reset);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_rekey_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,

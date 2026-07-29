@@ -1441,6 +1441,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             self->avc444_aux_ltr_chain =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_ltr_chain;
             self->avc444_ltr_rekey_frame_num = cfg.ltr_rekey_frame_num;
+            self->avc444_ltr_rekey_surface_reset =
+                self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
             if (self->avc444_aux_ltr_chain)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "

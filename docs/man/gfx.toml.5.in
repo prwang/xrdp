@@ -239,9 +239,10 @@ The AVC444 long\(hyterm\(hyreference chain drives one shared, monotonically
 increasing \fBframe_num\fR across both views. A decoder that reaches the
 16\(hybit wrap in this topology has been measured to stop decoding silently, so
 the server re\(hykeys before the counter can get there: it destroys the encoder
-pair, deletes and recreates the affected EGFX surface \(em a protocol\(hydefined
-decoder teardown \(em and repaints the whole surface from a fresh IDR in the
-same frame. The visible cost is one full\(hyframe update.
+pair, so the replacement opens with a fresh IDR and the shared counter resets,
+and repaints the whole surface in the same frame. The visible cost is one
+full\(hyframe update. See \fBltr_rekey_surface_reset\fR for whether the re\(hykey
+also emits an EGFX surface teardown.
 
 At the default the boundary arrives after roughly 18 minutes of continuous
 30 fps animation; frames are encoded only on damage, so an idle session may
@@ -250,6 +251,20 @@ arm at \fB536\fR crosses it every few seconds). Accepted range is \fB64\fR to
 \fB65024\fR; a value outside it is refused with a warning and the default is
 kept, because a higher threshold would expose a decoder to the very wrap this
 mechanism exists to prevent.
+
+.TP
+\fBltr_rekey_surface_reset\fR = \fItrue\fR | \fIfalse\fR
+Applies only when \fBaux_ltr_chain\fR is enabled. Whether the re\(hykey also
+deletes and recreates the affected EGFX surface, in addition to rebuilding the
+encoder pair. Default: \fBtrue\fR.
+
+The surface teardown is a protocol\(hydefined decoder reset, and was intended as
+belt\(hyand\(hybraces on top of the fresh IDR. It is not what the re\(hykey is for:
+the counter reset comes from the encoder rebuild alone. Some clients repaint
+the output when a mapped surface is replaced, which is seen as a brief black
+flash at every boundary; set this to \fBfalse\fR to keep the re\(hykey entirely
+inside the bitstream, so the client sees only a full\(hysurface repaint from a
+fresh IDR and no surface lifecycle event at all.
 
 .TP
 \fBencoder_args\fR = \fI<array of strings>\fR

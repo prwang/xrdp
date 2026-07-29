@@ -147,6 +147,14 @@ struct xrdp_tconfig_gfx
      * animation; the MAX is a ceiling, since a higher value would let
      * a decoder meet the frame_num wrap. */
     int avc444_ffmpeg_ltr_rekey_frame_num;
+    /* Emit the EGFX surface delete/create/map teardown at a re-key.
+     * Default 1 (the BACKLOG #48 mechanism). Setting it to 0 MASKS the
+     * surface churn from the client: the encoder is still restarted, so
+     * the client still gets a real IDR with full-surface damage and the
+     * shared frame_num counter still resets -- which is the only thing
+     * the re-key is actually FOR. Measured 2026-07-29: macOS flashes
+     * black at every surface swap, in both emission orders. */
+    int avc444_ffmpeg_ltr_rekey_surface_reset;
     /* NOTE: AVC444 reference partitioning (aux encoded by a second
      * all-IDR child and spliced in as non-reference, non-IDR I leaves)
      * is NOT configurable: it is a structural requirement of the
