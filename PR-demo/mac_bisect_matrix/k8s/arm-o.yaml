@@ -1,5 +1,8 @@
-# Arm N: FR-H264-8 EXPERIMENTAL LTR aux-chain (aux_ltr_chain=true) on the
-# arm-m VAAPI CQP 444 config -- the acceptance-gate A/B arm vs arm-m.
+# Arm O (BACKLOG #48): the re-key BOUNDARY arm -- arm-n's LTR aux-chain
+# config with ltr_rekey_frame_num lowered to 536, so the EGFX surface
+# delete/create/map re-key boundary arrives every ~268 encoded frames.
+# The image tag MUST be the #48 build (e928914a0e93): the arm-n image
+# does not contain gfx_emit_surface_reset or the settable threshold.
 # RDP endpoint on the host: 127.0.0.1:40014 (tester / host tester password).
 # Image tag pins the xrdp-dev commit; gfx.toml comes from the committed
 # gfx/arm-o.toml via ConfigMap xrdp-gfx-arm-o (created by build_and_deploy.sh).
@@ -28,7 +31,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:34795577580b.xx5b9650c-xfce
+          image: localhost/xrdp-bisect:e928914a0e93.xx5b9650c-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true

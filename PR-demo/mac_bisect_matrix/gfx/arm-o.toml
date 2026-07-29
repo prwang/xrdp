@@ -51,6 +51,12 @@ encoder_args = [
   "-c:v", "h264_vaapi",
   "-rc_mode", "CQP", "-qp", "20",
   "-bf", "0", "-async_depth", "1",
+  # NOTE (2026-07-29): the inherited claim that "-g 30000 makes epochs
+  # coincide with re-keys" is WRONG by the factor of 2 between pairs and
+  # the shared frame_num. -g 30000 => a main IDR every 30000 pairs =>
+  # shared counter 60000, below the 65024 default threshold, so the
+  # re-key can never fire at the default. It fires here only because
+  # ltr_rekey_frame_num is lowered to 536 (boundary at pair 268).
   # FR-H264-8: long GOP. Mid-stream main IDRs empty the DPB (LT1 dies),
   # forcing an aux-child respawn and starting a new topology-3 epoch
   # every GOP (vaapi default gop=120 = every ~12 s). With a reliable

@@ -10,7 +10,9 @@
 #include "xrdp_h264_annexb.h"
 #include "xrdp_avc444_convert.h"
 #include "os_calls.h"
+#include "string_calls.h"
 #include "log.h"
+#include "xrdp_encoder.h"
 #include "test_xrdp.h"
 
 /*
@@ -385,14 +387,32 @@ START_TEST(test_ffmpeg_ltr_rekey_cycle)
         "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
     };
     const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
-    const int threshold = XRDP_H264_LTR_FRAME_NUM_REKEY_MIN;
+    /* the value arm-o deploys: proves a REAL configured threshold
+     * fires, and fires early (pair 268), not merely the API minimum */
+    const int threshold = 536;
+    const int max_pairs = 5000;   /* bounded expectation: see below */
 
     if (!have_ffmpeg(&cfg))
     {
         return;
     }
-    cfg.aux_ltr_chain = 1;
-    cfg.ltr_rekey_frame_num = threshold;
+    /* Build cfg through the REAL plumbing hop rather than by hand: the
+     * arm-o failure (2026-07-29) was a dropped field in exactly this
+     * copy, and a test that sets cfg directly is blind to it. */
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = threshold;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+        ck_assert_int_eq(cfg.ltr_rekey_frame_num, threshold);
+        ck_assert_int_eq(cfg.aux_ltr_chain, 1);
+    }
     cfg.encoder_args.count = nargs;
     for (i = 0; i < nargs; i++)
     {
@@ -407,7 +427,7 @@ START_TEST(test_ffmpeg_ltr_rekey_cycle)
     ck_assert_ptr_ne(enc, NULL);
     /* nothing pending before the first pair */
     ck_assert_int_eq(xrdp_ffmpeg_avc444_rekey_pending(enc), 0);
-    for (i = 0; i < threshold; i++)
+    for (i = 0; i < max_pairs; i++)
     {
         fill_yuv444_mostly_static(xrgb, w, h, i);
         ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
@@ -429,7 +449,13 @@ START_TEST(test_ffmpeg_ltr_rekey_cycle)
     }
     /* two frame_num values per pair: the trip is on pair threshold/2 - 1
      * (zero-based), i.e. the first pair whose SECOND value reaches it */
+    /* Fires at EXACTLY the configured counter (two frame_num per pair),
+     * and fires EARLY. A harness that just waits is a defect: the arm-o
+     * run burned ~20 min because a dead knob is indistinguishable from a
+     * slow one unless the expectation is bounded. Bound it here. */
     ck_assert_int_eq(fired_at, threshold / 2 - 1);
+    ck_assert_int_lt(fired_at, max_pairs);
+    ck_assert_int_lt(fired_at, 5000);
 
     /* Cross the boundary the way the caller does (xrdp_encoder.c: the
      * pair has shipped, now destroy the encoder so the next damaged frame
@@ -632,6 +658,105 @@ START_TEST(test_ffmpeg_resize_recycle)
 END_TEST
 
 /******************************************************************************/
+/* REGRESSION (arm-o, 2026-07-29): the gfx.toml -> runner plumbing has four
+ * hops (tconfig -> xrdp_mm -> struct xrdp_encoder -> cfg) and the LAST one
+ * is a hand-written field-by-field copy. ltr_rekey_frame_num was added to
+ * the first three and dropped from the fourth, so the knob parsed, logged
+ * a WARNING naming the lowered value, and never reached the encoder: the
+ * deployed threshold stayed the compiled-in default and the #48 re-key
+ * could not fire at all. 72698 pairs on arm-o produced ZERO boundaries.
+ *
+ * The pre-existing ffmpeg test could not catch it because it sets the
+ * config struct directly, bypassing this hop entirely. This test drives
+ * the real function. Every session-scoped field gets a value distinct
+ * from the default so a dropped assignment fails here. */
+START_TEST(test_avc444_cfg_from_encoder_carries_every_field)
+{
+    struct xrdp_encoder enc;
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444_config defaults;
+
+    xrdp_ffmpeg_avc444_config_default(&defaults);
+    memset(&enc, 0, sizeof(enc));
+    enc.avc444_chroma_align = 16;
+    enc.avc444_dump_extra = 1;
+    enc.avc444_strip_sei = 1;
+    enc.avc444_sanitize_hrd = 1;
+    enc.avc444_strip_pic_struct = 1;
+    enc.avc444_aux_ltr_chain = 1;
+    enc.avc444_ltr_rekey_frame_num = 536;
+    enc.avc444_fault_aux_delay = 1;
+    enc.avc444_fault_strip_mmco = 1;
+    snprintf(enc.avc444_path, sizeof(enc.avc444_path), "/opt/x/ffmpeg");
+    enc.avc444_encoder_args.count = 2;
+    snprintf(enc.avc444_encoder_args.arg[0],
+             sizeof(enc.avc444_encoder_args.arg[0]), "-c:v");
+    snprintf(enc.avc444_encoder_args.arg[1],
+             sizeof(enc.avc444_encoder_args.arg[1]), "h264_nvenc");
+
+    xrdp_avc444_cfg_from_encoder(&enc, &cfg);
+
+    ck_assert_int_eq(cfg.chroma_align, 16);
+    ck_assert_int_eq(cfg.use_dump_extra, 1);
+    ck_assert_int_eq(cfg.strip_sei, 1);
+    ck_assert_int_eq(cfg.sanitize_hrd, 1);
+    ck_assert_int_eq(cfg.strip_pic_struct, 1);
+    ck_assert_int_eq(cfg.aux_ltr_chain, 1);
+    ck_assert_int_eq(cfg.fault_aux_delay, 1);
+    ck_assert_int_eq(cfg.fault_strip_mmco, 1);
+    ck_assert_str_eq(cfg.path, "/opt/x/ffmpeg");
+    ck_assert_int_eq(cfg.encoder_args.count, 2);
+    ck_assert_str_eq(cfg.encoder_args.arg[1], "h264_nvenc");
+    /* structural, never configurable (PRD FR-H264-7) */
+    ck_assert_int_eq(cfg.aux_intra_leaf, 1);
+    /* THE bug: settable everywhere except where it mattered */
+    ck_assert_int_eq(cfg.ltr_rekey_frame_num, 536);
+    ck_assert_int_ne(cfg.ltr_rekey_frame_num, defaults.ltr_rekey_frame_num);
+}
+END_TEST
+
+
+/* REGRESSION (arm-o cause 2, 2026-07-29): a main IDR resets the shared
+ * counter, and the counter advances by TWO per pair, so a child GOP of g
+ * pairs caps it at 2g. With `-g 30000` against the 65024 default the cap
+ * is 60000 and the re-key can NEVER fire -- 72698 pairs produced zero
+ * boundaries, and the only symptom was ~20 minutes of silence. Pin the
+ * arithmetic so the condition is a CI failure, not a stakeout. */
+START_TEST(test_ltr_counter_cap_detects_unreachable_rekey)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+
+    xrdp_ffmpeg_avc444_config_default(&cfg);
+    /* no explicit -g: cap unknown, encoder default is far below any
+     * sane threshold */
+    cfg.encoder_args.count = 0;
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_ltr_counter_cap(&cfg), -1);
+
+    /* the DEPLOYED arm-n / T4 config: unreachable at the default */
+    cfg.encoder_args.count = 2;
+    snprintf(cfg.encoder_args.arg[0],
+             sizeof(cfg.encoder_args.arg[0]), "-g");
+    snprintf(cfg.encoder_args.arg[1],
+             sizeof(cfg.encoder_args.arg[1]), "30000");
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_ltr_counter_cap(&cfg), 60000);
+    ck_assert_int_lt(xrdp_ffmpeg_avc444_ltr_counter_cap(&cfg),
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+
+    /* the smallest GOP that makes the DEFAULT threshold reachable */
+    snprintf(cfg.encoder_args.arg[1],
+             sizeof(cfg.encoder_args.arg[1]), "32513");
+    ck_assert_int_ge(xrdp_ffmpeg_avc444_ltr_counter_cap(&cfg),
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+
+    /* arm-o is reachable because the THRESHOLD is lowered, not the GOP */
+    snprintf(cfg.encoder_args.arg[1],
+             sizeof(cfg.encoder_args.arg[1]), "30000");
+    cfg.ltr_rekey_frame_num = 536;
+    ck_assert_int_ge(xrdp_ffmpeg_avc444_ltr_counter_cap(&cfg),
+                     cfg.ltr_rekey_frame_num);
+}
+END_TEST
+
 Suite *
 make_suite_avc444_ffmpeg(void)
 {
@@ -648,6 +773,8 @@ make_suite_avc444_ffmpeg(void)
     tcase_add_test(tc, test_ffmpeg_single_sps_per_keyframe);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_ltr_rekey_cycle);
+    tcase_add_test(tc, test_avc444_cfg_from_encoder_carries_every_field);
+    tcase_add_test(tc, test_ltr_counter_cap_detects_unreachable_rekey);
     tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);
     suite_add_tcase(s, tc);

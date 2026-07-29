@@ -18,10 +18,11 @@ DIST=${DIST:-/work/dist}
 # (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
 # tweak content/config, roll ONE arm — never rebuilds or re-imports an
 # image (the ~1.5GB import + native-snapshotter unpack is the slow path).
-# arm-o (BACKLOG #48 re-key boundary) is deliberately NOT in the default
-# list: it needs an xrdp deb built from the #48 commit, so it is deployed
-# by name ("build_and_deploy.sh arm-o") once ARM_TAG/TAG_DEB below carry
-# that build. Listing it here before then would abort a whole-fleet roll.
+# arm-o (BACKLOG #48 re-key boundary) is registered below but deliberately
+# NOT in the default list: it runs a deliberately lowered re-key threshold
+# (ltr_rekey_frame_num = 536), so it is a boundary-exercising test arm, not
+# a member of the steady-state matrix. Deploy it by name:
+#   build_and_deploy.sh arm-o
 ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h arm-i arm-j arm-k arm-l arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
@@ -40,6 +41,8 @@ declare -A ARM_XORG_DEB=(
     # loud connect-time refusal on undersized /dev/shm, 2026-07-28)
     [arm-m]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
     [arm-n]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
+    # arm-o: same xorgxrdp as arm-n; only the xrdp side carries #48
+    [arm-o]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-a]=52099149 [arm-b]=52099149 [arm-c]=e96e655416dc [arm-d]=52099149
@@ -49,6 +52,7 @@ declare -A ARM_TAG=(
     [arm-l]=459b66d5319f-xfce
     [arm-m]=39bb08a48377.xx5b9650c-xfce
     [arm-n]=34795577580b.xx5b9650c-xfce
+    [arm-o]=e928914a0e93.xx5b9650c-xfce
 )
 declare -A TAG_DEB=(
     [52099149]="xrdp-dev_0.10.80+git520991491f1e_amd64.deb"
@@ -63,6 +67,8 @@ declare -A TAG_DEB=(
     # .xx<hash> = same xrdp deb, rebuilt image embedding xorgxrdp <hash>
     [39bb08a48377.xx5b9650c]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
     [34795577580b.xx5b9650c]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
+    # BACKLOG #48: re-key = EGFX surface delete/create + settable threshold
+    [e928914a0e93.xx5b9650c]="xrdp-dev_0.10.80+git20260729003200.e928914a0e93_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
@@ -119,6 +125,19 @@ kubectl -n bisect-matrix create configmap xrdp-banner \
     --from-file=code_corpus.ansi="$D/code_corpus.ansi" \
     --dry-run=client -o yaml \
     | kubectl apply --server-side --force-conflicts -f -
+# The manifest pins the image tag independently of ARM_TAG above, so a
+# copy-pasted k8s/*.yaml silently runs ANOTHER arm's binary and every
+# measurement taken from it is about that other arm. Caught live on
+# 2026-07-29: k8s/arm-o.yaml still carried arm-n's tag. Fail loudly.
+for arm in $ARMS; do
+    want="localhost/xrdp-bisect:${ARM_TAG[$arm]}"
+    got=$(sed -n 's/^ *image: *//p' "$D/k8s/$arm.yaml" | head -1)
+    if [ "$want" != "$got" ]; then
+        echo "ABORT: k8s/$arm.yaml pins image '$got' but ARM_TAG says" \
+             "'$want' — the arm would run the wrong binary" >&2
+        exit 1
+    fi
+done
 for arm in $ARMS; do
     kubectl -n bisect-matrix create configmap "xrdp-gfx-$arm" \
         --from-file=gfx.toml="$D/gfx/$arm.toml" \

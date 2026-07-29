@@ -212,6 +212,65 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
 }
 
 /*****************************************************************************/
+/* aux_ltr_chain: is the configured re-key threshold actually REACHABLE?
+ * A main-child IDR resets the shared counter (xrdp_h264_annexb.c: "IDR
+ * resets the shared chain"), and the counter advances by TWO per pair
+ * (one value per view). So a child GOP of g pairs caps the counter at
+ * 2g: if 2g < threshold the re-key can NEVER fire, and the frame_num
+ * wrap ends up prevented by the GOP IDR by accident rather than by the
+ * mechanism built for it.
+ *
+ * Found the expensive way on arm-o (2026-07-29): `-g 30000` caps the
+ * counter at 60000 against a 65024 default, so 72698 pairs produced zero
+ * boundaries and the only signal was ~20 min of silence. Silence is not
+ * a diagnosis -- say it at startup instead. */
+int
+xrdp_ffmpeg_avc444_ltr_counter_cap(
+    const struct xrdp_ffmpeg_avc444_config *cfg)
+{
+    int i;
+    int gop = -1;
+
+    for (i = 0; i + 1 < cfg->encoder_args.count; i++)
+    {
+        if (strcmp(cfg->encoder_args.arg[i], "-g") == 0)
+        {
+            gop = atoi(cfg->encoder_args.arg[i + 1]);
+        }
+    }
+    return gop > 0 ? 2 * gop : -1;
+}
+
+static void
+warn_if_rekey_unreachable(const struct xrdp_ffmpeg_avc444_config *cfg)
+{
+    int cap;
+
+    if (!cfg->aux_ltr_chain)
+    {
+        return;
+    }
+    cap = xrdp_ffmpeg_avc444_ltr_counter_cap(cfg);
+    if (cap < 0)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: aux_ltr_chain with no explicit "
+            "-g: the encoder default GOP is far below the re-key threshold "
+            "%d, so a main IDR will reset the shared counter first and the "
+            "re-key will never fire", cfg->ltr_rekey_frame_num);
+        return;
+    }
+    if (cap < cfg->ltr_rekey_frame_num)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: aux_ltr_chain re-key is "
+            "UNREACHABLE: -g %d caps the shared frame_num at %d, below the "
+            "threshold %d (a main IDR resets the counter). The re-key will "
+            "never fire; the wrap is being avoided by the GOP IDR instead. "
+            "Use -g > %d or lower ltr_rekey_frame_num", cap / 2, cap,
+            cfg->ltr_rekey_frame_num, cfg->ltr_rekey_frame_num / 2);
+    }
+}
+
+/*****************************************************************************/
 void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
 {
@@ -1558,6 +1617,7 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
             ? XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
             : XRDP_H264_LTR_FRAME_NUM_REKEY_MAX;
     }
+    warn_if_rekey_unreachable(&self->cfg);
     self->in_fd = -1;
     self->out_fd = -1;
     self->err_fd = -1;

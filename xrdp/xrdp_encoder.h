@@ -174,6 +174,13 @@ struct xrdp_enc_data
 
 typedef struct xrdp_enc_data_done XRDP_ENC_DATA_DONE;
 
+struct xrdp_ffmpeg_avc444_config;
+/* last hop of the gfx.toml plumbing: session policy -> runner config.
+ * Exposed for the unit test that pins every field (BACKLOG #48/#50). */
+void
+xrdp_avc444_cfg_from_encoder(const struct xrdp_encoder *self,
+                             struct xrdp_ffmpeg_avc444_config *cfg);
+
 struct xrdp_encoder *
 xrdp_encoder_create(struct xrdp_mm *mm);
 void

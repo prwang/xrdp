@@ -1305,6 +1305,40 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
+/* Build the ffmpeg runner config from the encoder's session-scoped policy.
+ * EXTRACTED so it is unit-testable: this is the LAST hop of the gfx.toml
+ * plumbing (tconfig -> xrdp_mm -> struct xrdp_encoder -> cfg), and a field
+ * silently dropped here is invisible everywhere else -- ltr_rekey_frame_num
+ * was write-only for exactly this reason (found on arm-o, 2026-07-29: the
+ * knob loaded, logged, and never reached the encoder). Every session-scoped
+ * cfg field MUST be assigned here and asserted by
+ * test_avc444_cfg_from_encoder_carries_every_field. */
+void
+xrdp_avc444_cfg_from_encoder(const struct xrdp_encoder *self,
+                             struct xrdp_ffmpeg_avc444_config *cfg)
+{
+    xrdp_ffmpeg_avc444_config_default(cfg);
+    cfg->chroma_align = self->avc444_chroma_align;
+    cfg->use_dump_extra = self->avc444_dump_extra;
+    cfg->strip_sei = self->avc444_strip_sei;
+    cfg->sanitize_hrd = self->avc444_sanitize_hrd;
+    cfg->strip_pic_struct = self->avc444_strip_pic_struct;
+    /* reference partitioning is STRUCTURAL, not configurable (PRD
+     * FR-H264-7): the aux view is encoded by a second all-IDR child
+     * and shipped as non-reference, non-IDR I leaves, so main frames
+     * never reference aux frames under any client decode topology */
+    cfg->aux_intra_leaf = 1;
+    /* EXPERIMENTAL FR-H264-8 (gfx.toml aux_ltr_chain): takes
+     * precedence over the leaf path inside the runner */
+    cfg->aux_ltr_chain = self->avc444_aux_ltr_chain;
+    cfg->ltr_rekey_frame_num = self->avc444_ltr_rekey_frame_num;
+    cfg->fault_aux_delay = self->avc444_fault_aux_delay;
+    cfg->fault_strip_mmco = self->avc444_fault_strip_mmco;
+    g_strncpy(cfg->path, self->avc444_path, sizeof(cfg->path) - 1);
+    cfg->encoder_args = self->avc444_encoder_args;
+}
+
+/*****************************************************************************/
 /* aux_ltr_chain re-key (BACKLOG #48): rebuild the client's decoder for one
  * monitor by deleting and recreating its EGFX surface. MS-RDPEGFX binds
  * codec/decoder state to the surface, so a surface delete is a PROTOCOL-
@@ -1512,24 +1546,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     if (ff == NULL)
     {
         struct xrdp_ffmpeg_avc444_config cfg;
-        xrdp_ffmpeg_avc444_config_default(&cfg);
-        cfg.chroma_align = self->avc444_chroma_align;
-        cfg.use_dump_extra = self->avc444_dump_extra;
-        cfg.strip_sei = self->avc444_strip_sei;
-        cfg.sanitize_hrd = self->avc444_sanitize_hrd;
-        cfg.strip_pic_struct = self->avc444_strip_pic_struct;
-        /* reference partitioning is STRUCTURAL, not configurable (PRD
-         * FR-H264-7): the aux view is encoded by a second all-IDR child
-         * and shipped as non-reference, non-IDR I leaves, so main frames
-         * never reference aux frames under any client decode topology */
-        cfg.aux_intra_leaf = 1;
-        /* EXPERIMENTAL FR-H264-8 (gfx.toml aux_ltr_chain): takes
-         * precedence over the leaf path inside the runner */
-        cfg.aux_ltr_chain = self->avc444_aux_ltr_chain;
-        cfg.fault_aux_delay = self->avc444_fault_aux_delay;
-        cfg.fault_strip_mmco = self->avc444_fault_strip_mmco;
-        g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
-        cfg.encoder_args = self->avc444_encoder_args;
+        xrdp_avc444_cfg_from_encoder(self, &cfg);
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {

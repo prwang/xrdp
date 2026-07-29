@@ -28,12 +28,20 @@ with `git log -p -- BACKLOG.md`.
 FR-H264-8 remains **EXPERIMENTAL**; `aux_intra_leaf` remains the shipped
 default. Gate status and evidence: `PRD.md` FR-H264-8.
 
-> **`-g 30000` is a known-risky interim, not the target state.** It removes
-> mid-stream IDRs, which is the only thing currently preventing the ~630 ms
-> aux-child respawn stall — but it also removes the only mechanism bounding
-> invariant **I3** (transitive dependency depth), so an encoder/decoder
-> divergence would persist until reconnect. It MUST be reverted to a sane
-> GOP once task #45 lands.
+> **`-g 30000` is a known-risky interim, not the target state.** Corrected
+> 2026-07-29 (arm-o): it does NOT *remove* mid-stream IDRs, it makes them
+> rare — the main child still emits a GOP IDR every 30 000 pairs (~11 min
+> at the measured 43.8 pairs/s), each still paying the ~630 ms aux-child
+> respawn. It also removes the only mechanism bounding invariant **I3**
+> (transitive dependency depth), so an encoder/decoder divergence would
+> persist until reconnect. **And it makes the re-key structurally dead:**
+> a main IDR resets the shared counter (`xrdp_h264_annexb.c:2450`), so at
+> `-g 30000` the counter peaks at 60 000 and can never reach the 65 024
+> threshold. The frame_num wrap is therefore being prevented by the GOP
+> IDR *by accident*, not by the re-key mechanism designed for it — change
+> `-g` and that protection silently changes character. The re-key only
+> fires first if `-g > 32512`. MUST be reverted to a sane GOP once #45
+> lands.
 
 ---
 
@@ -88,16 +96,39 @@ inherit is only removed by 1–4.
    `ltr_aux_fresh`) and restore a sane refresh interval on the T4 profile
    and arm-n (≈240 costs ≈ +4 % bandwidth; PRD FR-H264-6).
 
-**5. `main‖aux`.** NOT a mechanical split, correcting PRD's wording:
-   `submit_single()` would only queue into the vmsplice iov list —
-   `in_iov_push()` performs no I/O, all transfer happens inside `pump()`
-   (`xrdp_encoder_ffmpeg.c:730`, `:794`). Submitting both then collecting
-   both would still serialise. Needs a **union-poll pump over both
-   children** (each has its own `in_fd`/`out_fd`/`err_fd`) under ONE shared
-   deadline; collecting main first while aux's stdout fills its pipe would
-   stall the aux child (a 4K I packet is comfortably larger than a pipe
-   buffer). Re-check the FR-PROC-6 borrowed-pointer contract per child at
-   collect.
+**5. `main‖aux` — MOVED to #51** (converged with monitor concurrency; the
+   two are the same serialization and the same fix). Retained here for the
+   ordering constraint only: #51 needs steps 1-4 first. Original analysis:
+   submit both, collect both — the two children are
+   independent processes and genuinely encode concurrently. The ONE
+   constraint (and the whole of the correction to PRD's "mechanical
+   refactor"): **`submit` must transfer, not merely enqueue.**
+   `in_iov_push()` performs no I/O — it appends to an iov array — and
+   `feed_vmsplice()` has exactly one caller, inside `pump()`
+   (`xrdp_encoder_ffmpeg.c:730`, `:794`, `:856`). So a split where
+   `submit_single()` is just the push half sends nothing to the aux child
+   until `collect_aux()` pumps it, and the pair stays serial.
+   `submit_single()` must therefore pump until `!in_iov_pending()`,
+   without waiting for output.
+
+   With that, sequential writes already buy most of the win, because a
+   write is cheap against an encode: serial `2(w+e)` becomes `2w+e`
+   (4K: `e` = 19.6 ms measured, `w` = a ~15 MB vmsplice ⇒ ~43 ms → ~24 ms).
+
+   The union poll must be **set-shaped, not pair-shaped**:
+   `pump_set(kids[], n, deadline)` with the caller owning the completion
+   predicate, so `n = 1` (LC=1 main-only) and `n = 2` (pair) are the same
+   code — a `pump2(main, aux)` would hard-wire "two issue, two retire" and
+   break under FR-PROC-7's variable shape. Do NOT thread main/aux: see PRD
+   "Threads: not on the main/aux axis". Under ONE shared deadline, it is a
+   robustness upgrade, NOT a prerequisite — it is not needed to avoid a deadlock,
+   since the parent is never blocked on the child it is not draining.
+   What it buys: `F_SETPIPE_SZ` is applied only to the INPUT pipe (1 MB,
+   `:528`); the output pipe keeps the 64 KB default, and a 4K intra packet
+   is several times that, so an undrained child stalls mid-write and
+   erodes the overlap exactly when packets are largest. Measure the simple
+   form first and only add the union poll if the measurement demands it.
+   Re-check the FR-PROC-6 borrowed-pointer contract per child at collect.
 
 Acceptance:
 - **Ratchets verify the schedule is OBSERVED, not requested** — at every
@@ -119,6 +150,60 @@ Acceptance:
   in PRD "Concurrency state of the encode pipeline".
 
 ---
+
+## #51 — Converge `main‖aux` + monitor concurrency into ONE `pump_set`
+
+Supersedes #45 step 5 as a standalone item: the two are the SAME
+serialization with the same fix, and splitting them would build the
+mechanism twice. Everything is serialized behind one worker thread
+blocking in `pump()` on one child — main before aux, monitor 1 before
+monitor 2 — so m monitors cost `2m(w+e)`.
+
+**Justified by measurement, not assumption** (dev-box VAAPI, 2026-07-29,
+`PR-demo/vaapi_concurrency_bench.sh`; full table in PRD):
+N=2 concurrent encodes are FREE (0.90×/0.94× per stream), N=4 costs only
+1.39×/1.64×. At 4K that is 13.9 ms → 6.5 ms for one monitor (2.1×) and
+27.9 ms → 11.4 ms for two (2.4×). The local N=2 ratio (0.94×) independently
+corroborates the T4's recorded 0.96×, so "two concurrent encodes are free"
+now holds on two vendors' hardware.
+
+Scope:
+1. Factor `pump()` into `pump_arm()` (build this child's pollfd slots)
+   and `pump_service()` (dispatch revents: `feed_vmsplice` / stderr /
+   stdout). `pump()` keeps its signature — every existing caller is
+   untouched.
+2. `pump_set(kids[], n, deadline)`: arm all, poll once, service all. The
+   CALLER owns the completion predicate, so shape lives with policy —
+   `n=1` LC=1, `n=2` a pair, `n=2m` m monitors. NOT `pump2()`: a
+   pair-shaped helper breaks under FR-PROC-7's variable shape.
+3. `submit_single()` must PUMP until `!in_iov_pending()`, not merely
+   `in_iov_push()` — `feed_vmsplice()` has one caller, inside `pump()`,
+   so a push-only submit sends nothing and the pair stays serial.
+4. ONE shared deadline across the set (otherwise a stalled child gets
+   `n × pair_timeout_ms`), and the FR-PROC-6 borrowed-pointer check per
+   child at collect.
+5. `kids[]` is REBUILT every cycle from live `avc444_ffmpeg_handle[]`, never
+   memoized — a monitor dropped mid-session (UWP windowed mode) must
+   simply stop contributing a child.
+
+Ordering: needs #45 steps 1-4 first. Until the aux-respawn path is gone,
+whether the aux child must be REPLACED depends on main's rewrite result
+(`encode_pair` `:1184`), so aux cannot be submitted before main is
+collected — a data dependency no poll restructuring removes.
+
+Do NOT thread main/aux (shared `ltr`, pair contract, zero CPU to win).
+Threading monitors is safe but unnecessary once `pump_set` lands — the
+per-monitor state is already partitioned; they just join the set. This
+is FR-PROC-7's BREADTH policy.
+
+**Cheap local measurement to do FIRST, before any cloud spend:** the T4
+pair cost 67.5 ms while two 4K encodes account for 39.2 ms — a ~28 ms
+remainder that is NOT encode and that concurrency cannot touch. The dev
+box can attribute it for free: run a fleet arm at a fixed resolution and
+compare its frame period against the 6.97 ms raw-encode floor measured
+here. Whatever the difference is (capture, vmsplice feed, NUT demux, LTR
+rewrite, EGFX assembly) is the real ceiling, and it should be attributed
+BEFORE re-provisioning a GPU box, not after.
 
 ## #40 — FR-PROC-7 preemptive aux (sparse aux cadence)
 
@@ -189,7 +274,44 @@ eliminated rather than tested.
   step-1 gap by making the rewriter refuse a real non-IDR I. Treat the
   re-key timing as locally-evidenced, NOT CI-gated, until #49 lands.
 
-**Remaining acceptance (needs the fleet + the owner's eyes):**
+**ARM-O RESULT 2026-07-29: RED — the boundary never fired. Two causes,
+both now understood; cause 1 is fixed, cause 2 is a config arithmetic
+error.**
+
+*Cause 1 (FIXED) — the knob never reached the encoder.* The gfx.toml value
+travelled tconfig → `xrdp_mm.c:1382` → `:1415` → `xrdp_encoder.c:255` and
+STOPPED: `self->avc444_ltr_rekey_frame_num` was write-only, because the
+live cfg build in `gfx_wiretosurface1_avc444` never copied it. Effective
+threshold was always the compiled-in 65024, so 72 698 pairs at 43.8
+pairs/s produced ZERO boundaries where 268-pair spacing predicts ~270.
+The knob parsed, logged its WARNING, and did nothing — settable everywhere
+except where it mattered. Fixed by extracting `xrdp_avc444_cfg_from_encoder()`
+(the last plumbing hop, previously an inline hand-written field copy) and
+pinning it with `test_avc444_cfg_from_encoder_carries_every_field`, which
+is UNGATED (runs in CI) and verified to fail against the bug
+(`cfg.ltr_rekey_frame_num == 65024`, expected 536).
+
+*Cause 2 (OPEN, config) — 65024 is unreachable at `-g 30000`.* See the
+deployed-state note above: a main IDR resets the shared counter, so the
+counter peaks at 60 000. Any arm wanting the re-key at the DEFAULT
+threshold needs `-g > 32512`. arm-o is unaffected once cause 1 is fixed
+(threshold 536 ⇒ boundary at pair 268, long before the GOP IDR).
+
+*Not yet observed, therefore not claimed:* the wire shape at a boundary
+(B below) remains unproven — there was no boundary to audit. What the
+capture DID show at each epoch change is the in-band IDR on the live
+surface that #48 exists to replace, with a 74×20 damage rect rather than
+a full-surface repaint. The chain away from boundaries is PROVEN clean:
+145 393 non-IDR pictures, every main P → LT0 and every aux P → LT1, zero
+cross-view references, the only 3 exceptions being the designed aux seed
+I slices after each main IDR.
+
+Artifacts: `PR-demo/mac_bisect_matrix/captures/arm_o_rekey_20260729/`
+(71 MB: oracle AVC444 capture, 50 MB post-TLS EGFX dump, audit, logs,
+deployed image/package manifests). New uncommitted tooling:
+`egfx_pdu_scan.py`, `rekey_boundary_audit.py`.
+
+**Remaining acceptance (needs a redeploy with the fix, then the fleet + the owner's eyes):**
 - Deploy `arm-o` (`gfx/arm-o.toml`, `k8s/arm-o.yaml`, port 40014 —
   `ltr_rekey_frame_num = 536`, boundary every ~268 frames). It is
   deliberately NOT in `build_and_deploy.sh`'s default arm list: it needs an

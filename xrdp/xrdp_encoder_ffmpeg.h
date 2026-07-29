@@ -145,6 +145,14 @@ struct xrdp_ffmpeg_avc444_config
     size_t max_encoded_pair_bytes;
 };
 
+/* aux_ltr_chain: the shared frame_num cap implied by the child's -g
+ * (2 values per pair), or -1 when no explicit -g is configured. If the
+ * cap is below ltr_rekey_frame_num the re-key can NEVER fire, because a
+ * main IDR resets the counter first (BACKLOG #48, found on arm-o). */
+int
+xrdp_ffmpeg_avc444_ltr_counter_cap(
+    const struct xrdp_ffmpeg_avc444_config *cfg);
+
 /** Populate cfg with the MVP defaults (path left empty). */
 void
 xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg);

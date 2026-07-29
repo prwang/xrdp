@@ -1,0 +1,275 @@
+#!/usr/bin/env python3
+"""BACKLOG #48 acceptance audit: the aux_ltr_chain re-key BOUNDARY on the wire.
+
+Two independent wire captures of the SAME connection are cross-checked:
+
+  1. the oracle dump (/tmp/oracle_avc_s<id>.bin) -- every AVC444 surface
+     command PAYLOAD, u32-length-prefixed, in wire order. Gives the damage
+     region (the AVC420 regionRects preamble), the H.264 slice type and the
+     shared LTR frame_num.
+  2. FreeRDP's transport dump (/dump:record) -- the post-TLS byte stream.
+     xrdp writes EGFX as RDP8_BULK_ENCODED_DATA with the COMPRESSED bit
+     clear, so the PDUs are literal bytes; egfx_pdu_scan gives their ORDER.
+
+The audit answers, per boundary:
+  A. did a re-key happen (main view IDR, shared frame_num back to 0)?
+  B. did DELETE_SURFACE -> CREATE_SURFACE -> MAP_SURFACE_TO_OUTPUT arrive
+     BEFORE that frame's first WIRE_TO_SURFACE PDU, and does the frame's
+     damage region cover the whole surface?
+  C. away from the boundary, is every picture still an inter P slice
+     retargeted to its own view's long-term slot?
+
+Correlation between the two captures is by payload identity: a WIRE_TO_
+SURFACE_1 PDU's bitmapDataLength equals the oracle record length, and the
+first bitmap bytes are compared literally.
+
+Usage: rekey_boundary_audit.py <oracle.bin> <transport.dump> [surface_w] [surface_h]
+"""
+import struct
+import sys
+
+sys.path.insert(0, __file__.rsplit('/', 1)[0])
+from egfx_pdu_scan import scan, CMD          # noqa: E402
+
+
+class Bits:
+    def __init__(self, buf):
+        out = bytearray()
+        i = 0
+        while i < len(buf):
+            if i + 2 < len(buf) and buf[i] == 0 and buf[i + 1] == 0 \
+                    and buf[i + 2] == 3:
+                out += buf[i:i + 2]
+                i += 3
+            else:
+                out.append(buf[i])
+                i += 1
+        self.b = bytes(out)
+        self.pos = 0
+
+    def u(self, n):
+        v = 0
+        for _ in range(n):
+            v = (v << 1) | ((self.b[self.pos >> 3] >>
+                             (7 - (self.pos & 7))) & 1)
+            self.pos += 1
+        return v
+
+    def ue(self):
+        z = 0
+        while self.u(1) == 0:
+            z += 1
+            if z > 31:
+                raise ValueError('bad ue')
+        return (1 << z) - 1 + (self.u(z) if z else 0)
+
+
+def nals(buf):
+    out = []
+    i = buf.find(b'\x00\x00\x01')
+    while i >= 0:
+        j = buf.find(b'\x00\x00\x01', i + 3)
+        end = j if j >= 0 else len(buf)
+        raw = buf[i + 3:end]
+        if raw.endswith(b'\x00'):
+            raw = raw[:-1]
+        if raw:
+            out.append(raw)
+        i = j
+    return out
+
+
+def slice_info(nal, log2_mfn=16):
+    """(idr, slice_type, frame_num, ltr_target, ltr_mark) or None."""
+    t = nal[0] & 0x1F
+    if t not in (1, 5):
+        return None
+    b = Bits(nal[1:])
+    first_mb = b.ue()
+    if first_mb != 0:
+        return None
+    st = b.ue() % 5
+    b.ue()                                   # pps id
+    fn = b.u(log2_mfn)
+    idr = (t == 5)
+    idr_pic_id = b.ue() if idr else None
+    target = mark = None
+    if st == 0:                              # P
+        if b.u(1):                           # num_ref_idx_active_override
+            b.ue()
+        if b.u(1):                           # ref_pic_list_modification_l0
+            while True:
+                op = b.ue()
+                if op == 3:
+                    break
+                arg = b.ue()
+                if target is None and op == 2:
+                    target = arg
+    if (nal[0] >> 5) & 3:                    # nal_ref_idc != 0
+        if idr:
+            b.u(1)                           # no_output_of_prior_pics
+            mark = ('ltr_flag', b.u(1))
+        else:
+            if b.u(1):                       # adaptive_ref_pic_marking
+                while True:
+                    op = b.ue()
+                    if op == 0:
+                        break
+                    if op in (1, 3):
+                        b.ue()
+                    if op in (2,):
+                        b.ue()
+                    if op in (3, 6):
+                        arg = b.ue()
+                        if op == 6 and mark is None:
+                            mark = ('mark_lt', arg)
+                    if op in (4, 5):
+                        if op == 4:
+                            b.ue()
+    return {'idr': idr, 'type': st, 'frame_num': fn, 'idr_pic_id': idr_pic_id,
+            'ltr_target': target, 'mark': mark}
+
+
+def oracle_records(path):
+    """Yield (index, payload, rects, view_lc)."""
+    data = open(path, 'rb').read()
+    pos = 0
+    idx = 0
+    while pos + 4 <= len(data):
+        (ln,) = struct.unpack_from('<I', data, pos)
+        pos += 4
+        if pos + ln > len(data) or ln < 8:
+            break
+        rec = data[pos:pos + ln]
+        pos += ln
+        (w,) = struct.unpack_from('<I', rec, 0)
+        lc = (w >> 30) & 3
+        view = rec[4:]
+        (nr,) = struct.unpack_from('<I', view, 0)
+        rects = []
+        for k in range(nr):
+            x1, y1, x2, y2 = struct.unpack_from('<HHHH', view, 4 + k * 10)
+            rects.append((x1, y1, x2, y2))
+        yield idx, rec, view[4 + nr * 10:], rects, lc, ln
+        idx += 1
+
+
+def main():
+    oracle, dump = sys.argv[1], sys.argv[2]
+    sw = int(sys.argv[3]) if len(sys.argv) > 3 else None
+    sh_ = int(sys.argv[4]) if len(sys.argv) > 4 else None
+
+    print('== capture 1: oracle payload dump ==')
+    pics = []
+    for idx, rec, es, rects, lc, ln in oracle_records(oracle):
+        info = None
+        for nal in nals(es):
+            info = slice_info(nal) or info
+        if info is None:
+            continue
+        info.update({'rec': idx, 'rects': rects, 'lc': lc, 'reclen': ln,
+                     'prefix': es[:32]})
+        pics.append(info)
+    print('records with a slice: %d' % len(pics))
+
+    idrs = [p for p in pics if p['idr']]
+    print('IDR pictures at records: %s' % [p['rec'] for p in idrs])
+    boundaries = [p for p in idrs if p['rec'] > 0]
+
+    # C: steady-state shape between boundaries
+    bad = [p for p in pics
+           if not p['idr'] and (p['type'] != 0 or p['ltr_target'] is None)]
+    lt = {}
+    for p in pics:
+        if not p['idr']:
+            lt.setdefault(p['ltr_target'], 0)
+            lt[p['ltr_target']] += 1
+    print('C: non-IDR pictures: %d, of which not P-with-LTR-retarget: %d'
+          % (len(pics) - len(idrs), len(bad)))
+    print('C: L0 retarget histogram (long-term slot -> count): %s' % lt)
+    par = {}
+    for p in pics:
+        if not p['idr'] and p['ltr_target'] is not None:
+            par.setdefault((p['rec'] % 2, p['ltr_target']), 0)
+            par[(p['rec'] % 2, p['ltr_target'])] += 1
+    print('C: (record parity, LT slot) -> count: %s' % par)
+
+    print()
+    print('== capture 2: post-TLS transport dump (EGFX PDU order) ==')
+    data = open(dump, 'rb').read()
+    pdus = scan(data)
+    counts = {}
+    for _o, _k, c, _f in pdus:
+        counts[CMD[c]] = counts.get(CMD[c], 0) + 1
+    print('%d PDUs: %s' % (len(pdus), counts))
+
+    dels = [i for i, (_o, _k, c, _f) in enumerate(pdus) if c == 0x000A]
+    print('DELETE_SURFACE occurrences: %d' % len(dels))
+    # AVC444 (codec 14 = v1, 15 = v2) surface commands, in wire order
+    avc_pdus = [i for i, (_o, _k, c, f) in enumerate(pdus)
+                if c == 0x0001 and f.get('codec') in (14, 15)]
+    print('AVC444 WIRE_TO_SURFACE_1 PDUs: %d (oracle records: %d)'
+          % (len(avc_pdus), len(pics)))
+
+    print()
+    print('== boundaries ==')
+    for n, p in enumerate(boundaries):
+        print('-- boundary %d: oracle record %d --' % (n + 1, p['rec']))
+        prev = [q for q in pics if q['rec'] < p['rec']]
+        print('   previous picture: rec=%d frame_num=%d %s'
+              % (prev[-1]['rec'], prev[-1]['frame_num'],
+                 'IDR' if prev[-1]['idr'] else 'P'))
+        print('   re-key picture  : rec=%d IDR=%s frame_num=%d idr_pic_id=%s'
+              % (p['rec'], p['idr'], p['frame_num'], p['idr_pic_id']))
+        print('   damage rects    : %s' % (p['rects'],))
+        full = (len(p['rects']) == 1 and p['rects'][0][0] == 0
+                and p['rects'][0][1] == 0
+                and (sw is None or p['rects'][0][2] == sw)
+                and (sh_ is None or p['rects'][0][3] == sh_))
+        print('   whole surface   : %s' % ('YES' if full else 'NO'))
+        nxt = [q for q in pics if q['rec'] == p['rec'] + 1]
+        if nxt:
+            print('   paired aux      : rec=%d %s frame_num=%d L0->LT%s'
+                  % (nxt[0]['rec'], 'IDR' if nxt[0]['idr'] else 'P',
+                     nxt[0]['frame_num'], nxt[0]['ltr_target']))
+
+        # Correlate by ORDER, not by bytes: the Nth AVC444 WIRE_TO_SURFACE_1
+        # PDU carries the Nth oracle record, and its bitmapDataLength must
+        # equal that record's length. (An IDR's first bytes are the SPS, so
+        # a byte-prefix search would match every IDR in the capture.)
+        if p['rec'] >= len(avc_pdus):
+            print('   TRANSPORT: fewer AVC444 PDUs (%d) than oracle records'
+                  % len(avc_pdus))
+            continue
+        pi = avc_pdus[p['rec']]
+        hit = pdus[pi][0]
+        blen = pdus[pi][3].get('bitmap_len')
+        print('   correlation    : AVC444 W2S1 #%d @%d bitmap_len=%s vs '
+              'oracle record len=%d -> %s'
+              % (p['rec'], hit, blen, p['reclen'],
+                 'MATCH' if blen == p['reclen'] else 'MISMATCH'))
+        before = [x for x in pdus if x[0] < hit]
+        after = [x for x in pdus if x[0] >= hit]
+        ctx = before[-6:]
+        print('   PDU order around the re-key frame (byte offsets):')
+        for o, k, c, fl in ctx:
+            print('      @%-10d %-9s %-24s %s' % (o, k, CMD[c], fl))
+        print('      >>> re-key H.264 payload bytes at @%d' % hit)
+        for o, k, c, fl in after[:3]:
+            print('      @%-10d %-9s %-24s %s' % (o, k, CMD[c], fl))
+        seq = [CMD[c] for _o, _k, c, _f in ctx]
+        try:
+            d_i = len(seq) - 1 - seq[::-1].index('DELETE_SURFACE')
+            c_i = len(seq) - 1 - seq[::-1].index('CREATE_SURFACE')
+            m_i = len(seq) - 1 - seq[::-1].index('MAP_SURFACE_TO_OUTPUT')
+            w_i = len(seq) - 1 - seq[::-1].index('WIRE_TO_SURFACE_1')
+            ok = d_i < c_i < m_i < w_i
+        except ValueError:
+            ok = False
+        print('   B: DELETE < CREATE < MAP < first WIRE_TO_SURFACE_1: %s'
+              % ('YES' if ok else 'NO'))
+        print()
+
+
+if __name__ == '__main__':
+    main()
