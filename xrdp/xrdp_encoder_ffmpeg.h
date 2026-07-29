@@ -289,6 +289,40 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
 int
 xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
 
+/**
+ * #45 step 5 -- the submit / pump / collect construction behind
+ * xrdp_ffmpeg_avc444_encode_pair(), exposed so the caller can drive
+ * SEVERAL monitors' children as ONE poll set (E4: one thread, four
+ * views). aux_ltr_chain only; every other architecture keeps the
+ * synchronous per-pair call.
+ *
+ * Usage per worker cycle:
+ *   for each damaged monitor: xrdp_ffmpeg_avc444_submit_pair(...)
+ *   xrdp_ffmpeg_avc444_pump_pairs(handles, n, &bad_handle, &kids_armed)
+ *   for each monitor: xrdp_ffmpeg_avc444_collect_pair(...)
+ *
+ * The NV12 pointers are BORROWED (FR-PROC-6) and must stay valid from
+ * submit until that handle's collect returns. On a non-zero return from
+ * pump_pairs, *bad_handle is the index of the handle whose child failed
+ * -- tear THAT one down, not an arbitrary one. *kids_armed is the number
+ * of children armed in the set (2 per handle), which is the quantity E4
+ * asserts.
+ */
+int
+xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
+                               const unsigned char *main_nv12,
+                               const unsigned char *aux_nv12,
+                               int nv12_size,
+                               unsigned long long desktop_sequence);
+int
+xrdp_ffmpeg_avc444_pump_pairs(struct xrdp_ffmpeg_avc444 **handles,
+                              int n_handles, int *bad_handle,
+                              int *kids_armed);
+int
+xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
+                                unsigned long long desktop_sequence,
+                                struct xrdp_avc444_encoded_pair *result);
+
 /* aux_ltr_chain (FR-H264-8): nonzero when the shared frame_num counter
  * is near its wrap; the caller must delete + recreate the encoder
  * AFTER shipping the current pair (a per-view decoder cannot survive

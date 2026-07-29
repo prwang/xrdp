@@ -915,6 +915,149 @@ START_TEST(test_ffmpeg_scheduled_paired_cut_live)
 }
 END_TEST
 
+/* BACKLOG #45 E4, at the unit level: ONE thread drives FOUR views
+ * concurrently. Two encoder handles stand in for two damaged monitors;
+ * each handle owns two children (main + aux). One submit pass, ONE
+ * pump_pairs call over both handles, one collect pass -- and
+ * pump_pairs reports how many children it armed in that single poll
+ * set, which is the counter E4 asserts rather than inferring
+ * concurrency from a wall-clock improvement.
+ *
+ * What this does NOT prove: that the four encodes overlap in time. The
+ * poll set makes overlap possible (all four fds are armed in one poll
+ * and serviced in one pass); the measurement that it HAPPENS is E5's
+ * oracle frame interval on the real path. Stated here so the test is
+ * not read as more than it is. */
+START_TEST(test_ffmpeg_pump_set_four_views_one_thread)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *handles[2];
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair[2];
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    /* 24 is XRDP_H264_INTRA_REFRESH_FRAMES_MIN: anything smaller is
+     * clamped by the runner, and a test that asked for 8 would silently
+     * be measuring 24 (it did, first time round) */
+    const int period = XRDP_H264_INTRA_REFRESH_FRAMES_MIN;
+    const int pairs = 30;
+    int cuts = 0;
+    int bad_handle;
+    int kids_armed;
+    int i;
+    int k;
+    static const char *const ltr_args[] =
+    {
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+        "-refs", "1", "-bf", "0",
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
+    };
+    const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+        e.avc444_intra_refresh_frames = period;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+    }
+    cfg.encoder_args.count = nargs;
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", ltr_args[i]);
+    }
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    for (k = 0; k < 2; k++)
+    {
+        handles[k] = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+        ck_assert_ptr_ne(handles[k], NULL);
+    }
+    for (i = 0; i < pairs; i++)
+    {
+        fill_yuv444_mostly_static(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        /* submit pass: both monitors, nothing written to a pipe yet */
+        for (k = 0; k < 2; k++)
+        {
+            ck_assert_int_eq(
+                xrdp_ffmpeg_avc444_submit_pair(handles[k],
+                                               conv->main_nv12,
+                                               conv->aux_nv12,
+                                               conv->nv12_size,
+                                               (unsigned long long)i),
+                XRDP_FFMPEG_PAIR_READY);
+        }
+        /* ONE poll set over four children */
+        bad_handle = -1;
+        kids_armed = 0;
+        ck_assert_int_eq(xrdp_ffmpeg_avc444_pump_pairs(handles, 2,
+                         &bad_handle, &kids_armed),
+                         XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_eq(kids_armed, 4);
+        ck_assert_int_eq(bad_handle, -1);
+        /* collect pass: each monitor's pair, in its own chain */
+        for (k = 0; k < 2; k++)
+        {
+            ck_assert_int_eq(
+                xrdp_ffmpeg_avc444_collect_pair(handles[k],
+                                                (unsigned long long)i,
+                                                &pair[k]),
+                XRDP_FFMPEG_PAIR_READY);
+            ck_assert_int_gt(pair[k].main_len, 0);
+            ck_assert_int_gt(pair[k].aux_len, 0);
+            ck_assert_int_eq((int)pair[k].desktop_sequence, i);
+            /* no IDR after the first picture, in either monitor */
+            if (i > 0)
+            {
+                ck_assert_int_eq(ff_first_vcl_type(pair[k].main_data,
+                                                   pair[k].main_len), 1);
+                ck_assert_int_eq(ff_first_vcl_type(pair[k].aux_data,
+                                                   pair[k].aux_len), 1);
+            }
+        }
+        /* both monitors cut on the same ordinals: independent chains,
+         * identical schedule */
+        if (ff_first_vcl_is_intra(pair[0].main_data, pair[0].main_len))
+        {
+            cuts++;
+            ck_assert_int_eq(i % period, 0);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[1].main_data,
+                                      pair[1].main_len), 1);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[0].aux_data,
+                                      pair[0].aux_len), 1);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[1].aux_data,
+                                      pair[1].aux_len), 1);
+        }
+    }
+    ck_assert_int_eq(cuts, 1 + (pairs - 1) / period);
+    for (k = 0; k < 2; k++)
+    {
+        xrdp_ffmpeg_avc444_delete(handles[k]);
+    }
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
 /* RETIRED with BACKLOG #45 step 2 (recorded as C6).
  *
  * test_ltr_counter_cap_detects_unreachable_rekey used to pin the
@@ -957,6 +1100,7 @@ make_suite_avc444_ffmpeg(void)
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_ltr_rekey_cycle);
     tcase_add_test(tc, test_ffmpeg_scheduled_paired_cut_live);
+    tcase_add_test(tc, test_ffmpeg_pump_set_four_views_one_thread);
     tcase_add_test(tc, test_avc444_cfg_from_encoder_carries_every_field);
     tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);
