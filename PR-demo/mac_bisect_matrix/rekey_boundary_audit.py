@@ -216,6 +216,45 @@ def main():
     print('surface geometry used for the whole-surface test: %sx%s'
           % (sw, sh_))
 
+    # ---- D: never map a blank surface (BACKLOG #48 RED, 2026-07-29) ----
+    # The defect the owner saw on macOS: the re-key mapped a freshly
+    # CREATEd (zero-filled) surface to output BEFORE sending that frame's
+    # pixels, so any client that composites when the mapping changes shows
+    # black until the IDR decodes. FreeRDP composites at END_FRAME and is
+    # structurally blind to it, so no pixel check can gate this -- the
+    # wire order is the invariant, and this is it.
+    #
+    # The FIRST map of the session is exempt: at connect there is no prior
+    # content to preserve, so mapping an empty surface is correct.
+    painted = {}
+    seen_create = set()
+    blank_maps = []
+    for off, _k, c, f in pdus:
+        name = CMD[c]
+        sid = f.get('surface')
+        if name == 'CREATE_SURFACE':
+            painted[sid] = False
+            first = sid not in seen_create
+            seen_create.add(sid)
+            f['_first_create'] = first
+        elif name == 'WIRE_TO_SURFACE_1':
+            painted[sid] = True
+        elif name == 'MAP_SURFACE_TO_OUTPUT':
+            if painted.get(sid, True) is False:
+                blank_maps.append((off, sid))
+    # the connect-time map is the first one in the stream
+    connect_map = blank_maps[:1]
+    offending = blank_maps[1:]
+    print('D: MAP of a surface with no pixels since CREATE: %d '
+          '(+%d exempt connect-time map)'
+          % (len(offending), len(connect_map)))
+    if offending:
+        print('D: VIOLATIONS at byte offsets %s'
+              % [o for o, _s in offending][:12])
+    print('D: NEVER MAP A BLANK SURFACE: %s'
+          % ('PASS' if not offending else 'FAIL'))
+    print()
+
     dels = [i for i, (_o, _k, c, _f) in enumerate(pdus) if c == 0x000A]
     print('DELETE_SURFACE occurrences: %d' % len(dels))
     # AVC444 (codec 14 = v1, 15 = v2) surface commands, in wire order
@@ -276,22 +315,37 @@ def main():
         # previous frame's WIRE_TO_SURFACE_1, which legitimately precedes
         # DELETE_SURFACE, so the ordering test could never pass (it read
         # NO against a capture whose printed order was correct).
+        # B: the replacement surface is CREATEd before the pixels and
+        # MAPped only after them, with the old surface deleted last.
+        # Expected shape, per BACKLOG #48 after the 2026-07-29 RED:
+        #   ... CREATE(new) | W2S1(new) W2S1(new) | MAP(new) DELETE(old)
+        # The earlier code asserted DELETE < CREATE < MAP < pixels, which
+        # is the ORDER THAT CAUSED THE BUG -- it printed YES seven times
+        # against a capture that flashed black on macOS.
         prev_hit = pdus[avc_pdus[p['rec'] - 1]][0] if p['rec'] else -1
         gap = [x for x in pdus if prev_hit < x[0] < hit]
         gseq = [CMD[c] for _o, _k, c, _f in gap]
+        # window after this frame's two payloads, up to the next picture
+        nxt_hit = (pdus[avc_pdus[p['rec'] + 2]][0]
+                   if p['rec'] + 2 < len(avc_pdus) else 1 << 62)
+        tail = [x for x in pdus if hit < x[0] < nxt_hit]
+        tseq = [CMD[c] for _o, _k, c, _f in tail]
+        pre_ok = ('CREATE_SURFACE' in gseq
+                  and 'MAP_SURFACE_TO_OUTPUT' not in gseq
+                  and 'DELETE_SURFACE' not in gseq)
         try:
-            d_i = gseq.index('DELETE_SURFACE')
-            c_i = gseq.index('CREATE_SURFACE')
-            m_i = gseq.index('MAP_SURFACE_TO_OUTPUT')
-            # nothing may be drawn to the surface between the re-map and
-            # the re-key picture itself
-            ok = (d_i < c_i < m_i
-                  and 'WIRE_TO_SURFACE_1' not in gseq[m_i:])
+            m_i = tseq.index('MAP_SURFACE_TO_OUTPUT')
+            d_i = tseq.index('DELETE_SURFACE')
+            # both views must land before output is handed over
+            post_ok = (tseq[:m_i].count('WIRE_TO_SURFACE_1') >= 1
+                       and m_i < d_i)
         except ValueError:
-            ok = False
-        print('   B: DELETE < CREATE < MAP, no draw before the re-key '
-              'payload: %s   (gap: %s)'
-              % ('YES' if ok else 'NO', ' '.join(gseq)))
+            post_ok = False
+        ok = pre_ok and post_ok
+        print('   B: CREATE before pixels, MAP only after them, old '
+              'surface deleted last: %s' % ('YES' if ok else 'NO'))
+        print('      before: %s' % ' '.join(gseq))
+        print('      after : %s' % ' '.join(tseq))
         print()
 
 

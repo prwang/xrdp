@@ -1186,6 +1186,30 @@ xrdp_mm_egfx_create_surfaces(struct xrdp_mm *self)
 }
 
 /******************************************************************************/
+/* The aux_ltr_chain re-key (BACKLOG #48) rebuilds a monitor's surface
+ * under an alternate id, so the id the client actually holds is not
+ * necessarily the base id this function assumed. Ask the encoder, under
+ * its mutex, which one is live. */
+static int
+xrdp_mm_egfx_live_surface_id(struct xrdp_mm *self, int mon_index,
+                             int base_surface_id)
+{
+    struct xrdp_encoder *encoder = self->encoder;
+    int live = base_surface_id;
+
+    if (encoder != NULL && mon_index >= 0 && mon_index < 16)
+    {
+        tc_mutex_lock(encoder->mutex);
+        if (encoder->avc444_surface_id_live[mon_index] >= 0)
+        {
+            live = encoder->avc444_surface_id_live[mon_index];
+        }
+        tc_mutex_unlock(encoder->mutex);
+    }
+    return live;
+}
+
+/******************************************************************************/
 static int
 xrdp_mm_egfx_delete_surfaces(struct xrdp_mm *self)
 {
@@ -1196,13 +1220,17 @@ xrdp_mm_egfx_delete_surfaces(struct xrdp_mm *self)
               "monitor count %d", count);
     if (count < 1)
     {
-        xrdp_egfx_send_delete_surface(self->egfx, self->egfx->surface_id);
+        xrdp_egfx_send_delete_surface(
+            self->egfx,
+            xrdp_mm_egfx_live_surface_id(self, 0, self->egfx->surface_id));
     }
     else
     {
         for (index = 0; index < count; index++)
         {
-            xrdp_egfx_send_delete_surface(self->egfx, index);
+            xrdp_egfx_send_delete_surface(
+                self->egfx,
+                xrdp_mm_egfx_live_surface_id(self, index, index));
         }
     }
     return 0;

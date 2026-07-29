@@ -262,6 +262,8 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             {
                 self->avc444_surface_x[mi_index] = 0;
                 self->avc444_surface_y[mi_index] = 0;
+                /* -1 = no re-key yet, the id in the command is live */
+                self->avc444_surface_id_live[mi_index] = -1;
             }
             if (mi_count > 16)
             {
@@ -1339,58 +1341,81 @@ xrdp_avc444_cfg_from_encoder(const struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
-/* aux_ltr_chain re-key (BACKLOG #48): rebuild the client's decoder for one
- * monitor by deleting and recreating its EGFX surface. MS-RDPEGFX binds
- * codec/decoder state to the surface, so a surface delete is a PROTOCOL-
- * DEFINED decoder teardown -- the same event class a resize already
- * produces and every client already survives -- instead of an in-band IDR
- * whose handling by a two-context client we would have to assume. The
- * three PDUs are queued AHEAD of this frame's pixels and the caller
- * repaints the whole surface from the fresh IDR in the SAME frame, so the
- * recreated surface is never left blank waiting for the next damage. */
+/* Queue one already-built EGFX PDU, taking ownership of s either way. */
 static int
-gfx_emit_surface_reset(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
-                       struct xrdp_egfx_bulk *bulk, int surface_id,
-                       int mon_index, int width, int height)
+gfx_queue_pdu(struct xrdp_encoder *self, XRDP_ENC_DATA *enc, struct stream *s)
 {
-    struct stream *s;
-    int index;
-
-    for (index = 0; index < 3; index++)
+    if (s == NULL)
     {
-        if (index == 0)
-        {
-            s = xrdp_egfx_delete_surface(bulk, surface_id);
-        }
-        else if (index == 1)
-        {
-            s = xrdp_egfx_create_surface(bulk, surface_id, width, height,
-                                         XR_PIXEL_FORMAT_XRGB_8888);
-        }
-        else
-        {
-            s = xrdp_egfx_map_surface(bulk, surface_id,
-                                      self->avc444_surface_x[mon_index],
-                                      self->avc444_surface_y[mon_index]);
-        }
-        if (s == NULL)
-        {
-            return 1;
-        }
-        if (gfx_send_done(self, enc, (int)(s->end - s->data), 0, s->data,
-                          0, 0, 0) != 0)
-        {
-            free_stream(s);
-            return 1;
-        }
-        g_free(s); /* ->data now owned by the queued enc_done */
+        return 1;
+    }
+    if (gfx_send_done(self, enc, (int)(s->end - s->data), 0, s->data,
+                      0, 0, 0) != 0)
+    {
+        free_stream(s);
+        return 1;
+    }
+    g_free(s); /* ->data now owned by the queued enc_done */
+    return 0;
+}
+
+/* aux_ltr_chain re-key (BACKLOG #48), part 1 of 2: create the REPLACEMENT
+ * surface, ahead of this frame's pixels.
+ *
+ * MS-RDPEGFX binds codec/decoder state to the surface, so destroying one
+ * is a protocol-defined decoder teardown -- the event class a resize
+ * already produces and every client already survives -- rather than an
+ * in-band IDR whose handling by a two-context client we would have to
+ * assume.
+ *
+ * The replacement is built under a DIFFERENT id and is NOT mapped here.
+ * The first implementation reused the same id and emitted
+ * DELETE -> CREATE -> MAP -> pixels, which leaves output mapped to a
+ * freshly created (zero-filled) surface for as long as the re-key IDR
+ * takes to arrive and decode -- measured at ~200 ms plus decode. macOS
+ * flashed black at every boundary (owner, 2026-07-29). FreeRDP never
+ * showed it because gdi_MapSurfaceToOutput only sets flags and
+ * presentation happens at END_FRAME, so no amount of client-side
+ * sampling here could have caught it; the wire order is the invariant. */
+static int
+gfx_emit_surface_create(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                        struct xrdp_egfx_bulk *bulk, int new_surface_id,
+                        int width, int height)
+{
+    return gfx_queue_pdu(self, enc,
+                         xrdp_egfx_create_surface(bulk, new_surface_id,
+                                 width, height,
+                                 XR_PIXEL_FORMAT_XRGB_8888));
+}
+
+/* Part 2 of 2: hand output over to the replacement, AFTER its pixels.
+ *
+ * MAP(new) is queued and DELETE(old) is returned so the caller emits it
+ * last. Order matters in both directions: mapping before the pixels
+ * shows a blank surface, and deleting the old one before mapping the new
+ * leaves output with nothing mapped. Between MAP and DELETE both
+ * surfaces are briefly mapped at the same origin, which is the only
+ * window in which a client can composite, and by then the new surface
+ * already holds the full-surface repaint. */
+static struct stream *
+gfx_emit_surface_swap(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                      struct xrdp_egfx_bulk *bulk, int new_surface_id,
+                      int old_surface_id, int mon_index)
+{
+    if (gfx_queue_pdu(self, enc,
+                      xrdp_egfx_map_surface(bulk, new_surface_id,
+                                            self->avc444_surface_x[mon_index],
+                                            self->avc444_surface_y[mon_index]))
+            != 0)
+    {
+        return NULL;
     }
     LOG(LOG_LEVEL_INFO, "gfx_wiretosurface1_avc444: aux_ltr_chain re-key: "
-        "surface %d rebuilt %dx%d at %d,%d; the full repaint from the "
-        "fresh IDR follows in this frame", surface_id, width, height,
+        "surface %d replaced by %d at %d,%d, mapped only after its full "
+        "repaint from the fresh IDR", old_surface_id, new_surface_id,
         self->avc444_surface_x[mon_index],
         self->avc444_surface_y[mon_index]);
-    return 0;
+    return xrdp_egfx_delete_surface(bulk, old_surface_id);
 }
 
 /*****************************************************************************/
@@ -1429,6 +1454,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     const unsigned char *aux_view;
     struct xrdp_ffmpeg_avc444 *ff;
     struct xrdp_avc444_encoded_pair pair;
+    int base_surface_id;
+    int old_surface_id;
+    int do_rekey;
     int nv12_bytes;
     int aux_offset;
     struct stream ls;
@@ -1449,6 +1477,17 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     in_uint32_le(in_s, flags);
     mon_index = (flags >> 28) & 0xF;
     (void)codec_id; /* the AVC mode is authoritative; override to AVC444 */
+    /* A previous re-key may have moved this monitor's surface to the
+     * alternate id (BACKLOG #48). xorgxrdp keeps sending the base id, so
+     * translate here, once, before anything is addressed to a surface. */
+    base_surface_id = surface_id;
+    do_rekey = 0;
+    old_surface_id = surface_id;
+    if (self->avc444_surface_id_live[mon_index] >= 0)
+    {
+        surface_id = self->avc444_surface_id_live[mon_index];
+        old_surface_id = surface_id;
+    }
     in_uint16_le(in_s, num_rects_d);
     if ((num_rects_d < 1) || (num_rects_d > 16 * 1024) ||
             (!s_check_rem(in_s, num_rects_d * 8)))
@@ -1505,17 +1544,25 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
 
     if (self->avc444_surface_reset_pending[mon_index])
     {
-        /* re-key (BACKLOG #48): this frame rebuilds the surface, whose
-         * content is undefined afterwards, so the damage region must
-         * cover ALL of it. The capture is always a full frame and the
-         * encoder was destroyed with the re-key, so this frame's picture
-         * is a fresh IDR that genuinely carries every pixel -- declaring
-         * the whole surface is accurate, not a widened guess. */
+        /* re-key (BACKLOG #48): this frame paints a BRAND NEW surface, so
+         * the damage region must cover ALL of it. The capture is always a
+         * full frame and the encoder was destroyed with the re-key, so
+         * this frame's picture is a fresh IDR that genuinely carries
+         * every pixel -- declaring the whole surface is accurate, not a
+         * widened guess. */
         d_rects[0].x1 = 0;
         d_rects[0].y1 = 0;
         d_rects[0].x2 = twidth;
         d_rects[0].y2 = theight;
         num_rects_d = 1;
+        /* alternate base <-> base+16 so the replacement never reuses the
+         * id whose decoder state we are discarding, and so this frame's
+         * pixels can be addressed to it while the OLD surface is still
+         * the one mapped to output */
+        do_rekey = 1;
+        surface_id = (old_surface_id == base_surface_id)
+                     ? base_surface_id + XRDP_AVC444_SURFACE_ALT
+                     : base_surface_id;
     }
 
     nv12_bytes = xup_cap_avc444_nv12_bytes(twidth, theight,
@@ -1645,13 +1692,15 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             g_free(d_rects);
             return NULL;
         }
-        /* The surface rebuild must reach the client BEFORE this frame's
-         * pixels; emitted here, with the luma PDU already built, so
-         * nothing between the teardown and the repaint can fail. */
-        if (self->avc444_surface_reset_pending[mon_index])
+        /* The replacement surface must EXIST before this frame's pixels
+         * can be addressed to it, but it is deliberately not mapped yet;
+         * output stays on the old surface until the repaint has landed.
+         * Emitted here, with the luma PDU already built, so nothing
+         * between the create and the repaint can fail. */
+        if (do_rekey)
         {
-            if (gfx_emit_surface_reset(self, enc, bulk, surface_id,
-                                       mon_index, twidth, theight) != 0)
+            if (gfx_emit_surface_create(self, enc, bulk, surface_id,
+                                        twidth, theight) != 0)
             {
                 free_stream(s_luma);
                 g_free(s->data);
@@ -1684,6 +1733,28 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
                                     &dst_rect, s->data, bitmap_data_length);
     g_free(s->data);
     g_free(d_rects);
+    if (do_rekey && rv != NULL)
+    {
+        /* Both views have now landed on the replacement surface, so it is
+         * safe to hand output over: queue the aux PDU, then MAP(new), and
+         * return DELETE(old) as this command's last PDU. */
+        if (gfx_queue_pdu(self, enc, rv) != 0)
+        {
+            return NULL;
+        }
+        rv = gfx_emit_surface_swap(self, enc, bulk, surface_id,
+                                   old_surface_id, mon_index);
+        /* published for the main thread's resize teardown, which would
+         * otherwise delete the base id and orphan this one */
+        tc_mutex_lock(self->mutex);
+        self->avc444_surface_id_live[mon_index] =
+            (surface_id == base_surface_id) ? -1 : surface_id;
+        tc_mutex_unlock(self->mutex);
+        if (rv == NULL)
+        {
+            return NULL;
+        }
+    }
     if (xrdp_ffmpeg_avc444_rekey_pending(ff))
     {
         /* aux_ltr_chain: the shared frame_num counter is near its

@@ -7,6 +7,13 @@
 #include "xrdp_client_info.h"
 #include "xrdp_encoder_ffmpeg.h"
 
+/* The aux_ltr_chain re-key (BACKLOG #48) builds its replacement surface
+ * under base_id + this offset, alternating base <-> base+16 across
+ * boundaries. 16 is the per-monitor array bound, so an alternate id can
+ * never collide with another monitor's base id (ids are 0..monitorCount-1,
+ * xrdp_mm.c:1171). */
+#define XRDP_AVC444_SURFACE_ALT 16
+
 #define ENC_IS_BIT_SET(_flags, _bit) (((_flags) & (1 << (_bit))) != 0)
 #define ENC_SET_BIT(_flags, _bit) do { _flags |= (1 << (_bit)); } while (0)
 #define ENC_CLR_BIT(_flags, _bit) do { _flags &= ~(1 << (_bit)); } while (0)
@@ -69,6 +76,21 @@ struct xrdp_encoder
      * whole surface from the fresh IDR. Set in the encoder thread,
      * consumed by the encoder thread on the following frame. */
     int avc444_surface_reset_pending[16];
+    /* The re-key builds the replacement surface under a DIFFERENT id and
+     * only maps it once it holds pixels, so output is never mapped to a
+     * blank surface (BACKLOG #48 RED 2026-07-29: mapping the freshly
+     * created surface BEFORE this frame's pixels made macOS flash black
+     * at every boundary. FreeRDP composites at END_FRAME so it never
+     * showed it -- the fault is visible only to clients that present
+     * when the mapping changes).
+     *
+     * -1 means "the id in the command is live"; otherwise this is the id
+     * the client currently has for that monitor, and it REPLACES the id
+     * xorgxrdp sends. Written by the encoder thread; read by the main
+     * thread in xrdp_mm_egfx_delete_surfaces() under self->mutex, so a
+     * resize tears down the surface that actually exists rather than the
+     * base id it assumed. */
+    int avc444_surface_id_live[16];
     /* EGFX surface layout cached at encoder-create time (main thread)
      * so the encoder thread can rebuild a surface without touching
      * wm/client_info concurrently. A resize deletes the encoder
