@@ -421,8 +421,53 @@ that were on disk before the owner ever connected.
 / `gfx_emit_surface_swap` emit, so this is gated without a live client,
 GPU or fleet. Currently the invariant runs only in the capture audit.
 
+**RED 2026-07-29 (run 4, owner on macOS, build 8f0994e2): STILL flashes
+black.** So the blank-surface window was A defect but not THE defect.
+
+Owner's gate, and it is the right one: nothing goes onscreen again until
+the oracle capture decodes clean with no mid-stream black frame. Built
+as `oracle_black_frame_check.py`. Result on the run-4 capture
+(`captures/arm_o_rekey_noblank_20260729/`):
+
+    surface 0   2144 pictures, 2144 decoded, 0 black
+    surface 16  1978 pictures, 1978 decoded, 0 black
+
+**The bitstream is clean. The black is not in the H.264.** Both
+surfaces' CREATE geometry is identical (1024x768 at 0,0), so it is not a
+mis-sized replacement either. What is left is the surface swap itself:
+macOS blanks on surface CHURN, in BOTH orderings tried —
+`DELETE→CREATE→MAP→pixels` (run 3) and `CREATE→pixels→MAP→DELETE`
+(run 4). That falsifies #48's founding premise, that a surface delete is
+"the event class a resize already produces and every client already
+survives".
+
+*Three false alarms came out of building this checker, all on captures
+that were fine — recorded so nobody rebuilds them:* (1) decoding the
+split `_main`/`_aux` streams separately — under the shared chain each
+view alone steps frame_num by 2 and the parameter sets ship once, in
+main, so a KNOWN-GOOD arm-n capture reports main 66.8/167 and aux 0;
+(2) ffmpeg's default frame-rate mode silently dropped 334 pictures to
+131 (needs `-vsync 0`); (3) hand-rolled `width*height` byte arithmetic
+over rawvideo, when main and aux views are different sizes — it reported
+"619.7 frames" for 334 pictures. The checker is now validated against
+arm-n first: 334/334, zero black. A checker that cannot pass a good
+capture cannot condemn a bad one.
+
+*Limit of the gate, stated so it is not mistaken for a full clearance:*
+it decodes each surface's chain independently, so it proves no black is
+ENCODED. It cannot see a compositing fault at the surface transition,
+because that is client behaviour and never appears in the bytes.
+
+**Next, and it is cheap:** an arm with surface churn DISABLED — encoder
+restart + full-surface IDR only, i.e. what arm-n already does, which has
+never been reported flashing. #48 exists because the in-band IDR's
+handling by VideoToolbox was UNPROVABLE from the bitstream; that is no
+longer true, because the owner is now testing on macOS and a boundary
+arrives every ~27 s. If that arm is clean, the surface-teardown
+mechanism is unnecessary and #48 collapses to the encoder restart.
+
 **Remaining acceptance — client-compat only:**
-- macOS re-check on the fixed build: the black flash must be gone.
+- macOS re-check, gated behind a clean `oracle_black_frame_check.py`.
 - mstsc, mstsc multimon and the macOS Windows App across several
   boundaries. FreeRDP surviving does not transfer: the whole reason #48
   exists is that VideoToolbox's 2-context lifecycle is unprovable from
