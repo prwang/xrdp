@@ -220,7 +220,10 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
    message. A validator that cannot fail is worthless; one of ours asserted
    a bug as correct (2026-07-29, `rekey_boundary_audit.py` check B).
 
-**1. Rewriter accepts BOTH intra input shapes, in BOTH views.**
+**1. Rewriter accepts BOTH intra input shapes, in BOTH views. DONE
+   2026-07-29 (`9653bd1f`).** The reject at `xrdp_h264_annexb.c:2128`
+   plus the three walker gates that keyed on `ntype == 5` (C1); the
+   emitter needed no change at all.
    `slice_ltr_rewrite()` today handles exactly IDR-carrying-I and P:
    - **non-IDR I** (`h264_nvenc` at a forced key frame without
      `-forced-idr`) hits the reject at `xrdp_h264_annexb.c:2128`. Third
@@ -237,7 +240,15 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
    (VAAPI) and the T4 (nvenc) each exercise exactly one shape, so a
    single-shape build passes half the fleet silently.
 
-**2. Schedule + observed-vs-requested check.** Both children spawn with an
+**2. Schedule + observed-vs-requested check. DONE 2026-07-29
+   (`9653bd1f` rewriter half, `a0d9e773` schedule + plumbing).**
+   `intra_refresh_frames` plumbed through all four hops; both children
+   spawned with `-force_key_frames expr:not(mod(n,N))` (no backslash --
+   the escaped form is rejected by ffmpeg, verified) and `-g N`; the
+   rewriter fails the pair on a mismatch in EITHER direction. Proven on
+   two real ffmpeg children by `test_ffmpeg_scheduled_paired_cut_live`:
+   77 pairs at period 24, cuts only on scheduled ordinals in both views,
+   zero mid-stream IDRs. Both children spawn with an
    identical frame-indexed `-force_key_frames` schedule derived from
    `intra_refresh_frames` (D6). `xrdp_h264_ltr_state` carries the expected
    refresh index; a picture parsing P where intra was scheduled **fails the
@@ -245,18 +256,27 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
    that runs before the client sees the frame; it fails the pair rather
    than shipping it.
 
-**3. No parameter sets at a cut** (D5, unconditional). A non-IDR I is not a
+**3. No parameter sets at a cut** (D5, unconditional). **DONE
+   2026-07-29 (`9653bd1f`), resolved as D18 after finding the item
+   contradicted itself (C2).** A non-IDR I is not a
    decoder entry point, the stream never seeks, EGFX is reliable.
    Child-emitted SPS/PPS still passes through on the main view (`:2350–2392`).
 
-**4. Delete the aux respawn path; retire the `-g 30000` interim.** Remove
+**4. Delete the aux respawn path; retire the `-g 30000` interim. DONE
+   2026-07-29 (`a0d9e773`).** `-g` is REMOVED from arm-n/p/q and both T4
+   LTR profiles rather than lowered: the runner pins it, so a `-g` in
+   `encoder_args` would be silently overridden. Remove
    `encode_pair` `:1184–1197` and `ltr_aux_fresh`. Set `-g` equal to
    `intra_refresh_frames` (D7) on the T4 profile, arm-n and arm-p — every
    intra picture lands on a scheduled index by construction, "unscheduled
    IDR" is unreachable, and the frame_num-wrap re-key becomes the live wrap
    mechanism instead of being masked by the GOP IDR.
 
-**5. `pump_set` (xrdp).**
+**5. `pump_set` (xrdp). DONE 2026-07-29 (`3ceed31d`).** `pump()` is
+   now the n = 1 case, argued equivalent path by path;
+   `submit_pair`/`pump_pairs`/`collect_pair` is the construction #40
+   shares; `test_ffmpeg_pump_set_four_views_one_thread` asserts
+   `kids_armed == 4` over four real children.
    1. Factor `pump()` into `pump_arm()` (build this child's pollfd slots) +
       `pump_service()` (dispatch revents: `feed_vmsplice`/stderr/stdout).
       `pump()` keeps its signature; existing callers untouched
@@ -276,7 +296,13 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
       never memoized — a monitor dropped mid-session (UWP windowed mode)
       simply stops contributing a child.
 
-**6. Per-monitor capture budget, depth 2 (xorgxrdp; lands before E5).**
+**6. Per-monitor capture budget, depth 2 (xorgxrdp; lands before E5).
+   DONE 2026-07-29 — xorgxrdp `d77d054` + xrdp `6f80b0fe`.** Deb:
+   `dist/xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb`
+   (verified recon-free). Three adversarial reviews ran against the
+   diff; two real findings were fixed before the commit and three
+   consequences are recorded below (see "What step 6 changed that the
+   item did not predict").
    In sub-order:
    - **6a. Make the completed-scan clear structurally safe FIRST.** Replace
      "clear `dirtyRegion` when all monitors were visited" with the thing it
@@ -427,6 +453,67 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
     headroom costs nothing and a tight bound buys nothing. `k8s/arm-q.yaml`
     carries it with the arithmetic in the comment; other arms keep 512Mi
     (6.9× at this geometry) until they run E3-sized sessions.
+
+### What step 6 changed that the item did not predict (2026-07-29)
+
+Found by three adversarial reviews of the step-6 diff. Two were fixed
+before it was committed; three are consequences that must be MEASURED,
+not assumed away.
+
+**Fixed before the commit:**
+
+- **A pass that serves nobody used to stamp the frame clock and arm the
+  timer.** With a per-monitor budget the top gate is permissive (it only
+  refuses when NO monitor has capacity) while the in-loop gate BREAKs on
+  the first capped monitor (D15) — so at m = 2 roughly every other
+  wake-up serves nobody. Stamping `lastUpdateTime` there paced the next
+  pass off a frame that never happened; arming `updateScheduled` made
+  the ack's own `rdpScheduleDeferredUpdate()` a no-op, so a freed
+  monitor waited out a whole frame interval; and rescheduling turned it
+  into a ~250 Hz loop doing a full region intersect per tick and sending
+  nothing — a direct tax on the quantity E5 measures. Now: no send, no
+  clock stamp, no reschedule; the ack re-arms (both ack handlers do so
+  unconditionally).
+- **The budget must NOT be reset when the capture arena is re-laid
+  out.** `rdpClientConAllocateSharedMemory` REUSES the mapping whenever
+  the byte total is unchanged, and the total is an order-independent sum
+  over monitors — so a layout update that only permutes or moves
+  monitors keeps the same shm object. Clearing the ring there pointed
+  the next capture at slot 0 of memory a still-unacked frame's enc item
+  borrows by pointer (FR-PROC-6), i.e. the encoder reading a slot being
+  rewritten. Nothing needs resetting instead: `rect_id`/`rect_id_ack`
+  are never reset either, and a real re-map is preceded by xrdp deleting
+  its encoder and acking everything with `rect_id_ack = INT_MAX`.
+
+**Consequences to measure, recorded because they change what a gate
+means:**
+
+- **6c switches ON a per-frame re-pack that R1 measured as INERT.**
+  Under the dead parity rule each monitor was pinned to one slot, so
+  `cap_slot_missing[mon][other]` was never read and the re-pack union in
+  `rdpCapRect` contributed nothing at m = 2. With a per-monitor counter
+  the slot alternates on every send, so every capture now additionally
+  packs the previous frame's damage for that monitor — and that union is
+  also what goes on the wire as the frame's dirty rects. This is
+  REQUIRED by FR-CAPTURE-8 clause 9 (a slot that sat idle is stale), it
+  is the price of real two-slot pipelining, and it lands in the same
+  measurement as the concurrency gain. So: **E5's 51.1 ms baseline never
+  paid it, and E6's bandwidth gate is now measuring a different capture
+  region.** Both must be re-read with that in mind, and the aux/main
+  KB/frame numbers recorded beside the interval rather than compared to
+  the pre-#45 bandwidth figures as if nothing changed.
+- **6d's per-monitor "no third capture" assertion is UNREACHABLE by
+  construction.** The in-loop gate evaluates the same predicate
+  immediately upstream and `rect_id_ack` cannot move in between
+  (single-threaded, monotone). It is a tripwire for future edits, not
+  present coverage, and it is not counted as evidence for anything.
+- **6a's coverage intersect also runs on the single-monitor path**,
+  which previously had no clear at all: damage beyond the client canvas
+  is now dropped instead of retained forever. Benign in both directions
+  (that damage is unreachable, and both resize paths re-damage the full
+  screen) and it removes a pre-existing permanent-reschedule loop — but
+  it IS a behaviour change outside `CC_GFX_AVC444`, so it is stated
+  rather than folded into "replacing the clear".
 
 ### Corrections to this item, found by reading the source (2026-07-29)
 
