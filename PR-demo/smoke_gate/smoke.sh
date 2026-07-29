@@ -7,10 +7,26 @@
 # Runs FROM the dev box (CLAUDE.md "T4 test methodology"): the client side
 # lives here, the T4 is reached over an ssh -L forward, and the encoder log
 # is checked over ssh.
+#
+# TARGET (added 2026-07-29): SMOKE_TARGET=t4 (default) or =pod, which runs
+# the same gate against a bisect-fleet arm on its host loopback port. E1
+# needs the gate to run against whatever pair is actually deployed, and
+# the T4 is not always up. A pod pass is NOT a T4 pass -- the T4 is the
+# representative old-CPU box -- so the target is printed with the result.
 set -u
+TARGET=${SMOKE_TARGET:-t4}
+NS=${SMOKE_NS:-bisect-matrix}
+ARM=${SMOKE_ARM:-arm-r}
 T4=${T4:-$(cat /root/.t4_host 2>/dev/null)}
 T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
-[ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
+if [ "$TARGET" = pod ]; then
+    POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    [ -z "$POD" ] && { echo "ABORT: no running pod for $ARM"; exit 1; }
+    LOGMARK=$(kubectl -n "$NS" logs "$POD" 2>/dev/null | wc -l | tr -d ' ')
+else
+    [ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
+fi
 D=$(cd "$(dirname "$0")" && pwd)
 mkdir -p /tmp/ab
 # Full date+time mark: a time-of-day-only mark matched OLD log lines from
@@ -32,11 +48,18 @@ for size in 1920x1080 1024x768; do
     ok=$(grep -c "  ok$" /tmp/ab/smoke_$size.out)
     lag=$(grep -c "LAG" /tmp/ab/smoke_$size.out)
     edge=$(grep "EDGE_FIDELITY" /tmp/ab/smoke_$size.out | awk '{print $2}')
-    errs=$(ssh -i "$T4_KEY" "$T4" \
-               "awk -v m='[$MARK' 'substr(\$1, 1, length(m)) >= m' \
-                    /var/log/xrdp.log 2>/dev/null" \
-           | grep -cE "restarting encoder|sequence mismatch")
-    echo "smoke[$size]: ok=$ok lag=$lag edge=${edge:-none} encoder_errors=$errs"
+    if [ "$TARGET" = pod ]; then
+        errs=$(kubectl -n "$NS" logs "$POD" 2>/dev/null \
+               | tail -n +$((LOGMARK + 1)) \
+               | grep -cE "restarting encoder|sequence mismatch")
+    else
+        errs=$(ssh -i "$T4_KEY" "$T4" \
+                   "awk -v m='[$MARK' 'substr(\$1, 1, length(m)) >= m' \
+                        /var/log/xrdp.log 2>/dev/null" \
+               | grep -cE "restarting encoder|sequence mismatch")
+    fi
+    echo "smoke[$size]: target=$TARGET ok=$ok lag=$lag \
+edge=${edge:-none} encoder_errors=$errs"
     if [ "$ok" -lt 8 ] || [ "$lag" -ne 0 ] || [ "$errs" -ne 0 ]; then
         pass=0
     fi
