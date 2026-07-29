@@ -180,6 +180,15 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
 #define XRDP_H264_LTR_LOG2_MAX_FRAME_NUM 16
 #define XRDP_H264_LTR_FRAME_NUM_REKEY \
     ((1 << XRDP_H264_LTR_LOG2_MAX_FRAME_NUM) - 512)
+/* The re-key threshold is settable (gfx.toml ltr_rekey_frame_num) so the
+ * boundary can be exercised in minutes instead of the ~18 min of
+ * continuous 30 fps animation the shipped value implies (32512 pairs).
+ * The MAX is the shipped default and is a CEILING, not a suggestion:
+ * a larger value would let a decoder see the frame_num wrap this whole
+ * mechanism exists to prevent. The MIN keeps a test value from turning
+ * every frame into a re-key. */
+#define XRDP_H264_LTR_FRAME_NUM_REKEY_MAX XRDP_H264_LTR_FRAME_NUM_REKEY
+#define XRDP_H264_LTR_FRAME_NUM_REKEY_MIN 64
 
 struct xrdp_h264_ltr_state
 {

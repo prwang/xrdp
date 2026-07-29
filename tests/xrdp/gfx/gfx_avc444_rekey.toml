@@ -1,0 +1,10 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# BACKLOG #48: a lowered re-key threshold so a test arm reaches the
+# boundary (surface reset + fresh IDR) in seconds instead of the ~18 min
+# of continuous 30 fps animation the shipped 65024 implies.
+ltr_rekey_frame_num = 536

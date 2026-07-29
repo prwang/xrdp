@@ -1379,6 +1379,8 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_fault_strip_mmco;
             cfg.aux_ltr_chain =
                 self->wm->gfx_config->avc444_ffmpeg_aux_ltr_chain;
+            cfg.ltr_rekey_frame_num =
+                self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_frame_num;
             if (cfg.fault_strip_mmco)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml fault_strip_mmco is ON: "
@@ -1410,6 +1412,7 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_strip_mmco;
             self->avc444_aux_ltr_chain =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_ltr_chain;
+            self->avc444_ltr_rekey_frame_num = cfg.ltr_rekey_frame_num;
             if (self->avc444_aux_ltr_chain)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "

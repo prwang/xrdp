@@ -18,6 +18,10 @@ DIST=${DIST:-/work/dist}
 # (banner.sh) and gfx.toml are ConfigMaps, so the common iteration —
 # tweak content/config, roll ONE arm — never rebuilds or re-imports an
 # image (the ~1.5GB import + native-snapshotter unpack is the slow path).
+# arm-o (BACKLOG #48 re-key boundary) is deliberately NOT in the default
+# list: it needs an xrdp deb built from the #48 commit, so it is deployed
+# by name ("build_and_deploy.sh arm-o") once ARM_TAG/TAG_DEB below carry
+# that build. Listing it here before then would abort a whole-fleet roll.
 ARMS="${*:-arm-a arm-b arm-c arm-d arm-e arm-f arm-g arm-h arm-i arm-j arm-k arm-l arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01

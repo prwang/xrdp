@@ -106,6 +106,16 @@ struct xrdp_ffmpeg_avc444_config
     /* Default 0: FR-H264-7 leaves remain    */
     /* the shipped architecture until the    */
     /* FR-H264-8 acceptance gate passes.     */
+    int ltr_rekey_frame_num;        /* aux_ltr_chain: shared frame_num      */
+    /* value at which a re-key is requested   */
+    /* (gfx.toml ltr_rekey_frame_num).        */
+    /* Clamped to                             */
+    /* [XRDP_H264_LTR_FRAME_NUM_REKEY_MIN,    */
+    /*  XRDP_H264_LTR_FRAME_NUM_REKEY_MAX];   */
+    /* the MAX default is a ceiling that      */
+    /* keeps the wrap out of decoder sight.   */
+    /* Lower it to exercise the boundary in a */
+    /* test arm (BACKLOG #48).                */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */

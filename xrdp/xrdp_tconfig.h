@@ -138,6 +138,15 @@ struct xrdp_tconfig_gfx
      * all-intra leaves remain the shipped architecture until the
      * FR-H264-8 acceptance gate (incl. the bandwidth gate) passes. */
     int avc444_ffmpeg_aux_ltr_chain;
+    /* aux_ltr_chain re-key threshold: the shared frame_num value at
+     * which the encoder pair is rebuilt and the EGFX surface reset
+     * (BACKLOG #48). Default XRDP_H264_LTR_FRAME_NUM_REKEY (2^16-512,
+     * ~18 min of continuous 30 fps animation); clamped to
+     * [XRDP_H264_LTR_FRAME_NUM_REKEY_MIN, ..._MAX]. Lower it to
+     * exercise the re-key boundary in a test arm without an hour of
+     * animation; the MAX is a ceiling, since a higher value would let
+     * a decoder meet the frame_num wrap. */
+    int avc444_ffmpeg_ltr_rekey_frame_num;
     /* NOTE: AVC444 reference partitioning (aux encoded by a second
      * all-IDR child and spliced in as non-reference, non-IDR I leaves)
      * is NOT configurable: it is a structural requirement of the

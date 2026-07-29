@@ -252,6 +252,29 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_fault_aux_delay = mm->avc444_fault_aux_delay;
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
         self->avc444_aux_ltr_chain = mm->avc444_aux_ltr_chain;
+        self->avc444_ltr_rekey_frame_num = mm->avc444_ltr_rekey_frame_num;
+        /* cache the EGFX surface origins the re-key reset re-maps with;
+         * mirrors xrdp_mm_egfx_create_surfaces (BACKLOG #48) */
+        {
+            int mi_index;
+            int mi_count = mm->wm->client_info->display_sizes.monitorCount;
+            for (mi_index = 0; mi_index < 16; mi_index++)
+            {
+                self->avc444_surface_x[mi_index] = 0;
+                self->avc444_surface_y[mi_index] = 0;
+            }
+            if (mi_count > 16)
+            {
+                mi_count = 16;
+            }
+            for (mi_index = 0; mi_index < mi_count; mi_index++)
+            {
+                const struct monitor_info *mi =
+                        mm->wm->client_info->display_sizes.minfo_wm + mi_index;
+                self->avc444_surface_x[mi_index] = mi->left;
+                self->avc444_surface_y[mi_index] = mi->top;
+            }
+        }
         LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: AVC444 %s",
             self->avc444_v2 ? "v2 (ChromaV2, 0x000F)" : "v1 (0x000E)");
         g_strncpy(self->avc444_path, mm->wm->gfx_config->avc444_ffmpeg_path,
@@ -1282,6 +1305,61 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
+/* aux_ltr_chain re-key (BACKLOG #48): rebuild the client's decoder for one
+ * monitor by deleting and recreating its EGFX surface. MS-RDPEGFX binds
+ * codec/decoder state to the surface, so a surface delete is a PROTOCOL-
+ * DEFINED decoder teardown -- the same event class a resize already
+ * produces and every client already survives -- instead of an in-band IDR
+ * whose handling by a two-context client we would have to assume. The
+ * three PDUs are queued AHEAD of this frame's pixels and the caller
+ * repaints the whole surface from the fresh IDR in the SAME frame, so the
+ * recreated surface is never left blank waiting for the next damage. */
+static int
+gfx_emit_surface_reset(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                       struct xrdp_egfx_bulk *bulk, int surface_id,
+                       int mon_index, int width, int height)
+{
+    struct stream *s;
+    int index;
+
+    for (index = 0; index < 3; index++)
+    {
+        if (index == 0)
+        {
+            s = xrdp_egfx_delete_surface(bulk, surface_id);
+        }
+        else if (index == 1)
+        {
+            s = xrdp_egfx_create_surface(bulk, surface_id, width, height,
+                                         XR_PIXEL_FORMAT_XRGB_8888);
+        }
+        else
+        {
+            s = xrdp_egfx_map_surface(bulk, surface_id,
+                                      self->avc444_surface_x[mon_index],
+                                      self->avc444_surface_y[mon_index]);
+        }
+        if (s == NULL)
+        {
+            return 1;
+        }
+        if (gfx_send_done(self, enc, (int)(s->end - s->data), 0, s->data,
+                          0, 0, 0) != 0)
+        {
+            free_stream(s);
+            return 1;
+        }
+        g_free(s); /* ->data now owned by the queued enc_done */
+    }
+    LOG(LOG_LEVEL_INFO, "gfx_wiretosurface1_avc444: aux_ltr_chain re-key: "
+        "surface %d rebuilt %dx%d at %d,%d; the full repaint from the "
+        "fresh IDR follows in this frame", surface_id, width, height,
+        self->avc444_surface_x[mon_index],
+        self->avc444_surface_y[mon_index]);
+    return 0;
+}
+
+/*****************************************************************************/
 /* RFX_AVC444_BITMAP_STREAM (LC=0) serializer for the external ffmpeg AVC444
  * backend (PRD FR-WIRE). Emits AVC444 v1 (codec id 0x000E) or, when the client
  * advertised v2 support, AVC444 v2 (0x000F) with ChromaV2 packing; the LC field
@@ -1390,6 +1468,21 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     dst_rect.y1 = 0;
     dst_rect.x2 = width;
     dst_rect.y2 = height;
+
+    if (self->avc444_surface_reset_pending[mon_index])
+    {
+        /* re-key (BACKLOG #48): this frame rebuilds the surface, whose
+         * content is undefined afterwards, so the damage region must
+         * cover ALL of it. The capture is always a full frame and the
+         * encoder was destroyed with the re-key, so this frame's picture
+         * is a fresh IDR that genuinely carries every pixel -- declaring
+         * the whole surface is accurate, not a widened guess. */
+        d_rects[0].x1 = 0;
+        d_rects[0].y1 = 0;
+        d_rects[0].x2 = twidth;
+        d_rects[0].y2 = theight;
+        num_rects_d = 1;
+    }
 
     nv12_bytes = xup_cap_avc444_nv12_bytes(twidth, theight,
                                            self->avc444_chroma_align);
@@ -1535,6 +1628,21 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             g_free(d_rects);
             return NULL;
         }
+        /* The surface rebuild must reach the client BEFORE this frame's
+         * pixels; emitted here, with the luma PDU already built, so
+         * nothing between the teardown and the repaint can fail. */
+        if (self->avc444_surface_reset_pending[mon_index])
+        {
+            if (gfx_emit_surface_reset(self, enc, bulk, surface_id,
+                                       mon_index, twidth, theight) != 0)
+            {
+                free_stream(s_luma);
+                g_free(s->data);
+                g_free(d_rects);
+                return NULL;
+            }
+            self->avc444_surface_reset_pending[mon_index] = 0;
+        }
         if (gfx_send_done(self, enc, (int)(s_luma->end - s_luma->data), 0,
                           s_luma->data, 0, 0, 0) != 0)
         {
@@ -1570,6 +1678,10 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             "re-key: recreating the encoder pair after this frame");
         xrdp_ffmpeg_avc444_delete(ff);
         self->avc444_ffmpeg_handle[mon_index] = NULL;
+        /* the next frame for this monitor rebuilds the client's decoder
+         * with a surface delete/create rather than relying on an in-band
+         * IDR (BACKLOG #48) */
+        self->avc444_surface_reset_pending[mon_index] = 1;
     }
     return rv;
 }

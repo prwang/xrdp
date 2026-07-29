@@ -61,6 +61,20 @@ struct xrdp_encoder
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip        */
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window   */
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain  */
+    int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)    */
+    /* aux_ltr_chain re-key (BACKLOG #48): when the shared frame_num
+     * counter hits the threshold the encoder pair is destroyed, and the
+     * NEXT frame for that monitor rebuilds the client's decoder by
+     * deleting and recreating its EGFX surface before repainting the
+     * whole surface from the fresh IDR. Set in the encoder thread,
+     * consumed by the encoder thread on the following frame. */
+    int avc444_surface_reset_pending[16];
+    /* EGFX surface layout cached at encoder-create time (main thread)
+     * so the encoder thread can rebuild a surface without touching
+     * wm/client_info concurrently. A resize deletes the encoder
+     * (WMRZ_ENCODER_DELETE), so this cache cannot go stale. */
+    int avc444_surface_x[16];
+    int avc444_surface_y[16];
     int avc444_chroma_align; /* coded WIDTH alignment 16 or 32        */
     char avc444_path[256];
     struct xrdp_avc444_encoder_args avc444_encoder_args;

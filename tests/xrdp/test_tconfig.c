@@ -3,6 +3,7 @@
 #endif
 
 #include "xrdp_tconfig.h"
+#include "xrdp_h264_annexb.h"
 #include "test_xrdp.h"
 #include "xrdp.h"
 #include "string_calls.h"
@@ -230,6 +231,41 @@ START_TEST(test_tconfig_gfx_avc444_empty_args_fallback)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_rekey_threshold)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #48: the aux_ltr_chain re-key threshold is settable so the
+     * boundary can be exercised without ~18 min of continuous animation.
+     * Absent -> the shipped default. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num, 536);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY_MIN);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_rekey_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* Above the max the wrap guard would be defeated: the loader must
+     * keep the default rather than weaken it silently (BACKLOG #48). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY_MAX);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -256,6 +292,10 @@ make_suite_tconfig_load_gfx(void)
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_invalid);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_defaults);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_override);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_threshold);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_empty_args_fallback);
 

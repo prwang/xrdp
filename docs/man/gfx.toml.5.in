@@ -230,6 +230,28 @@ log \(em when the declared value does not match the encoder's real bitstream.
 The value is never adapted at runtime.
 
 .TP
+\fBltr_rekey_frame_num\fR = \fI<integer>\fR
+Applies only when \fBaux_ltr_chain\fR is enabled. The shared \fBframe_num\fR
+value at which the encoder pair is rebuilt and the client's decoder is reset.
+Default: \fB65024\fR (2^16\(hy512).
+
+The AVC444 long\(hyterm\(hyreference chain drives one shared, monotonically
+increasing \fBframe_num\fR across both views. A decoder that reaches the
+16\(hybit wrap in this topology has been measured to stop decoding silently, so
+the server re\(hykeys before the counter can get there: it destroys the encoder
+pair, deletes and recreates the affected EGFX surface \(em a protocol\(hydefined
+decoder teardown \(em and repaints the whole surface from a fresh IDR in the
+same frame. The visible cost is one full\(hyframe update.
+
+At the default the boundary arrives after roughly 18 minutes of continuous
+30 fps animation; frames are encoded only on damage, so an idle session may
+never reach it. Lower the value to exercise the boundary deliberately (a test
+arm at \fB536\fR crosses it every few seconds). Accepted range is \fB64\fR to
+\fB65024\fR; a value outside it is refused with a warning and the default is
+kept, because a higher threshold would expose a decoder to the very wrap this
+mechanism exists to prevent.
+
+.TP
 \fBencoder_args\fR = \fI<array of strings>\fR
 The encoder block, inserted verbatim into the \fBffmpeg\fR argv immediately
 after the input mapping and before the output framing. Each array element

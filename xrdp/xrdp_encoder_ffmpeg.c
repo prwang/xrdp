@@ -223,6 +223,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->strip_pic_struct = 0;
     cfg->aux_intra_leaf = 0;
     cfg->aux_ltr_chain = 0;
+    cfg->ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -1223,7 +1224,7 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
         }
         result->aux_data = self->aux_buf;
         result->aux_len = self->aux_len;
-        if (self->ltr.frame_num >= XRDP_H264_LTR_FRAME_NUM_REKEY &&
+        if (self->ltr.frame_num >= self->cfg.ltr_rekey_frame_num &&
                 !self->rekey_pending)
         {
             /* re-key BEFORE the shared counter can wrap (a per-view
@@ -1234,7 +1235,8 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
              * rebuilds the encoder, so the NEXT frame is a fresh IDR.
              * Roughly once an hour of continuous encoding. */
             LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_ltr_chain frame_num "
-                "%d near wrap; re-key requested", self->ltr.frame_num);
+                "%d reached the re-key threshold %d; re-key requested",
+                self->ltr.frame_num, self->cfg.ltr_rekey_frame_num);
             self->rekey_pending = 1;
         }
         return XRDP_FFMPEG_PAIR_READY;
@@ -1540,6 +1542,22 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
         return NULL;
     }
     self->cfg = *cfg;
+    if (self->cfg.ltr_rekey_frame_num < XRDP_H264_LTR_FRAME_NUM_REKEY_MIN ||
+            self->cfg.ltr_rekey_frame_num >
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MAX)
+    {
+        /* out of range is CLAMPED, never honoured: above the max a
+         * decoder would meet the frame_num wrap the re-key exists to
+         * prevent (BACKLOG #48) */
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: ltr_rekey_frame_num %d out "
+            "of range [%d,%d]; clamped", self->cfg.ltr_rekey_frame_num,
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MIN,
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MAX);
+        self->cfg.ltr_rekey_frame_num =
+            self->cfg.ltr_rekey_frame_num < XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
+            ? XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
+            : XRDP_H264_LTR_FRAME_NUM_REKEY_MAX;
+    }
     self->in_fd = -1;
     self->out_fd = -1;
     self->err_fd = -1;
