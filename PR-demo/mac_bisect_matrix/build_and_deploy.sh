@@ -24,6 +24,11 @@ DIST=${DIST:-/work/dist}
 # frames instead of every ~18 min. It is a boundary-exercising test arm,
 # not a member of the steady-state matrix. Deploy it by name:
 #   build_and_deploy.sh arm-p
+# arm-q is likewise off the default list: it is the RECON arm for xrdp
+# BACKLOG #45 recon gate R1 (arm-n's encoder config on an xorgxrdp that
+# logs the capture slot actually used, per monitor, per frame). It exists
+# to answer that one gate and is retired with it:
+#   build_and_deploy.sh arm-q
 ARMS="${*:-arm-e arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
@@ -39,12 +44,16 @@ declare -A ARM_XORG_DEB=(
     # arm-p: same xorgxrdp as arm-n; only the xrdp side carries the
     # frame_num-wrap re-key knobs (PRD FR-H264-8)
     [arm-p]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
+    # arm-q: arm-n's xrdp deb with the RECON xorgxrdp (5b9650c + the
+    # R1SLOT log line) — xrdp BACKLOG #45 recon gate R1
+    [arm-q]="xorgxrdp-dev_1%3a0.10.80+git20260729190443.957fa794ebdc_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
     [arm-m]=39bb08a48377.xx5b9650c-xfce
     [arm-n]=34795577580b.xx5b9650c-xfce
     [arm-p]=6894d7de2202.xx5b9650c-xfce
+    [arm-q]=34795577580b.xx957fa79
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -53,6 +62,8 @@ declare -A TAG_DEB=(
     [34795577580b.xx5b9650c]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
     # BACKLOG #48: ltr_rekey_surface_reset — churn masked from the client
     [6894d7de2202.xx5b9650c]="xrdp-dev_0.10.80+git20260729030225.6894d7de2202_amd64.deb"
+    # arm-q: arm-n's xrdp deb, image rebuilt on the recon xorgxrdp
+    [34795577580b.xx957fa79]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

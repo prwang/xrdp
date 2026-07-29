@@ -1,0 +1,22 @@
+[19:10:24:765] [2118295:0020529b] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x08 -> no RDP scancode found
+[19:10:24:765] [2118295:0020529b] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x5d -> no RDP scancode found
+[19:10:24:808] [2118295:0020529b] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[19:10:24:808] [2118295:0020529b] [WARN][com.freerdp.core.license] - [license_read_binary_blob_data]: license binary blob::type BB_ERROR_BLOB, length=0, skipping.
+[19:10:24:808] [2118295:0020529b] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[19:10:25:108] [2118295:002052e3] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x713c181d3190
+[19:10:28:181] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:182] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:385] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:386] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:591] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:592] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:796] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:797] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:998] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:28:998] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:202] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:203] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:407] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:408] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:610] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting
+[19:10:29:611] [2118295:002052e3] [WARN][com.freerdp.codec] - [intersects]: YUV decoder: intersecting rectangles, aborting

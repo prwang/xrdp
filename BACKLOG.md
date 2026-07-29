@@ -159,7 +159,9 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
   per-monitor slots (`cap_offsets[mon] + slotIndex * cap_slot_bytes[mon]`).
   Consequences at m = 2: (a) the two-slot alternation is inert — `rect_id`
   advances by m between one monitor's consecutive sends, so `(rect_id+1)&1`
-  is constant per monitor and each monitor is pinned to one slot (R1);
+  is constant per monitor and each monitor is pinned to one slot
+  (**measured, R1: same slot on 1079/1079 full-pass consecutive sends;
+  per-monitor two-slot pipelining fired once in 1100 sends**);
   (b) a batched 4-view encode holds both budget slots for its whole
   duration, so no capture can overlap it. The overlap that exists today at
   m = 2 is *cross-monitor* interleaving via the per-item ack
@@ -323,13 +325,33 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
 
 ### Recon gates (required; each reaches its gate BEFORE the property is used)
 
-- **R1 — even-m slot pinning, measured on the fleet.** The pinning is
-  source-derived; before 6c changes the arithmetic, run one m = 2
-  fleet-arm session logging the slot index per monitor per frame.
-  **Gate:** the log confirms neither monitor ever changes slot (recorded
-  as the "before" evidence for 6c). If it refutes the derivation instead,
-  6c's rationale is re-examined before any code changes — the measurement
-  wins over the arithmetic. **6c may not land before this gate.**
+- **R1 — even-m slot pinning, measured on the fleet. GATE REACHED
+  2026-07-29: CONFIRMED, with one correction to the gate's own wording.**
+  Run: arm-q (`PR-demo/mac_bisect_matrix/k8s/arm-q.yaml`) — arm-n's
+  encoder config byte for byte, on xorgxrdp `957fa79` = `5b9650c` plus
+  one recon-only INFO line per AVC444 send; 2 × 1024×768 client from the
+  host dummy-X rig, `SESSION_KIND=code`, 60 s, **1100 sends**. Harness
+  `PR-demo/mac_bisect_matrix/r1_slot_recon.sh` + `r1_slot_report.py`;
+  evidence `PR-demo/mac_bisect_matrix/captures/r1_slot_recon_20260729_191020/`.
+  - **Full passes (both monitors sent; `rect_id` gap 2): 1079 of 1079
+    consecutive sends reused the same slot — zero changes.** Monitor 1
+    used exactly ONE slot for the entire run; its second slot was never
+    written.
+  - **Correction to the gate wording.** It said "neither monitor ever
+    changes slot". Monitor 0 changed slot **18** times — every one of
+    them on a *partial* pass (gap 1: it sent while monitor 1 had no
+    damage), a case the wording did not anticipate. Those flips do not
+    rescue the mechanism: 17 of the 18 second sends happened with the
+    monitor's previous frame already acked, so nothing was pipelined.
+  - **The property 6c depends on**, measured directly: a monitor holding
+    **two outstanding frames in two different slots** occurred **once in
+    1100 sends (0.09 %)**. Per-monitor two-slot pipelining is inert at
+    m = 2. The overlap the session does get is cross-monitor, and the
+    global budget is saturated — max (`rect_id − rect_id_ack`) = 2, with
+    543 of 1100 sends issued at depth 2.
+  - **6c may proceed on this basis.** The recon instrumentation is not
+    part of step 6: revert xorgxrdp `957fa79` and retire arm-q when the
+    step lands.
 - **R2 — the `/dev/shm` floor at 2560×1440 + 3840×2400, measured on the
   fleet.** Derive and record the actual capture shmem footprint at the
   target geometry (two slots × two views × both monitors). **Gate:** the
