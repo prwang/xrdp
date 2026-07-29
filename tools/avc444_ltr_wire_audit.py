@@ -17,9 +17,41 @@ modification and 7.3.3.3 dec_ref_pic_marking). Nothing is assumed about
 the encoder; a stream that does not match the guard shape is reported as
 such rather than silently mis-parsed.
 
-Usage: avc444_ltr_wire_audit.py [--annexb] <file> [label] [max_pictures]
+Usage: avc444_ltr_wire_audit.py [--annexb] [--assert] [--intra-refresh N]
+                                [--allow-idr K] <file> [label] [max_pictures]
   --annexb: <file> is a RAW Annex-B elementary stream from a child
   encoder; report its shape and whether ltr_cache_ok() accepts it.
+  --assert: turn the report into a GATE (BACKLOG #45 step 0). Every
+  check below is evaluated and named, and the tool exits non-zero on
+  the first violated one. Without --assert the tool only prints (the
+  descriptive mode every earlier capture was read with).
+  --intra-refresh N: the scheduled paired-cut period the stream was
+  encoded with (gfx.toml intra_refresh_frames). Enables the schedule
+  and chain-depth assertions, which cannot be checked without it.
+  --allow-idr K: tolerate K mid-stream IDRs (only a frame_num-wrap
+  re-key may legitimately produce one; default 0).
+
+The assertions, and why each one has teeth:
+  A1 no mid-stream IDR              FR-H264-6: a refresh is a non-IDR I;
+                                    an IDR flushes the DPB and breaks
+                                    both long-term chains.
+  A2 intra only on scheduled index  every intra picture sits at
+                                    ordinal % N == 0 in its own view.
+  A3 cuts are PAIRED                main and aux cut at the SAME view
+                                    ordinals -- one view refreshing
+                                    alone desynchronises the pair.
+  A4 no scheduled cut is skipped    every scheduled ordinal inside the
+                                    captured window carries an intra in
+                                    BOTH views (the observed-vs-
+                                    requested property, on the wire).
+  A5 own-slot refs and self-marks   every P retargets L0 to its own
+                                    view's long-term slot and re-marks
+                                    itself into it; no picture ever
+                                    references the other view's slot.
+  A6 one contiguous frame_num chain +1 per picture across the whole
+                                    merged decode order, cuts included.
+  A7 chain depth <= N               no picture is more than N pictures
+                                    from its own view's last intra.
 """
 import struct
 import sys
@@ -374,17 +406,168 @@ def audit_annexb(path, label, max_pics):
           'encoder (chain stays off; leaf topology used).')
     return 1
 
+def assert_gate(sps, pics, refresh, allow_idr):
+    """Evaluate the #45 wire assertions. Returns a list of
+    (name, ok, detail) in check order -- nothing is skipped silently:
+    a check that cannot run without --intra-refresh says so and
+    counts as a FAIL, because the gate was asked for."""
+    out = []
+    own_slot = {'main': 0, 'aux': 1}
+    per_view = {'main': [s for s in pics if s['view'] == 'main'],
+                'aux': [s for s in pics if s['view'] == 'aux']}
+
+    # A1 -- mid-stream IDR
+    mid_idr = [i for i, s in enumerate(pics) if s['idr'] and i > 0]
+    out.append(('A1 no mid-stream IDR', len(mid_idr) <= allow_idr,
+                '%d mid-stream IDR(s)%s' %
+                (len(mid_idr),
+                 '' if not mid_idr
+                 else ' at decode indices %s' % mid_idr[:8])))
+
+    # A2/A3/A4/A7 need the schedule
+    intra_ord = {}
+    for view, sel in per_view.items():
+        intra_ord[view] = [i for i, s in enumerate(sel)
+                           if s['slice_type'] == I]
+    if refresh is None:
+        for name in ('A2 intra only on a scheduled index',
+                     'A4 no scheduled cut skipped',
+                     'A7 chain depth <= intra_refresh_frames'):
+            out.append((name, False,
+                        'not evaluated: --intra-refresh N was not given'))
+        unscheduled = None
+    else:
+        unscheduled = {}
+        for view, ords in intra_ord.items():
+            unscheduled[view] = [o for o in ords if o % refresh != 0]
+        bad = sum(len(v) for v in unscheduled.values())
+        out.append(('A2 intra only on a scheduled index', bad == 0,
+                    'unscheduled intra: main %s aux %s'
+                    % (unscheduled['main'][:8], unscheduled['aux'][:8])))
+
+    # A3 -- paired cuts (independent of the period)
+    out.append(('A3 cuts are paired across views',
+                intra_ord['main'] == intra_ord['aux'],
+                'main intra ordinals %s ... aux %s'
+                % (intra_ord['main'][:8], intra_ord['aux'][:8])))
+
+    if refresh is not None:
+        missing = {}
+        for view, sel in per_view.items():
+            want = range(0, len(sel), refresh)
+            missing[view] = [o for o in want
+                             if o not in set(intra_ord[view])]
+        nmiss = sum(len(v) for v in missing.values())
+        out.append(('A4 no scheduled cut skipped', nmiss == 0,
+                    'scheduled ordinals with no intra: main %s aux %s'
+                    % (missing['main'][:8], missing['aux'][:8])))
+
+    # A5 -- own-slot refs and self-marks
+    a5 = []
+    for view, sel in per_view.items():
+        if not sel:
+            continue
+        slot = own_slot[view]
+        inter = [s for s in sel if s['slice_type'] == P]
+        wrong_ref = [s for s in inter
+                     if not (s['rplm'] and s['rplm'][0] == (2, slot))]
+        wrong_mark = [s for s in sel
+                      if not s['idr']
+                      and not (s['marking']
+                               and s['marking'][0] == (6, slot))]
+        if wrong_ref:
+            a5.append('%s: %d/%d P not retargeted to LT%d'
+                      % (view, len(wrong_ref), len(inter), slot))
+        if wrong_mark:
+            a5.append('%s: %d/%d non-IDR pictures do not self-mark LT%d'
+                      % (view, len(wrong_mark), len(sel), slot))
+    out.append(('A5 own-slot refs and self-marks', not a5,
+                '; '.join(a5) if a5 else 'all pictures conform'))
+
+    # A6 -- one contiguous shared frame_num chain, cuts included
+    mod = 1 << sps['log2_max_frame_num']
+    gaps = [i + 1 for i, (a, b_) in enumerate(zip(pics, pics[1:]))
+            if (a['frame_num'] + 1) % mod != b_['frame_num']]
+    out.append(('A6 one contiguous frame_num chain', not gaps,
+                '%d gap(s)%s' % (len(gaps),
+                                 '' if not gaps
+                                 else ' at decode indices %s' % gaps[:8])))
+
+    # A7 -- transitive chain depth
+    if refresh is not None:
+        deep = {}
+        for view, sel in per_view.items():
+            depth = None
+            worst = 0
+            for s in sel:
+                if s['slice_type'] == I:
+                    depth = 0
+                elif depth is None:
+                    depth = None    # window opened mid-chain: unknown
+                else:
+                    depth += 1
+                    worst = max(worst, depth)
+            deep[view] = worst
+        ok = all(v <= refresh for v in deep.values())
+        out.append(('A7 chain depth <= intra_refresh_frames', ok,
+                    'worst depth: main %d aux %d (bound %d)'
+                    % (deep['main'], deep['aux'], refresh)))
+    return out
+
+
+def run_assert_gate(sps, pics, refresh, allow_idr):
+    checks = assert_gate(sps, pics, refresh, allow_idr)
+    print('=== ASSERT GATE (BACKLOG #45 step 0) ===')
+    failed = 0
+    for name, ok, detail in checks:
+        print('  %-40s %-4s  %s' % (name, 'PASS' if ok else 'FAIL', detail))
+        if not ok:
+            failed += 1
+    print()
+    if failed:
+        print('ASSERT VERDICT: FAIL -- %d of %d checks violated'
+              % (failed, len(checks)))
+        return 1
+    print('ASSERT VERDICT: PASS -- %d checks, all clean' % len(checks))
+    return 0
+
+
 def main():
     argv = sys.argv[1:]
     annexb = False
-    if argv and argv[0] == '--annexb':
-        annexb = True
-        argv = argv[1:]
+    do_assert = False
+    refresh = None
+    allow_idr = 0
+    rest = []
+    i = 0
+    while i < len(argv):
+        a = argv[i]
+        if a == '--annexb':
+            annexb = True
+        elif a == '--assert':
+            do_assert = True
+        elif a == '--intra-refresh':
+            i += 1
+            refresh = int(argv[i])
+            if refresh < 1:
+                sys.exit('--intra-refresh must be >= 1')
+        elif a == '--allow-idr':
+            i += 1
+            allow_idr = int(argv[i])
+        else:
+            rest.append(a)
+        i += 1
+    argv = rest
+    if not argv:
+        sys.exit(__doc__)
     path = argv[0]
     label = argv[1] if len(argv) > 1 else path
     max_pics = int(argv[2]) if len(argv) > 2 else 10 ** 9
     if annexb:
-        sys.exit(audit_annexb(path, label, max_pics))
+        rv = audit_annexb(path, label, max_pics)
+        if do_assert and rv != 0:
+            print('ASSERT VERDICT: FAIL -- child stream fails the guard')
+        sys.exit(rv)
     sps_seen, sps, pps, pics = audit(path, label, max_pics)
     if not pics:
         sys.exit('%s: no pictures parsed' % label)
@@ -468,9 +651,15 @@ def main():
     print()
     if problems:
         print('VERDICT: PROBLEMS -- ' + '; '.join(problems))
+        if do_assert:
+            print()
+            sys.exit(run_assert_gate(sps, pics, refresh, allow_idr) or 1)
         sys.exit(1)
     print('VERDICT: both views are inter-coded from their OWN previous '
           'picture (main<-LT0, aux<-LT1); no cross-view prediction.')
+    if do_assert:
+        print()
+        sys.exit(run_assert_gate(sps, pics, refresh, allow_idr))
 
 
 if __name__ == '__main__':

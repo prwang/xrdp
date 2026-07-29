@@ -203,7 +203,13 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
 
 ### Steps (ordered; 0–4 correctness, 5–7 throughput; 6 lands before E5 is measured)
 
-**0. Ratchets first — must FAIL against today's code before step 1.**
+**0. Ratchets first — must FAIL against today's code before step 1.
+   DONE 2026-07-29, RED demonstrated and recorded** in
+   `PR-demo/mac_bisect_matrix/captures/ratchets_red_20260729/` (three new
+   C ratchets fail at `cd856fad`; the wire audit's new `--assert` mode
+   fails 5 of 7 checks on the pre-#45 arm-o capture whose descriptive
+   verdict is PASS). Four corrections to this item's own text came out of
+   it, recorded at the end of this section.
    Extend the pure-C DPB simulator in `tests/xrdp/test_avc444_ltr.c` with a
    scheduled paired-cut AU sequence in both 1-context and 2-context decode
    modes; byte-exact goldens from `ltr_splice_ref.py`; an assertion mode
@@ -353,6 +359,7 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
 | D15 | **BREAK on a capped monitor; skip-and-continue is forbidden.** A skipped monitor that lets the scan complete re-creates the `251bc4d` damage-destruction shape by a second route. Fairness comes from the rotation snapshot plus the bounded ack (same stall as today's global gate), not from skipping. |
 | D16 | **The completed-scan clear is replaced by an explicit coverage intersect** (`dirtyRegion ∩= union(monitor rects)`), landed first with its own E7-harness gate (step 6a). |
 | D17 | **Per-monitor slot index** replaces global `rect_id` parity. No shmem layout change, no xup contract bump (`shmem_offset` is explicit per frame). |
+| D18 | **D5 resolved against step 3's parenthetical (see C2): at a CONVERTED cut the child's SPS/PPS/SEI are DROPPED on the main view; at a real stream-start IDR they still pass through.** A converted cut is not a decoder entry point, so parameter sets there buy nothing and cost 206 B every refresh on VAAPI. Guarded, because a swallowed *changed* SPS is silent whole-picture corruption: the dropped set must be byte-identical to the cached one, and a differing SPS/PPS **fails the pair loudly** instead of being dropped. (A parameter-set change cannot happen without a fresh encoder object today — a geometry change destroys and recreates it, so `started` is 0 and the pass-through path is taken — which is why the guard is cheap and why it must still be there.) |
 
 ### Recon gates (required; each reaches its gate BEFORE the property is used)
 
@@ -420,6 +427,65 @@ Verified in `/workUpdateXorgXrdp/module/rdpClientCon.c`, 2026-07-29:
     headroom costs nothing and a tight bound buys nothing. `k8s/arm-q.yaml`
     carries it with the arithmetic in the comment; other arms keep 512Mi
     (6.9× at this geometry) until they run E3-sized sessions.
+
+### Corrections to this item, found by reading the source (2026-07-29)
+
+Recorded rather than silently fixed, because each one changes what a
+step has to do:
+
+- **C1 — step 1 is bigger than the `:2128` reject.** Fixing only
+  `slice_ltr_rewrite()`'s reject does NOT make the rewriter accept a
+  non-IDR I "in both views": three walker-level gates key on
+  `ntype == 5` rather than on the picture being intra —
+  `xrdp_h264_annexb.c:2466` rejects any non-IDR aux picture while
+  `!aux_seeded` (so an nvenc aux cut is still refused), `:2481` derives
+  `to_seed_i` from `ntype == 5`, and `:2532` sets `aux_seeded` only on
+  an IDR. The emitter, by contrast, needs **no change at all**: the
+  existing non-IDR arm already emits the exact required bytes for both
+  new shapes (no rplm, constant `mmco6 ltfi=view`, `out[0] = 0x61`,
+  `cabac_init_idc` neither read nor written).
+- **C2 — step 3 as written is self-contradictory, measurably.** D5 says
+  "no SPS/PPS at a cut, unconditionally"; step 3's parenthetical says
+  child-emitted SPS/PPS still pass through on the main view. On VAAPI
+  the cut IS a child IDR carrying parameter sets, so both cannot hold:
+  the shipped arm-o capture spends **206 B per cut** (SPS 29 + PPS 4 +
+  SEI 173) on exactly those. **Resolved 2026-07-29 (D18):** D5 wins for
+  a CONVERTED cut, with a guard — see D18.
+- **C3 — stale line references.** The aux respawn is
+  `xrdp_encoder_ffmpeg.c:1244–1257` (with `ltr_aux_fresh` at `:149`,
+  `:1267`, `:1712`), not `:1184–1197`. `feed_vmsplice()`'s single call
+  site is `:915`, not `:730/:794/:856`. `F_SETPIPE_SZ` is `:587`, not
+  `:528`. The counter reset is `:2452`, not `:2450`.
+  `submit_single()`/`pump_set()`/`pump_arm()` **do not exist** — step 5
+  creates them; the existing submit half is inline in `encode_single`.
+- **C4 — the wire audit was not toothless, it was incomplete.** Its
+  default mode already exits non-zero on cross-view refs, missing list
+  modification, non-self-marking pictures and frame_num gaps. What it
+  lacked was an `--assert` mode and, specifically, any check of the
+  properties #45 adds: it *skipped* the gap check at a mid-stream IDR
+  (`if b_['idr']: continue`), i.e. it was blind to the exact defect step
+  2 removes. Both fixed in step 0.
+- **C5 — the `fifo_to_proc_depth > 2` scaling belongs to step 6, not
+  step 7.** Step 6b alone raises the legal in-flight count from 2 to
+  2m, so at m = 2 the assertion at `xrdp_mm.c:4819` becomes a permanent
+  false ERROR the moment step 6 deploys, batching or no batching — and
+  E2's "zero errors in the server log" would be unreachable, with
+  relaxing the criterion as the tempting next move. Landed with step 6.
+- **C6 — after step 2 the re-key is the ONLY frame_num-wrap
+  protection.** Today a main GOP IDR resets the shared counter, which
+  masks the wrap by accident; `xrdp_ffmpeg_avc444_ltr_counter_cap()` and
+  `warn_if_rekey_unreachable()` (plus their test at
+  `tests/xrdp/test_avc444_ffmpeg.c`) model exactly that reset and become
+  FALSE at the D7 target `-g 240`. They are corrected in the same commit
+  as step 1/4, not left to warn about a mechanism that no longer exists.
+- **C7 — one existing test asserts the abolished behaviour.**
+  `test_ltr_emitter_epoch_restart_byte_exact` asserts
+  `st.aux_seeded == 0` and `st.frame_num == 1` after a mid-stream main
+  IDR. That is the DPB flush step 2 removes, so the test is re-scoped to
+  the `!started` epoch case (re-key restart, where the encoder object is
+  destroyed and the state is memset) rather than deleted — and the
+  re-scope is recorded here so it cannot be mistaken for weakening a
+  gate to keep it green.
 
 ### Out of scope
 

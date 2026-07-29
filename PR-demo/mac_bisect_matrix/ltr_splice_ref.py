@@ -417,9 +417,18 @@ def parse_child_marking(r):
 
 
 def rewrite_slice(nal, new_fn, log2, pps, view, lt1_seeded,
-                  fault_ltpn=None):
+                  fault_ltpn=None, started=False):
     """Rewrite one child VCL NAL per the FR-H264-8 recipe. Returns the
-    rewritten NAL (escaped, with header byte, no start code)."""
+    rewritten NAL (escaped, with header byte, no start code).
+
+    started: the shared chain is already running (BACKLOG #45 step 1).
+    A main-view IDR arriving then is a SCHEDULED REFRESH, not a stream
+    start: it is converted to the same self-contained non-IDR I the aux
+    view has always used, so the shared counter continues and the other
+    view's long-term slot survives (an IDR would flush the DPB and take
+    LT1 with it). A non-IDR I input (h264_nvenc at a forced key frame
+    without -forced-idr) is the same picture in the shape the encoder
+    already emits, and is accepted directly."""
     ntype = nal[0] & 0x1F
     if ntype not in (1, 5):
         die('unexpected VCL NAL type %d' % ntype)
@@ -443,7 +452,7 @@ def rewrite_slice(nal, new_fn, log2, pps, view, lt1_seeded,
         idr_pic_id = r.ue()
         nopp = r.u(1)              # no_output_of_prior_pics_flag
         r.u(1)                     # long_term_reference_flag
-        if view == 'M':
+        if view == 'M' and not started:
             if old_fn != 0:
                 die('main IDR frame_num %d != 0' % old_fn)
             w.ue(idr_pic_id)       # idr_pic_id preserved (C parity)
@@ -451,12 +460,25 @@ def rewrite_slice(nal, new_fn, log2, pps, view, lt1_seeded,
             w.u(1, 1)              # long_term_reference_flag 0 -> 1
             out_type = 5
         else:
-            # aux IDR -> self-contained non-IDR I, self-marks LT1
+            # aux IDR, and (step 1) a mid-stream main IDR: converted to
+            # a self-contained non-IDR I that self-marks its OWN slot
             w.u(1, 1)              # adaptive_ref_pic_marking_mode_flag
             w.ue(6)                # mmco 6
-            w.ue(1)                # long_term_frame_idx = 1
+            w.ue(0 if view == 'M' else 1)   # long_term_frame_idx
             w.ue(0)                # mmco 0
             out_type = 1
+    elif st == 2:
+        # non-IDR I (step 1): no ref_pic_list_modification exists for an
+        # I slice and none is emitted; the child's marking is parsed only
+        # to be discarded, exactly as on the P path
+        if view == 'M' and not started:
+            die('main chain must start with an IDR, got a non-IDR I')
+        parse_child_marking(r)
+        w.u(1, 1)                  # adaptive_ref_pic_marking_mode_flag
+        w.ue(6)                    # mmco 6
+        w.ue(0 if view == 'M' else 1)       # long_term_frame_idx
+        w.ue(0)                    # mmco 0
+        out_type = 1
     elif st == 0:
         if r.u(1):                 # num_ref_idx_active_override_flag
             die('%s P: num_ref_idx_active_override set' % view)
@@ -502,6 +524,70 @@ def rewrite_slice(nal, new_fn, log2, pps, view, lt1_seeded,
         w.u(1, 1)
     return bytes([0x60 | out_type]) + escape(w.tobytes()
                                              + rbsp[r.p >> 3:])
+
+
+def synth_nonidr_i(nal, log2, pps, child_fn, marking):
+    """Build a CHILD-shaped non-IDR I slice from a child IDR slice:
+    same slice_type, same CABAC payload byte-verbatim, header re-emitted
+    in the non-IDR form (no idr_pic_id, no long_term_reference_flag,
+    dec_ref_pic_marking present because nal_ref_idc != 0).
+
+    This is the shape h264_nvenc emits at a forced key frame WITHOUT
+    -forced-idr (BACKLOG #45 step 1). It is synthesised rather than
+    captured because no nvenc-capable GPU exists on the dev box; the
+    synthesis is validated by DECODING the result with ffmpeg (see
+    --emit-cut-header), so the vector is a real decodable picture, and
+    the T4 confirms the real encoder's shape at deploy time.
+
+    marking: 'sliding' -> adaptive_ref_pic_marking_mode_flag = 0;
+             'mmco1'   -> the benign [mmco1 diff=0, mmco0] chain Mesa
+                          emits, which the rewriter must parse and
+                          discard.
+    """
+    if (nal[0] & 0x1F) != 5:
+        die('synth_nonidr_i wants an IDR slice NAL')
+    rbsp = unescape(nal[1:])
+    r = R(rbsp)
+    w = W()
+    first_mb = r.ue()
+    stype = r.ue()
+    pps_id = r.ue()
+    r.u(log2)                      # child frame_num (replaced)
+    if stype % 5 != 2:
+        die('synth_nonidr_i: IDR slice_type %d is not I' % stype)
+    r.ue()                         # idr_pic_id, dropped
+    r.u(1)                         # no_output_of_prior_pics_flag
+    r.u(1)                         # long_term_reference_flag
+    w.ue(first_mb)
+    w.ue(stype)
+    w.ue(pps_id)
+    w.u(child_fn, log2)
+    if marking == 'sliding':
+        w.u(0, 1)                  # adaptive_ref_pic_marking_mode_flag
+    elif marking == 'mmco1':
+        w.u(1, 1)
+        w.ue(1)                    # mmco 1
+        w.ue(0)                    # difference_of_pic_nums_minus1
+        w.ue(0)                    # mmco 0
+    else:
+        die('synth_nonidr_i: unknown marking %r' % marking)
+    # tail verbatim: slice_qp_delta se, [deblock control]; an I slice
+    # has no cabac_init_idc
+    t0 = r.p
+    r.se()
+    if pps['deblocking_filter_control']:
+        if r.ue() != 1:
+            r.se()
+            r.se()
+    t1 = r.p
+    r.p = t0
+    w.copy_bits(r, t1 - t0)
+    while r.p & 7:
+        if r.u(1) != 1:
+            die('synth_nonidr_i: bad cabac_alignment_one_bit')
+    while len(w.bits) & 7:
+        w.u(1, 1)
+    return bytes([0x61]) + escape(w.tobytes() + rbsp[r.p >> 3:])
 
 
 def condition_slice(nal, old_log2, new_log2, pps):
@@ -620,7 +706,8 @@ def splice(main_aus, aux_aus, sps_f, pps_f, sps_nal, pps_nal,
         if not vcl:
             die('main AU %d has no VCL NAL' % k)
         is_idr = (vcl[0][0] & 0x1F) == 5
-        if is_idr:
+        started = counter is not None
+        if is_idr and not started:
             fn = 0
         else:
             if counter is None:
@@ -635,16 +722,20 @@ def splice(main_aus, aux_aus, sps_f, pps_f, sps_nal, pps_nal,
                 pkt += SC4 + n     # main PPS/SEI/AUD pass through
             else:
                 pkt += SC4 + rewrite_slice(n, fn, log2, pps_f, 'M',
-                                           lt1)
-        if is_idr:
+                                           lt1, started=started)
+        if is_idr and not started:
             counter = 1 % mod
             lt1 = False            # DPB flushed: LT1 unseeded
         else:
+            # a mid-stream refresh (converted IDR or non-IDR I) keeps
+            # the shared counter running and leaves LT1 alone
             counter = (counter + 1) % mod
         main_pkts.append(bytes(pkt))
         ent = {'v': 'M', 'f': len(main_pkts) - 1, 'frame_num': fn}
         if is_idr and len(main_pkts) > 1:
-            ent['idr'] = 1     # re-key: 2-ctx aux context restarts here
+            # a mid-stream child IDR is now a refresh on the wire, not a
+            # decoder reset: the 2-ctx aux context does NOT restart
+            ent['cut'] = 1
         order.append(ent)
         if k % cadence == 0 and aux_i < len(aux_aus):
             au2 = aux_aus[aux_i]
@@ -853,6 +944,179 @@ def emit_header(path, main_name, aux_name, main_aus, aux_aus,
     open(path, 'w').write('\n'.join(lines))
 
 
+CUT_KIND_IDR_START = 0
+CUT_KIND_P = 1
+CUT_KIND_NONIDR_I = 2
+CUT_KIND_MIDSTREAM_IDR = 3
+
+
+def build_cut_sequence(main_aus, aux_aus, sps_f, pps_f, sps_nal,
+                       pps_nal):
+    """The BACKLOG #45 step-0 scheduled-paired-cut vector sequence.
+
+    Twelve pictures on ONE shared chain: a normal start, a paired cut in
+    the h264_nvenc shape (non-IDR I in BOTH views), P pictures proving
+    the chain continues across it, a second cut whose child marking is a
+    benign mmco chain, and finally a mid-stream main IDR in the
+    h264_vaapi shape -- which must be converted to the same
+    self-contained I, keep the shared counter running and leave the aux
+    view's LT1 in place (the aux P that follows it is the check).
+
+    Returns (list of picture dicts, sps_rw). Each dict has:
+      view  'M' or 'A'
+      kind  CUT_KIND_*
+      inb   the child AU as fed to the rewriter (annex-b, 4-byte SCs)
+      gold  the rewritten packet the C rewriter must produce
+      fn    the shared frame_num this picture carries
+    """
+    log2 = sps_f['log2_max_frame_num']
+    _, sps_rw_rbsp = parse_sps(unescape(sps_nal[1:]), rewrite=True,
+                               new_log2=OUT_LOG2)
+    sps_rw = bytes([sps_nal[0]]) + escape(sps_rw_rbsp)
+    if len(main_aus) < 3 or len(aux_aus) < 5:
+        die('cut vectors need >= 3 main and >= 5 aux child AUs')
+
+    def vcl_of(au):
+        v = [n for n in au if (n[0] & 0x1F) in (1, 5)]
+        if len(v) != 1:
+            die('cut vectors need exactly one VCL NAL per child AU')
+        return v[0]
+
+    plan = [
+        ('M', CUT_KIND_IDR_START, main_aus[0], None),
+        ('A', CUT_KIND_IDR_START, aux_aus[0], None),
+        ('M', CUT_KIND_P, main_aus[1], None),
+        ('A', CUT_KIND_P, aux_aus[1], None),
+        ('M', CUT_KIND_NONIDR_I, main_aus[0], 'sliding'),
+        ('A', CUT_KIND_NONIDR_I, aux_aus[0], 'sliding'),
+        ('M', CUT_KIND_P, main_aus[2], None),
+        ('A', CUT_KIND_P, aux_aus[2], None),
+        ('M', CUT_KIND_NONIDR_I, main_aus[0], 'mmco1'),
+        ('A', CUT_KIND_P, aux_aus[3], None),
+        ('M', CUT_KIND_MIDSTREAM_IDR, main_aus[0], None),
+        ('A', CUT_KIND_P, aux_aus[4], None),
+    ]
+    pics = []
+    counter = 0
+    lt1 = False
+    started = False
+    for k, (view, kind, au, marking) in enumerate(plan):
+        if kind == CUT_KIND_NONIDR_I:
+            nal = synth_nonidr_i(vcl_of(au), log2, pps_f, counter & 0xF,
+                                 marking)
+            in_nals = [nal]
+        else:
+            in_nals = list(au)
+        inb = b''.join(SC4 + n for n in in_nals)
+        gold = bytearray()
+        for n in in_nals:
+            t = n[0] & 0x1F
+            if view == 'A':
+                if t in (6, 7, 8, 9):
+                    continue       # aux SPS/PPS/SEI/AUD dropped
+            elif t == 7:
+                gold += SC4 + sps_rw
+                continue
+            elif t in (6, 8, 9):
+                gold += SC4 + n    # main PPS/SEI/AUD pass through
+                continue
+            gold += SC4 + rewrite_slice(n, counter, log2, pps_f, view,
+                                        lt1, started=started)
+        pics.append({'view': view, 'kind': kind, 'inb': inb,
+                     'gold': bytes(gold), 'fn': counter})
+        if view == 'M':
+            started = True
+        if kind == CUT_KIND_IDR_START and view == 'M':
+            lt1 = False            # the stream-start IDR flushes the DPB
+        if view == 'A' and kind in (CUT_KIND_IDR_START,
+                                    CUT_KIND_NONIDR_I):
+            lt1 = True             # the aux seed I occupies LT1
+        counter = (counter + 1) % (1 << OUT_LOG2)
+    return pics, sps_rw
+
+
+def emit_cut_header(path, pics, sps_rw, pps_nal, main_name, aux_name):
+    kindname = {CUT_KIND_IDR_START: 'stream-start IDR',
+                CUT_KIND_P: 'P',
+                CUT_KIND_NONIDR_I: 'non-IDR I cut (h264_nvenc shape)',
+                CUT_KIND_MIDSTREAM_IDR:
+                'mid-stream IDR cut (h264_vaapi shape)'}
+    lines = [
+        '/*',
+        ' * test_avc444_ltr_cut_vectors.h -- BACKLOG #45 scheduled',
+        ' * paired-cut golden vectors (FR-H264-6 refresh shapes).',
+        ' *',
+        ' * GENERATED by PR-demo/mac_bisect_matrix/ltr_splice_ref.py',
+        ' * -- DO NOT hand-edit. Regenerate with:',
+        ' *   ltr_splice_ref.py %s %s <outdir>' % (main_name, aux_name),
+        ' *     --emit-cut-header tests/xrdp/test_avc444_ltr_cut_vectors.h',
+        ' *',
+        ' * ONE shared chain of %d pictures. The two intra shapes a real'
+        % len(pics),
+        ' * child encoder produces at a scheduled refresh are both here:',
+        ' * a non-IDR I (h264_nvenc without -forced-idr, synthesised from',
+        ' * a child IDR slice with the payload byte-verbatim and validated',
+        ' * by an ffmpeg decode -- no nvenc GPU exists on the dev box) and',
+        ' * a mid-stream IDR (h264_vaapi, always). Both must leave ONE',
+        ' * contiguous frame_num chain and both long-term slots intact.',
+        ' *',
+        ' * ltr_cut_seq[] is the sequence in decode order; the C rewriter',
+        ' * must turn each .in into exactly .golden and carry the shared',
+        ' * counter past .fn.',
+        ' */',
+        '#ifndef TEST_AVC444_LTR_CUT_VECTORS_H',
+        '#define TEST_AVC444_LTR_CUT_VECTORS_H',
+        '',
+        '#define LTR_CUT_VIEW_MAIN 0',
+        '#define LTR_CUT_VIEW_AUX  1',
+        '#define LTR_CUT_KIND_IDR_START      0',
+        '#define LTR_CUT_KIND_P              1',
+        '#define LTR_CUT_KIND_NONIDR_I       2',
+        '#define LTR_CUT_KIND_MIDSTREAM_IDR  3',
+        '',
+    ]
+    for k, p in enumerate(pics):
+        lines += ['/* picture %d: %s, %s,' %
+                  (k, 'main' if p['view'] == 'M' else 'aux',
+                   kindname[p['kind']]),
+                  ' * frame_num %d */' % p['fn']]
+        lines += c_array('ltr_cut_in_%d' % k, p['inb'])
+        lines += c_array('ltr_cut_golden_%d' % k, p['gold'])
+    lines += [
+        'struct ltr_cut_vec',
+        '{',
+        '    int view;                    /* LTR_CUT_VIEW_*            */',
+        '    int kind;                    /* LTR_CUT_KIND_*            */',
+        '    const unsigned char *in;',
+        '    int in_len;',
+        '    const unsigned char *golden;',
+        '    int golden_len;',
+        '    int fn;                      /* shared frame_num carried  */',
+        '};',
+        '',
+        'static const struct ltr_cut_vec ltr_cut_seq[] =',
+        '{',
+    ]
+    for k, p in enumerate(pics):
+        lines.append('    {')
+        lines.append('        %s, %d,'
+                     % ('LTR_CUT_VIEW_MAIN' if p['view'] == 'M'
+                        else 'LTR_CUT_VIEW_AUX', p['kind']))
+        lines.append('        ltr_cut_in_%d, LTR_CUT_IN_%d_LEN,' % (k, k))
+        lines.append('        ltr_cut_golden_%d, LTR_CUT_GOLDEN_%d_LEN,'
+                     % (k, k))
+        lines.append('        %d' % p['fn'])
+        lines.append('    },')
+    lines += ['};',
+              '#define LTR_CUT_SEQ_COUNT %d' % len(pics),
+              '']
+    lines += ['/* the aux-view decode prefix (rewritten SPS + child PPS),',
+              ' * as the 2-context aux decoder needs it */']
+    lines += c_array('ltr_cut_aux_prefix', SC4 + sps_rw + SC4 + pps_nal)
+    lines += ['#endif /* TEST_AVC444_LTR_CUT_VECTORS_H */', '']
+    open(path, 'w').write('\n'.join(lines))
+
+
 def main():
     if len(sys.argv) > 1 and sys.argv[1] == '--condition':
         if len(sys.argv) != 5:
@@ -866,6 +1130,7 @@ def main():
     ap.add_argument('--aux-cadence', type=int, default=1)
     ap.add_argument('--fault-retarget', action='store_true')
     ap.add_argument('--emit-header')
+    ap.add_argument('--emit-cut-header')
     ap.add_argument('--win2022')
     args = ap.parse_args()
     if args.aux_cadence < 1:
@@ -885,6 +1150,31 @@ def main():
     if pps_m != pps_a:
         die('main/aux PPS parse fields differ:\n  main %r\n  aux  %r'
             % (pps_m, pps_a))
+
+    if args.emit_cut_header:
+        pics, sps_rw = build_cut_sequence(main_aus, aux_aus, sps_m,
+                                          pps_m, sps_nal, pps_nal)
+        os.makedirs(args.outdir, exist_ok=True)
+        emit_cut_header(args.emit_cut_header, pics, sps_rw, pps_nal,
+                        os.path.basename(args.main),
+                        os.path.basename(args.aux))
+        open(os.path.join(args.outdir, 'cut_interleaved.h264'),
+             'wb').write(b''.join(p['gold'] for p in pics))
+        open(os.path.join(args.outdir, 'cut_main_only.h264'),
+             'wb').write(b''.join(p['gold'] for p in pics
+                                  if p['view'] == 'M'))
+        open(os.path.join(args.outdir, 'cut_aux_only.h264'),
+             'wb').write(SC4 + sps_rw + SC4 + pps_nal
+                         + b''.join(p['gold'] for p in pics
+                                    if p['view'] == 'A'))
+        open(os.path.join(args.outdir, 'cut_children.h264'),
+             'wb').write(b''.join(p['inb'] for p in pics
+                                  if p['view'] == 'M'))
+        print('cut sequence: ' + ' '.join(
+            '%s%d/k%d' % (p['view'], p['fn'], p['kind']) for p in pics))
+        print('wrote %s and cut_*.h264 in %s'
+              % (args.emit_cut_header, args.outdir))
+        return
 
     main_pkts, aux_pkts, order, aux_prefix, log2 = splice(
         main_aus, aux_aus, sps_m, pps_m, sps_nal, pps_nal,
