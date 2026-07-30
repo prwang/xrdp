@@ -426,6 +426,17 @@ log_hexdump_with_location(const char *function_name,
 char *getLogFile(char *replybuf, int bufsize);
 
 /**
+ * Rounds a microsecond fraction of a second to whole milliseconds
+ *
+ * Exposed so the conversion the log timestamp depends on can be tested
+ * on its own.
+ *
+ * @param usec microseconds within the second, 0 to 999999
+ * @return milliseconds within the second, 0 to 999
+ */
+int log_usec_to_msec(int usec);
+
+/**
  * Returns formatted datetime for log
  */
 char *getFormattedDateTime(char *replybuf, int bufsize);

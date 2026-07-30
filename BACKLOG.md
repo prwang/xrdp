@@ -695,7 +695,7 @@ not asserted. Plus:
 
 ---
 
-## #52 — E5-2: saturated-payload frame interval (TODO, NEXT — the benchmark E5 should have been)
+## #52 — E5-2: saturated-payload frame interval (IN PROGRESS — the benchmark E5 should have been)
 
 **Why.** E5's payload (`SESSION_KIND=code`) is a `sleep 0.1` scroll
 loop: 10 Hz damage per monitor, server 78 % idle, pipeline never full —
