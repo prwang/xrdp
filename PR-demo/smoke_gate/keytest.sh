@@ -35,10 +35,17 @@ ARM=${SMOKE_ARM:-arm-r}
 if [ "$TARGET" = pod ]; then
     SU=${KEYTEST_USER:-probe444}
     CRED_FILE=${KEYTEST_PASS_FILE:-/root/.oracle_cred}
-    LPORT=${SMOKE_PORT:-40017}
     POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
           -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
     [ -z "$POD" ] && { echo "ABORT: no running pod for $ARM"; exit 1; }
+    # The port MUST follow the arm. It used to default to 40017 (arm-r):
+    # SMOKE_ARM=arm-s then read arm-s's pod name and its log for encoder
+    # errors while the client connected to arm-r — a gate result about the
+    # wrong binary, the same class of mistake as a copy-pasted image tag
+    # (2026-07-30). Read the hostPort off the running pod instead.
+    LPORT=${SMOKE_PORT:-$(kubectl -n "$NS" get pod "$POD" -o \
+        jsonpath='{.spec.containers[0].ports[0].hostPort}' 2>/dev/null)}
+    [ -z "$LPORT" ] && { echo "ABORT: no hostPort on pod $POD"; exit 1; }
 else
     [ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
     SU=${KEYTEST_USER:-ubuntu}

@@ -29,6 +29,12 @@ DIST=${DIST:-/work/dist}
 # logs the capture slot actually used, per monitor, per frame). It exists
 # to answer that one gate and is retired with it:
 #   build_and_deploy.sh arm-q
+# arm-s / arm-t are the BACKLOG #52 (E5-2) PAIR: the same xorgxrdp and
+# the same encoder config, xrdp with (arm-s) and without (arm-t) #45
+# steps 5+7, both running SESSION_KIND=codeflood so the payload does not
+# clock the measurement. They are deployed together or not at all --
+# a flood measurement of one arm alone has no baseline:
+#   build_and_deploy.sh arm-s arm-t
 ARMS="${*:-arm-e arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
@@ -50,6 +56,11 @@ declare -A ARM_XORG_DEB=(
     # recon instrumentation is reverted. Kept registered only so an old
     # capture can be reproduced; not in the default arm list.
     [arm-q]="xorgxrdp-dev_1%3a0.10.80+git20260729190443.957fa794ebdc_amd64.deb"
+    # arm-s/arm-t: the BACKLOG #52 E5-2 pair — SAME xorgxrdp as arm-r on
+    # both, so the producer side is identical and the A/B isolates the
+    # xrdp-side steps 5+7
+    [arm-s]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
+    [arm-t]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
     # arm-r: the BACKLOG #45 arm — step 6's per-monitor capture budget,
     # coverage intersect and per-monitor slot (xorgxrdp d77d05463e52),
     # paired with the xrdp deb carrying steps 0-7
@@ -62,6 +73,8 @@ declare -A ARM_TAG=(
     [arm-p]=6894d7de2202.xx5b9650c-xfce
     [arm-q]=34795577580b.xx957fa79
     [arm-r]=f7acb5979788.xxd77d054
+    [arm-s]=52b8798839ad.xxd77d054
+    [arm-t]=5dae11f63adb.xxd77d054
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -75,6 +88,12 @@ declare -A TAG_DEB=(
     # arm-r: BACKLOG #45 steps 0-7 (xrdp) paired with step 6 (xorgxrdp
     # d77d05463e52). This is the pair every #45 gate is measured on.
     [f7acb5979788.xxd77d054]="xrdp-dev_0.10.80+git20260729233553.f7acb5979788_amd64.deb"
+    # arm-s (#52 E5-2): #45 steps 0-7 PLUS the step-0 log clock fix — the
+    # trace timestamps this benchmark is read from have to be right
+    [52b8798839ad.xxd77d054]="xrdp-dev_0.10.80+git20260730013346.52b8798839ad_amd64.deb"
+    # arm-t (#52 E5-2 baseline): #45 steps 0-4 only (a0d9e773) + the same
+    # log clock fix, from branch bench/e52-arm-t-baseline
+    [5dae11f63adb.xxd77d054]="xrdp-dev_0.10.80+git20260730013437.5dae11f63adb_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

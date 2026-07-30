@@ -24,7 +24,9 @@ with `git log -p -- BACKLOG.md`.
 |---|---|---|---|
 | T4 (EC2, Tesla T4 / NVENC) | `xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1`, `xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3` | `PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml` — `aux_ltr_chain = true`, `-g 30000` | **Renders correctly onscreen on both Windows (incl. multimon) and macOS** (owner-tested) |
 | bisect fleet arm-n | image `34795577580b.xx5b9650c-xfce` | `gfx/arm-n.toml` — `aux_ltr_chain = true`, no `-g` (the runner pins it) | good on Windows multimon + macOS |
-| bisect fleet arm-r (2026-07-29) | image `f7acb5979788.xxd77d054` = xrdp #45 steps 0–7 + xorgxrdp step 6 | `gfx/arm-r.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | **#45 gates E1/E2/E3/E6/E7 PASS, E5 RED at 0.97×** (see #45 GATE RESULTS) |
+| bisect fleet arm-r (2026-07-29) | image `f7acb5979788.xxd77d054` = xrdp #45 steps 0–7 + xorgxrdp step 6 | `gfx/arm-r.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | #45 gates E1/E2/E3/E6/E7 PASS; its E5 number was payload-clocked (see #45 GATE RESULTS). Kept as the 10 Hz-cadence reference arm |
+| bisect fleet arm-s (2026-07-30) | image `52b8798839ad.xxd77d054` = xrdp #45 steps 0–7 + the log clock fix, xorgxrdp step 6 | `gfx/arm-s.toml` (encoder block identical to arm-r), `SESSION_KIND=codeflood` | **#52 E5-2 arm: 29.9 ms mean per send = 2.13× over arm-t** — the #45 E5 gate, GREEN |
+| bisect fleet arm-t (2026-07-30) | image `5dae11f63adb.xxd77d054` = xrdp #45 steps **0–4** + the log clock fix, xorgxrdp step 6 | `gfx/arm-t.toml` (identical encoder block), `SESSION_KIND=codeflood` | #52 E5-2 **baseline** arm: 63.6 ms mean per send. Same xorgxrdp as arm-s, so the A/B isolates steps 5+7 |
 
 FR-H264-8 remains **EXPERIMENTAL**; `aux_intra_leaf` remains the shipped
 default. Gate status and evidence: `PRD.md` FR-H264-8.
@@ -47,7 +49,7 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 ---
 
-## #45 — Scheduled paired intra refresh, one-thread 4-view `pump_set`, per-monitor capture budget (OPEN on E5 — next work is #52)
+## #45 — Scheduled paired intra refresh, one-thread 4-view `pump_set`, per-monitor capture budget (DONE — E5 resolved by #52 at 2.13×)
 
 ONE plan across two repos: xrdp (steps 0–5, 7) and xorgxrdp (step 6).
 Implements the revised **FR-H264-6** (PRD) and the multimon
@@ -530,8 +532,8 @@ Pair under test: xrdp-dev `f7acb5979788` (steps 0–7) + xorgxrdp-dev
 | **E1** smoke gate | **PASS** at BOTH sizes against the package-installed pair: 8/8 keypresses rendered the right colour, zero lag, edge fidelity 0.994 / 0.992 (floor 0.50), zero encoder errors. Run with the new `SMOKE_TARGET=pod` path — **the T4 is gone** (no `/root/.t4_host`, no key), so this is a fleet-pod pass, NOT a T4 pass. |
 | **E2** ≥ 1000 pairs | **PASS**: 1688 pairs per view, **8 scheduled cuts** at ordinals 0/240/…/1680, wire audit `--assert` 7/7 clean, black-frame check 3376/3376 decoded with **zero** black frames, and zero rewrite failures / `unsupported` / pair aborts / budget assertions / fifo-depth errors in either server log. |
 | **E3** target geometry | **PASS** — the E2 run IS the E3 run; both monitors audited independently. |
-| **E4** one thread, four views | **Mechanism PROVEN, premise rare.** The worker armed 4 children in ONE poll set 21 times (asserted counter + a once-per-run INFO line), so the construction demonstrably works — but that is **21 of 3346 cycles (0.6 %)**. See E5. |
-| **E5** oracle frame interval | **RED — 0.97×** (52.5 ms mean vs the 51.1 ms baseline). **The stop rule applies; nothing was re-tuned.** Reassessed 2026-07-30: BOTH numbers are readings of the payload's own 10 Hz clock, not of the server — see the attribution below and **#52 (E5-2)**. |
+| **E4** one thread, four views | **PASS.** The mechanism was proven here (4 children in ONE poll set, asserted counter + a once-per-run INFO line) but the premise was rare under this payload — 21 of 3346 cycles (0.6 %). Under E5-2's saturating payload it is the common case: **2013 of 3889 cycles (52 %)**. |
+| **E5** oracle frame interval | **RESOLVED by E5-2 (#52) on 2026-07-30: 2.13× GREEN.** The 0.97× first measured here (52.5 ms vs a 51.1 ms baseline) was metronome-against-metronome — both sides read the payload's own 10 Hz clock, not the server (attribution below). Re-run under a saturating two-monitor payload against a re-measured baseline: **63.6 ms → 29.9 ms per send, 2.13×**, `kids_armed=4` in 52 % of cycles. Evidence: `captures/e52_flood2_arm-s_20260730/`. |
 | **E6** no regression | `make check` green: xrdp 152/152, libcommon 157, libipm 35, libxrdp 13, memtest 1, zero failures. Refresh cost measured on the gate corpus: a paired cut adds 210 308 B over a 47 614 B pair, i.e. **+1.84 % at N = 240** (PRD predicted ≈ +4 %). The arm-n/arm-m `bandwidth_bench.sh` A/B was NOT re-run: arm-n is `SESSION_KIND=xfce`, a different payload, so it is not comparable to this corpus. |
 | **E7** dual-monitor drag | **PASS** on the sweep window: 551 and 812 sends over 60 s of sweeping across the boundary, worst per-monitor gap 702 ms / 406 ms (threshold 2000 ms). |
 
@@ -585,15 +587,18 @@ are robust — the 0.97× verdict stands — but raw percentiles and any
 two-line timing delta are untrustworthy until the one-line fix lands
 (**#52 step 0**).
 
-**What this means for the item.** Steps 0–7 are implemented, tested and
-deployed; E1/E2/E3/E6/E7 pass on the deployed pair; E4's mechanism is
-proven. **#45 stays open on E5**, and the reassessment redirects the
-next work: not capture-side archaeology under a 10 Hz payload — a
-saturating benchmark first (**#52, E5-2**). The two capture-side
-questions recorded on 2026-07-29 (why a monitor's period is ~105 ms;
-whether the producer can hand both monitors over together) are kept
-under #52's predictions: they are only answerable, and only meaningful,
-once the payload outruns the pipeline.
+**What this means for the item — CLOSED 2026-07-30.** Steps 0–7 are
+implemented, tested and deployed; E1/E2/E3/E6/E7 passed on the deployed
+pair; E4 and E5 are answered by **#52 (E5-2)**, which replaced the 10 Hz
+metronome with a saturating two-monitor payload and re-measured BOTH
+sides: **2.13×** (63.6 ms → 29.9 ms mean per send), with the batch
+arming four children in 52 % of cycles instead of 0.6 %. The two
+capture-side questions from 2026-07-29 (why a monitor's period is what
+it is; whether the producer can hand both monitors over together) are
+now answerable and carry evidence — see #52's results: the worker is
+still only 32 % busy and the wait is on the next capture handoff, so the
+remaining headroom is capture-side, and that is the next item, not a
+blocker on #45.
 
 **One residual coupling recorded from step 7's review, not fixed:** with
 the shared deadline across a set (D3), a child that withholds its picture
@@ -695,7 +700,7 @@ not asserted. Plus:
 
 ---
 
-## #52 — E5-2: saturated-payload frame interval (IN PROGRESS — the benchmark E5 should have been)
+## #52 — E5-2: saturated-payload frame interval (DONE 2026-07-30 — 2.13× GREEN)
 
 **Why.** E5's payload (`SESSION_KIND=code`) is a `sleep 0.1` scroll
 loop: 10 Hz damage per monitor, server 78 % idle, pipeline never full —
@@ -779,6 +784,72 @@ recorded in the deployed-state table; E5-2 ratio + attribution
 committed beside the captures and summarized in PRD FR-H264-6/#45
 (the old E5 numbers stay, relabeled as the 10 Hz-cadence measurement);
 smoke gate run against any arm handed to a human.
+
+
+### #52 RESULTS (2026-07-30) — **E5-2: 2.13×, GREEN**
+
+Two arms, one payload, 180 s each, E3 geometry, oracle client. Evidence:
+`PR-demo/mac_bisect_matrix/captures/e52_flood2_arm-s_20260730/` (README
+carries the tables; `../e52_flood2_arm-t_20260730/` is the baseline arm).
+
+| | arm-t baseline (steps 0–4) | arm-s (steps 0–7) |
+|---|---|---|
+| xrdp-dev | `+git20260730013437.5dae11f63adb` | `+git20260730013346.52b8798839ad` |
+| xorgxrdp-dev | `d77d05463e52` | **the same** |
+| mean per send | 63.6 ms | **29.9 ms** |
+| p50 / p90 / p99 | 61 / 80 / 86 ms | 31 / 53 / 64 ms |
+| sends/s | 15.72 | **33.40** |
+| per-monitor period | 127.4 ms | **59.9 ms** |
+| pictures pushed | 4 938 MiB (234 Mbit/s) | **10 434 MiB (495 Mbit/s)** |
+| worker busy | 16 % | 32 % |
+| `kids_armed=4` | n/a | **52 % of 3 889 cycles** |
+
+**Ratio 2.13× — GREEN.** Predictions 1 and 2 from the spec hold:
+`kids_armed=4` went from 0.6 % of cycles at 10 Hz to 52 %, and the
+parallel set is worth ~2× once both monitors have work. E2 also holds
+under the flood (7/7 assertions, zero black frames in 991 pictures at
+~0.93 MB per picture, zero rewrite failures / budget assertions).
+
+**Steps as landed.** Step 0: `common/log.c` rounds µs→ms via a factored
+`log_usec_to_msec()`, with `tests/common/test_log.c` (8 cases) — full
+`make check` 366/366. Verified in situ: arm-t has ZERO out-of-order log
+stamps and a flat histogram of fractional parts; arm-s has 1.1 % of
+lines out of order by ≤ 8 ms, which is step 5's worker thread
+interleaving with the main thread, not clock corruption. Step 1:
+`codeflood` + `grayflood` in `banner.sh`; cadence kinds untouched. Step
+2: arms `arm-s` (:40018) and `arm-t` (:40019), both from clean debs,
+both `SESSION_KIND=codeflood`, same xorgxrdp so the A/B isolates steps
+5+7. Step 3: `E5_BASE_MS` replaces the hardcoded 51.1, and the harness
+now records the `kids_armed` histogram, worker busy %, per-monitor
+period and `SESSION_KIND` per run.
+
+**The first flood pair was RED at 0.91×, and it is kept.**
+`captures/e52_flood_arm-{s,t}_20260730/`: removing the metronome was not
+enough. A corpus line is ~27 visible columns and the xterm is 6400 px
+wide, so the ink sat on the primary monitor only — the oracle dumps
+measured **167 MB of pictures on the 2560×1440 monitor against 0.75 MB
+on the 3840×2400 one**, which still took full-monitor damage every cycle
+because the window spans both. A batch has nothing to overlap when one
+of its monitors is blank, while the shared deadline still couples the
+active monitor to the idle monitor's full-area capture and upload:
+68.5 ms against the baseline's 62.6 ms. `codeflood` now repeats each
+corpus line 32× so every row wraps past the right edge of monitor 2.
+
+**Two findings this leaves open (new items, not blockers):**
+1. **Idle-monitor coupling is a real ~9 % regression.** One active
+   monitor beside an idle one is an ordinary desktop, and there the
+   batch loses. The fix is to arm a monitor only when it has changed
+   pixels, rather than because a window overlaps it — cheap to test
+   with the first flood pair as the ready-made benchmark.
+2. **The remaining headroom is capture-side, now with evidence.** At
+   2.13× the worker is still only 32 % busy: per-pair service is
+   14.7 ms (encode collected 2.8 + rewrite/emit 12.3) against a 59.9 ms
+   per-monitor period, and after a frame's `last=1` the same monitor's
+   next damage arrives 41 ms (p50) to 105 ms later. Flow control never
+   binds (un-acked p50 0 / max 4 of fif=2, client `queue_depth` 0) and
+   it is not bandwidth (495 Mbit/s over loopback). #45's two deferred
+   capture questions — deferred-update pacing / ack-budget retirement,
+   and handing both monitors over together — are the next lever.
 
 ---
 

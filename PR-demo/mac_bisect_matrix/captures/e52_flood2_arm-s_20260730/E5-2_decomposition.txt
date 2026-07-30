@@ -1,0 +1,41 @@
+=== arm-t (steps 0-4) ===
+  sends 2781 over 176.9 s  ->  15.72 sends/s
+  merged send interval                   n=2780  mean    63.6  p50    61.0  p90    80.0  max    176.0 ms
+  surface 0 own period                   n=1390  mean   127.4  p50   127.0  p90   133.0  max    377.0 ms
+  surface 1 own period                   n=1389  mean   127.3  p50   127.0  p90   133.0  max    225.0 ms
+  pair service: dmg -> last=1            n=2777  mean    10.2  p50    10.0  p90    13.0  max    208.0 ms
+    dmg -> encode collected              n=1     mean   194.0  p50   194.0  p90   194.0  max    194.0 ms
+    encode collected -> last=1           n=1     mean    14.0  p50    14.0  p90    14.0  max     14.0 ms
+  surface 0: last=1 -> next own dmg      n=1388  mean   115.4  p50   115.0  p90   122.0  max    174.0 ms
+  surface 1: last=1 -> next own dmg      n=1387  mean   118.8  p50   119.0  p90   125.0  max    205.0 ms
+  worker busy 28.3 s of 176.9 s = 16%
+  batch cycles 0 (pre-step-5 build: one child per pump)
+  picture payloads > 4 KiB: n=5554  mean 932280 B  p50 827822 B  max 1801722 B  total 4938 MiB
+  wire rate: 234.1 Mbit/s
+  ack round trip (last=1 -> ack)         n=2776  mean     4.5  p50     4.0  p90     5.0  max     15.0 ms
+  un-acked frames at send time: p50 0  p90 1  max 1 (fif cap [2])
+  client queue_depth: p50 0  max 0
+
+=== arm-s (steps 0-7) ===
+  out-of-order stamps: 490 of 45200 (1.1%), worst 8 ms — THREAD INTERLEAVE (expected on a pump_set build)
+  sends 5902 over 176.7 s  ->  33.40 sends/s
+  merged send interval                   n=5901  mean    29.9  p50    31.0  p90    53.0  max    146.0 ms
+  surface 0 own period                   n=2949  mean    59.9  p50    56.0  p90   100.0  max    254.0 ms
+  surface 1 own period                   n=2951  mean    59.8  p50    57.0  p90    74.0  max    180.0 ms
+  pair service: dmg -> last=1            n=3885  mean    14.7  p50    15.0  p90    18.0  max     72.0 ms
+    dmg -> encode collected              n=3792  mean     2.8  p50     2.0  p90     4.0  max     51.0 ms
+    encode collected -> last=1           n=3789  mean    12.3  p50    13.0  p90    15.0  max     33.0 ms
+  surface 0: last=1 -> next own dmg      n=2499  mean    57.4  p50    41.0  p90   105.0  max    553.0 ms
+  surface 1: last=1 -> next own dmg      n=1384  mean   110.4  p50   105.0  p90   207.0  max    746.0 ms
+  worker busy 57.0 s of 176.7 s = 32%
+  batch cycles 3889   kids_armed 2:48% 4:52%   set_n 1:48% 2:52%
+  picture payloads > 4 KiB: n=11804  mean 926884 B  p50 813722 B  max 1852785 B  total 10434 MiB
+  wire rate: 495.3 Mbit/s
+  ack round trip (last=1 -> ack)         n=5897  mean    11.1  p50     7.0  p90    20.0  max     62.0 ms
+  un-acked frames at send time: p50 0  p90 1  max 4 (fif cap [2])
+  client queue_depth: p50 0  max 0
+
+=== E5-2 ratio (flood against flood) ===
+  baseline arm-t (steps 0-4) 63.6 ms mean per send
+  measured arm-s (steps 0-7) 29.9 ms mean per send
+  ratio 2.13x  ->  GREEN (>= 2.0x)

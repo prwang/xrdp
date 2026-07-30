@@ -168,17 +168,39 @@ XRDBEOF
         KIND=$(cat /etc/session_kind 2>/dev/null)
         STEP=1
         DELAY=0.1
+        REPEAT=1
         [ "$KIND" = codefast ] && STEP=10
-        # codeflood: no metronome at all, and a 25-line write so the
-        # per-write shell overhead is small next to the repaint it causes
-        [ "$KIND" = codeflood ] && { STEP=25; DELAY=; }
+        # codeflood: no metronome at all, a 25-line write so the per-write
+        # shell overhead is small next to the repaint it causes, and each
+        # corpus line REPEATED so it wraps across the whole terminal.
+        #
+        # The repeat is not cosmetic. Measured 2026-07-30 from the oracle
+        # dumps of the first flood pair: a corpus line is ~60 visible
+        # characters, so on a 6400x2400 xterm the ink sat in the left
+        # ~600 px and the 3840x2400 monitor received full-monitor damage
+        # every cycle with ZERO changed pixels — 167 MB of pictures on
+        # monitor 0 against 0.75 MB on monitor 1. That makes a multimon
+        # throughput gate a single-monitor benchmark with a blank second
+        # capture attached, which is exactly the premise #45 step 7 is
+        # supposed to be judged on. Repeating fills every row edge to
+        # edge, so both monitors carry real content. 32x: the corpus
+        # median line is 27 visible columns and a 6400 px xterm at -fs 14
+        # is ~760, so 32 copies wrap past the right edge of monitor 1.
+        [ "$KIND" = codeflood ] && { STEP=25; DELAY=; REPEAT=32; }
         i=0
         tput civis 2>/dev/null
         while true; do
             n=1
             while [ "$n" -le "$STEP" ]; do
-                printf "%4d  %s\n" $(((i + n) % ${#L[@]})) \
-                    "${L[$(((i + n) % ${#L[@]}))]}"
+                txt="${L[$(((i + n) % ${#L[@]}))]}"
+                if [ "$REPEAT" -gt 1 ]; then
+                    r=1
+                    while [ "$r" -lt "$REPEAT" ]; do
+                        txt="$txt $txt"
+                        r=$((r * 2))
+                    done
+                fi
+                printf "%4d  %s\n" $(((i + n) % ${#L[@]})) "$txt"
                 n=$((n + 1))
             done
             i=$((i + STEP))

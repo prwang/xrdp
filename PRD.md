@@ -834,9 +834,12 @@ N=2 is free at both resolutions (marginally FASTER per stream — concurrent sub
 **MEASURED OUTCOME of the multimon batching (2026-07-29, REASSESSED
 2026-07-30 — BACKLOG #45 GATE RESULTS and #52; arm-r, 2560×1440 +
 3840×2400, oracle client, 1688 pairs per view).** The oracle frame
-interval went from 51.1 ms to **52.5 ms mean (0.97×)**. The batching
+interval went from 51.1 ms to **52.5 ms mean (0.97×)** — a null result
+that turned out to measure the payload, not the server; the real
+outcome, **2.13×**, is recorded two paragraphs down. The batching
 mechanism works — the worker demonstrably armed four children in one
-poll set — but it fired in only **21 of 3346 worker cycles (0.6 %)**.
+poll set — but under this payload it fired in only **21 of 3346 worker
+cycles (0.6 %)**.
 The first attribution blamed the capture side; the timestamp-repaired
 reanalysis moved it one level upstream: **the gate's payload
 (`SESSION_KIND=code`, a `sleep 0.1` scroll loop) clocked the entire
@@ -859,6 +862,42 @@ leading digits of `tv_usec` as the millisecond field (`tv.tv_usec +
 500 / 1000`), so ~10 % of log lines are stamped up to ~0.9 s late.
 Means over long windows are robust; percentiles and two-line deltas
 are not. Fixed by #52 step 0.**
+
+**THE MULTIMON BATCHING IS WORTH 2.13× — measured 2026-07-30 under a
+saturating payload (BACKLOG #52 / E5-2; evidence
+`PR-demo/mac_bisect_matrix/captures/e52_flood2_arm-s_20260730/`).** Two
+arms differing ONLY in the xrdp-side steps 5+7 (same xorgxrdp, same
+encoder block, same geometry, same `SESSION_KIND=codeflood` payload,
+180 s each, oracle client, log clock fixed on both): the baseline
+(steps 0–4) delivers **63.6 ms mean per send** (15.72 sends/s,
+per-monitor period 127.4 ms) and the batching build **29.9 ms**
+(33.40 sends/s, per-monitor period 59.9 ms) — **2.13×**, over the 2.0×
+gate. Pictures pushed in the same window went from 4 938 MiB to
+10 434 MiB (234 → 495 Mbit/s). `kids_armed=4` in **52 % of 3889
+cycles** against 0.6 % at 10 Hz, so step 7's premise is exercised, and
+the E2 wire assertions hold under the flood (7/7, zero black frames,
+~0.93 MB per picture).
+
+Three durable qualifications on that number:
+
+1. **A payload that damages both monitors is part of the measurement.**
+   The first flood attempt scored 0.91× because a 27-column corpus line
+   in a 6400 px xterm left the second monitor blank (167 MB of pictures
+   on monitor 1 against 0.75 MB on monitor 2) while it still took
+   full-monitor damage every cycle. A parallel set has nothing to
+   overlap when one member encodes an all-skip frame.
+2. **Idle-monitor coupling is a real regression of ~9 %.** That first
+   pair is the measurement of the common "one active monitor, one idle"
+   desktop: the shared deadline ties the active monitor to the idle
+   one's full-area capture and upload, and the batch loses to the
+   serialized path. Arming a monitor only when its pixels changed is
+   the open fix.
+3. **The remaining headroom is capture-side.** At 2.13× the worker is
+   still 32 % busy: per-pair service 14.7 ms (encode collected 2.8 +
+   rewrite/emit 12.3) against a 59.9 ms per-monitor period, with the
+   wait sitting on the next damage handoff (41 ms p50). Flow control
+   never binds (un-acked p50 0 / max 4 of fif = 2, client
+   `queue_depth` 0) and it is not bandwidth (495 Mbit/s over loopback).
 
 So the honest bound is: best case ≈ 48 ms (one encode term removed) ⇒ ~21 fps; the advertised "~20 ms ⇒ ~40 fps" only follows if the 28 ms remainder is itself per-child work. **Attributing that 28 ms with `PR-demo/t4_profile/frame_accounting.sh` is a prerequisite to quoting any speed-up**, not a follow-up. Two further ceilings sit above it: the frame period is `max(capture, encode_pair)` under FR-CAPTURE-8, so a capture stage that is currently hidden can become the new bottleneck and absorb the whole win; and the *client* can be the binding constraint entirely — xfreerdp's software 4:4:4 reconstruction measured ~65 ms/frame at the owner layout, capping end-to-end at ~15 fps regardless of server speed (§FR-PROC-7 clause 9). **Confirmed at dual-monitor 2560×1440 + 3840×2400 on 2026-07-29** (BACKLOG #45; one arm, 60 s each, back to back): the rendering client delivered 5.94 sends/s (2.97 pairs/s per monitor, send-gap mean 169 ms) against the oracle client's 19.57 sends/s (9.79 pairs/s per monitor, mean **51.1 ms**) — **client-bound by 3.29×**, the client costing ~117 ms per surface frame on top of the server's 51 ms. Consequence: a server-side speed-up is chased and gated on the **oracle frame interval** (the send-to-send interval with a client that acks before decode/present); the rendering client's rate is reported beside it as the end-to-end figure but cannot show a server gain until the client side moves. Report the T4 gain per client (mstsc / macOS / xfreerdp), each as a frame period, and say which of the two instruments produced each number.
 
