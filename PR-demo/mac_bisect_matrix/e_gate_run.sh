@@ -9,10 +9,22 @@
 #                             decode and present, so the send-to-send
 #                             interval seen at the server is the SERVER
 #                             ceiling with the client contributing ~0.
-#                             This is the gate metric. Baseline
-#                             2026-07-29 (pre-steps-5..7): 51.1 ms mean
-#                             per send at this geometry; >= 2.0x means
-#                             <= 25.6 ms mean.
+#                             This is the gate metric. The baseline is
+#                             E5_BASE_MS (default 51.1 ms, the 2026-07-29
+#                             pre-steps-5..7 run at this geometry);
+#                             >= 2.0x of it passes.
+#
+#                             E5_BASE_MS EXISTS BECAUSE A BASELINE IS ONLY
+#                             COMPARABLE UNDER THE SAME PAYLOAD. The 51.1
+#                             default was measured with SESSION_KIND=code,
+#                             a `sleep 0.1` metronome: the reassessment on
+#                             2026-07-30 showed both it and the 52.5 ms
+#                             measurement were readings of that 10 Hz
+#                             clock, not of the server (BACKLOG #45 GATE
+#                             RESULTS, #52). Under SESSION_KIND=codeflood
+#                             run the BASELINE ARM first and pass its mean
+#                             in as E5_BASE_MS; never compare a flood run
+#                             against the cadence default.
 #   end-to-end rate           MODE=render. The distro xfreerdp3 decodes
 #                             and presents. Recorded beside E5 every
 #                             time as CONTEXT, never as the gate: the
@@ -46,7 +58,8 @@
 # /root/.oracle_cred, is read into a variable and handed to the client
 # through the environment, never as an argument and never printed.
 #
-# THE ARM MUST BE SESSION_KIND=code. Measured 2026-07-29 while validating
+# THE ARM MUST BE SESSION_KIND=code (cadence) or =codeflood (throughput,
+# BACKLOG #52 — the frame-interval gate's payload). Measured 2026-07-29 while validating
 # this harness: two control runs against arm-n (SESSION_KIND=xfce, a
 # static desktop) produced 28 pictures in 25 s and 10 in 30 s -- the
 # session simply had nothing to damage, and E2's >= 1000 pairs would be
@@ -67,6 +80,10 @@ CLI=${E_DISPLAY:-:94}
 FRDP=${E_XFREERDP:-xfreerdp3}
 MODE=${E_MODE:-oracle}
 REFRESH=${E_REFRESH:-240}
+# mean ms per send the E5 ratio is taken against. Default = the 2026-07-29
+# SESSION_KIND=code (10 Hz cadence) baseline. A flood run MUST pass its own
+# baseline arm's mean instead — see the header.
+E5_BASE_MS=${E5_BASE_MS:-51.1}
 ORACLE_BIN=${E_ORACLE_BIN:-/opt/freerdp-vaapi/bin/xfreerdp}
 MMCONF=${E_MULTIMON_DIR:-$D/../multimon_offline}
 XCONF=${E_XORG_CONF:-$MMCONF/xorg-dummy-2mon-4k.conf}
@@ -92,6 +109,11 @@ kubectl -n "$NS" get pod "$POD" \
     > "$OUT/deployed_image.txt" 2>&1
 kubectl -n "$NS" exec "$POD" -- cat /etc/xrdp/gfx.toml \
     > "$OUT/gfx.toml" 2>&1
+# WHICH PAYLOAD produced the damage is part of the measurement: a frame
+# interval read under the 10 Hz `code` metronome and one read under
+# `codeflood` are different quantities (BACKLOG #52).
+kubectl -n "$NS" exec "$POD" -- cat /etc/session_kind \
+    > "$OUT/deployed_session_kind.txt" 2>&1
 # the recon build must be GONE (its gate is answered); if it is still
 # there the arm is the wrong one
 if kubectl -n "$NS" exec "$POD" -- \
@@ -204,16 +226,21 @@ grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
     grep -E "xrdp-dev|xorgxrdp-dev" "$OUT/deployed_packages.txt" \
         | awk '{print "package: " $2 " " $3}'
     echo "monitors: $(tail -1 "$OUT/client-monitors.txt")"
+    echo "payload:  SESSION_KIND = $(cat "$OUT/deployed_session_kind.txt")"
     echo "refresh:  intra_refresh_frames = \
 $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
     echo
 
     echo "=== E5 / rate — send interval from the server's own log ==="
-    python3 - "$OUT/gfx_trace.txt" "$MODE" <<'PY'
+    python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" <<'PY'
 import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
+DMG = re.compile(r"GFX_TRACE avc dmg surface=(\d+)")
+BATCH = re.compile(r"GFX_TRACE batch cycle=(\d+) set_n=(\d+) "
+                   r"monitors_armed=(\d+) kids_armed=(\d+)")
+SEND = re.compile(r"GFX_TRACE send bytes=(\d+) last=(\d+) frame_id=(\d+)")
 
 
 def secs(line):
@@ -226,17 +253,39 @@ def secs(line):
 
 
 t = []
+events = []
 for line in open(sys.argv[1], errors="replace"):
-    if "GFX_TRACE enc submitted_seq" not in line:
-        continue
     v = secs(line)
-    if v is not None:
+    if v is None:
+        continue
+    if "GFX_TRACE enc submitted_seq" in line:
         t.append(v)
+        continue
+    m = DMG.search(line)
+    if m:
+        events.append((v, "dmg", int(m.group(1))))
+        continue
+    m = BATCH.search(line)
+    if m:
+        events.append((v, "batch", int(m.group(4))))
+        continue
+    m = SEND.search(line)
+    if m and m.group(2) == "1":
+        events.append((v, "last", int(m.group(3))))
 if len(t) < 3:
     print("RED: only %d GFX_TRACE send records — is XRDP_GFX_TRACE=1 set "
           "in the arm's env?" % len(t))
     raise SystemExit(0)
-t.sort()
+# File order is write order. Out-of-order stamps mean the deployed xrdp
+# still carries the pre-#52 log clock (common/log.c printed microseconds
+# as the millisecond field), and every percentile below would need
+# offline repair — say so instead of quietly sorting it away.
+inversions = sum(1 for a, b in zip(t, t[1:]) if b < a)
+if inversions:
+    print("WARNING: %d of %d send stamps go BACKWARDS in file order — this "
+          "build predates the #52 step-0 log clock fix; percentiles below "
+          "are unreliable (means are not)" % (inversions, len(t) - 1))
+    t.sort()
 span = t[-1] - t[0]
 gaps = sorted(b - a for a, b in zip(t, t[1:]))
 n = len(gaps)
@@ -252,11 +301,49 @@ print("send-to-send gap: mean %.1f ms  p50 %.0f ms  p90 %.0f ms  "
       "p99 %.0f ms" % (mean, pct(0.5), pct(0.9), pct(0.99)))
 print("%.2f sends/s = %.2f pairs/s per monitor (2 monitors)"
       % (len(t) / span, len(t) / span / 2.0))
+
+# --- saturation evidence (BACKLOG #52: is the pipeline actually full?) ---
+per_surf = {}
+for v, kind, arg in events:
+    if kind == "dmg":
+        per_surf.setdefault(arg, []).append(v)
+for s in sorted(per_surf):
+    p = sorted(b - a for a, b in zip(per_surf[s], per_surf[s][1:]))
+    if p:
+        print("surface %d own period: n=%d mean %.1f ms  p50 %.1f ms"
+              % (s, len(p) + 1, sum(p) / len(p) * 1000.0,
+                 p[len(p) // 2] * 1000.0))
+busy = 0.0
+armed = 0.0
+cycles = 0
+open_at = None
+kids = {}
+for v, kind, arg in events:
+    if kind == "batch":
+        cycles += 1
+        kids[arg] = kids.get(arg, 0) + 1
+        if open_at is None:
+            open_at = v
+    elif kind == "last" and open_at is not None:
+        busy += v - open_at
+        open_at = None
+if cycles:
+    print("cycles: %d   kids_armed: %s"
+          % (cycles, "  ".join("%d:%d (%.0f%%)"
+                               % (k, c, 100.0 * c / cycles)
+                               for k, c in sorted(kids.items()))))
+if span > 0 and busy > 0:
+    print("worker busy (batch arm -> last=1): %.1f s of %.1f s = %.0f%%   "
+          "mean service %.1f ms"
+          % (busy, span, 100.0 * busy / span, busy / max(1, cycles) * 1000.0))
+    print("             (100% busy = the pipeline is the limit; a low "
+          "number with a long interval = the payload or capture is)")
+print()
+
 if sys.argv[2] == "oracle":
-    base = 51.1
-    print()
-    print("E5 GATE: baseline %.1f ms mean per send (2026-07-29, "
-          "pre-steps-5..7)" % base)
+    base = float(sys.argv[3])
+    print("E5 GATE: baseline %.1f ms mean per send (SAME payload — see "
+          "E5_BASE_MS)" % base)
     print("         measured %.1f ms  ->  %.2fx" % (mean, base / mean))
     if mean <= base / 2.0:
         print("         >= 2.0x: PASS")
