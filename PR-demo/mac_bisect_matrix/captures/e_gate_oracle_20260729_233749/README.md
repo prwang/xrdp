@@ -31,55 +31,65 @@ per view** (gate ≥ 4) at view ordinals 0, 240, 480, 720, 960, 1200, 1440,
 | black frames | **PASS** — 3376/3376 decoded, **zero** black anywhere |
 | server log: rewrite failures / unsupported / pair aborts / budget assertions / fifo depth | **0 / 0 / 0 / 0 / 0** |
 
-## E5 — RED: 0.97×
+## E5 — RED: 0.97× (REASSESSED 2026-07-30: both sides payload-clocked)
 
 | | baseline (pre-steps 5–7) | this run |
 |---|---|---|
 | mean per send | 51.1 ms | **52.5 ms** |
-| p50 | 50 ms | **28 ms** |
-| p90 | 103 ms | **88 ms** |
-| p99 | not recorded | 190 ms |
 | sends/s | 19.57 | 19.04 |
 
-The **median halved** (50 → 28 ms) and p90 improved, but the mean did
-not move, so by the item's own metric this is 0.97× — under the 1.5×
-stop rule. **The stop rule applies and nothing is being re-tuned to make
-the number look better.** The attribution asked for by the stop rule,
-from this capture:
+0.97× is under the 1.5× stop rule: RED, nothing re-tuned. The first
+version of this section attributed the result to the capture side; the
+2026-07-30 reanalysis on repaired timestamps (`reanalyze_repaired.py`,
+this directory) corrected it — first version in git history. The
+percentile rows originally published here, and `VERDICT.txt`'s, were
+computed on corrupted stamps and are superseded.
 
-- **The concurrency premise almost never held.** The worker armed 4
-  children in **21 of 3346 cycles (0.6 %)**; the other 3325 cycles had
-  one monitor's item in hand and armed 2. E4's mechanism works — the
-  counter proves it fired — but there was nothing to batch.
-- **Why:** the capture side serialises the two monitors. Consecutive
-  sends of *different* monitors are **26 ms apart (p50)** while a pair's
-  encode-and-emit finishes in ~26 ms, so the second monitor's item
-  arrives after the first is already done. Batching cannot overlap work
-  the producer hands over sequentially.
-- **What actually binds:** each monitor sends every **~105 ms**
-  (p50 102 ms, both monitors) while its own encode costs ~26 ms — the
-  worker is idle about half the time. The limit is the per-monitor
-  capture/ack period, not the encoder.
-- **The tail is not the refresh.** 130 gaps > 150 ms account for 28.2 s
-  of the 176.9 s window (16 %), and only **2 of them** sit at or next to
-  a scheduled cut ordinal. Excluding that tail the mean is 46.0 ms
-  (1.11× the baseline) — so even a tail-free run would be far short of
-  2.0×.
+- **The payload clocks the run.** `SESSION_KIND=code` sleeps 0.1 s per
+  scroll line (`banner.sh`): per-monitor period p50 102 ms (mean
+  104.7), the two monitors 26 ms apart in phase, and all 121
+  steady-state gaps > 150 ms are exactly ONE skipped beat (~204 ms =
+  2× the period). The only larger gaps are two session-startup
+  transients (4.3 s / 9.0 s). The pipeline is never full.
+- **The server is nearly idle.** Service per pair **11.8 ms** (encode
+  collect 4.2 + rewrite/emit 7.6; the "~26 ms encode-and-emit" first
+  recorded here was a clock artifact), oracle ack 2.1 ms, then ~95 ms
+  waiting for the same monitor's next handoff. Worker busy 22 %.
+  Nothing waits on encode, rewrite or ack.
+- **The mean is not tail-driven.** 52.5 ms is the harmonic of two
+  ~105 ms payload periods: the 70–150 ms wait-gaps contribute 35.2 ms
+  of it, the entire > 150 ms tail 7.9 ms; tail-free mean 46.3 ms
+  (1.10×). p50 ≈ 26 ms is burst spacing between the two monitors'
+  frames, not throughput. (Long gaps near a scheduled cut: 9 of 122,
+  vs ~5.5 expected by chance — the refresh is not the tail either.)
+- **Verdict on the gate itself:** the 51.1 ms baseline ran the SAME
+  10 Hz payload, so this experiment could not show an encoder-side
+  gain and cannot convict the capture path. Successor benchmark:
+  **BACKLOG #52 (E5-2)** — unclocked `codeflood` payload, baseline
+  re-measured under the same flood.
+
+**Instrument bug found during the reassessment (upstream xrdp):**
+`common/log.c:1159` computes `tv.tv_usec + 500 / 1000` (= µs + 0) and
+truncates it to 3 chars — whenever the true sub-second part is
+< 100 ms (10.4 % of lines here) the printed fraction is the leading
+digits of the µs count, up to ~0.9 s late (acks stamped before the
+sends they acknowledge). File order is causal; repair = right-running
+minimum. Means are robust, so 0.97× stands. Fix is #52 step 0.
 
 With the rendering client (`../e_gate_render_*`, 60 s, same arm) the
 end-to-end rate is **5.92 sends/s = 2.96 pairs/s per monitor**, against
 5.94 / 2.97 measured before #45: unchanged, exactly as predicted for a
-client-bound session. Notably the batch fired **34 of 305 cycles (11 %)**
-there — a slower consumer is what lets two items coexist, which is the
-same mechanism seen from the other side.
+client-bound session. The batch fired **34 of 305 cycles (11 %)** there
+— a slower consumer is what lets two items coexist.
 
-## E4 — mechanism proven, premise rare
+## E4 — mechanism proven; premise was payload-limited
 
-`GFX_TRACE batch ... kids_armed=4` occurred 21 times, and the
-once-per-run INFO line names the four armed children. So "ONE thread
-drives FOUR views concurrently" is demonstrated on the deployed build,
-by an asserted counter rather than a wall-clock inference — but at 0.6 %
-of cycles it cannot carry E5, which is the finding above.
+`GFX_TRACE batch ... kids_armed=4` occurred 21 of 3346 cycles (0.6 %),
+and the once-per-run INFO line names the four armed children — "ONE
+thread drives FOUR views" is demonstrated by an asserted counter. But
+with items landing 26 ms apart and 11.8 ms of service, two items almost
+never coexist: 0.6 % is the 10 Hz payload's number, not the mechanism's
+ceiling. #52 (E5-2) retests the premise under saturation.
 
 ## Refresh cost (E6's bandwidth half), measured here
 
@@ -93,11 +103,15 @@ not comparable to this run); this figure is the refresh cost on the
 gate's own corpus, which is what E6 asks to have recorded rather than
 assumed.
 
-**Files.** `VERDICT.txt` the generated report · `gfx_trace.txt` the
-server's own per-send trace (the E5/E4 source) · `oracle/` the kept AVC
-payload dump (the E2 source) · `xrdp.log`, `session-xorg.log` server
-logs, windowed to this run · `deployed_*.txt`, `gfx.toml` what was
-actually deployed · `client.log`, `client-monitors.txt` client side.
+**Files.** `VERDICT.txt` the generated report (its E5 percentile lines
+are superseded by the reassessment above — kept verbatim as the
+instrument's raw output) · `reanalyze_repaired.py` the 2026-07-30
+timestamp-repair reanalysis (run it on the decompressed
+`gfx_trace.txt`) · `gfx_trace.txt` the server's own per-send trace (the
+E5/E4 source) · `oracle/` the kept AVC payload dump (the E2 source) ·
+`xrdp.log`, `session-xorg.log` server logs, windowed to this run ·
+`deployed_*.txt`, `gfx.toml` what was actually deployed · `client.log`,
+`client-monitors.txt` client side.
 
 ## What was trimmed before committing
 
