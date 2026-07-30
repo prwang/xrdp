@@ -26,6 +26,25 @@
 #            codefast = 10 lines/0.1 s stress bound; codeline =
 #            legacy alias of code.
 #
+# THROUGHPUT kinds (no metronome — BACKLOG #52 / E5-2):
+#   codeflood  the same corpus scroll with the sleep REMOVED (25 lines
+#              per write, then straight back to the top of the loop), so
+#              the producer is limited by the consumer, not by a timer.
+#              Every cadence kind above is a 10 Hz metronome: E5 measured
+#              52.5 ms per send against a 51.1 ms baseline and both
+#              numbers were readings of that metronome, not of the server
+#              (#45 GATE RESULTS, reassessed 2026-07-30). A frame-interval
+#              gate needs damage to arrive FASTER than the pipeline drains
+#              it, so repaints coalesce and the send interval is the
+#              server's own.
+#   grayflood  full-screen bands with the sleep removed — the
+#              max-encode-cost bound (every macroblock damaged, every
+#              frame) beside codeflood's realistic glyph damage.
+# The flood kinds are for the FRAME-INTERVAL gate only. They are NOT
+# byte-comparable across arms (the frame count is whatever the arm
+# managed), which is exactly why the cadence kinds above are left alone:
+# the FR-H264-8 bandwidth gate needs a fixed number of fixed frames.
+#
 # All are deterministic (fixed sequences, fixed cadence) so wire byte
 # counts are comparable across arms and across runs. Line-by-line is
 # the DEFAULT scroll granularity for both text classes (owner
@@ -58,8 +77,10 @@ scroll|scrollfast)
             sleep 0.1
         done'
     ;;
-gray)
+gray|grayflood)
     exec "${XTERM[@]}" -e bash -c '
+        DELAY=0.2
+        [ "$(cat /etc/session_kind 2>/dev/null)" = grayflood ] && DELAY=
         i=0
         tput civis 2>/dev/null
         H=$(tput lines); W=$(tput cols)
@@ -71,7 +92,7 @@ gray)
                 r=$((r + 1))
             done
             i=$((i + 1))
-            sleep 0.2
+            [ -n "$DELAY" ] && sleep "$DELAY"
         done'
     ;;
 chroma)
@@ -91,7 +112,7 @@ chroma)
             sleep 0.2
         done'
     ;;
-code|codeline|codefast)
+code|codeline|codefast|codeflood)
     # Scrolls the pre-generated ANSI corpus (real repo code, pygments
     # solarized-dark + clangd semantic tokens — see gen_code_corpus.py).
     #   code      1 line / 0.1 s (DEFAULT; codeline = legacy alias) —
@@ -144,8 +165,13 @@ XRDBEOF
             done
         fi
         mapfile -t L < "$CORPUS"
+        KIND=$(cat /etc/session_kind 2>/dev/null)
         STEP=1
-        [ "$(cat /etc/session_kind 2>/dev/null)" = codefast ] && STEP=10
+        DELAY=0.1
+        [ "$KIND" = codefast ] && STEP=10
+        # codeflood: no metronome at all, and a 25-line write so the
+        # per-write shell overhead is small next to the repaint it causes
+        [ "$KIND" = codeflood ] && { STEP=25; DELAY=; }
         i=0
         tput civis 2>/dev/null
         while true; do
@@ -156,7 +182,7 @@ XRDBEOF
                 n=$((n + 1))
             done
             i=$((i + STEP))
-            sleep 0.1
+            [ -n "$DELAY" ] && sleep "$DELAY"
         done'
     ;;
 *)
