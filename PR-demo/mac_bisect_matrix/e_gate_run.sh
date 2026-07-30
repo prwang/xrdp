@@ -371,6 +371,30 @@ for s in sorted(per_surf):
         print("surface %d own period: n=%d mean %.1f ms  p50 %.1f ms"
               % (s, len(p) + 1, sum(p) / len(p) * 1000.0,
                  p[len(p) // 2] * 1000.0))
+
+# --- G5: was BOTH monitors' ink actually in this run? --------------------
+# The batch can only overlap monitors that have something to send, so a
+# payload that inks one monitor measures BACKLOG #53's one-active-one-idle
+# regime and says nothing about the batching this gate is for. It has
+# happened twice: a 27-column corpus line in a 6400 px xterm (2026-07-30,
+# 0.91x RED), and xfwm4 re-snapping the flood window onto one monitor on
+# the T4 (2026-07-30, kids_armed=2 in 96 % of cycles). Both looked like
+# ordinary runs. State the coverage so no number is read as the wrong
+# regime's.
+if per_surf:
+    counts = {s: len(v) for s, v in per_surf.items()}
+    lo, hi = min(counts.values()), max(counts.values())
+    print("damage coverage: %s"
+          % "  ".join("surface %d: %d" % (s, c)
+                      for s, c in sorted(counts.items())))
+    if len(counts) < 2 or hi > 3 * max(1, lo):
+        print("         COVERAGE WARNING: one monitor carried the run "
+              "(%d vs %d). This is the one-active-one-idle regime "
+              "(BACKLOG #53), NOT two-monitor batching — an E5 ratio from "
+              "it is not an E5-2 result." % (hi, lo))
+    else:
+        print("         both monitors inked (worst imbalance %.2fx) — "
+              "this is the two-monitor regime" % (hi / max(1.0, lo)))
 busy = 0.0
 armed = 0.0
 cycles = 0

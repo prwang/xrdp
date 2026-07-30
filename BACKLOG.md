@@ -18,11 +18,12 @@ with `git log -p -- BACKLOG.md`.
 
 ---
 
-## Deployed state (2026-07-28)
+## Deployed state (2026-07-30)
 
 | Box | Packages | Encoder config | Status |
 |---|---|---|---|
-| T4 (EC2, Tesla T4 / NVENC) | `xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1`, `xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3` | `PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml` — `aux_ltr_chain = true`, `-g 30000` | **Renders correctly onscreen on both Windows (incl. multimon) and macOS** (owner-tested) |
+| T4 (EC2 `100.24.126.48`, Tesla T4 / NVENC, 4 vCPU) | `xrdp-dev 0.10.80+git20260730013346.52b8798839ad` (#45 steps 0–7 + log clock fix), `xorgxrdp-dev 1:0.10.80+git20260729225933.d77d05463e52` (step 6) | `PR-demo/t4_profile/gfx-t4-nvenc-ltr-g240-gate.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | **#55 E5-2 = 1.67× AMBER**, wire audit 7/7, smoke gate PASS at both sizes. Payload disarmed, sessions off, `XRDP_GFX_TRACE=1` drop-in and `nvidia-smi -pm 1` in place. **Onscreen (UWP/macOS) not yet walked** |
+| T4 — previous state (2026-07-28, for reference) | `xrdp-dev 2a0279ef3aa1`, `xorgxrdp-dev 5b9650cafbc3` | `gfx-t4-nvenc-ltr.toml` — `-g 30000` | Rendered correctly onscreen on Windows (incl. multimon) and macOS (owner-tested) |
 | bisect fleet arm-n | image `34795577580b.xx5b9650c-xfce` | `gfx/arm-n.toml` — `aux_ltr_chain = true`, no `-g` (the runner pins it) | good on Windows multimon + macOS |
 | bisect fleet arm-r (2026-07-29) | image `f7acb5979788.xxd77d054` = xrdp #45 steps 0–7 + xorgxrdp step 6 | `gfx/arm-r.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | #45 gates E1/E2/E3/E6/E7 PASS; its E5 number was payload-clocked (see #45 GATE RESULTS). Kept as the 10 Hz-cadence reference arm |
 | bisect fleet arm-s (2026-07-30) | image `52b8798839ad.xxd77d054` = xrdp #45 steps 0–7 + the log clock fix, xorgxrdp step 6 | `gfx/arm-s.toml` (encoder block identical to arm-r), `SESSION_KIND=codeflood` | **#52 E5-2 arm: 29.9 ms mean per send = 2.13× over arm-t** — the #45 E5 gate, GREEN |
@@ -912,7 +913,100 @@ remainder is attributed, not re-tuned.
 
 ---
 
-## #55 — E5-2 on the T4 (TODO — protocol written, waiting on the instance)
+## #55 — E5-2 on the T4 (DONE 2026-07-30 — **1.67×, AMBER**, attributed)
+
+### RESULTS (2026-07-30, `ubuntu@100.24.126.48`, Tesla T4 / 4 vCPU Xeon 8259CL)
+
+Both arms measured on the T4 itself under `codeflood`, 180 s each,
+2560×1440 + 3840×2400, oracle client, identical xorgxrdp and identical
+`gfx.toml` — so the A/B isolates xrdp steps 5+7 exactly as on the dev box.
+
+| | baseline (0–4) `5dae11f63adb` | batched (0–7) `52b8798839ad` |
+|---|---|---|
+| mean per send | 77.3 ms | **46.3 ms** |
+| sends/s | 12.94 | 21.61 |
+| per-monitor period | 154.6 / 155.1 ms | 91.6 / 93.2 ms |
+| pair service dmg→last=1 | 13.9 ms | 23.5 ms |
+| worker busy | 18 % | 45 % |
+| `kids_armed=4` | n/a (pre-step-5) | **93 %** of 1 965 cycles |
+| pictures pushed | 1 330 MiB / 63.6 Mbit/s | 2 183 MiB / 104.5 Mbit/s |
+| **E5-2 ratio** | | **1.67× — AMBER** |
+
+Evidence: `PR-demo/mac_bisect_matrix/captures/e52_t4_{baseline,batched}_20260730/`
+(READMEs, `VERDICT.txt`, gzipped `gfx_trace.txt`, decomposition, CPU
+samples). A 100 s repeat reproduced the batched arm at 47.6 ms.
+
+**Attribution — the remainder is capture-side and it is one saturated
+thread.** The session Xorg runs at **92 % of a core**, measured by reading
+`/proc/<xorg>/stat` twice 60 s apart during a clean run (a `top` sampler
+perturbs a 4-vCPU box enough to move the rate from 47.6 ms to 71.3 ms, so
+that run is kept only as CPU evidence, never as a rate). Against that: the
+four NVENC children cost ~7 % of a core **each** (0.28 core total), the
+worker is idle 55 % of the time, service is 23.5 ms inside a 91.6 ms
+period, flow control never binds (un-acked p90 = 1 of a cap of 2,
+`queue_depth` 0 throughout), and the box overall sits at ~2.5 of 4 cores.
+The T4 is not out of CPU; it is out of *one* CPU. That is **#54**, and it
+is why the same code gives 2.13× on the 32-core dev box and 1.67× here.
+
+Pack bench on this CPU (CLAUDE.md obligation), 3840×2400:
+**old planar 7.14 · scalar packed 53.09 · shipped vectorized 9.03 ms/frame**
+— i.e. ~10 % of a 91.6 ms period spent inside the same saturated thread.
+
+Also clean on the T4: all six E2 counters zero on both arms; wire audit
+`--assert --intra-refresh 240` **7/7 PASS** (3 824 pictures batched,
+2 274 baseline, 0 frame_num gaps); smoke gate as the last step **PASS** at
+1920×1080 and 1024×768, 8/8 keys, edge 1.000, 0 encoder errors.
+
+The black-frame check FAILs on both arms and is the **login paint-in**, not
+a dropout: main-view luma is 0 through picture 28, 0.77 at 30, 118.9 by 40,
+and there are zero black pictures afterwards in 3 824. The T4 runs XFCE,
+which takes seconds to paint; the fleet pods have no desktop and paint
+immediately, which is why this never appeared before. `startup_frame40_
+painted.jpg` in the batched capture is the painted frame. The FAIL is left
+standing in `VERDICT.txt`; see #58 for fixing the checker rather than the
+evidence.
+
+**Onscreen (§6 of the protocol) is still open** — the box is left on the
+batched build with the payload disarmed, smoke-gated, ready to connect.
+
+### Four things this run found that the protocol did not predict
+
+1. **A freshly booted T4 fails AVC444 negotiation and silently falls back
+   to RFX.** First connection after boot: `xrdp_ffmpeg: probe TIMEOUT ...
+   elapsed=4008 ms, packets=0` → "ffmpeg verification FAILED (TIMEOUT);
+   removing external AVC candidate" → "Matched RFX mode". Cold
+   `h264_nvenc` at 3840×2400 measured 3.95 s to first output vs 1.40 s
+   warm — the 4 s probe deadline is right on top of the cold path, and
+   with NVIDIA persistence mode off the driver unloads whenever no CUDA
+   process is running, so *every* first connection is cold. Worked around
+   for this campaign with `nvidia-smi -pm 1` (recorded in the capture
+   READMEs); the real fix is **#56**.
+2. **`apt-get install` of an xrdp-dev deb stops at a conffile prompt**
+   (`/etc/xrdp/cert.pem`, `rsakeys.ini` — modified on the box) and leaves
+   xrdp-dev half-configured with `dpkg: error processing package`. Every
+   T4 deb install needs `-o Dpkg::Options::=--force-confold` alongside
+   `--allow-downgrades`. Folded into the protocol.
+3. **The T4 runs a window manager and the fleet does not**, so the payload
+   inked one monitor. `xterm -maximized` spans the root on a bare X server
+   but means *the current monitor* to xfwm4 — the first probe measured 251
+   damage events on surface 1 against 44 on surface 0, i.e. #53's regime
+   wearing the E5-2 label. Fixed in `e52_payload.sh` by sizing the window
+   to the root geometry from `xwininfo -root` (`xdotool getdisplaygeometry`
+   returns the *primary monitor*, which is the same bug again) after
+   removing the maximized state, and re-asserting it for the life of the
+   session — a one-shot resize held on one run and lost on the next, and a
+   6400×2400 window at **X=2570** covers exactly one monitor while looking
+   correct in every size check.
+4. **The harness could not tell.** Both of those produced ordinary-looking
+   runs. `e_gate_run.sh` now prints per-surface damage coverage on every
+   run and says loudly when one monitor carried it (**gate G5**):
+   `COVERAGE WARNING: one monitor carried the run (1376 vs 28) ... an E5
+   ratio from it is not an E5-2 result`. Both committed T4 runs pass it
+   (1.01× and 1.06× imbalance).
+
+---
+
+## #55 (original scope) — E5-2 on the T4
 
 The dev-box 2.13× is a VAAPI number on a 32-core box. The T4 (Cascade Lake
 + Tesla T4/NVENC) is the representative low-to-average old-CPU target, so
@@ -945,6 +1039,88 @@ the §6 onscreen checklist walked on both the Windows App (UWP) and macOS —
 that list is also what the owner watches, with the mid-stream non-IDR I
 refresh cadence (item 1) and the idle-monitor coupling (item 2) as the two
 genuinely new risks since the 2026-07-28 T4 test.
+
+---
+
+## #56 — A cold GPU makes the first login fall back to RFX, silently (TODO, HIGH)
+
+Found on the T4 on 2026-07-30 (#55). On the **first RDP connection after
+boot**, `xrdp_mm_egfx_caps_advertise`'s ffmpeg verification times out and
+xrdp drops H.264 entirely:
+
+```
+xrdp_ffmpeg: probe TIMEOUT: no verdict within the deadline (cold encoder/device
+  init? child still starting?) (dump_extra=1, 3840x2400, packets=0, elapsed=4008 ms)
+  ffmpeg verification FAILED (TIMEOUT); removing external AVC candidate
+Codec search order is H264, RFX
+Matched RFX mode
+```
+
+Measured on the same box: `h264_nvenc` at 3840×2400 takes **3.95 s** cold
+and **1.40 s** warm. The probe deadline is ~4 s, so the cold path lands on
+top of it. With NVIDIA persistence mode off (the default) the driver is
+unloaded whenever no CUDA process is running, so this is not a
+once-per-boot event — it is *every* connection that follows an idle gap.
+
+Why it matters beyond the benchmark: the session comes up **looking fine**.
+The user gets RFX, at RFX quality, with no error anywhere except one WARN
+line in `xrdp.log`, and no retry — the AVC candidate is *removed* for the
+life of the connection. This is exactly the failure shape CLAUDE.md's
+strict-honesty rule is about: a fallback that converts a loud failure into
+a silent degradation.
+
+Options, none chosen yet (needs owner sign-off — a shipped fallback change):
+* make the probe deadline resolution- and encoder-aware rather than a flat
+  4 s, and log at ERROR when it fires;
+* warm the encoder once at xrdp start instead of at first connect;
+* re-probe on the next connection rather than removing the candidate for
+  the session;
+* document `nvidia-smi -pm 1` as a deployment requirement (what #55 did as
+  a workaround, recorded in the capture READMEs).
+
+Acceptance: a cold-boot first connection negotiates AVC444, proven by
+`xrdp.log` + a wire audit, with no persistence-mode workaround; and a probe
+timeout that *does* happen is loud.
+
+---
+
+## #57 — xrdp-dev debs stop at a conffile prompt in non-interactive installs (TODO)
+
+`apt-get install -y /tmp/xrdp-dev_*.deb` on the T4 (2026-07-30) halted at
+`Configuration file '/etc/xrdp/cert.pem' ... What would you like to do about
+it ?` and then `dpkg: error processing package xrdp-dev (--configure): end of
+file on stdin at conffile prompt`, leaving xrdp-dev unpacked but not
+configured. `/etc/xrdp/rsakeys.ini` does the same. Both files are legitimately
+modified on any box that has ever generated its own key/cert, i.e. every
+deployed box.
+
+Workaround in use: `-o Dpkg::Options::=--force-confold`, now in the T4
+protocol and DEPLOY_RUNBOOK. Real fix: these are generated-at-install
+artifacts, not admin configuration — they should not be shipped as
+conffiles at all. Small, self-contained packaging change; belongs with the
+clean-room port (#46) rather than the dev branch.
+
+---
+
+## #58 — The black-frame check cannot tell a login paint-in from a dropout (TODO)
+
+`oracle_black_frame_check.py` flags any black main-view picture with
+`0 < i < n-2` as mid-stream and FAILs the run. On the T4 that fires on
+every capture, because the session is XFCE and takes ~1.3 s to paint after
+`E_COLD=1` logs the previous one off: main-view luma is 0 through picture
+28, 0.77 at picture 30, 118.9 by picture 40, and zero black pictures in the
+remaining ~3 800. The fleet pods never showed it because they run the
+payload with no desktop and paint immediately.
+
+A check that FAILs every good run gets ignored, which is worse than not
+having it. Fix: treat a **leading contiguous run** of black pictures that
+ends in a monotone ramp as startup (report it, do not fail on it), and keep
+failing on any black picture after the first painted one. Needs a unit test
+built from both shapes — a synthetic startup ramp and a synthetic
+mid-stream dropout — so the distinction is pinned.
+
+Until then the #55 captures carry the FAIL in `VERDICT.txt` with the
+decode evidence beside it, rather than an edited verdict.
 
 ---
 

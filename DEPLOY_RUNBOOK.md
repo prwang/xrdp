@@ -23,13 +23,19 @@ The two are version-coupled: the `xrdp-dev` deb declares
 `Breaks: xorgxrdp (<< 1:0.10.80~)`, so an outdated xorgxrdp fails **loudly** at
 install rather than silently at login. Install both.
 
-> **Currently deployed on the T4 (2026-07-28)** — the reference pair for the
-> FR-H264-8 nvenc gate:
-> `xrdp-dev 0.10.80+git20260728184709.2a0279ef3aa1` +
-> `xorgxrdp-dev 1:0.10.80+git20260728175938.5b9650cafbc3`, with
-> `/etc/xrdp/gfx.toml` = `PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml`
-> (`aux_intra_leaf = false`, `aux_ltr_chain = true`). The xorgxrdp side of
-> that pair carries the capture-shmem up-front reservation (§2b(d)).
+> **Currently deployed on the T4 (2026-07-30)** — the #45 steps 0–7 pair,
+> measured by the #55 E5-2 gate (1.67×) and smoke-gated:
+> `xrdp-dev 0.10.80+git20260730013346.52b8798839ad` +
+> `xorgxrdp-dev 1:0.10.80+git20260729225933.d77d05463e52`, with
+> `/etc/xrdp/gfx.toml` = `PR-demo/t4_profile/gfx-t4-nvenc-ltr-g240-gate.toml`
+> (`aux_intra_leaf = false`, `aux_ltr_chain = true`,
+> `intra_refresh_frames = 240` — **not** `-g 30000` any more). Also on the
+> box: a `XRDP_GFX_TRACE=1` systemd drop-in (measurement instrument, harmless
+> otherwise) and `nvidia-smi -pm 1` (§2b(e)).
+> Previous state, for rollback: `xrdp-dev 2a0279ef3aa1` +
+> `xorgxrdp-dev 5b9650cafbc3` with `gfx-t4-nvenc-ltr.toml`.
+> The xorgxrdp side of both pairs carries the capture-shmem up-front
+> reservation (§2b(d)).
 > Whenever you change what is deployed, update this line — it is the only
 > place that records what a box is actually running.
 
@@ -184,7 +190,7 @@ you more — the front-end is already past its part when this appears):
    proprietary driver needs `nvidia-drm.modeset=1` for GBM/EGL. Look for
    glamor/EGL errors in the Xorg log.
 
-### 2b. Four install hazards that have each cost real time
+### 2b. Six install hazards that have each cost real time
 
 **(a) Conffile prompt hangs the install (2026-07-28, T4).** Any box whose
 `/etc/xrdp/cert.pem` (or `gfx.toml`, `xrdp.ini`, …) was locally modified makes
@@ -228,6 +234,41 @@ df -h /dev/shm                    # bare metal: usually RAM/2, fine
 # k8s: emptyDir { medium: Memory, sizeLimit: 512Mi } mounted at /dev/shm
 # docker: --shm-size=512m
 ```
+
+**(e) A cold GPU silently downgrades the session to RFX (2026-07-30, T4).**
+On the first connection after boot — or after any idle gap long enough for
+the NVIDIA driver to unload — xrdp's AVC444 verification times out and
+removes H.264 for the life of the connection:
+
+```
+xrdp_ffmpeg: probe TIMEOUT ... (3840x2400, packets=0, elapsed=4008 ms)
+  ffmpeg verification FAILED (TIMEOUT); removing external AVC candidate
+Codec search order is H264, RFX
+Matched RFX mode          <-- the session comes up looking fine, at RFX quality
+```
+
+Cold `h264_nvenc` at 3840×2400 measured **3.95 s** to first output against
+**1.40 s** warm, and the probe deadline is ~4 s. Mitigate on any NVIDIA box
+by keeping the driver resident, and **check the log before trusting a
+session**:
+
+```sh
+sudo nvidia-smi -pm 1                                  # persistence mode
+grep -E "Matched (RFX|H264) mode|probe TIMEOUT" /var/log/xrdp.log | tail
+```
+
+There is no visible symptom other than quality, and no retry — see
+BACKLOG #56 for the fix.
+
+**(f) `apt-get` needs the conffile option spelled its own way.** Hazard (a)
+above shows the `dpkg -i` form. Through apt it is:
+
+```sh
+sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+    --allow-downgrades -o Dpkg::Options::=--force-confold /tmp/xrdp-dev_*.deb
+```
+
+Without it a plain `apt-get install -y` still stops at the prompt.
 
 ### 2c. Credentials — where they live, how to use them
 

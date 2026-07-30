@@ -6,6 +6,22 @@ installed one after the other. Written before the launch so the cloud time
 goes into measuring, not discovering. Everything here is scripted or a
 copy-paste command; nothing needs improvising on the box.
 
+> ## RUN ONCE, 2026-07-30 — result: **1.67× AMBER**
+>
+> | arm | mean per send | sends/s | per-monitor period | `kids_armed=4` |
+> |---|---|---|---|---|
+> | baseline `5dae11f63adb` | 77.3 ms | 12.94 | 154.6 / 155.1 ms | n/a |
+> | batched `52b8798839ad` | **46.3 ms** | 21.61 | 91.6 / 93.2 ms | 93 % |
+>
+> Attribution: the session **Xorg sits at 92 % of one core** while the four
+> NVENC children cost ~7 % of a core each. Capture-bound (#54), not
+> encoder-bound. Full write-up in `BACKLOG.md` #55 and in
+> `../mac_bisect_matrix/captures/e52_t4_{baseline,batched}_20260730/`.
+>
+> Everything in §1–§5 below was executed; the corrections that run produced
+> are folded in (they are marked **[2026-07-30]**). §6 — the onscreen
+> checklist — has **not** been walked yet.
+
 **Reference result to compare against (dev box, VAAPI, 2026-07-30):**
 
 | arm | xrdp | mean per send | sends/s | per-monitor period | worker busy | `kids_armed=4` |
@@ -93,7 +109,24 @@ scp -i /root/.ssh/tmp_access_T4 \
     /work/dist/xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb \
     "$(cat /root/.t4_host):/tmp/"
 ssh -i /root/.ssh/tmp_access_T4 "$(cat /root/.t4_host)" \
-    "sudo apt-get install -y --allow-downgrades /tmp/xrdp-dev_*.deb /tmp/xorgxrdp-dev_*.deb"
+    "sudo DEBIAN_FRONTEND=noninteractive apt-get install -y \
+         --allow-downgrades -o Dpkg::Options::=--force-confold \
+         /tmp/xrdp-dev_*.deb /tmp/xorgxrdp-dev_*.deb"
+
+# 2b. [2026-07-30] instrument + environment, BOTH required or the run is void
+#   XRDP_GFX_TRACE: without it e_gate_run.sh reports "RED: only 0 GFX_TRACE
+#   send records". A systemd drop-in survives every deb swap; the pods get
+#   it from their manifest, a real box has nowhere else to put it.
+printf '[Service]\nEnvironment=XRDP_GFX_TRACE=1\n' > /tmp/gfxtrace.conf
+scp -i /root/.ssh/tmp_access_T4 /tmp/gfxtrace.conf "$(cat /root/.t4_host):/tmp/"
+ssh -i /root/.ssh/tmp_access_T4 "$(cat /root/.t4_host)" \
+    "sudo install -D -m 644 /tmp/gfxtrace.conf \
+         /etc/systemd/system/xrdp.service.d/gfxtrace.conf && \
+     sudo systemctl daemon-reload && sudo systemctl restart xrdp && \
+     systemctl show xrdp -p Environment"
+#   GPU persistence: see the cold-probe box below. Without it the FIRST
+#   connection of the campaign negotiates RFX, not AVC444.
+ssh -i /root/.ssh/tmp_access_T4 "$(cat /root/.t4_host)" "sudo nvidia-smi -pm 1"
 
 # 3. encoder config: the #45 profile — scheduled paired refresh, NOT -g 30000
 scp -i /root/.ssh/tmp_access_T4 \
@@ -107,6 +140,28 @@ sh PR-demo/t4_profile/e52_t4_payload.sh install
 sh PR-demo/t4_profile/e52_t4_payload.sh arm codeflood
 sh PR-demo/t4_profile/e52_t4_payload.sh status
 ```
+
+> ### [2026-07-30] Three things that void a run before it starts
+>
+> **The credential.** `cloud-init` re-locks `ubuntu` on every boot of a
+> recreated instance, so `t4_restore_cred.sh` is not optional — skipping it
+> produces `User does not exist, or could not be authenticated` in
+> `xrdp.log` and an empty capture. It reported `L -> P` on this run.
+>
+> **The cold GPU.** The first connection after boot fails AVC444
+> negotiation: `probe TIMEOUT ... elapsed=4008 ms` → "removing external AVC
+> candidate" → `Matched RFX mode`. Cold `h264_nvenc` at 3840×2400 takes
+> 3.95 s vs 1.40 s warm, and with persistence mode off the driver unloads
+> between processes so every idle gap re-creates the condition. `nvidia-smi
+> -pm 1` (§2 step 2b) is the workaround; the bug is **BACKLOG #56**. Check
+> `xrdp.log` for `Matched RFX mode` before believing any capture.
+>
+> **The conffile prompt.** `/etc/xrdp/cert.pem` and `rsakeys.ini` are
+> modified on any box that generated its own key, so a plain
+> `apt-get install -y` stops at a prompt and leaves xrdp-dev
+> half-configured. Always pass `-o Dpkg::Options::=--force-confold`
+> (BACKLOG #57). If it already happened:
+> `sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a --force-confold`.
 
 `e52_t4_payload.sh` is checksum-gated: re-running `install` after editing
 the payload re-installs only what changed. Arming writes
@@ -183,6 +238,25 @@ The harness checks G1–G3 itself and aborts or warns; G4 is on you.
   off first, so the new xorgxrdp module is actually loaded. A surviving
   session keeps the PREVIOUS module: with a matching xup contract it pairs
   silently and you measure the old code (CLAUDE.md, T4 deployments).
+* **G5 [2026-07-30] both monitors were inked.** The harness prints
+  `damage coverage: surface 0: N  surface 1: M` and warns when the split is
+  worse than 3:1. **This is the gate that catches the T4's own trap:** the
+  T4 runs XFCE and the fleet pods run no window manager, so `xterm
+  -maximized` — which spans the root on a bare X server — means *the
+  current monitor* to xfwm4. The first probes measured 251 damage events
+  against 44, i.e. BACKLOG #53's one-active-one-idle regime wearing the
+  E5-2 label. `e52_payload.sh` now sizes its window to the root geometry
+  from `xwininfo -root` (note: `xdotool getdisplaygeometry` returns the
+  *primary monitor* — using it is the same bug again) after removing the
+  maximized state, and re-asserts **position and size** for the life of the
+  session: a one-shot resize held on one run and lost on the next, and a
+  6400×2400 window at X=2570 covers exactly one monitor while passing every
+  size check. Both committed T4 runs are within 1.06×.
+* **G6 [2026-07-30] nothing else was watching.** On a 4-vCPU box the
+  measurement instrument is not free: a `top -b -d 2` sampler moved the
+  batched arm from 47.6 ms to 71.3 ms. Take CPU attribution from two
+  `/proc/<pid>/stat` reads 60 s apart (`xorg_cpu_probe.sh` shape), never a
+  polling loop, and never quote a rate from a run that had a sampler on it.
 
 ### Per-build extras the T4 owes (CLAUDE.md)
 
@@ -213,10 +287,12 @@ Each `e_gate_run.sh` run writes one directory under
 | `E5-2_decomposition.txt`, `E2_prefix_audit.txt` | analysis outputs you generate | **yes** |
 
 **Dump sizes are the one thing that will surprise you.** The oracle client
-saves every picture. Measured at 2560×1440 + 3840×2400 under `codeflood`:
-**5 GB (baseline) and 11 GB (batched) per 180 s run** — the batched arm
-pushes twice the pictures, so its dump is twice the size. At the T4's owner
-geometry expect the same order of magnitude. They land in `/tmp` on the dev
+saves every picture. On the **dev box** at 2560×1440 + 3840×2400 under
+`codeflood`: **5 GB (baseline) and 11 GB (batched) per 180 s run**. On the
+**T4** the same geometry and duration produced **1.4 GB and 2.3 GB**
+[2026-07-30] — the T4 pushes fewer pictures per second and NVENC's are
+smaller, so the whole audit fits in memory and no prefix trick was needed.
+Size the disk for the dev-box figure anyway. They land in `/tmp` on the dev
 box and are moved into the capture dir, so:
 
 * check `df -h /work /tmp` before starting (want ≥ 40 GB free);
@@ -320,7 +396,7 @@ a memory is not.
 
 ---
 
-## 7. If a number comes back short
+## 7. If a number comes back short — it did, and here is what that looked like
 
 The stop rule from #52 carries over verbatim: **≥ 2.0× GREEN, ≥ 1.5×
 AMBER, below that RED**, and a RED is attributed — capture pacing, vmsplice
@@ -336,3 +412,21 @@ service split into encode-collected and rewrite/emit, and the
 On the dev box at 2.13× the worker was still only 32 % busy, so a T4 result
 below 2× is at least as likely to be capture-side as encoder-side — and the
 decomposition will say which.
+
+**[2026-07-30] It came back 1.67× and the decomposition said capture.** The
+sequence that turned an AMBER into an attributed AMBER, for the next time:
+
+1. `e52_flood_analyze.py` on both traces — worker busy 45 %, service 23.5 ms
+   inside a 91.6 ms per-monitor period, `queue_depth` 0 and un-acked p90 = 1
+   against a cap of 2. So: not encoder-bound, not wire-bound, not
+   flow-controlled. The time is in the wait for the next damage.
+2. `xorg_cpu_probe.sh` on the T4 during a clean repeat — **session Xorg at
+   92 % of one core**, while the four NVENC children cost ~7 % of a core
+   each. One saturated thread, on a box with 1.5 idle cores.
+3. `avc444_pack_bench.c` on the same CPU — 9.03 ms/frame for the shipped
+   vectorized 4K pack, ~10 % of a period, inside that same thread.
+
+Conclusion recorded in BACKLOG #55: the batch works (`kids_armed=4` in 93 %
+of cycles) and the ceiling is single-threaded capture (#54). Nothing was
+re-tuned, no arm was swapped, and the dev box's 2.13× was never presented
+as the T4's number.

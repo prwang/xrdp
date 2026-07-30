@@ -42,6 +42,84 @@ esac
 # never assume a display: take the one this session actually has.
 [ -n "${DISPLAY:-}" ] || exit 0
 
+# --- span the WHOLE root window, not one monitor --------------------------
+# The fleet pods run the payload with NO window manager, so xterm
+# -maximized sizes itself to the root window and one xterm inks BOTH
+# monitors. The T4 runs XFCE (wm1.sh -> xfce4-session), and to xfwm4
+# "maximized" means the CURRENT MONITOR. Measured on the first T4 probe
+# (2026-07-30): 251 damage events on surface 1 against 44 on surface 0 —
+# i.e. the second monitor was essentially idle, which is BACKLOG #53's
+# one-active-one-idle regime and NOT the two-monitor batching the E5-2
+# gate is about. The gate needs both monitors damaged in the same cycle.
+#
+# So size the window explicitly to the root geometry. This is the payload
+# resizing ITS OWN window at login, inside the session — not an external
+# process reaching into a live session (CLAUDE.md GUI lifecycle).
+#
+# Two traps, both hit on the first T4 probes (2026-07-30):
+#   * `xdotool getdisplaygeometry` reports the PRIMARY MONITOR (2560x1440
+#     here), not the root window. The root size comes from xwininfo -root
+#     (6400x2400) — using the xdotool number sizes the window to one
+#     monitor again, which is the bug being fixed.
+#   * a window xfwm4 considers MAXIMIZED is re-snapped to its monitor
+#     after any resize, so the maximized state has to be removed first
+#     (and `-maximized` is no longer passed to xterm at all).
+E52_TITLE=E52FLOOD
+E52_MAIN=$$
+if command -v xdotool >/dev/null 2>&1 && command -v xwininfo >/dev/null 2>&1
+then
+    (
+        RG=$(xwininfo -root 2>/dev/null \
+             | sed -n 's/^  -geometry  *\([0-9]*x[0-9]*\).*/\1/p')
+        RW=${RG%x*}
+        RH=${RG#*x}
+        case "${RW:-0}${RH:-0}" in
+        *[!0-9]* | 0*) exit 0 ;;
+        esac
+        # RE-ASSERT FOR THE LIFE OF THE SESSION, not once. A one-shot
+        # resize was measured to hold on one run and silently lose on the
+        # next (2026-07-30: a 75 s repeat came back kids_armed=2 in 96 %
+        # of cycles, i.e. back to one monitor, and would have been
+        # reported as a batched number for a regime the batch cannot
+        # help). xfwm4 re-snaps on its own schedule; the payload is not
+        # in a position to know when, so it just checks. Re-asserting a
+        # geometry the window already has damages nothing, so the check
+        # is free in the thing being measured.
+        LOG=${XDG_RUNTIME_DIR:-/tmp}/e52_span.log
+        : > "$LOG"
+        # ...and stop when the payload does. `exec xterm` below keeps this
+        # script's pid, so watching it is watching the flood window; without
+        # this the loop outlives every logoff and the box accumulates one
+        # spinning shell per login.
+        while kill -0 "$E52_MAIN" 2>/dev/null; do
+            wid=$(xdotool search --name "^$E52_TITLE\$" 2>/dev/null | head -1)
+            if [ -n "$wid" ]; then
+                set -- $(xdotool getwindowgeometry --shell "$wid" 2>/dev/null \
+                         | sed -n 's/^X=\([0-9-]*\)/\1/p;s/^Y=\([0-9-]*\)/\1/p;s/^WIDTH=\([0-9]*\)/\1/p;s/^HEIGHT=\([0-9]*\)/\1/p')
+                # POSITION MATTERS AS MUCH AS SIZE. A 6400x2400 window at
+                # X=2570 covers monitor 1 and nothing else — measured on
+                # the T4 on 2026-07-30, and it read as a perfectly normal
+                # run until the coverage gate called it. xfwm4 restores a
+                # window's pre-maximize POSITION when the maximized state
+                # is removed, so the move has to be re-checked, not just
+                # issued. The tolerance is the frame: asking for 0,0
+                # lands the client at (border, titlebar).
+                if [ "${1:-9999}" -gt 100 ] || [ "${2:-9999}" -gt 200 ] \
+                   || [ "${3:-0}" != "$RW" ] || [ "${4:-0}" != "$RH" ]; then
+                    echo "$(date -Is) fix ${3:-?}x${4:-?}+${1:-?}+${2:-?}" \
+                         "-> ${RW}x${RH}+0+0" >> "$LOG"
+                    xdotool windowstate --remove MAXIMIZED_VERT \
+                        --remove MAXIMIZED_HORZ "$wid" 2>/dev/null
+                    sleep 1
+                    xdotool windowmove --sync "$wid" 0 0 2>/dev/null
+                    xdotool windowsize --sync "$wid" "$RW" "$RH" 2>/dev/null
+                fi
+            fi
+            sleep 3
+        done
+    ) &
+fi
+
 if [ ! -s "$CORPUS" ]; then
     exec xterm -fa 'DejaVu Sans Mono' -fs 22 -bg red -fg white -e bash -c '
         while true; do
@@ -52,7 +130,7 @@ if [ ! -s "$CORPUS" ]; then
         done'
 fi
 
-exec xterm -maximized -fa 'DejaVu Sans Mono' -fs 14 \
+exec xterm -title "$E52_TITLE" -fa 'DejaVu Sans Mono' -fs 14 \
     -bg '#002b36' -fg '#839496' -e bash -c '
     CORPUS="'"$CORPUS"'"
     KIND="'"$KIND"'"

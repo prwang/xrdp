@@ -878,6 +878,19 @@ cycles** against 0.6 % at 10 Hz, so step 7's premise is exercised, and
 the E2 wire assertions hold under the flood (7/7, zero black frames,
 ~0.93 MB per picture).
 
+**On the T4 the same code is worth 1.67× (2026-07-30, BACKLOG #55;
+evidence `PR-demo/mac_bisect_matrix/captures/e52_t4_*_20260730/`).** Same
+A/B, run on the representative low-to-average old-CPU target (Tesla T4 /
+NVENC, 4-vCPU Xeon 8259CL): baseline **77.3 ms** → batched **46.3 ms**,
+per-monitor period 155 → 92 ms, `kids_armed=4` in **93 %** of cycles.
+AMBER, and attributed rather than re-tuned: the session **Xorg is a single
+thread at 92 % of one core** while the four NVENC children cost ~7 % of a
+core each, the worker is idle 55 % of the time, and flow control never
+binds. The T4 hits the single-threaded capture wall (#54) that the 32-core
+dev box has the headroom to hide. **Quote the ratio with its box**: 2.13×
+is a VAAPI/32-core number and 1.67× is what a 4-vCPU NVENC box gets, and
+the second is the one a reader with old hardware should expect.
+
 Three durable qualifications on that number:
 
 1. **A payload that damages both monitors is part of the measurement.**
