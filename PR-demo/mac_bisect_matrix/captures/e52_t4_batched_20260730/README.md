@@ -6,6 +6,47 @@ the #52 stop rule that is recorded as-is and attributed; nothing was
 re-tuned to make it look better, and the baseline is a real T4 measurement
 (`../e52_t4_baseline_20260730/`), never the dev box's number.
 
+> ## CORRECTION (same day, later): the number is a BAND, 1.5×–2.3×
+>
+> Repeating both arms found the T4 is **bimodal**. Sixteen further runs of
+> the batched arm split into two tight clusters — **47–49 ms** (8 runs) and
+> **67–74 ms** (8 runs) — and the baseline, re-measured hours later, came
+> back at **108.9 / 109.9 ms** rather than 77.3 ms.
+>
+> | pairing | baseline | batched | ratio |
+> |---|---|---|---|
+> | original 180 s pair (below) | 77.3 ms | 46.3 ms | **1.67× AMBER** |
+> | slow-state pair | 109.4 ms | 72.5 ms | **1.51× AMBER** |
+> | paired re-measure, same session, deb swapped between | 108.9 ms | 48.2 ms | **2.26× GREEN** |
+>
+> The drift is largely **common-mode** — both arms slow together, and every
+> pairing clears 1.5× — so the *conclusion* (the batch is worth well over
+> 1.5× on the T4) survives. The single number does not. **Report the T4
+> result as 1.5×–2.3×, centred near 1.7×**, not as 1.67×.
+>
+> The two clusters differ in bytes, not in cadence alone: the fast cluster
+> averages **580 KB per picture at a 92 ms period**, the slow one **875 KB
+> at 140 ms** (`E5-2_run_to_run_variance.txt`), with `encode collected →
+> last=1` moving 21.3 → 32.6 ms in step. Encode time tracks picture size,
+> so the loop has two self-consistent equilibria. What tips it is **not
+> root-caused**: it is not the codec (no run fell back to RFX — checked in
+> every `xrdp.log`), not the corpus position (3 000 lines, ±17 % density,
+> fully traversed every ~12 s), not the profiler (both clusters occur with
+> and without one), and not compositing (the xfconf change did not stick and
+> did not move the number). Filed as **BACKLOG #60**.
+>
+> What makes the 180 s pair below still the best single sample: both arms
+> pushed the **same bytes per picture** (602.7 KB vs 594.0 KB, 1.5 % apart),
+> so the ratio is content-neutral, and the byte-rate ratio (7.6 → 12.5 MiB/s
+> = 1.64×) matches the frame-rate ratio (1.67×). A pairing where the arms
+> had *different* mean picture sizes would not be trustworthy — check that
+> line before quoting any future E5-2 number.
+>
+> Also: **60–110 s runs are too short.** Use ≥180 s, and pair the arms
+> inside one sitting rather than trusting a baseline measured hours earlier.
+>
+> Where the saturated core actually goes: **`CPU_BOTTLENECK.md`**.
+
 | | T4 baseline (0–4) | T4 batched (0–7) | dev box batched (ref) |
 |---|---|---|---|
 | mean per send | 77.3 ms | **46.3 ms** | 29.9 ms |

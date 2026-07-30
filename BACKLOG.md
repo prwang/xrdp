@@ -913,7 +913,20 @@ remainder is attributed, not re-tuned.
 
 ---
 
-## #55 — E5-2 on the T4 (DONE 2026-07-30 — **1.67×, AMBER**, attributed)
+## #55 — E5-2 on the T4 (DONE 2026-07-30 — **1.5×–2.3×, AMBER**, attributed)
+
+> ### CORRECTION, same day: the T4 number is a band, not 1.67×
+> Repeating both arms found the box bimodal. The batched arm splits into
+> **47–49 ms** (8 runs) and **67–74 ms** (8 runs); the baseline, re-measured
+> later, gave **108.9 / 109.9 ms** rather than 77.3 ms. Three pairings:
+> 77.3/46.3 = **1.67×**, 109.4/72.5 = **1.51×**, 108.9/48.2 = **2.26×**.
+> The drift is common-mode and every pairing clears 1.5×, so the conclusion
+> holds and the single number does not. **Quote 1.5×–2.3×, centred ~1.7×.**
+> Not root-caused (**#60**); the 180 s pair below is still the best single
+> sample because both arms pushed the same bytes per picture (602.7 vs
+> 594.0 KB) and its byte-rate ratio (1.64×) matches its frame-rate ratio.
+> Where the saturated core goes: **#59** and
+> `PR-demo/mac_bisect_matrix/captures/e52_t4_batched_20260730/CPU_BOTTLENECK.md`.
 
 ### RESULTS (2026-07-30, `ubuntu@100.24.126.48`, Tesla T4 / 4 vCPU Xeon 8259CL)
 
@@ -1039,6 +1052,95 @@ the §6 onscreen checklist walked on both the Windows App (UWP) and macOS —
 that list is also what the owner watches, with the mid-stream non-IDR I
 refresh cadence (item 1) and the idle-monitor coupling (item 2) as the two
 genuinely new risks since the 2026-07-28 T4 test.
+
+---
+
+## #59 — The capture is 14 % of the bottleneck thread; `present_fake` is 19 % (TODO)
+
+Answers "which function is slow despite the vectorized capture, and does
+capture dominate the interval?" — profiled on the T4 with
+`PR-demo/t4_profile/xorg_perf_probe.sh` plus `xserver-xorg-core-dbgsym`,
+full write-up and raw profile in
+`PR-demo/mac_bisect_matrix/captures/e52_t4_batched_20260730/CPU_BOTTLENECK.md`.
+
+Of the session Xorg's cycles (it is ~92 % of one core; period ~92 ms):
+
+| path | % | ≈ms/period |
+|---|---|---|
+| xterm glyphs — `ProcRenderComposite → pixman_image_composite32` | 19.3 | 16 |
+| **X Present in software emulation — `present_fake_do_timer → present_execute_copy → pixman_blt`** | **18.8** | **16** |
+| xterm scroll — `ProcCopyArea → pixman_blt` | 16.5 | 14 |
+| **xorgxrdp capture — `rdpDeferredUpdateCallback → rdpCaptureGfxA2 → a8r8g8b8_to_avc444_box`** | **13.8** | **12** |
+| fills — `ProcRenderFillRectangles → fbFill` | 9.1 | 8 |
+
+**Capture does not dominate**: 13.8 % against 44.9 % for the payload's own
+X rendering. Two independent confirmations: with no client connected at all
+the flood alone holds Xorg at **99.9 %** of a core; and `rdpCopyBoxList`
+(the hw→sw staging copy) fires **0 times in 40 s** against `rdpCapture` 825
+— there is no redundant copy on this box.
+
+**The AVX2 kernels are not the problem and are not worth optimising**:
+`avc444_decode_row.avx2` 9.85 % + `a8r8g8b8_to_avc444_box.avx2` 3.59 %, and
+`avc444_pack_bench` predicts 12.6 ms/period against 12 ms profiled — bench
+and profile agree to 5 %.
+
+Two levers, in measured order:
+
+1. **`present_fake`, 18.8 % — bigger than the whole capture.** The xrdp
+   `xorg.conf` sets `Option "DRI3" "1"`; with Present and no hardware flip,
+   Xorg emulates presentation on a timer with a full-region `pixman_blt`,
+   in a session with no local display to present to. Identified, **not
+   proven**: an attempt to disable the xfwm4 compositor via a user xfconf
+   file did not stick (xfconfd rewrites it at logoff, and a stale xfconfd
+   survives a session) and did not move the number. Next attempts, in
+   order: `Option "DRI3" "0"` in the shipped xorg.conf; `-extension Present`
+   on the Xorg command line; then re-profile and confirm the path is gone
+   before claiming anything.
+2. **Move the pack off the X server thread** (#54's capture-side half). The
+   12 ms is not slow, but it sits on the single thread the whole session is
+   queued behind. Hand xrdp a raw XRGB snapshot and pack in the
+   encoder-side worker: the same arithmetic, off the critical path.
+
+One process note worth keeping: the first reading of this profile, taken
+before the dbgsym install when the frames above `rdpCopyArea` were bare
+addresses, blamed xorgxrdp's own staging copy and would have sent an
+optimisation at code that never runs. The uprobe count killed it. Do not
+attribute a stripped stack by inference.
+
+---
+
+## #60 — The T4's E5-2 is bimodal and it is not root-caused (TODO)
+
+Sixteen repeats of the batched arm split into two tight clusters — 47–49 ms
+(8 runs) and 67–74 ms (8) — with nothing in between, and the baseline
+measured 77.3 ms once and 108.9 / 109.9 ms later. That is the whole reason
+#55's answer is a band.
+
+The clusters differ in bytes, not just cadence: **580 KB per picture at a
+92 ms period** vs **875 KB at 140 ms**, with `encode collected → last=1`
+moving 21.3 → 32.6 ms in step (`E5-2_run_to_run_variance.txt`). Encode time
+tracks picture size, so the loop has two self-consistent equilibria and
+something tips it at session start.
+
+Ruled out, each with evidence: **codec fallback** (no run logged
+`Matched RFX mode`; every run's `xrdp.log` checked), **corpus position**
+(3 000 lines, per-500-line density varies only 1.17×, fully traversed every
+~12 s so even a 60 s window averages five passes), **the profiler** (both
+clusters occur with and without perf/top/uprobes attached), **compositing**
+(the xfconf change neither stuck nor moved the number), **leftover probes**
+(`perf probe -l` empty), and **GPU clocks** (`nvidia-smi dmon` shows the
+encoder essentially idle in both).
+
+Still open: what selects the equilibrium. Worth trying — pin the payload's
+write rate instead of letting it free-run (a `codeflood` variant with a
+fixed bytes/s), and log per-picture size against period from the first
+frame of a session to see whether the two branches separate at startup or
+drift apart later.
+
+Until it is closed: **E5-2 runs must be ≥180 s, both arms measured in one
+sitting, and the mean bytes-per-picture of the two arms must agree** before
+a ratio is quoted. A pairing whose arms differ in picture size is measuring
+content, not the pipeline.
 
 ---
 

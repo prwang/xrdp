@@ -878,18 +878,33 @@ cycles** against 0.6 % at 10 Hz, so step 7's premise is exercised, and
 the E2 wire assertions hold under the flood (7/7, zero black frames,
 ~0.93 MB per picture).
 
-**On the T4 the same code is worth 1.67× (2026-07-30, BACKLOG #55;
+**On the T4 the same code is worth 1.5×–2.3× (2026-07-30, BACKLOG #55/#60;
 evidence `PR-demo/mac_bisect_matrix/captures/e52_t4_*_20260730/`).** Same
 A/B, run on the representative low-to-average old-CPU target (Tesla T4 /
-NVENC, 4-vCPU Xeon 8259CL): baseline **77.3 ms** → batched **46.3 ms**,
-per-monitor period 155 → 92 ms, `kids_armed=4` in **93 %** of cycles.
+NVENC, 4-vCPU Xeon 8259CL): the 180 s pair gave baseline **77.3 ms** →
+batched **46.3 ms** (per-monitor period 155 → 92 ms, `kids_armed=4` in
+**93 %** of cycles) = 1.67×; repeats found the box **bimodal**, and two
+further pairings gave 1.51× and 2.26×. Every pairing clears 1.5×, so the
+conclusion holds while the single number does not — **quote the band**. The
+bimodality is not root-caused (#60); a pairing is only trustworthy when
+both arms report the same mean bytes per picture, which the 180 s pair does
+(602.7 vs 594.0 KB).
+
 AMBER, and attributed rather than re-tuned: the session **Xorg is a single
-thread at 92 % of one core** while the four NVENC children cost ~7 % of a
-core each, the worker is idle 55 % of the time, and flow control never
-binds. The T4 hits the single-threaded capture wall (#54) that the 32-core
-dev box has the headroom to hide. **Quote the ratio with its box**: 2.13×
-is a VAAPI/32-core number and 1.67× is what a 4-vCPU NVENC box gets, and
-the second is the one a reader with old hardware should expect.
+thread at ~92 % of one core**, and the profile says where it goes (#59) —
+payload glyph+scroll+fill rendering **44.9 %**, the X **Present** extension
+running in software emulation **18.8 %**, and xorgxrdp's **entire capture
+just 13.8 %** (~12 ms of a 92 ms period, matching `avc444_pack_bench`'s
+12.6 ms prediction to 5 %). The four NVENC children cost ~7 % of a core
+each, the worker idles 55 % of the time, and flow control never binds. So
+the capture is *not* the dominant term even on the box where the pipeline
+is capture-bound: the X server is, and 12 ms of the capture's cost is
+merely stuck on the same single thread — which is why #54's remedy is to
+move the pack off that thread rather than to make it faster.
+
+**Quote the ratio with its box**: 2.13× is a VAAPI/32-core number and
+~1.7× is what a 4-vCPU NVENC box gets, and the second is the one a reader
+with old hardware should expect.
 
 Three durable qualifications on that number:
 
