@@ -853,6 +853,101 @@ corpus line 32× so every row wraps past the right edge of monitor 2.
 
 ---
 
+## #53 — Arm a monitor only when its pixels changed (TODO, NEXT)
+
+**Why.** Measured 2026-07-30 (#52 results, first flood pair): with one
+active monitor beside an idle one, the batch is **~9 % SLOWER** than the
+serialized path (68.5 ms vs 62.6 ms mean per send). The idle monitor
+still reported full-monitor damage every cycle — the window spans both
+monitors, so a scroll dirties both areas even though only one has
+changed pixels — and the shared deadline (D3) then ties the active
+monitor's frame to the idle monitor's full-area capture, NV12 upload and
+encode. One active monitor next to an idle one is an ordinary desktop,
+so this is a real regression in a common case, not a bench artifact.
+
+**Scope.** Decide per cycle whether a monitor joins the set, on evidence
+that its pixels changed rather than on damage-rect coverage. Candidates
+to evaluate in this order (cheapest first): (a) drop a monitor from the
+set when its previous pair coded as all-skip below a byte threshold and
+its damage rects are unchanged; (b) a capture-side changed-region test
+in xorgxrdp before the slot is handed over; (c) keep the monitor in the
+set but give it its own deadline so it cannot hold the healthy monitor
+(this is the residual coupling already recorded under #45 step 7).
+Whatever lands must NOT drop a real update — a monitor that stops
+sending is worse than one that sends all-skip frames.
+
+**Gate.** The benchmark already exists and needs no new scaffolding: the
+first flood pair (`SESSION_KIND=codeflood` before the 32× line repeat,
+i.e. ink on one monitor only) currently reads 0.91×. Acceptance: **≥
+1.0× on that pair** (no regression against serialized) with **the 2.13×
+two-monitor result unchanged within noise** — both arms re-measured, not
+one. Plus E2 clean and no monitor left un-updated over a 180 s run.
+
+---
+
+## #54 — Capture-side handoff: the remaining 2× (TODO)
+
+**Why.** #52 proved the encode side is no longer the constraint: at
+2.13× the worker is **32 % busy**, per-pair service is 14.7 ms (encode
+collected 2.8 + rewrite/emit 12.3) against a 59.9 ms per-monitor period,
+and after a frame's `last=1` the same monitor's next damage arrives
+41 ms (p50) to 105 ms later. Flow control never binds (un-acked p50 0 /
+max 4 of fif = 2, client `queue_depth` 0) and it is not bandwidth
+(495 Mbit/s over loopback with the oracle client). The wait is the
+capture handoff.
+
+**Scope** — #45's two deferred capture questions, now with evidence:
+1. what sets a monitor's floor period (deferred-update pacing vs
+   ack-budget retirement in xorgxrdp), measured per stage rather than
+   inferred from the send interval;
+2. whether the producer can hand BOTH monitors over in one cycle, so the
+   set is armed with two fresh captures instead of one plus a stale
+   slot.
+
+**Gate.** Same instrument as E5-2 (arm-s vs a new arm, `codeflood`,
+180 s, oracle, `E5_BASE_MS` = arm-s's own 29.9 ms): **≥ 1.5×** on top of
+2.13×, worker busy above 60 %, and the `last=1 → next own dmg` wait
+below the per-pair service time. Stop rule as #52: under 1.5× the
+remainder is attributed, not re-tuned.
+
+---
+
+## #55 — E5-2 on the T4 (TODO — protocol written, waiting on the instance)
+
+The dev-box 2.13× is a VAAPI number on a 32-core box. The T4 (Cascade Lake
++ Tesla T4/NVENC) is the representative low-to-average old-CPU target, so
+its ratio is the one that belongs in the PR.
+
+**Protocol: `PR-demo/t4_profile/E5-2_T4_PROTOCOL.md`** — written before the
+launch, ~40 min of instance time, every step scripted. It covers the
+single-instance A/B (both debs named, and the version-sort trap: the
+baseline deb sorts NEWER than the batched one, so `--allow-downgrades` and
+a hash check before every measurement), the four gates a number must pass
+to count (xorgxrdp still installed, deployed hash is the intended arm,
+payload declared, session freshly logged off), the artifact inventory with
+sizes (the oracle dumps are 5–11 GB per run and are audited on a prefix
+then deleted; everything else is committed), the pack-bench and smoke-gate
+obligations, and cleanup on both boxes.
+
+Machinery that landed with it: `e_gate_run.sh` grew `E_TARGET=ssh` so the
+same harness and the same analysis run against a real box over an ssh
+port-forward with the client side still on the dev box;
+`PR-demo/t4_profile/e52_payload.sh` + `e52-payload.desktop` +
+`e52_t4_payload.sh` are the persistent, checksum-gated, autostart-armed
+T4 payload (arming is a marker file plus a session logoff — never an ssh
+launch into a live session); `PR-demo/mac_bisect_matrix/sessions_off.sh`
+logs every fleet session off afterwards.
+
+**Acceptance.** Both arms measured on the T4 under `codeflood`, ratio and
+decomposition committed beside the captures, pack-bench ms/frame recorded
+next to the deployed hashes, smoke gate PASS before the owner connects, and
+the §6 onscreen checklist walked on both the Windows App (UWP) and macOS —
+that list is also what the owner watches, with the mid-stream non-IDR I
+refresh cadence (item 1) and the idle-monitor coupling (item 2) as the two
+genuinely new risks since the 2026-07-28 T4 test.
+
+---
+
 ## #40 — FR-PROC-7 preemptive aux (sparse aux cadence)
 
 Submit/collect construction plus all three policies (preempt, breadth,

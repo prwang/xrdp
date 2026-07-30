@@ -502,3 +502,25 @@ An older BACKLOG record (2026-07-26) shows 4K `ENCODE` at 30.1 ms vs today's
 are a different EC2 instance after recreation, the `-refs 1 -dpb_size 1` args
 added during the 2026-07-27 nvenc bisect, and ffmpeg 8.0.1. It is recorded as
 open rather than guessed at.
+
+---
+
+## 6. Measuring the frame interval on the T4 (BACKLOG #52 / E5-2)
+
+Protocol, gates and artifact inventory: **`PR-demo/t4_profile/E5-2_T4_PROTOCOL.md`**.
+It is the procedure for an A/B on a box with ONE xrdp instance — both debs
+named, the version-sort trap (a baseline deb built later sorts *newer*, so
+the swap is a downgrade and the deployed hash must be verified before every
+measurement), the four gates a number must pass to count, the 5–11 GB oracle
+dumps and how they are audited on a prefix and then deleted, the pack-bench
+and smoke-gate obligations, and the cleanup that stops a session from burning
+a core after the run.
+
+Two things there generalise beyond the T4 and belong in any deploy:
+
+- **After ANY xrdp-dev install, confirm `xorgxrdp-dev` is still installed**
+  (§2b hazard). `e_gate_run.sh` now aborts instead of measuring without it.
+- **Log the session off after a deb swap, before measuring or handing over.**
+  A surviving session keeps the previous xorgxrdp module loaded; if the xup
+  contract version happens to match, it pairs silently and you test the old
+  code.

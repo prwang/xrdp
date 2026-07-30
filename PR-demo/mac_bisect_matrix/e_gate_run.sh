@@ -67,15 +67,42 @@
 # what generates continuous damage on both monitors. arm-r sets it.
 #
 # Usage: e_gate_run.sh [seconds]     (default 120; E2 wants >= 1000 pairs)
-#   E_ARM=arm-r E_PORT=40017 E_MODE=oracle E_REFRESH=240 e_gate_run.sh 120
+#
+#   fleet pod (default):
+#     E_ARM=arm-s E_PORT=40018 E_MODE=oracle E_REFRESH=240 e_gate_run.sh 180
+#
+#   a real box over an ssh port-forward (the T4) — protocol, artifact list
+#   and single-instance upgrade/downgrade discipline in
+#   PR-demo/t4_profile/E5-2_T4_PROTOCOL.md:
+#     ssh -f -N -i /root/.ssh/tmp_access_T4 -L 33389:127.0.0.1:3389 <t4>
+#     E_TARGET=ssh E_PORT=33389 E_USER=ubuntu \
+#       E_CRED_FILE=/root/.t4_rdp_cred E_MODE=oracle e_gate_run.sh 180
+#
+# Env: E_TARGET pod|ssh · E_SSH_HOST (else /root/.t4_host) · E_SSH_KEY ·
+#   E_ARM/E_NS (pod only) · E_PORT · E_USER · E_CRED_FILE · E_MODE
+#   oracle|render · E_REFRESH · E5_BASE_MS · E_OUT · E_COLD 0|1 ·
+#   E_MODE0/E_MODE1/E_POS1/E_MODELINE0/E_MODELINE1 (client geometry)
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 SECS=${1:-120}
 ARM=${E_ARM:-arm-r}
 PORT=${E_PORT:-40017}
 NS=${E_NS:-bisect-matrix}
-SU=${E_USER:-probe444}
-CRED=${E_CRED_FILE:-/root/.oracle_cred}
+# TARGET: pod (a bisect-fleet arm, the default) or ssh (a real box reached
+# over an ssh port-forward — the T4). The client side is identical either
+# way and always runs HERE (CLAUDE.md: nothing is installed client-side on
+# the T4); only server-side identity, log collection and the cold-session
+# reset differ, and both go through srv()/srv_cat() below.
+TARGET=${E_TARGET:-pod}
+SSH_HOST=${E_SSH_HOST:-$(cat /root/.t4_host 2>/dev/null || true)}
+SSH_KEY=${E_SSH_KEY:-/root/.ssh/tmp_access_T4}
+if [ "$TARGET" = ssh ]; then
+    SU=${E_USER:-ubuntu}
+    CRED=${E_CRED_FILE:-/root/.t4_rdp_cred}
+else
+    SU=${E_USER:-probe444}
+    CRED=${E_CRED_FILE:-/root/.oracle_cred}
+fi
 CLI=${E_DISPLAY:-:94}
 FRDP=${E_XFREERDP:-xfreerdp3}
 MODE=${E_MODE:-oracle}
@@ -93,33 +120,62 @@ mkdir -p "$OUT"
 
 fail() { echo "ABORT: $*" >&2; exit 1; }
 
-[ -s "$CRED" ] || fail "no probe credential at $CRED"
-POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
-      -o jsonpath='{.items[0].metadata.name}') || fail "no $ARM pod"
-[ -n "$POD" ] || fail "no running pod for $ARM"
-echo "arm=$ARM pod=$POD port=$PORT mode=$MODE secs=$SECS out=$OUT"
+# --- server side: one command, one place -----------------------------------
+# srv <shell command>   run it on the server under test
+# srv_cat <path>        stream a server-side file to stdout
+if [ "$TARGET" = ssh ]; then
+    [ -n "$SSH_HOST" ] || fail "E_TARGET=ssh needs E_SSH_HOST or /root/.t4_host"
+    srv() { ssh -n -i "$SSH_KEY" -o BatchMode=yes "$SSH_HOST" "$1"; }
+    srv_cat() { ssh -n -i "$SSH_KEY" -o BatchMode=yes "$SSH_HOST" \
+                    "sudo cat '$1' 2>/dev/null || cat '$1'"; }
+    SRV_NAME=$SSH_HOST
+else
+    POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
+          -o jsonpath='{.items[0].metadata.name}') || fail "no $ARM pod"
+    [ -n "$POD" ] || fail "no running pod for $ARM"
+    srv() { kubectl -n "$NS" exec "$POD" -- bash -lc "$1"; }
+    srv_cat() { kubectl -n "$NS" exec "$POD" -- cat "$1"; }
+    SRV_NAME=$POD
+fi
+
+[ -s "$CRED" ] || fail "no RDP credential at $CRED"
+echo "target=$TARGET server=$SRV_NAME arm=$ARM port=$PORT mode=$MODE" \
+     "user=$SU secs=$SECS out=$OUT"
 
 # Record WHAT is deployed before measuring it: a gate result against an
 # unknown build is not a gate result.
-kubectl -n "$NS" exec "$POD" -- bash -lc \
-    'dpkg -l | grep -E "xrdp-dev|xorgxrdp-dev"' \
+srv 'dpkg -l | grep -E "xrdp-dev|xorgxrdp-dev"' \
     > "$OUT/deployed_packages.txt" 2>&1
-kubectl -n "$NS" get pod "$POD" \
-    -o jsonpath='{.spec.containers[0].image}{"\n"}' \
-    > "$OUT/deployed_image.txt" 2>&1
-kubectl -n "$NS" exec "$POD" -- cat /etc/xrdp/gfx.toml \
-    > "$OUT/gfx.toml" 2>&1
+grep -qE '^ii +xorgxrdp-dev' "$OUT/deployed_packages.txt" \
+    || fail "xorgxrdp-dev is NOT installed on $SRV_NAME — an xrdp-dev deb
+Breaks: old xorgxrdp and may have removed it (DEPLOY_RUNBOOK 2b); no
+session will start and any number from this run is meaningless"
+if [ "$TARGET" = pod ]; then
+    kubectl -n "$NS" get pod "$POD" \
+        -o jsonpath='{.spec.containers[0].image}{"\n"}' \
+        > "$OUT/deployed_image.txt" 2>&1
+else
+    { echo "host install (no image): $SSH_HOST"
+      srv 'uname -srm; nvidia-smi --query-gpu=name --format=csv,noheader \
+           2>/dev/null || ls /dev/dri'; } > "$OUT/deployed_image.txt" 2>&1
+fi
+srv_cat /etc/xrdp/gfx.toml > "$OUT/gfx.toml" 2>&1
 # WHICH PAYLOAD produced the damage is part of the measurement: a frame
 # interval read under the 10 Hz `code` metronome and one read under
-# `codeflood` are different quantities (BACKLOG #52).
-kubectl -n "$NS" exec "$POD" -- cat /etc/session_kind \
+# `codeflood` are different quantities (BACKLOG #52). On the fleet the
+# payload is /etc/session_kind; on a real box it is the armed marker of
+# PR-demo/t4_profile/e52_payload.sh.
+srv 'cat /etc/session_kind 2>/dev/null || cat /etc/xrdp-e52-payload \
+     2>/dev/null || echo "UNKNOWN (no session-kind marker on this server)"' \
     > "$OUT/deployed_session_kind.txt" 2>&1
+grep -q UNKNOWN "$OUT/deployed_session_kind.txt" && echo \
+    "WARNING: the payload is not declared on $SRV_NAME — record what was" \
+    "on screen by hand, or the interval cannot be compared to anything" >&2
 # the recon build must be GONE (its gate is answered); if it is still
 # there the arm is the wrong one
-if kubectl -n "$NS" exec "$POD" -- \
-        grep -qc R1SLOT /usr/lib/xorg/modules/libxorgxrdp.so 2>/dev/null
+if srv 'grep -qc R1SLOT /usr/lib/xorg/modules/libxorgxrdp.so' >/dev/null 2>&1
 then
-    fail "$ARM still carries the R1 recon xorgxrdp — wrong arm for a gate run"
+    fail "$SRV_NAME still carries the R1 recon xorgxrdp — wrong build for a gate run"
 fi
 
 # --- client-side X server at the E3 target geometry ----------------------
@@ -143,18 +199,17 @@ tail -1 "$OUT/client-monitors.txt"
 # container's life: mark both and read only this run's window. Skipping
 # this turned a 60 s measurement into 2.2 h of accumulated lines on
 # 2026-07-29.
-MARK_X=$(kubectl -n "$NS" exec "$POD" -- \
-    bash -lc "wc -l < /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
+MARK_X=$(srv "wc -l < /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
     | tr -d ' \r')
 MARK_X=${MARK_X:-0}
 # xrdp logs to /var/log/xrdp.log INSIDE the pod (xrdp.ini LogFile), not to
 # the container's stdout: kubectl logs carries only the entrypoint's own
 # output, which is why a first version of this harness reported zero
 # GFX_TRACE records on a session that was in fact running.
-MARK_P=$(kubectl -n "$NS" exec "$POD" -- \
-    bash -lc 'wc -l < /var/log/xrdp.log 2>/dev/null' | tr -d ' \r')
+MARK_P=$(srv 'sudo wc -l < /var/log/xrdp.log 2>/dev/null \
+    || wc -l < /var/log/xrdp.log 2>/dev/null' | tr -d ' \r')
 MARK_P=${MARK_P:-0}
-echo "log marks: session-xorg $MARK_X lines, pod $MARK_P lines"
+echo "log marks: session-xorg $MARK_X lines, xrdp.log $MARK_P lines"
 
 # A COLD session, by default: xrdp reconnects to an EXISTING session, and
 # a fleet pod that has been up for hours may have one whose scrolling
@@ -162,12 +217,18 @@ echo "log marks: session-xorg $MARK_X lines, pod $MARK_P lines"
 # pictures (1.1 sends/s) and would have made E2's >= 1000 pairs
 # impossible. This is a disposable probe444 session in a test pod, never
 # the owner's: log it off and let sesman build a fresh one.
+#
+# On a real box (E_TARGET=ssh) it matters for a DIFFERENT reason (CLAUDE.md,
+# T4 deployments): a surviving session keeps the PREVIOUS xorgxrdp module
+# loaded, so after a deb swap the measurement can silently be of the old
+# code. Logging the WHOLE session off is the sanctioned operation — never
+# pkill/relaunch individual GUI processes inside a live session. E_COLD=0
+# measures an existing session on purpose.
 if [ "${E_COLD:-1}" = 1 ]; then
-    kubectl -n "$NS" exec "$POD" -- bash -lc \
-        "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" >/dev/null 2>&1
-    kubectl -n "$NS" exec "$POD" -- bash -lc \
-        "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null || break; \
-         sleep 1; done" >/dev/null 2>&1
+    srv "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
+        >/dev/null 2>&1
+    srv "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null \
+         || break; sleep 1; done" >/dev/null 2>&1
 fi
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \
@@ -209,14 +270,11 @@ if [ "$MODE" = oracle ]; then
 fi
 
 # --- collect both server-side logs, windowed ------------------------------
-XLOG=$(kubectl -n "$NS" exec "$POD" -- \
-    bash -lc "ls -t /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1")
-[ -n "$XLOG" ] || fail "no session Xorg log in the pod — did the login fail? \
+XLOG=$(srv "ls -t /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1")
+[ -n "$XLOG" ] || fail "no session Xorg log on $SRV_NAME — did the login fail? \
 see $OUT/client.log"
-kubectl -n "$NS" exec "$POD" -- cat "$XLOG" \
-    | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
-kubectl -n "$NS" exec "$POD" -- cat /var/log/xrdp.log 2>/dev/null \
-    | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
+srv_cat "$XLOG" | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
+srv_cat /var/log/xrdp.log | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
 grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
 
 # --- the report ----------------------------------------------------------

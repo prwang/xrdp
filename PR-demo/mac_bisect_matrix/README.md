@@ -44,6 +44,18 @@ construction, and the tester always knows which arm is on screen.
 - `k8s/*.yaml` — namespace + one Deployment per arm (privileged, `/dev/dri`
   hostPath, `hostPort` pinned to `hostIP 127.0.0.1`).
 - `build_and_deploy.sh` — build → import into k3s → apply → roll → wait.
+- `e_gate_run.sh` — the acceptance-gate runner (E2/E3/E4/E5 in one
+  offscreen dual-monitor session). `E_TARGET=pod` (default) measures a
+  fleet arm; `E_TARGET=ssh` measures a real box over an ssh port-forward
+  with the client side still here — see
+  `../t4_profile/E5-2_T4_PROTOCOL.md`.
+- `e52_flood_analyze.py` — where the frame interval goes, per arm: service
+  split, per-monitor period, the `last=1 → next own dmg` wait that says
+  whether the pipeline was full, `kids_armed` histogram, ack path.
+- **`sessions_off.sh` — run this after a campaign.** A fleet session keeps
+  running its payload after the client disconnects; accumulated sessions
+  were found burning ~4 cores (2026-07-30). One command logs every session
+  off and kills the dev-box client rig.
 
 ## Host assumptions (this dev box)
 
