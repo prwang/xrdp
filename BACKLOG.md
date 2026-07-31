@@ -1055,7 +1055,7 @@ genuinely new risks since the 2026-07-28 T4 test.
 
 ---
 
-## #59 — The capture is 14 % of the bottleneck thread; `present_fake` is 19 % (TODO)
+## #59 — The capture is 14 % of the bottleneck thread; the rest is not ours to optimise (TODO — one lever left, see #62)
 
 Answers "which function is slow despite the vectorized capture, and does
 capture dominate the interval?" — profiled on the T4 with
@@ -1084,22 +1084,39 @@ the flood alone holds Xorg at **99.9 %** of a core; and `rdpCopyBoxList`
 `avc444_pack_bench` predicts 12.6 ms/period against 12 ms profiled — bench
 and profile agree to 5 %.
 
-Two levers, in measured order:
+**One lever, and it is ours:**
 
-1. **`present_fake`, 18.8 % — bigger than the whole capture.** The xrdp
-   `xorg.conf` sets `Option "DRI3" "1"`; with Present and no hardware flip,
-   Xorg emulates presentation on a timer with a full-region `pixman_blt`,
-   in a session with no local display to present to. Identified, **not
-   proven**: an attempt to disable the xfwm4 compositor via a user xfconf
-   file did not stick (xfconfd rewrites it at logoff, and a stale xfconfd
-   survives a session) and did not move the number. Next attempts, in
-   order: `Option "DRI3" "0"` in the shipped xorg.conf; `-extension Present`
-   on the Xorg command line; then re-profile and confirm the path is gone
-   before claiming anything.
-2. **Move the pack off the X server thread** (#54's capture-side half). The
-   12 ms is not slow, but it sits on the single thread the whole session is
-   queued behind. Hand xrdp a raw XRGB snapshot and pack in the
-   encoder-side worker: the same arithmetic, off the critical path.
+**Move the pack off the X server thread** (#54's capture-side half). The
+12 ms is not slow, but it sits on the single thread the whole session is
+queued behind. Hand xrdp a raw XRGB snapshot and pack in the encoder-side
+worker: the same arithmetic, off the critical path.
+
+> ### WITHDRAWN (2026-07-31): the `present_fake` lever — we do not own it
+>
+> This item previously proposed attacking the 18.8 % `present_fake` path
+> (X's Present extension running in software emulation) by setting
+> `Option "DRI3" "0"` in the shipped `xorg.conf` or passing
+> `-extension Present` on the Xorg command line, on the argument that a
+> config file xrdp ships is in our scope.
+>
+> **That argument was wrong and the lever is withdrawn.** Flipping those
+> knobs does not make our code faster; it changes how the *X server*
+> presents, in the hope its emulation path gets cheaper. That is
+> optimising a component we neither own nor ship, measured through a
+> benchmark that was itself the problem — and it changes the behaviour of
+> every session, for a benefit that was never demonstrated (the one
+> attempt, disabling the xfwm4 compositor, did not stick and did not move
+> the number).
+>
+> **#62 supersedes it.** `present_fake` fires on Present requests;
+> `textflood` drives the screen with `XShmPutImage` and issues none, so
+> the payload stops feeding that path rather than the X server being
+> reconfigured to make it cheaper. Whatever remains is a fraction of an
+> X-thread cost that fell 7.7x, and is no longer worth a config change.
+>
+> The rule this leaves behind: **when a profile says the cost is in code
+> we do not own, the fix is to stop generating the work, not to retune
+> the other component.**
 
 One process note worth keeping: the first reading of this profile, taken
 before the dbgsym install when the frames above `rdpCopyArea` were bare
@@ -1217,11 +1234,14 @@ measures, on the render path we already smoke-gate. Measure it as: arm
 baseline/batched pair, and re-profile to show the pixman paths shrank.
 Cross-check the black-frame count on every run — it is what caught this.
 
-Other levers for making E5-2 measure our ceiling, if the payload half is
-not enough: `Option "DRI3" "0"` / `-extension Present` (#59 lever 1,
-removes the 18.8 % `present_fake` path), and a payload that damages large
-regions without drawing them (e.g. an XShm image blit) so the X-side cost
-is a memcpy rather than typography.
+**Resolved by #62.** The payload half was built: `PR-demo/textflood/`
+renders the same corpus with cairo in its own process and blits it with
+`XShmPutImage`, cutting the payload's X-thread cost 7.7x (99.0 % -> 12.8 %
+of a core on Xvfb, against a 13.7 % idle floor) with the residual being the
+SHM memcpy itself. The `Option "DRI3" "0"` / `-extension Present` idea that
+was listed here as a second lever is **withdrawn** — see the box under #59:
+it retunes the X server rather than our code, and textflood issues no
+Present requests, so the path stops being fed instead.
 
 ---
 
@@ -1375,3 +1395,60 @@ absent (no silent inert leg anywhere) or keep an explicitly-reported skip.
 
 - **Owner sign-off** on making `aux_ltr_chain` the default (after #45
   lands and the gates are re-run).
+
+---
+
+## #62 — textflood: a payload whose X-side cost is a memcpy (IN PROGRESS)
+
+Closes the instrument half of #61. #59 established that the xterm payload
+makes E5-2 measure the X server rather than our pipeline; `PR-demo/textflood/`
+renders the **same** corpus (`code_corpus.ansi`, real xrdp source highlighted
+by pygments + clangd in solarized-dark) with cairo **in its own process** and
+hands X one finished image per frame over MIT-SHM.
+
+Measured on the dev box, Xvfb 6400x2400, 30 s per arm, two `/proc/<pid>/stat`
+reads:
+
+| arm | X-server CPU | payload's X-side cost |
+|---|---|---|
+| idle Xvfb | 13.7 % of a core | — |
+| xterm codeflood (server-side XRender glyphs) | **99.0 %** | 85.3 points |
+| textflood (client-side cairo + MIT-SHM) | **12.8 %** | ~0, at the idle floor |
+
+**7.7x less X-thread cost for the same content.** textflood's own
+rasterization (~87 % of a core) runs in a different process on a different
+core; the 3.85 s of X CPU that remains is the SHM copy — ~1050 frames x
+61 MB in 3.85 s = 16.6 GB/s, the memcpy floor. Total system work rises, the
+bottleneck thread is freed. That is the right trade where Xorg is
+single-threaded with idle cores beside it.
+
+Rendering verified from a decoded `xwd`, not assumed: 8/9 solarized entries
+present (magenta is on 43 of 3000 corpus lines, so a sample missing it is
+expected), 3650 distinct colours, and **21.5 % of pixels are subpixel-AA
+fringes** (non-palette, R!=G or G!=B: `#002b37`, `#012b36`, `#165d83`).
+Subpixel AA is requested explicitly rather than inherited from the session's
+fontconfig — it is what a real desktop renders, and it is the maximal AVC444
+stressor, so a silent fallback to greyscale AA would flatter the 4:2:0 arm.
+
+Also removes the failure mode that invalidated three T4 runs: the window is
+override-redirect over the whole root, so xfwm4 cannot re-snap it to one
+monitor (#53's one-active-one-idle regime) and the xdotool span-fixer loop
+is no longer needed.
+
+**Scope note.** That table measures the *payload's* X-side cost on Xvfb — a
+property of the payload, not an xrdp measurement, and not a substitute for
+one. The E5-2 number still has to come from the T4 with xorgxrdp in the loop.
+
+### Remaining, in order
+
+1. Deploy to the T4 as a new payload kind; **smoke gate first**, read the
+   black-frame count, then measure (the #61 precondition).
+2. Confirm it does not starve Xorg on 4 vCPUs: textflood ~0.9 core +
+   Xorg (capture ~12 ms + memcpy ~6 ms) + 4 nvenc children (0.28 core)
+   should sit near 1.6 of 4, but this is the one real risk and it must be
+   measured, not assumed.
+3. Re-profile and show the pixman glyph/scroll/fill paths are actually gone
+   before quoting any ratio from it.
+4. Then re-run the E5-2 pair, and use it as the instrument for FR-PROC-7
+   (#40/#41), whose preempt/breadth/depth policies need a payload that
+   loads the aux view — which subpixel-AA text does maximally.

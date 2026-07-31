@@ -60,27 +60,34 @@ emulation is another **18.8 %**. Two independent checks agree:
   no redundant copy in the capture on this box; the conversion reads the
   screen pixmap directly.
 
-**Can we push it, and how?** The levers, in measured order, and only the
-first two are ours:
+**Can we push it, and how?** Two answers, and neither is "make the X
+server faster":
 
-1. **`present_fake` — 18.8 %, bigger than the whole capture.** The session
-   has DRI3 enabled (`Option "DRI3" "1"` in the xrdp `xorg.conf`) and the
-   Present extension with no hardware flip path, so Xorg emulates
-   presentation on a timer with a full-region `pixman_blt`. This is
-   desktop-compositing overhead in a session that has no local display to
-   present to. Removing it is a *configuration* change in something xrdp
-   ships, so it is squarely in scope — but see the failed attempt below:
-   turning the xfwm4 compositor off via xfconf did not measurably help and
-   could not be made to stick, so the lever is **identified, not proven**
-   (BACKLOG #59).
+1. **Stop generating the work.** 63.7 % of this thread — the payload's own
+   drawing (44.9 %) plus the `present_fake` emulation (18.8 %) — exists
+   only because the *benchmark* chose an xterm. Replacing it with
+   `PR-demo/textflood/`, which rasterizes the same corpus in its own
+   process and blits with `XShmPutImage`, cut the payload's X-thread cost
+   **7.7x** on Xvfb (99.0 % -> 12.8 % of a core against a 13.7 % idle
+   floor), and issues no Present requests at all. BACKLOG #62.
 2. **Move the conversion off the X server thread.** The 12 ms of AVX2 pack
    is not slow, but it is on the *single* thread that everything else in
    the session is queued behind. Handing xrdp a raw XRGB snapshot and
    packing in the encoder-side worker would move 12 ms off the critical
    path without making the arithmetic any faster. This is the capture-side
-   half of #54.
-3. Nothing else in xorgxrdp is worth touching: there is no staging copy,
-   and the conversion matches its bench.
+   half of #54, and it is the only lever here that is our own code.
+
+Nothing else in xorgxrdp is worth touching: there is no staging copy, and
+the conversion matches its bench.
+
+> **Withdrawn (2026-07-31).** An earlier version of this file listed
+> `present_fake` as lever 1 and argued it was in scope because
+> `Option "DRI3" "1"` lives in an `xorg.conf` that xrdp ships. That was
+> wrong: setting `DRI3 "0"` or `-extension Present` does not make our code
+> faster, it retunes the X server's presentation path — a component we
+> neither own nor ship — and would change every session's behaviour for a
+> benefit never demonstrated. The correct response to "the cost is in code
+> we do not own" is to stop generating the work, which is what #62 does.
 
 ## What this corrected
 
