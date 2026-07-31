@@ -1245,7 +1245,7 @@ Present requests, so the path stops being fed instead.
 
 ---
 
-## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (TODO, NEXT)
+## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (**BLOCKED on #65** — was TODO, NEXT; its gate numbers would be producer-confounded until FR-BENCH-1 passes, and FR-PROC-7's preemption signal needs a saturating producer to be testable at all)
 
 Motivated by #62's measured decomposition, not by intuition. On the T4 with
 the textflood payload the 173.7 ms period is:
@@ -1431,7 +1431,31 @@ loop over BOTH real predicates. Four assertions, three of them controls:
 controls while writing it (acking in the same tick as the send; a 1-tick
 encode) — both would have made every configuration read depth 1.
 
-### #64b — m=1 at 4K on the T4 does not overlap AT ALL (TODO, HIGH — the real finding)
+### #64b — m=1 at 4K on the T4 does not overlap AT ALL (RESOLVED 2026-07-31: H-c — the PRODUCER is the serialiser; fix tracked as #65, which BLOCKS everything downstream)
+
+**Resolution.** Read the shipped gates instead of running more arms
+(escalation ladder rung 0, in hindsight the right first move):
+
+- xorgxrdp's `rdpDeferredUpdateCallback` DOES admit a second capture at
+  depth 1 — per-monitor budget of 2, checked per monitor with a
+  break-not-skip scan (`rdpClientCon.c`, verified 2026-07-31 in the
+  `d77d054` tree). The flow-control layer is not the serialiser.
+- `rdpScheduleDeferredUpdate` paces at `msFrameInterval` = 16 ms — a
+  16 ms timer cannot produce an 87 ms serialisation.
+- `budget exceeded` / `third capture` = 0 on every run: the gate was
+  never even ASKED for a second slot.
+
+So the second slot is never exercised because **no second frame of
+damage ever exists during an encode: textflood produces at 8.19 fps —
+equal to the pipeline's own period.** Its loop is
+`cairo render (~100 ms at 8.3 Mpx) → XShmPutImage → XSync`, single
+thread, zero internal pipelining. H-c, with the mechanism named. H-a
+and H-b are moot for this observation (the resolution sweep would have
+measured textflood's render cost against pixels, not the pipeline).
+
+The m=1 T4 row therefore convicts the producer, not the pipeline, and
+the finding moved into the PRD as **FR-BENCH-1** (the
+saturating-producer contract, FAILING). Fix is **#65**.
 
 Ladder run 2026-07-31, capture
 `captures/e52_t4_textflood_m1_4k_20260731/`:
@@ -1751,7 +1775,59 @@ absent (no silent inert leg anywhere) or keep an explicitly-reported skip.
 
 ---
 
-## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**)
+## #65 — textflood violates the saturating-producer contract (TODO, **BLOCKING** — owner directive 2026-07-31; blocks #63, #64b re-run, FR-PROC-7, and every 4K E5-2 verdict)
+
+**The core bug moved to the producer.** PRD **FR-BENCH-1** (added with
+this item) states the design intent textflood was built to and now
+fails: CPU text rendering, representative subpixel-AA colored pixels,
+and — the load-bearing clause — **strictly faster than the pipeline
+under test**, so the measured interval is pipeline-limited and a
+successor frame is physically in the fifo at pop time. Measured
+2026-07-31 (T4, m=1, 3840×2160): textflood at **8.19 fps ≈ the
+pipeline's own period**; fifo empty at all 205 completions. Every
+number gated on this producer is producer-confounded until fixed —
+which is why this blocks everything downstream, per the owner
+directive.
+
+Root cause in the producer: `draw_frame (cairo, ~100 ms at 8.3 Mpx) →
+XShmPutImage → XSync`, one thread, zero internal pipelining. The XSync
+comment ("without it the client races ahead of the server") is
+FR-BENCH-1 inverted — the producer MUST race ahead, up to the 2-slot
+capture bound. A single live render thread mathematically cannot
+saturate 4K on the reference CPU (~100 ms/frame → ≤10 fps regardless
+of buffering), and N render threads would burn the cores the pipeline
+needs on a 4-vCPU box (footprint clause). So:
+
+- **Step 0 — instrument first.** `--selftest N`: render+blit N frames,
+  report the producer's own fps and per-frame timestamps. No
+  measurement runs before the producer can report its own rate.
+- **Step 1 — standalone baseline on the T4**: split render cost vs
+  blit cost at 1080p and 4K. Recorded next to the pipeline's sends/s.
+- **Step 2 — pre-rendered frame ring.** Render R distinct corpus
+  frames at startup (cairo, same subpixel-AA text — requirement 2
+  intact), then blit them cyclically: full-frame damage every frame at
+  memcpy cost, steady-state producer CPU ≈ one blit (requirement 3
+  intact), rate bounded by the blit (~10 ms → well over 2× any
+  pipeline rate). Keep `XSync` per blit — pacing then comes from the
+  X server's consumption, which is the correct back-pressure; the ring
+  just guarantees a frame is always ready. Memory: R=16 at 4K ≈
+  0.5 GB, fine on the T4's 16 GB.
+- **Step 3 — harness enforcement.** `e_gate_run.sh` VERDICT prints the
+  producer's selftest rate and the in-run saturation observable
+  (negative overlap-gap fraction from `e52_period_decompose.py`) and
+  stamps the run **VOID (producer-limited)** when either check fails —
+  the same loud-invalid pattern as the geometry guard.
+- **Step 4 — re-run what the confound taints**: the m=1 4K overlap run
+  (re-adjudicates #64b's 0/205 with a compliant producer) and the m=2
+  A/B (re-issues #62's 1.41×, which may UNDERSTATE the batch if both
+  arms were producer-paced).
+
+Acceptance: selftest ≥ 2× the oracle pipeline rate at 3840×2160 on the
+T4; a gate run whose VERDICT shows both saturation checks green; #62's
+and #64b's numbers re-issued or explicitly re-confirmed under the
+compliant producer.
+
+## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**; **2026-07-31 verdict annotated: producer-confounded, re-run under #65** — the 1.41× may understate the batch if both arms were paced by the same 8 fps producer, per FR-BENCH-1)
 
 Closes the instrument half of #61. #59 established that the xterm payload
 makes E5-2 measure the X server rather than our pipeline; `PR-demo/textflood/`

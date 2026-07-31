@@ -929,6 +929,67 @@ Three durable qualifications on that number:
 
 So the honest bound is: best case ≈ 48 ms (one encode term removed) ⇒ ~21 fps; the advertised "~20 ms ⇒ ~40 fps" only follows if the 28 ms remainder is itself per-child work. **Attributing that 28 ms with `PR-demo/t4_profile/frame_accounting.sh` is a prerequisite to quoting any speed-up**, not a follow-up. Two further ceilings sit above it: the frame period is `max(capture, encode_pair)` under FR-CAPTURE-8, so a capture stage that is currently hidden can become the new bottleneck and absorb the whole win; and the *client* can be the binding constraint entirely — xfreerdp's software 4:4:4 reconstruction measured ~65 ms/frame at the owner layout, capping end-to-end at ~15 fps regardless of server speed (§FR-PROC-7 clause 9). **Confirmed at dual-monitor 2560×1440 + 3840×2400 on 2026-07-29** (BACKLOG #45; one arm, 60 s each, back to back): the rendering client delivered 5.94 sends/s (2.97 pairs/s per monitor, send-gap mean 169 ms) against the oracle client's 19.57 sends/s (9.79 pairs/s per monitor, mean **51.1 ms**) — **client-bound by 3.29×**, the client costing ~117 ms per surface frame on top of the server's 51 ms. Consequence: a server-side speed-up is chased and gated on the **oracle frame interval** (the send-to-send interval with a client that acks before decode/present); the rendering client's rate is reported beside it as the end-to-end figure but cannot show a server gain until the client side moves. Report the T4 gain per client (mstsc / macOS / xfreerdp), each as a frame period, and say which of the two instruments produced each number.
 
+### FR-BENCH-1: The saturating-producer contract (owner directive, 2026-07-31 — FAILING, blocks FR-PROC-7 / #63 / all 4K E5-2 verdicts)
+
+The benchmark producer (`PR-demo/textflood/`) exists to make the
+pipeline the bottleneck. Its design intent is three requirements, in
+priority order:
+
+1. **Strictly faster than the pipeline under test**, at every geometry
+   it gates. Not "fast", not "faster than xterm" as an end in itself:
+   the producer must keep damage pending at every pipeline completion,
+   because every property this benchmark judges is undefined when the
+   producer is the limit — the E5 ratio measures the producer's cadence,
+   capture ‖ encode cannot be observed (no second frame exists to
+   capture), and FR-PROC-7's preemption signal ("successor physically
+   present in the fifo at pop time") never fires. Clause 2 of FR-PROC-7
+   below warns that a starved fifo degenerates its design into an idle
+   timer; a slow producer realizes that degeneration by another route.
+2. **Representative pixels**: CPU-rendered, subpixel-antialiased,
+   colored text — the real desktop workload and the maximal AVC444
+   chroma stressor.
+3. **Minimal X-side and system footprint**: the X server's cost is one
+   blit, and the producer must not perturb the measurement by competing
+   for the cores the pipeline needs (the reference box has 4 vCPUs).
+
+**Saturation is verified per run, never assumed.** A gate run is valid
+only if BOTH hold, and the harness VERDICT must print both:
+
+- **Producer telemetry**: the producer logs its own frame timestamps;
+  its standalone rate (`--selftest`, no RDP session) is ≥ 2× the
+  pipeline's measured sends/s at the same geometry on the same box.
+- **In-run observable**: damage is pending at pipeline completions —
+  operationally, the frame-identity-paired overlap gap
+  (`e52_period_decompose.py`) goes negative in a nonzero fraction of
+  frames, or an xorgxrdp-side trace shows capture N+1 starting during
+  encode N.
+
+A run that fails either check is **producer-limited: it is not an E5
+result and can neither confirm nor falsify any pipeline property.** It
+is reported as VOID with the producer's own rate beside the pipeline's.
+
+**Status: FAILING (measured 2026-07-31, T4 m=1 3840×2160).** textflood
+delivered 8.19 fps — equal to the pipeline period (122.6 ms) — and the
+fifo was empty at all 205 completions (overlap gap min +7 ms, never
+negative). The failure is structural: `draw_frame` (cairo, ~8.3 Mpx
+subpixel text), `XShmPutImage`, and `XSync` run sequentially in one
+thread, so the producer's period is render + blit + sync with zero
+internal pipelining — and the `XSync` comment states its purpose as "the
+client must not race ahead of the server", which is this contract
+INVERTED: the producer must race ahead, up to the 2-slot capture bound.
+A single render thread at ~100 ms/frame cannot exceed 10 fps at 4K on
+the reference CPU regardless of buffering, so the fix must remove the
+per-frame render from the steady-state path (e.g. a pre-rendered frame
+ring: full-frame subpixel-text damage every frame at blit cost,
+requirements 2 and 3 intact) rather than merely overlap it.
+Consequences until fixed: the 2026-07-31 m=2 textflood A/B (1.41×) is
+annotated as producer-confounded — both arms may have been paced by the
+same producer and the batch's true gain understated; the m=1 "0/205
+overlap" T4 run convicts the producer, not the pipeline; and the PRD's
+`capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
+holding, which its 1600×912 evidence satisfied and 4K does not.
+Tracked as **BACKLOG #65**; #63 and #64b are blocked on it.
+
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 
 Supersedes NG-6's deferral. During motion, frames are sent luma-first
