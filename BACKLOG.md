@@ -1269,11 +1269,64 @@ one paragraph each; full text in git history (46207bd7, f5e01aec,
 
 What survived every correction: the uprobe result below (#64), which
 closes the chain with counters read from the live gates themselves.
+*(2026-07-31, later the same day: it did NOT survive — the uprobe
+counters are real but their reading was wrong; see the #64
+withdrawal. The instrument cannot distinguish a pinned slot from
+ordinary saturation, and static analysis shows the ack was an echo
+all along.)*
 
 The blocking chain is now LINEAR: **#64 → #65 → #66**, then the #67
 benchmark re-runs. Nothing else advances until its predecessor closes.
+*(Amended with the #64 withdrawal: the chain's head is now the m=1
+ms-per-stage decomposition (rung 2, local); #65's m≥2 window item
+stands on its own arithmetic and no longer waits on #64.)*
 
-## #64 — rect_id ack protocol upgrade: ack-on-consume with echoed identity (TODO, **THE BLOCKER** — single-monitor capture‖encode; local-only, no T4 needed)
+## #64 — rect_id ack protocol upgrade: ack-on-consume with echoed identity (**WITHDRAWN as THE BLOCKER, 2026-07-31** — root cause refuted by static analysis; impl checkpointed on `wip/fr_ack_1_checkpoint`, retained as a robustness fix only)
+
+### WITHDRAWAL (2026-07-31) — the filed ghost does not exist; the probe numbers are the healthy pipeline's signature
+
+FR-ACK-1 was implemented exactly as specified (CI green, 380/380,
+five additive tests) and is checkpointed on `wip/fr_ack_1_checkpoint`
+(xrdp `8bd989c0`, xorgxrdp `59210b2`, reassessment `0b295631`). The
+post-implementation static review then refuted the filing's root
+cause, so the item's BLOCKER status is withdrawn on this stem:
+
+* **The ack value was always an echo.** `frame_id_server` has one
+  assignment in the tree — `xrdp_mm.c xrdp_mm_process_enc_done:
+  frame_id_server = enc_done->frame_id` — the id parsed from the
+  ENDFRAME xorgxrdp wrote from its own `rect_id`. It is incremented
+  nowhere. The filing's drift term `r − S` has no code to accumulate
+  in; corroborated by zero measured ack drift over 494 live frames.
+* **The consume-without-output paths acked anyway.** On `rv=PENDING` /
+  dropped pair only the WIRETOSURFACE command returns NULL; the loop
+  reaches the ENDFRAME, whose PDU is built unconditionally and was
+  queued with the echoed id. No slot pin. What those paths actually
+  lose is the REGION (stale content until unrelated damage) plus the
+  rare unacked mid-message hard-error returns — real defects, and the
+  only parts of FR-ACK-1 worth keeping (Invariant III, totality, a
+  leak fix). No throughput change should be predicted from them.
+* **The proof table below re-reads as the HEALTHY depth-2 signature.**
+  Under saturation, capture N+1 is admitted at ack(N−1) and runs while
+  N encodes: `rack = rid−1` at every admission, `rid−2` until the next
+  ack, `rid` only if the pipeline drains — i.e. 340/1004/0, exactly
+  the histogram. `rack = rid−2` during encode is TWO frames in flight:
+  the overlap this item declared impossible, present in its own
+  strongest row. Ghost and saturation are indistinguishable in that
+  instrument (CLAUDE.md quality gate 2b, missed again here).
+* **Redirect.** The open m=1 question is now "what are the ms per
+  stage of the ~120 ms cycle" — rung 2, local fleet, rect_id-paired
+  capture and encode timestamps, before any further protocol claim.
+  Candidates with in-tree support: per-frame work is genuinely
+  ~90–120 ms on the T4 (#55's 87–98 ms/send, #59's saturated Xorg,
+  #60's bimodality); and for REAL (non-oracle) clients the xup ack is
+  gated behind the egfx client window (`xrdp_mm.c
+  xrdp_mm_update_module_frame_ack`), coupling capture admission to
+  client decode — invisible on the oracle rig. #65's m≥2 premise
+  (global fif window) is arithmetic and stands. FR-PROC-7 (#40,
+  breadth+depth) is the lever the cycle numbers point at.
+
+The filing below is retained unedited as the record of the claim and
+its instrument.
 
 ### The proof (uprobes on the live deployed d77d054, 2026-07-31)
 
@@ -1369,7 +1422,7 @@ DECOMMISSIONED** until #64 (single-mon) and #65 (multi-mon) are closed
 locally on the fleet; #67 re-provisions it (DEPLOY_RUNBOOK from bare
 AMI) for the headline re-measurement only.
 
-## #65 — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — blocked by #64)
+## #65 — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — no longer blocked by #64 per its withdrawal; the global-window arithmetic stands on its own CI pin)
 
 At m≥2 two further issues sit ON TOP of the #64 ghost:
 
@@ -1451,7 +1504,7 @@ what a 1.41x says is needed.
 * the E5-2 pair re-run and DECOMPOSED, not just rated;
 * a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
 
-## #67 — T4 benchmark re-runs under restored concurrency (blocked by #64+#65; #66 optional but preferred)
+## #67 — T4 benchmark re-runs under restored concurrency (blocked by the m=1 ms decomposition + #65; #64 withdrawn as a prerequisite; #66 optional but preferred)
 
 The numbers the PR sells, re-measured on the representative box once
 the mechanism is proven locally. Requires re-provisioning the T4 from
