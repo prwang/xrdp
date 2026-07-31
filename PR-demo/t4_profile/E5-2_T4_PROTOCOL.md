@@ -163,6 +163,39 @@ sh PR-demo/t4_profile/e52_t4_payload.sh status
 > (BACKLOG #57). If it already happened:
 > `sudo DEBIAN_FRONTEND=noninteractive dpkg --configure -a --force-confold`.
 
+> ### [2026-07-31] HARD PRECONDITION: prove basic functionality first, measure second
+>
+> **Any change to the deployed config — not just the deb — is a deployment,
+> and must pass `PR-demo/smoke_gate/smoke.sh` BEFORE a single rate run is
+> taken against it.** Not after the campaign; before it.
+>
+> This was learned the expensive way on 2026-07-31. GLAMOR was enabled to
+> make the benchmark measure a ceiling we own (`nvidia` added to
+> `DRMAllowList`), the session logged in, Xorg reported `glamor X
+> acceleration enabled on Tesla T4/PCIe/SSE2`, and six rate runs, a perf
+> profile and a uprobe run were taken. The gate was run last and came back
+> `ok=0 lag=8 edge=0.000`, every key `got=black`, with
+> `(EE) XRDPDEV(0): Failed to make 1024x768x32bpp pixmap from GBM bo`. The
+> capture's own check: **1160 of 1160 main-view pictures black**. The whole
+> campaign was measuring a black screen, and the profile that appeared to
+> vindicate the change (`avc444_decode_row.avx2` becoming the #1 symbol,
+> libpixman vanishing) was the signature of nothing being drawn. Void:
+> `../mac_bisect_matrix/captures/e52_t4_glamor_VOID_20260731/`, BACKLOG #61.
+>
+> A login is not proof of function. **Two cheap checks, both mandatory:**
+>
+> 1. smoke gate against the exact deployed binary + config, before
+>    measuring — it is minutes, and it is the only thing that reads pixels
+>    back and compares them;
+> 2. `oracle_black_frame_check.py` on every capture, read before the rate
+>    number — a mid-stream black count in the hundreds or a *total* count
+>    equal to the picture count means the run is void regardless of how
+>    plausible the milliseconds look.
+>
+> And do not enable GLAMOR on this box at all: it is upstream
+> **neutrinolabs/xrdp#1697**, open since 2020 — "glamor ... only works well
+> with Intel or AMD hardware".
+
 `e52_t4_payload.sh` is checksum-gated: re-running `install` after editing
 the payload re-installs only what changed. Arming writes
 `/etc/xrdp-e52-payload` and takes effect **at the next login**, which is

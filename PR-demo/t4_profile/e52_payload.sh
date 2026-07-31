@@ -24,6 +24,36 @@
 #              server's own rather than a metronome reading.
 #   code       the same corpus, 1 line per 0.1 s — the 10 Hz CADENCE
 #              payload, kept for bandwidth comparisons with the fleet.
+#   gpuflood   codeflood's content in ALACRITTY instead of xterm.
+#              Profiling the T4 (BACKLOG #59) showed the xterm payload
+#              spends 44.9 % of the session Xorg's single core drawing
+#              ITSELF -- glyphs through pixman_image_composite32, scroll
+#              through pixman_blt, fills through fbFill -- against 13.8 %
+#              for the whole capture. A benchmark in which two thirds of
+#              the bottleneck thread is the payload's own software
+#              rendering measures the X server, not the pipeline we own.
+#              Alacritty rasterises in its OWN process and hands X finished
+#              buffers, so the X thread does capture instead of typography.
+#
+#              THE NAME OVERPROMISES: there is no GPU in this on the T4.
+#              xorgxrdp calls glamor_init() with GLAMOR_NO_DRI3, so clients
+#              cannot get DRI3 through the screen -- alacritty's stderr
+#              shows `glx: failed to create dri3 screen`, `failed to load
+#              driver: nvidia-drm`, and Mesa falling back to zink. It is
+#              still worth using (rasterisation moves to another PROCESS,
+#              and so to one of the box's ~1.5 idle cores), but it is
+#              llvmpipe/zink doing it, not the T4.
+#
+#              DO NOT try to fix that by enabling GLAMOR in
+#              /etc/X11/xrdp/xorg.conf. On NVIDIA it renders BLACK --
+#              `(EE) XRDPDEV(0): Failed to make ...x32bpp pixmap from GBM
+#              bo`, smoke gate ok=0/8 edge=0.000, 1160/1160 captured
+#              pictures black. Upstream neutrinolabs/xrdp#1697, open since
+#              2020: "glamor ... only works well with Intel or AMD
+#              hardware". BACKLOG #61.
+#
+#              Smoke-gate BEFORE measuring with this kind, and read the
+#              black-frame count before the rate number.
 #   none/absent  do nothing at all (normal desktop).
 #
 # Fails LOUD, on screen, if the corpus is missing: a benchmark that
@@ -34,9 +64,23 @@ CORPUS=${E52_CORPUS:-/usr/local/share/code_corpus.ansi}
 KIND=$(cat "$MARKER" 2>/dev/null | tr -d ' \r\n')
 
 case "${KIND:-none}" in
-codeflood|code) ;;
+codeflood|code|gpuflood) ;;
 *) exit 0 ;;
 esac
+if [ "$KIND" = gpuflood ] && ! command -v alacritty >/dev/null 2>&1; then
+    # Fail loud rather than silently falling back to xterm: an xterm run
+    # labelled gpuflood would be the old, X-server-bound benchmark wearing
+    # the new name, which is precisely the confusion this kind exists to
+    # end (CLAUDE.md strict-honesty rule: never swap the component under
+    # test).
+    exec xterm -fa 'DejaVu Sans Mono' -fs 22 -bg red -fg white -e bash -c '
+        while true; do
+            clear
+            echo "  E5-2 PAYLOAD INVALID: gpuflood armed but no alacritty"
+            echo "  apt-get install alacritty, then log the session off"
+            sleep 2
+        done'
+fi
 
 # The owner's session is the one under test (no special test users), so
 # never assume a display: take the one this session actually has.
@@ -130,15 +174,16 @@ if [ ! -s "$CORPUS" ]; then
         done'
 fi
 
-exec xterm -title "$E52_TITLE" -fa 'DejaVu Sans Mono' -fs 14 \
-    -bg '#002b36' -fg '#839496' -e bash -c '
+FLOOD='
     CORPUS="'"$CORPUS"'"
     KIND="'"$KIND"'"
     mapfile -t L < "$CORPUS"
     STEP=1
     DELAY=0.1
     REPEAT=1
-    [ "$KIND" = codeflood ] && { STEP=25; DELAY=; REPEAT=32; }
+    case "$KIND" in
+    codeflood|gpuflood) STEP=25; DELAY=; REPEAT=32 ;;
+    esac
     i=0
     tput civis 2>/dev/null
     while true; do
@@ -158,3 +203,41 @@ exec xterm -title "$E52_TITLE" -fa 'DejaVu Sans Mono' -fs 14 \
         i=$((i + STEP))
         [ -n "$DELAY" ] && sleep "$DELAY"
     done'
+
+if [ "$KIND" = gpuflood ]; then
+    # Alacritty rasterises glyphs on the GPU in its own process and hands
+    # X a finished frame. The colours match the xterm payload so the two
+    # kinds encode comparable content; only WHERE the pixels are drawn
+    # changes.
+    #
+    # SUPERVISED, AND LOUD ABOUT IT. Alacritty was observed exiting
+    # mid-run on the T4 (2026-07-31) with no OOM and no segfault in
+    # dmesg: a 180 s capture came back 3.03 sends/s with 246 black
+    # mid-stream pictures because the terminal had gone and the desktop
+    # was static. A restart loop alone would turn that into a quietly
+    # short measurement, so every exit is TIMESTAMPED to a restart log
+    # and alacritty's own stderr is kept. e_gate_run.sh collects the log;
+    # a run whose restart count is non-zero is not a clean measurement,
+    # and the count is reported next to the number rather than hidden by
+    # the relaunch.
+    RLOG=${XDG_RUNTIME_DIR:-/tmp}/e52_payload_restarts.log
+    ELOG=${XDG_RUNTIME_DIR:-/tmp}/e52_terminal_stderr.log
+    : > "$RLOG"
+    : > "$ELOG"
+    n=0
+    while : ; do
+        alacritty --title "$E52_TITLE" \
+            -o 'font.size=9' \
+            -o 'window.padding.x=0' -o 'window.padding.y=0' \
+            -o 'colors.primary.background="#002b36"' \
+            -o 'colors.primary.foreground="#839496"' \
+            -e bash -c "$FLOOD" >>"$ELOG" 2>&1
+        rc=$?
+        n=$((n + 1))
+        echo "$(date -Is) alacritty exited rc=$rc, restart #$n" >> "$RLOG"
+        sleep 1
+    done
+fi
+
+exec xterm -title "$E52_TITLE" -fa 'DejaVu Sans Mono' -fs 14 \
+    -bg '#002b36' -fg '#839496' -e bash -c "$FLOOD"

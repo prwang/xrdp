@@ -1,0 +1,441 @@
+profiling xorg pid=58476 for 45s
+=== FLAT (self time, where the cycles actually are) ===
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 16K of event 'task-clock:ppp'
+# Event count (approx.): 33839679088
+#
+# Overhead  Command  Shared Object                    Symbol                                           
+# ........  .......  ...............................  .................................................
+#
+    14.17%  Xorg     libxorgxrdp.so                   [.] avc444_decode_row.avx2
+     8.18%  Xorg     [kernel.kallsyms]                [k] rep_movs_alternative
+     8.10%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7e4
+     7.21%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001fa9
+     5.26%  Xorg     libxorgxrdp.so                   [.] a8r8g8b8_to_avc444_box.avx2
+     3.90%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001fa4
+     3.65%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f87
+     3.55%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f97
+     3.32%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f8f
+     3.30%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f7a
+     3.01%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f73
+     2.37%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001fa0
+     2.32%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7f8
+     1.90%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f7e
+     1.31%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7fc
+     1.27%  Xorg     libc.so.6                        [.] 0x00000000000b4a12
+     1.27%  Xorg     [vdso]                           [.] 0x0000000000000a09
+     1.23%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001f84
+     0.99%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7f4
+     0.92%  Xorg     [kernel.kallsyms]                [k] _raw_spin_unlock_irqrestore
+     0.87%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a800
+     0.73%  Xorg     [kernel.kallsyms]                [k] irqentry_exit
+     0.70%  Xorg     [kernel.kallsyms]                [k] finish_task_switch.isra.0
+     0.69%  Xorg     .glXXXXXX (deleted)              [.] 0x0000000000001fa2
+     0.63%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7e8
+     0.60%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a808
+     0.57%  Xorg     libnvidia-eglcore.so.580.173.02  [.] 0x0000000000b1a7f0
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
+
+=== CALLERS of the top self-time symbols ===
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 16K of event 'task-clock:ppp'
+# Event count (approx.): 33839679088
+#
+# Children      Self  Command  Shared Object                    Symbol                                           
+# ........  ........  .......  ...............................  .................................................
+#
+    41.00%     0.07%  Xorg     Xorg                             [.] Dispatch
+            |          
+            |--25.25%--Dispatch
+            |          |          
+            |          |--14.81%--WaitForSomething
+            |          |          |          
+            |          |           --12.44%--check_timers (inlined)
+            |          |                     |          
+            |          |                      --12.41%--DoTimers (inlined)
+            |          |                                DoTimer
+            |          |                                |          
+            |          |                                 --12.40%--rdpDeferredUpdateCallback
+            |          |                                           |          
+            |          |                                            --12.39%--rdpCapRect (inlined)
+            |          |                                                      |          
+            |          |                                                       --12.34%--rdpCaptureGfxA2
+            |          |                                                                 |          
+            |          |                                                                  --12.22%--a8r8g8b8_to_avc444_box (inlined)
+            |          |                                                                            |          
+            |          |                                                                             --8.92%--avc444_decode_row (inlined)
+            |          |          
+            |           --7.95%--ReadRequestFromClient
+            |                     |          
+            |                      --7.84%--_XSERVTransSocketRead
+            |                                |          
+            |                                 --7.82%--recvmsg
+            |                                           |          
+            |                                            --7.75%--0x7046fd4a860b
+            |                                                      0x7046fd4b4a12
+            |                                                      |          
+            |                                                       --7.43%--entry_SYSCALL_64_after_hwframe
+            |                                                                 do_syscall_64
+            |                                                                 |          
+            |                                                                  --7.21%--x64_sys_call
+            |                                                                            |          
+            |                                                                             --7.20%--__x64_sys_recvmsg
+            |                                                                                       |          
+            |                                                                                        --7.20%--__sys_recvmsg
+            |                                                                                                  |          
+            |                                                                                                   --7.16%--___sys_recvmsg
+            |                                                                                                             |          
+            |                                                                                                              --7.07%--____sys_recvmsg
+            |                                                                                                                        |          
+            |                                                                                                                         --6.99%--sock_recvmsg
+            |                                                                                                                                   |          
+            |                                                                                                                                    --6.96%--unix_stream_recvmsg
+            |                                                                                                                                              |          
+            |                                                                                                                                               --6.71%--unix_stream_read_generic
+            |                                                                                                                                                         |          
+            |                                                                                                                                                          --5.13%--unix_stream_read_actor
+            |                                                                                                                                                                    |          
+            |                                                                                                                                                                     --5.13%--skb_copy_datagram_iter
+            |                                                                                                                                                                               |          
+            |                                                                                                                                                                                --5.10%--__skb_datagram_iter
+            |                                                                                                                                                                                          |          
+            |                                                                                                                                                                                           --5.08%--simple_copy_to_iter
+            |                                                                                                                                                                                                     |          
+            |                                                                                                                                                                                                      --4.68%--rep_movs_alternative
+            |          
+             --15.68%--0x5dafac308ffc
+                       |          
+                       |--9.22%--0x5dafac48e6a9
+                       |          |          
+                       |           --7.60%--0x5dafac48e6a9
+                       |                     |          
+                       |                      --7.58%--0x5dafac48e6a9
+                       |                                0x5dafac48e41d
+                       |                                0x7046fcee1fa5
+                       |                                |          
+                       |                                 --7.57%--0x7046fcedfccf
+                       |                                           |          
+                       |                                            --7.54%--0x7046fceec4d6
+                       |                                                      |          
+                       |                                                       --7.47%--0x7046fcee7d10
+                       |                                                                 |          
+                       |                                                                  --5.42%--0x7046fcee6bdb
+                       |          
+                        --5.66%--0x5dafac493fc5
+                                  |          
+                                   --5.61%--0x5dafac49a41f
+                                             |          
+                                              --5.61%--0x7046fd541280
+                                                        |          
+                                                         --5.59%--0x7046fd4a860b
+                                                                   0x7046fd4b4a12
+                                                                   |          
+                                                                    --5.42%--0xffffffffa160012b
+                                                                              0xffffffffa2d13b65
+                                                                              |          
+                                                                               --5.38%--0xffffffffa1948c7a
+                                                                                         0xffffffffa29c9dad
+                                                                                         |          
+                                                                                          --5.37%--0xffffffffa29c9d10
+                                                                                                    |          
+                                                                                                     --5.35%--0xffffffffa29c6740
+                                                                                                               |          
+                                                                                                                --5.29%--0xffffffffa29c5950
+                                                                                                                          |          
+                                                                                                                           --5.26%--0xffffffffa29c578d
+                                                                                                                                     |          
+                                                                                                                                      --5.24%--0xffffffffa2bbe95b
+                                                                                                                                                |          
+                                                                                                                                                 --5.09%--0xffffffffa2bbe0c7
+                                                                                                                                                           |          
+                                                                                                                                                            --3.93%--0xffffffffa2bb9d6e
+                                                                                                                                                                      |          
+                                                                                                                                                                       --3.92%--0xffffffffa29e7233
+                                                                                                                                                                                 |          
+                                                                                                                                                                                  --3.91%--0xffffffffa29e705b
+
+=== BY DSO (which library owns the time) ===
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 16K of event 'task-clock:ppp'
+# Event count (approx.): 33839679088
+#
+# Overhead  Shared Object                  
+# ........  ...............................
+#
+    35.69%  .glXXXXXX (deleted)            
+    20.90%  libnvidia-eglcore.so.580.173.02
+            |          
+            |--8.10%--0x7046fb31a7e4
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--2.32%--0x7046fb31a7f8
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--1.31%--0x7046fb31a7fc
+            |          |          
+            |           --1.31%--0x7046fb31dc10
+            |                     0x7046fb31f6a5
+            |                     0x7046fb337250
+            |                     0x7046fb1feb22
+            |                     0x7046fb2ff63d
+            |                     0x7046fb2b077a
+            |          
+            |--0.99%--0x7046fb31a7f4
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--0.87%--0x7046fb31a800
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--0.63%--0x7046fb31a7e8
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--0.60%--0x7046fb31a808
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+            |--0.57%--0x7046fb31a7f0
+            |          0x7046fb31dc10
+            |          0x7046fb31f6a5
+            |          0x7046fb337250
+            |          0x7046fb1feb22
+            |          0x7046fb2ff63d
+            |          0x7046fb2b077a
+            |          
+             --0.34%--0x7046fb31a804
+                       0x7046fb31dc10
+                       0x7046fb31f6a5
+                       0x7046fb337250
+                       0x7046fb1feb22
+                       0x7046fb2ff63d
+                       0x7046fb2b077a
+
+    19.73%  libxorgxrdp.so                 
+            |          
+            |--14.17%--avc444_decode_row (inlined)
+            |          a8r8g8b8_to_avc444_box (inlined)
+            |          rdpCaptureGfxA2
+            |          rdpCapRect (inlined)
+            |          rdpDeferredUpdateCallback
+            |          DoTimer
+            |          DoTimers (inlined)
+            |          check_timers (inlined)
+            |          WaitForSomething
+            |          Dispatch
+            |          dix_main
+            |          0x7046fd42a8c0
+            |          __libc_start_main
+            |          _start
+            |          
+             --5.26%--a8r8g8b8_to_avc444_box (inlined)
+                       rdpCaptureGfxA2
+                       rdpCapRect (inlined)
+                       rdpDeferredUpdateCallback
+                       DoTimer
+                       DoTimers (inlined)
+                       check_timers (inlined)
+                       WaitForSomething
+                       Dispatch
+                       dix_main
+                       0x7046fd42a8c0
+                       __libc_start_main
+                       _start
+
+    17.99%  [kernel.kallsyms]              
+            |          
+            |--8.18%--rep_movs_alternative
+            |          |          
+            |           --8.14%--simple_copy_to_iter
+            |                     __skb_datagram_iter
+            |                     skb_copy_datagram_iter
+            |                     unix_stream_read_actor
+            |                     unix_stream_read_generic
+            |                     unix_stream_recvmsg
+            |                     sock_recvmsg
+            |                     ____sys_recvmsg
+            |                     ___sys_recvmsg
+            |                     __sys_recvmsg
+            |                     __x64_sys_recvmsg
+            |                     x64_sys_call
+            |                     do_syscall_64
+            |                     entry_SYSCALL_64_after_hwframe
+            |                     0x7046fd4b4a12
+            |                     0x7046fd4a860b
+            |                     recvmsg
+            |                     _XSERVTransSocketRead
+            |                     ReadRequestFromClient
+            |                     Dispatch
+            |                     dix_main
+            |                     0x7046fd42a8c0
+            |                     __libc_start_main
+            |                     _start
+            |          
+            |--0.92%--_raw_spin_unlock_irqrestore
+            |          |          
+            |           --0.59%--__wake_up_sync_key
+            |                     |          
+            |                      --0.46%--unix_write_space
+            |                                sock_wfree
+            |                                unix_wfree
+            |                                skb_release_head_state
+            |                                consume_skb
+            |                                unix_stream_read_generic
+            |                                unix_stream_recvmsg
+            |                                sock_recvmsg
+            |                                ____sys_recvmsg
+            |                                ___sys_recvmsg
+            |                                __sys_recvmsg
+            |                                __x64_sys_recvmsg
+            |                                x64_sys_call
+            |                                do_syscall_64
+            |                                entry_SYSCALL_64_after_hwframe
+            |                                0x7046fd4b4a12
+            |                                0x7046fd4a860b
+            |                                recvmsg
+            |                                _XSERVTransSocketRead
+            |                                ReadRequestFromClient
+            |                                Dispatch
+            |                                dix_main
+            |                                0x7046fd42a8c0
+            |                                __libc_start_main
+            |                                _start
+            |          
+            |--0.73%--irqentry_exit
+            |          |          
+            |           --0.55%--common_interrupt
+            |                     asm_common_interrupt
+            |          
+            |--0.70%--finish_task_switch.isra.0
+            |          __schedule
+            |          schedule
+            |          
+            |--0.38%--do_syscall_64
+            |          entry_SYSCALL_64_after_hwframe
+            |          |          
+            |           --0.36%--0x7046fd4b4a12
+            |                     0x7046fd4a860b
+            |          
+             --0.31%--_raw_spin_lock
+
+     2.07%  libc.so.6                      
+            |          
+             --1.27%--0x7046fd4b4a12
+                       0x7046fd4a860b
+                       |          
+                       |--0.49%--recvmsg
+                       |          _XSERVTransSocketRead
+                       |          ReadRequestFromClient
+                       |          Dispatch
+                       |          dix_main
+                       |          0x7046fd42a8c0
+                       |          __libc_start_main
+                       |          _start
+                       |          
+                       |--0.39%--epoll_wait
+                       |          ospoll_wait
+                       |          WaitForSomething
+                       |          Dispatch
+                       |          dix_main
+                       |          0x7046fd42a8c0
+                       |          __libc_start_main
+                       |          _start
+                       |          
+                        --0.34%--__select
+                                  rdpClientConCheck
+                                  WakeupHandler
+                                  WaitForSomething
+                                  Dispatch
+                                  dix_main
+                                  0x7046fd42a8c0
+                                  __libc_start_main
+                                  _start
+
+     1.91%  [vdso]                         
+            |          
+             --1.27%--0x7046fdc4ea09
+                       clock_gettime
+                       0x7046fb20bf80
+                       0x7046fb20fb68
+                       |          
+                       |--0.44%--0x7046fb32c112
+                       |          0x7046fb337bae
+                       |          |          
+                       |           --0.43%--0x7046fb31db76
+                       |                     0x7046fb31f6a5
+                       |                     0x7046fb337250
+                       |                     0x7046fb1feb22
+                       |                     0x7046fb2ff63d
+                       |                     0x7046fb2b077a
+                       |          
+                       |--0.42%--0x7046fb32da74
+                       |          0x7046fb32dbb4
+                       |          |          
+                       |           --0.41%--0x7046fb337bb6
+                       |                     |          
+                       |                      --0.41%--0x7046fb31db76
+                       |                                0x7046fb31f6a5
+                       |                                0x7046fb337250
+                       |                                0x7046fb1feb22
+                       |                                0x7046fb2ff63d
+                       |                                0x7046fb2b077a
+                       |          
+                        --0.41%--0x7046fb32c15c
+                                  |          
+                                   --0.40%--0x7046fb337bae
+                                             0x7046fb31db76
+                                             0x7046fb31f6a5
+                                             0x7046fb337250
+                                             0x7046fb1feb22
+                                             0x7046fb2ff63d
+                                             0x7046fb2b077a
+
+     1.05%  Xorg                           
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#
