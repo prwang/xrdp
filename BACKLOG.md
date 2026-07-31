@@ -1351,6 +1351,67 @@ XORG-SIDE APPLICATION latency is ≳30 ms consistently, or the
 raw-offset uprobe misread the field (un-audited; must be
 cross-checked by a log line in the next instrument).
 
+**RESOLVED 2026-07-31 (T4 redo — BOTH hypotheses falsified; the
+serializer is measured, named, and closes to 0.0 ms).** The owner
+re-provisioned the T4 (8 vCPU this time, same Cascade Lake + Tesla T4)
+and directed a redo for H1 + H2. Same debs as the 07-31 series
+(xrdp `52b8798839ad`, xorgxrdp `d77d05463e52`), m=1 at a true
+3840×2160, textflood, oracle client. Instrument:
+`PR-demo/t4_profile/i55_h1h2_uprobe.sh` (uprobes on the deployed
+binaries, one perf clock, per-thread schedstat two-read) +
+`i55_analyze.py`; captures `i55_t4_condB_pinned_v5_20260731`
+(CPUAffinity=0,1,4,5 — the original 2-physical-core shape, gate run
+118.3 ms = 1.04× of the 122.6 ms series: regime reproduced) and
+`i55_t4_condA_8vcpu_20260731` (unrestricted).
+
+- **H1 falsified.** aemit→xrecv (module ack emitted by xrdp → Xorg
+  services the xup fd) is **0.8 ms mean, p90 3.8, max 8.8** under
+  full load, pinned. There is no tens-of-ms Xorg ack-apply latency.
+  `rdpClientConProcessMsgClientRegionEx` is inlined in this build;
+  apply is observed at `rdpClientConRecv.isra.0` — a symbol probe,
+  not a raw-offset read.
+- **H2 falsified** (owner criterion: "closed if 8 cores stays 8 fps").
+  Unrestricted 8 vCPU: 109.8 ms / 9.2 sends/s vs pinned 118.3 / 8.8 —
+  2× CPU bought 7 %. Scheduler delay ≤0.2 % on every pipeline thread
+  unrestricted, ≤5 % pinned. Nobody starves; nothing waits for a core.
+- **The serialization, exactly** (legs sum 113.5 ms vs period 113.6 —
+  0.0 ms unattributed; table in the capture README): Xorg capture+pack
+  **8.7** → msg62 handoff + NVENC encode of both views **24.1** →
+  worker-thread LTR rewrite + NUT demux of ~3.5 MB/frame **35.8**
+  (zero pump polls inside the window: the worker is WORKING, not
+  waiting) → EGFX assembly **9.1** → main-thread drain of the two
+  ~1.6–2.0 MB EGFX writes **30.4**, and the module ack is emitted
+  only after the LAST write → ack transit **0.8** → deferred timer
+  **4.6** → next capture. The deferred timer fired 1074× and captured
+  264× — every refusal while the previous frame's ack was
+  outstanding. **Capture admission is gated on the module ack, and
+  the module ack is chained to the completion of the entire
+  encode→rewrite→assemble→drain pipeline; the one event that would
+  admit the next capture is emitted last.** That is why capture ‖
+  encode is 0/205 at 4K while every gate "admits" it.
+- **Consequence for the levers:** the two fat serial blocks are the
+  worker rewrite (35.8 ms, single-thread CPU) and the send drain
+  (30.4 ms, main thread). FR-PROC-7 Lever 2 (#40) overlapping frame
+  N+1's capture+encode with frame N's rewrite+drain attacks ~66 ms of
+  a 113 ms cycle; emitting the module ack at consume time rather than
+  after the last write (FR-ACK-1's ack-on-consume, parked on
+  `wip/fr_ack_1_checkpoint`) is the protocol half of the same fix.
+- **Instrument corrections recorded:** (a)
+  `xrdp_ffmpeg_avc444_encode_pair` gets ZERO hits on this build — the
+  #45 batch path calls `pump_set`; the first probe run measured a
+  dead symbol. (b) GFX_TRACE writes `avc dmg`/`enc`/`send` inside the
+  EMIT pass, so `e52_flood_analyze.py`'s "dmg→collected→last=1" spans
+  are within-emit stamps and its "last=1→next own dmg" wait CONTAINS
+  the next frame's rewrite; the 07-31 segment labels ("capture+pack
+  46.7 / idle 35.6") were mis-attributed and are superseded by the
+  uprobe table. (c) Two client-rig statefulness bugs voided four runs
+  before a clean pair existed — see CLAUDE.md "Client-rig
+  statelessness" and the VOID READMEs under
+  `captures/i55_t4_condB_pinned_{,v2_,v3_,v4_}20260731`.
+
+The hypotheses below are retained unedited as the record of what the
+redo was designed to decide.
+
 **Alternative hypothesis (H2, owner 2026-07-31): plain CPU
 oversubscription.** The T4 is 4 vCPU = 2 physical cores and the run
 held Xorg ~100% + textflood ~85% (producer design A, 24.1 ms/frame)
