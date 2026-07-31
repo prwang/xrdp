@@ -1412,18 +1412,84 @@ A 180 s run is for a *rate*; a binary property like "do these two stages
 ever overlap" is answered by seconds of trace. Escalate resolution and
 duration only when the cheap rung passes and the question survives.
 
-### Still open (the part that is real)
+### CI assertion — DONE 2026-07-31 (`7058ab97`)
 
-`capture ‖ encode` has **no CI assertion** — the state machine is unit
-tested, the wall-clock property is not. Add one: drive the decomposer's
-frame-identity pairing over a short recorded trace and assert the overlap
-fraction is non-zero at m=1. That is a deterministic check on a committed
-fixture, so it belongs in `tests/`, not in `PR-demo/`.
+`xrdp_gfx_ack_window_open()` extracted from `xrdp_mm_update_module_ack`
+(by name, unchanged) into `xrdp_encoder.h` so the joint flow control is
+testable, and `drive_pipeline()` in `test_avc444_multimon.c` models the
+loop over BOTH real predicates. Four assertions, three of them controls:
 
-Also unresolved and NOT explained by any of the above: the 2-monitor
-period is 173.7 ms with 132.1 ms of it inside our pipeline on a box at
-1.33 of 4 cores. Overlap existing at 50 % does not make that fast. The
-serial-cost question is real; the "never overlaps" framing was not.
+| config | depth | meaning |
+|---|---|---|
+| m=1 cap=2 fif=2 | **≥ 2** | the requirement |
+| m=1 cap=1 | 1 | no slots, no overlap |
+| m=1 cap=2 fif=1 | 1 | slots free, window shut — the cross-process coupling |
+| m=2 cap=2 fif=2 | 1 | the PRD's "inert per monitor" at m≥2 |
+| m=2 cap=2 fif=4 | ≥ 2 | what a per-monitor window would restore |
+
+`make check` **156/156 PASS**. Two modelling errors were caught by the
+controls while writing it (acking in the same tick as the send; a 1-tick
+encode) — both would have made every configuration read depth 1.
+
+### #64b — m=1 at 4K on the T4 does not overlap AT ALL (TODO, HIGH — the real finding)
+
+Ladder run 2026-07-31, capture
+`captures/e52_t4_textflood_m1_4k_20260731/`:
+
+| rung | m | geometry | payload | overlap |
+|---|---|---|---|---|
+| CI | 1 | n/a | n/a | **admitted** (156/156) |
+| local arm-s | 1 | 1920×1080 | codeflood | 7/86 = **8.1 %** |
+| local arm-s | 1 | 3840×2160 | codeflood | 4/53 = **7.5 %** |
+| **T4** | 1 | 3840×2160 | textflood | **0/205 = 0.0 %** |
+
+**This is a regression against a number already in the PRD** (quality
+gate check 4). PRD "Concurrency state of the encode pipeline" records
+`capture ‖ encode` = **"YES for m = 1, shipped"**, measured at 1600×912
+where *"capture is fully hidden"* — frame period equalled encode
+duration while `cap->enc_entry` added 23.8 ms that never reached the
+period. At 3840×2160 on the same box, nothing is hidden: 0 of 205
+frames, and the gap's **minimum is +7 ms — never once negative**.
+
+Period decomposition (122.6 ms mean): capture+pack 46.7, encode+assembly
+40.7, idle 35.6. Closes to 122.9 ≈ 122.6.
+
+**Not the capture budget.** `budget exceeded` and `third capture` are 0
+on the T4 run and both local runs — the capture side never hit its own
+capacity limit. It never had a second frame to capture while the first
+was encoding, so the serialiser is upstream of the slot accounting.
+
+**Open hypotheses**, in order of fit to `min = +7 ms never crossed`:
+
+- **H-a: resolution-dependent, and the PRD's m=1 evidence is stale.**
+  The "fully hidden" measurement was at 1600×912 = 1.46 Mpx; this is
+  8.29 Mpx. If capture cost scales past encode cost, the two stages stop
+  interleaving. Test: sweep m=1 on the T4 at 1600×912, 1920×1080,
+  2560×1440, 3840×2160 with ONE payload and plot overlap % against
+  pixels. Cheap — 5–10 s per point, and it either reproduces the PRD's
+  own number at its own resolution or falsifies it.
+- **H-b: the damage/deferred-update timer gates it.** 29 % of the period
+  is idle awaiting damage, and the m=2 run's minimum gap was exactly
+  4.0 ms = `MIN_MS_TO_WAIT_FOR_MORE_UPDATES`. If the next capture cannot
+  arm until a timer fires, overlap is structurally impossible regardless
+  of slots. Test: the `rdpDeferredUpdateCallback` vs `rdpCapRect` uprobe.
+- **H-c: payload, not pipeline.** textflood damages the whole root every
+  frame; there may be no second frame's damage pending to capture. Test:
+  run the T4 m=1 with codeflood so the local and T4 rows share a payload
+  — the one comparison this ladder is currently missing.
+
+**Do H-a and H-c first**: both are short local-then-T4 runs, and H-c is
+the confound that currently prevents attributing the local-8 %/T4-0 %
+difference to anything at all (different payload AND different hardware —
+CLAUDE.md stand-in rule forbids reading it as nvenc-vs-VAAPI).
+
+### Still open (the m≥2 serial cost)
+
+The 2-monitor period is 173.7 ms with 132.1 ms of it inside our pipeline
+on a box at 1.33 of 4 cores. The 50.1 % overlap there is cross-monitor
+interleaving, exactly as the PRD describes, and it does not make that
+fast. The serial-cost question is real; the "never overlaps" framing was
+not.
 
 ### Superseded observation (kept for the record)
 
