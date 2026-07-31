@@ -1245,6 +1245,68 @@ Present requests, so the path stops being fed instead.
 
 ---
 
+## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (TODO, NEXT)
+
+Motivated by #62's measured decomposition, not by intuition. On the T4 with
+the textflood payload the 173.7 ms period is:
+
+| segment | ms | % of period |
+|---|---|---|
+| capture + AVC444 pack (xorgxrdp) | 63.7 | 36.7 |
+| encode + LTR rewrite + EGFX assembly (xrdp) | 68.4 | 39.4 |
+| idle, awaiting damage | 41.5 | 23.9 |
+
+76 % of the period is our pipeline, on a box measured at **1.33 of 4 cores**
+with nothing pinned. The cost is serial latency, not arithmetic we cannot
+afford — so the lever that helps is one that removes WORK FROM THE CHAIN,
+not one that makes any single stage faster. The batch already parallelises
+the encode and lands `kids_armed=4` in 100 % of cycles; it cannot help the
+capture in front of it or the assembly behind it.
+
+**Both big segments are paid twice, once per view.** Measured on the same
+run: main P 2.09 MB, aux P 1.69 MB, so the aux view is **44.8 % of the
+bytes**, a second full-frame pack inside `a8r8g8b8_to_avc444_box` (26.5 %
+self, the top symbol in libxorgxrdp), and a second encode.
+
+**Proposal.** While the screen is in motion, send 4:2:0 only — drop the aux
+view — and send the full 4:4:4 pair once it settles. Motion is exactly when
+chroma detail is least perceptible and when the period is longest; a still
+screen is when subpixel-AA text fringes matter and when there is time to
+spare. This attacks capture AND encode AND assembly in one change, which is
+what a 1.41x says is needed.
+
+### Open questions to settle BEFORE implementing
+
+1. **What is "in motion"?** Needs a cheap, deterministic signal — damaged
+   area per cycle, or consecutive cycles with damage above a threshold.
+   It must not flap: oscillating between 420 and 444 every few frames
+   would be visible as chroma breathing on static text.
+2. **How does the settle transition avoid a visible pop?** The aux chain is
+   an LTR chain (#44/#45): resuming it after a gap needs its own intra, or
+   the chain has to survive the motion window unreferenced. Interacts
+   directly with the intra-refresh schedule (`intra_refresh_frames`) and
+   with A1-A7 of the wire audit — those ratchets must still pass.
+3. **Does the client tolerate a stream that alternates?** The EGFX
+   capability is negotiated once. Verify against the Mac and Windows
+   clients before trusting it — this is the class of change that produced
+   the wrong-colour bisect.
+4. **Is the win real?** Predicted from #62: removing the aux view should
+   take ~45 % off the encode segment and roughly half the pack. Measure
+   it with textflood and `e52_period_decompose.py`, same pair, same box —
+   do not accept a rate number without the decomposition.
+
+### Acceptance criteria
+
+* the motion detector is pure logic with unit tests under `tests/`;
+* default OFF, so absent/invalid config reproduces today's behaviour
+  exactly (no functional regression);
+* smoke gate PASS before any measurement (the #61 precondition);
+* wire audit A1-A7 still PASS in both the motion and settled regimes;
+* the E5-2 pair re-run and DECOMPOSED, not just rated;
+* a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
+
+---
+
 ## #56 — A cold GPU makes the first login fall back to RFX, silently (TODO, HIGH)
 
 Found on the T4 on 2026-07-30 (#55). On the **first RDP connection after
@@ -1398,7 +1460,7 @@ absent (no silent inert leg anywhere) or keep an explicitly-reported skip.
 
 ---
 
-## #62 — textflood: a payload whose X-side cost is a memcpy (IN PROGRESS)
+## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**)
 
 Closes the instrument half of #61. #59 established that the xterm payload
 makes E5-2 measure the X server rather than our pipeline; `PR-demo/textflood/`
@@ -1439,16 +1501,81 @@ is no longer needed.
 property of the payload, not an xrdp measurement, and not a substitute for
 one. The E5-2 number still has to come from the T4 with xorgxrdp in the loop.
 
+### T4 RESULT (2026-07-31) — the payload works; the ratio is RED
+
+Deployed to the T4 and the A/B run, both arms 180 s in one sitting, each
+deb smoke-gated BEFORE measuring (the #61 precondition):
+
+| | baseline (steps 0-4) | batched (steps 0-7) |
+|---|---|---|
+| mean per send | 122.9 ms | **87.0 ms** |
+| damage coverage | 715/714 = **1.00x** | 1009/1009 = **1.00x** |
+| `kids_armed=4` | n/a (cannot batch) | **100 % of 1011 cycles** |
+| black frames | 0 of 1424 | 0 of 2014 |
+| **ratio** | | **1.41x — RED** |
+
+Captures: `PR-demo/mac_bisect_matrix/captures/e52_t4_textflood_{baseline,batched}_20260731/`.
+
+**The instrument did its job.** Against the same box under the old xterm
+payload: session Xorg **92 % of a core -> 28.9 %**; libpixman self
+**71.6 % -> 6.3 %**; our capture path **13.8 % -> 37.4 %** of Xorg cycles
+(`avc444_decode_row.avx2` 26.5 % self, the top symbol in libxorgxrdp).
+Monitor coverage was 1.00x on both arms with no span-fixer — the
+override-redirect window removed that whole failure class.
+
+**The ratio is RED and it is NOT a CPU ceiling.** `session_cpu_split.sh`
+during the run: Xorg 28.9 %, payload 79.7 %, xrdp encoder side 24.4 % =
+**1.33 of 4 cores**. Nothing pinned, 2.7 cores idle. `e52_period_decompose.py`
+on the run's own trace says the 173.7 ms period is:
+
+| segment | ms | % | whose |
+|---|---|---|---|
+| batch arm -> first enc submit (capture + AVC444 pack) | **63.7** | 36.7 | **ours** |
+| enc submit -> last=1 (encode + LTR rewrite + EGFX assembly) | **68.4** | 39.4 | **ours** |
+| last=1 -> next batch arm (idle, awaiting damage) | 41.5 | 23.9 | payload |
+| **our pipeline** | **132.1** | **76.1** | |
+
+**76 % of every period is our own pipeline running serially on a box that
+is 33 % busy.** The remaining cost is latency we have not parallelised,
+not arithmetic we cannot afford.
+
+Why less than codeflood's 1.5x-2.3x: textflood damages the whole root every
+frame, so a pair is ~3.8 MB (main 2.09 + aux 1.69) against codeflood's
+~0.6 MB. The batch parallelises the encode of the four children and does
+nothing for the 63.7 ms of capture in front or the assembly behind. Amdahl,
+measured. The batch is not regressing — it is being measured against a
+workload heavy enough to expose what is not batched. This motivates **#63**.
+
+### Harness faults found and fixed during the run
+
+1. `E_COLD` waited only for the Xorg process to die, not for sesman to
+   finish teardown (~600 ms more); a client connecting inside that window
+   is dropped with `freerdp_post_connect failed`. Baseline won the race,
+   batched lost it — a flake that reads as "the batched deb cannot start a
+   session". Fixed in `e_gate_run.sh`.
+2. A deb install invalidates `xrdp.service` and its drop-ins; restarting
+   without `systemctl daemon-reload` silently dropped `XRDP_GFX_TRACE=1`
+   and produced a run with zero trace records. `t4_install_arm.sh` now
+   reloads and verifies the variable is in the unit environment.
+3. A dead ssh port-forward is reported by the harness as
+   `connected; recording for 180s`, producing a VERDICT against an empty
+   log. Two runs lost before it was spotted. **Not yet fixed** — see below.
+4. The gpuflood supervised-alacritty loop never exits when its session
+   ends: four orphaned shells were found respawning alacritty 5781 times.
+   The `gpuflood` kind is being deleted outright (alacritty is abandoned:
+   without a GPU it is llvmpipe/zink, which would be the new bottleneck).
+
 ### Remaining, in order
 
-1. Deploy to the T4 as a new payload kind; **smoke gate first**, read the
-   black-frame count, then measure (the #61 precondition).
-2. Confirm it does not starve Xorg on 4 vCPUs: textflood ~0.9 core +
-   Xorg (capture ~12 ms + memcpy ~6 ms) + 4 nvenc children (0.28 core)
-   should sit near 1.6 of 4, but this is the one real risk and it must be
-   measured, not assumed.
-3. Re-profile and show the pixman glyph/scroll/fill paths are actually gone
-   before quoting any ratio from it.
-4. Then re-run the E5-2 pair, and use it as the instrument for FR-PROC-7
-   (#40/#41), whose preempt/breadth/depth policies need a payload that
-   loads the aux view — which subpixel-AA text does maximally.
+1. DONE — deployed, smoke-gated first, measured.
+2. DONE — it does not starve Xorg: 1.33 of 4 cores, nothing pinned.
+   (Predicted ~1.6; measured 1.33.)
+3. DONE — pixman self 71.6 % -> 6.3 %, capture 13.8 % -> 37.4 %.
+4. DONE — E5-2 pair re-run: 1.41x RED, attributed above.
+5. TODO — make `e_gate_run.sh` FAIL LOUDLY when the RDP port is not
+   reachable or the run produced zero GFX_TRACE records, instead of
+   printing `connected` and emitting a VERDICT against an empty log.
+6. TODO — delete the `gpuflood` kind and its orphan-prone restart loop.
+7. Then use textflood as the instrument for FR-PROC-7 (#40/#41): its
+   preempt/breadth/depth policies need a payload that loads the aux view,
+   which subpixel-AA text does maximally (aux is 44.8 % of the bytes here).

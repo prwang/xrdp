@@ -10,6 +10,7 @@
 #   sh PR-demo/t4_profile/e52_t4_payload.sh install
 #   sh PR-demo/t4_profile/e52_t4_payload.sh arm codeflood   # then log the session off
 #   sh PR-demo/t4_profile/e52_t4_payload.sh arm code        # 10 Hz cadence variant
+#   sh PR-demo/t4_profile/e52_t4_payload.sh arm textflood   # client-side render
 #   sh PR-demo/t4_profile/e52_t4_payload.sh disarm          # then log the session off
 #   sh PR-demo/t4_profile/e52_t4_payload.sh status
 #
@@ -24,6 +25,7 @@ T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
 [ -n "$T4" ] || { echo "ABORT: set T4=user@host or /root/.t4_host" >&2; exit 1; }
 D=$(cd "$(dirname "$0")" && pwd)
 CORPUS=$D/../mac_bisect_matrix/code_corpus.ansi
+TFDIR=$D/../textflood
 ACTION=${1:-status}
 
 rsh() { ssh -n -i "$T4_KEY" "$T4" "$@"; }
@@ -46,14 +48,29 @@ install)
     push "$D/e52_payload.sh"      /usr/local/bin/e52_payload.sh          755
     push "$D/e52-payload.desktop" /etc/xdg/autostart/e52-payload.desktop 644
     push "$CORPUS"                /usr/local/share/code_corpus.ansi      644
+    # textflood is COMPILED ON THE T4, not shipped as a binary: it links
+    # against the box's own cairo/Xlib, and a binary built here against
+    # different sonames would either fail to start or silently pull in a
+    # different glyph rasterizer, which is the one thing this payload must
+    # not do. The build is checksum-gated like everything else.
+    push "$TFDIR/textflood.c"     /usr/local/src/textflood.c             644
+    push "$TFDIR/build.sh"        /usr/local/src/textflood_build.sh      755
+    echo "building textflood on the T4"
+    rsh "sudo sh -c 'command -v cc >/dev/null 2>&1 && \
+         pkg-config --exists cairo x11 xext' || \
+         sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
+         build-essential libcairo2-dev libx11-dev libxext-dev >/dev/null"
+    rsh "sudo sh -c 'cd /usr/local/src && CC=cc sh ./textflood_build.sh /usr/local/bin'"
+    rsh "/usr/local/bin/textflood --help >/dev/null && echo 'textflood: OK'"
     echo "installed. Nothing runs until it is armed:"
     echo "  $0 arm codeflood   (then log the RDP session off and back in)"
     ;;
 arm)
     KIND=${2:-codeflood}
     case "$KIND" in
-    codeflood|code) ;;
-    *) echo "ABORT: kind must be codeflood or code" >&2; exit 1 ;;
+    codeflood|code|gpuflood|textflood) ;;
+    *) echo "ABORT: kind must be codeflood|code|gpuflood|textflood" >&2
+       exit 1 ;;
     esac
     rsh "sudo sh -c 'echo $KIND > /etc/xrdp-e52-payload'"
     echo "armed: $KIND"
@@ -69,7 +86,7 @@ status)
     rsh "echo -n 'marker: '; cat /etc/xrdp-e52-payload 2>/dev/null \
          || echo '(disarmed)'; \
          md5sum /usr/local/bin/e52_payload.sh /usr/local/share/code_corpus.ansi \
-         /etc/xdg/autostart/e52-payload.desktop 2>&1; \
+         /etc/xdg/autostart/e52-payload.desktop /usr/local/bin/textflood 2>&1; \
          pgrep -a -f e52_payload.sh || echo 'payload not running'"
     ;;
 *)

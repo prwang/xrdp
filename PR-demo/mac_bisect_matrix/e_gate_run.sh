@@ -229,6 +229,25 @@ if [ "${E_COLD:-1}" = 1 ]; then
         >/dev/null 2>&1
     srv "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null \
          || break; sleep 1; done" >/dev/null 2>&1
+    # ...AND THEN WAIT FOR SESMAN TO FINISH THE TEARDOWN. The Xorg
+    # process disappearing is not the end of the session: sesman still
+    # has to reap the window manager and the channel server and retire
+    # the session record. Measured on the T4 on 2026-07-31, that tail is
+    # ~600 ms, and a client that connects inside it is accepted into a
+    # dying session and dropped:
+    #
+    #   02:29:38.725 WARN  Window manager exited with non-zero exit code 1
+    #   02:29:38.756 INFO  Session on display X11-10 has finished
+    #   02:29:39.365 WARN  xrdp process exited after 608 ms
+    #   02:29:39.164 ERROR freerdp_post_connect failed (broken pipe)
+    #
+    # which produced a 0-byte gfx_trace.txt and a run that had to be
+    # thrown away. It is a race, so the baseline arm won it and the
+    # batched arm lost it — exactly the kind of flake that would have
+    # been read as "the batched deb cannot start a session".
+    srv "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
+         || break; sleep 1; done" >/dev/null 2>&1
+    sleep 3
 fi
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \

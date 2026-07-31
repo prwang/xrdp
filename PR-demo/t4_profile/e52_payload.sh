@@ -64,9 +64,20 @@ CORPUS=${E52_CORPUS:-/usr/local/share/code_corpus.ansi}
 KIND=$(cat "$MARKER" 2>/dev/null | tr -d ' \r\n')
 
 case "${KIND:-none}" in
-codeflood|code|gpuflood) ;;
+codeflood|code|gpuflood|textflood) ;;
 *) exit 0 ;;
 esac
+if [ "$KIND" = textflood ] \
+   && ! command -v textflood >/dev/null 2>&1 \
+   && [ ! -x /usr/local/bin/textflood ]; then
+    exec xterm -fa 'DejaVu Sans Mono' -fs 22 -bg red -fg white -e bash -c '
+        while true; do
+            clear
+            echo "  E5-2 PAYLOAD INVALID: textflood armed but not installed"
+            echo "  run e52_t4_payload.sh install, then log the session off"
+            sleep 2
+        done'
+fi
 if [ "$KIND" = gpuflood ] && ! command -v alacritty >/dev/null 2>&1; then
     # Fail loud rather than silently falling back to xterm: an xterm run
     # labelled gpuflood would be the old, X-server-bound benchmark wearing
@@ -108,9 +119,15 @@ fi
 #   * a window xfwm4 considers MAXIMIZED is re-snapped to its monitor
 #     after any resize, so the maximized state has to be removed first
 #     (and `-maximized` is no longer passed to xterm at all).
+#
+# textflood does NOT need any of this: its window is override-redirect
+# over the whole root, so no window manager can re-snap it and there is
+# nothing to re-assert. That is one of the reasons it exists.
 E52_TITLE=E52FLOOD
 E52_MAIN=$$
-if command -v xdotool >/dev/null 2>&1 && command -v xwininfo >/dev/null 2>&1
+if [ "$KIND" != textflood ] \
+   && command -v xdotool >/dev/null 2>&1 \
+   && command -v xwininfo >/dev/null 2>&1
 then
     (
         RG=$(xwininfo -root 2>/dev/null \
@@ -172,6 +189,15 @@ if [ ! -s "$CORPUS" ]; then
             echo "  install it with PR-demo/t4_profile/e52_t4_payload.sh"
             sleep 2
         done'
+fi
+
+if [ "$KIND" = textflood ]; then
+    # Same corpus, same solarized colours, same 25-lines-per-frame step —
+    # rasterized by cairo in THIS process and handed to X as one finished
+    # image per frame over MIT-SHM, instead of as a stream of XRender
+    # glyph requests the X server has to draw on the thread that also
+    # runs our capture. See PR-demo/textflood/README.md.
+    exec textflood --corpus "$CORPUS" --title "$E52_TITLE" --step 25
 fi
 
 FLOOD='
