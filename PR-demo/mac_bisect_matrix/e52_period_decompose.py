@@ -52,6 +52,9 @@ def summarize(name, xs):
 
 def decompose(path):
     batch, enc, last_send = [], [], []
+    # per-frame timeline keyed by id_server: "first" = first send of that
+    # frame's EGFX payload, "last" = its last=1 close
+    frames = {}
     for ln in _open(path):
         ts = stamp(ln)
         if ts is None:
@@ -61,8 +64,21 @@ def decompose(path):
             batch.append((ts, int(k.group(1)) if k else 0))
         elif "GFX_TRACE enc submitted_seq" in ln:
             enc.append(ts)
-        elif "GFX_TRACE send " in ln and "last=1" in ln:
-            last_send.append(ts)
+        elif "GFX_TRACE send " in ln:
+            m = re.search(r'last=(\d+) frame_id=\d+ id_server=(\d+)', ln)
+            if m:
+                fid = int(m.group(2))
+                f = frames.setdefault(fid, {"arm": None, "last": None})
+                if f["arm"] is None:
+                    # the batch arm and encode submit that produced this
+                    # frame are the most recent ones seen before its first
+                    # send -- that is what makes the pairing frame-identity
+                    # based rather than cycle-window based
+                    f["arm"] = batch[-1][0] if batch else None
+                if m.group(1) == "1":
+                    f["last"] = ts
+            if "last=1" in ln:
+                last_send.append(ts)
 
     if len(batch) < 2:
         print("%s: only %d batch cycles — nothing to decompose "
@@ -115,6 +131,55 @@ def decompose(path):
     print("\n  kids_armed: %s" % ", ".join(
         "%d in %d cycles (%.0f%%)" % (k, c, 100.0 * c / len(batch))
         for k, c in sorted(counts.items())))
+
+    # --- does capture EVER overlap encode? -------------------------------
+    #
+    # Read this and not `inflight`. `inflight` in the GFX_TRACE enc line is
+    # pairs_submitted - pairs_returned INSIDE one ffmpeg child, logged on
+    # the same call that submitted the frame. The shipped args are
+    # `-tune zerolatency` (libx264) / `-async_depth 1` (VAAPI), which by
+    # design return the coded picture on the submitting call — so
+    # inflight==0 and rv==READY on every sample, always, at any monitor
+    # count and any ack-window size. It is a statement about the encoder
+    # child's internal queue depth, NOT about whether xorgxrdp's capture
+    # runs concurrently with xrdp's encode. Reading it as the latter is
+    # what made BACKLOG #64's first draft wrong.
+    #
+    # The overlap question is a cross-cycle timestamp question: does cycle
+    # N+1's capture begin before cycle N's final send completes? If the two
+    # stages pipeline, that gap goes negative. If it is positive on every
+    # cycle, the stages are strictly serial and the gap is dead time.
+    # Pair by FRAME IDENTITY (id_server), never by cycle window. A cycle
+    # window mis-attributes: the `last=1` that falls inside cycle N is the
+    # close of the frame captured in cycle N-1, because the next cycle arms
+    # before the previous frame's final send goes out. Windowing produced a
+    # NEGATIVE "encode + assembly" segment on the 1-monitor run (service
+    # 8.2 ms < capture 11.5 ms), which is the arithmetic telling us the
+    # pairing is wrong — not a measurement.
+    gaps = []
+    ids = sorted(frames)
+    for a, b in zip(ids, ids[1:]):
+        fa, fb = frames[a], frames[b]
+        if fa.get("last") is None or fb.get("arm") is None:
+            continue
+        gaps.append(fb["arm"] - fa["last"])
+    if gaps:
+        g = sorted(1000.0 * x for x in gaps)
+        n = len(g)
+        over = sum(1 for x in g if x < 0)
+        print()
+        print("  OVERLAP CHECK (capture arm of frame N+1 - last=1 of N):")
+        print("    n=%d  min %.1f  p10 %.1f  p50 %.1f  mean %.1f  max %.1f ms"
+              % (n, g[0], g[n // 10], g[n // 2], st.mean(g), g[-1]))
+        print("    cycles where the next capture started BEFORE the previous"
+              " send finished: %d (%.1f %%)" % (over, 100.0 * over / n))
+        if over == 0:
+            print("    -> STRICTLY SERIAL: capture and encode never overlap."
+                  " The %.1f ms mean gap is dead time between stages."
+                  % st.mean(g))
+        else:
+            print("    -> pipelined in %.1f %% of cycles."
+                  % (100.0 * over / n))
 
 
 if __name__ == "__main__":

@@ -171,6 +171,26 @@ Run all five, every time, before presenting:
    `fif=4` confirmed on the wire, and `inflight` stayed 0 on all 2084
    samples — the concurrency the change existed to create never appeared,
    yet the rate was reported first.)*
+   **2b. Before concluding "something is blocking it", rule out "this
+   metric cannot show it."** A telemetry value that never moves is
+   equally consistent with a hard blocker and with a quantity that is
+   constant by construction. Read the definition of the field — in the
+   source, not from its name — and confirm it *can* take the value you
+   expect before treating its absence as evidence. *(Missed 2026-07-31:
+   `inflight` is `pairs_submitted - pairs_returned` inside one ffmpeg
+   child, logged on the submitting call, and the shipped encoder args are
+   `-tune zerolatency` / `-async_depth 1` — its own accessor comment says
+   "zero with the shipped low-latency args". It is 0 on every sample of
+   every run by design. A whole backlog item was filed on its constancy.)*
+   **2c. A derived quantity that comes out negative is a broken pairing,
+   not a measurement.** Durations, counts and segment splits have signs
+   that are known in advance; when one violates its sign, stop and fix the
+   attribution before reading anything else in the same table. *(Caught
+   2026-07-31, and it is what prevented the bad run from being reported:
+   an "encode + assembly" segment of −3.3 ms revealed that events were
+   paired by cycle window when the pipeline overlaps cycles, so sends were
+   attributed to the wrong frame. Pair by explicit identity — here
+   `id_server` — never by time window.)*
 3. **Does the change violate a written spec?** Grep `PRD.md` and
    `BACKLOG.md` for the mechanism BEFORE running, not after. The PRD had
    already forbidden the exact global-pool shape probed on 2026-07-31,
@@ -186,6 +206,33 @@ Run all five, every time, before presenting:
    within one payload, one client, one resolution set. If the workload
    changed, say so before quoting the number, and do not compare it to the
    old series.
+
+### Escalation ladder (owner directive, 2026-07-31)
+
+**Never make the expensive remote run the FIRST experiment.** A property
+that is specified in `PRD.md` is checked in this order, and each rung is
+reported before the next is run:
+
+1. **CI.** Run `make check` and quote the result. If the property has no
+   assertion in `tests/`, say so explicitly — "not covered by CI" is a
+   finding, and adding the assertion is usually cheaper than the live run
+   that would have substituted for it.
+2. **Local, short, cheap.** Dev box (AMD VAAPI), 5 s, low resolution;
+   then 5 s at the target resolution. Same analysis script and the same
+   assertion as the remote run will use, so a failure upstream is
+   debuggable before hardware and latency are added as variables.
+3. **The T4**, last, and only at the duration the question actually
+   needs.
+
+Match duration to the question: a *rate* needs a long run, but a *binary
+property* ("do these two stages ever overlap") is answered by seconds of
+trace. Escalating resolution, duration and distance one at a time is what
+makes a red result diagnosable — jumping straight to 180 s on remote
+hardware means a failure has every variable in it at once. *(Violated
+2026-07-31: BACKLOG #64 chased a PRD-required overlap property with a
+180 s T4 run as the first experiment, with no CI result presented; the
+finding was a measurement artefact that CI and a 5 s local run would have
+exposed for a fraction of the cost.)*
 
 Corollary: **an experiment that fails its own mechanism check is a red
 result.** It does not become a green one by having a plausible rate

@@ -113,6 +113,16 @@ REFRESH=${E_REFRESH:-240}
 E5_BASE_MS=${E5_BASE_MS:-51.1}
 ORACLE_BIN=${E_ORACLE_BIN:-/opt/freerdp-vaapi/bin/xfreerdp}
 MMCONF=${E_MULTIMON_DIR:-$D/../multimon_offline}
+# How many monitors the client presents. 2 is the E3/E5-2 target layout.
+# E_MONITORS=1 is the BACKLOG #64 control: same payload, same build, same
+# everything, one monitor — it separates "the multimon batch serialises"
+# from "the pipeline never overlaps at all".
+NMON=${E_MONITORS:-2}
+# Session geometry for the NMON=1 case, WxH. Defaults to E_MODE0 with any
+# trailing RandR mode suffix (the "R" of 3840x2160R, "_60" of 2560x1440_60)
+# stripped, so the session matches the one monitor the client presents.
+E_SIZE=${E_SIZE:-$(echo "${E_MODE0:-3840x2160R}" \
+    | sed 's/^\([0-9]\{1,\}x[0-9]\{1,\}\).*$/\1/')}
 XCONF=${E_XORG_CONF:-$MMCONF/xorg-dummy-2mon-4k.conf}
 STAMP=$(date +%Y%m%d_%H%M%S)
 OUT=${E_OUT:-$D/captures/e_gate_${MODE}_$STAMP}
@@ -186,12 +196,14 @@ if ! DISPLAY=$CLI xrandr --query >/dev/null 2>&1; then
     sleep 4
 fi
 DISPLAY=$CLI \
+    MM_MONITORS=$NMON \
     MM_MODE0=${E_MODE0:-2560x1440_60} MM_MODE1=${E_MODE1:-3840x2400R} \
     MM_POS1=${E_POS1:-2560x0} \
     MM_MODELINE0=${E_MODELINE0:-312.25 2560 2752 3024 3488 1440 1443 1448 1493 -hsync +vsync} \
     MM_MODELINE1=${E_MODELINE1:-592.25 3840 3888 3920 4000 2400 2403 2409 2469 +hsync -vsync} \
     bash "$MMCONF/setup_monitors.sh" >"$OUT/client-monitors.txt" 2>&1 \
-    || { cat "$OUT/client-monitors.txt"; fail "client did not present 2 monitors"; }
+    || { cat "$OUT/client-monitors.txt"; \
+         fail "client did not present $NMON monitor(s)"; }
 tail -1 "$OUT/client-monitors.txt"
 
 # --- mark both logs, then drive ONE multimon AVC444 login -----------------
@@ -250,8 +262,25 @@ if [ "${E_COLD:-1}" = 1 ]; then
     sleep 3
 fi
 PW=$(cat "$CRED")
-RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" "/multimon" \
-                        "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
+if [ "$NMON" -eq 2 ]; then
+    RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" \
+                            "/multimon" \
+                            "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
+else
+    # no /multimon: one monitor, so the client must not ask the server to
+    # build a multi-surface layout it would then have to leave idle.
+    #
+    # /size is MANDATORY here and is not a cosmetic default. With /multimon
+    # the session geometry comes from the monitor layout PDU; WITHOUT it
+    # xfreerdp asks for its own default 1024x768 no matter what the client's
+    # X server presents. The first E_MONITORS=1 run (2026-07-31) was thrown
+    # away for exactly this: the client showed 3840x2160, the session ran at
+    # 1024x768, and all 6685 damage records read bbox=(0,0)-(1024,768) — a
+    # 0.79 Mpx run that would have been read as a 4K one.
+    RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" \
+                            "/size:$E_SIZE" \
+                            "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
+fi
 DUMPDIR=$OUT/oracle
 if [ "$MODE" = oracle ]; then
     [ -x "$ORACLE_BIN" ] || fail "oracle client missing at $ORACLE_BIN"
@@ -309,12 +338,14 @@ $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
     echo
 
     echo "=== E5 / rate — send interval from the server's own log ==="
-    python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" <<'PY'
+    python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" "$NMON" <<'PY'
 import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
 DMG = re.compile(r"GFX_TRACE avc dmg surface=(\d+)")
+BBOX = re.compile(r"GFX_TRACE avc dmg surface=\d+ num_rects=\d+ "
+                  r"bbox=\((\d+),(\d+)\)-\((\d+),(\d+)\)")
 BATCH = re.compile(r"GFX_TRACE batch cycle=(\d+) set_n=(\d+) "
                    r"monitors_armed=(\d+) kids_armed=(\d+)")
 SEND = re.compile(r"GFX_TRACE send bytes=(\d+) last=(\d+) frame_id=(\d+)")
@@ -331,6 +362,7 @@ def secs(line):
 
 t = []
 events = []
+bboxes = []
 for line in open(sys.argv[1], errors="replace"):
     v = secs(line)
     if v is None:
@@ -341,6 +373,9 @@ for line in open(sys.argv[1], errors="replace"):
     m = DMG.search(line)
     if m:
         events.append((v, "dmg", int(m.group(1))))
+        b = BBOX.search(line)
+        if b:
+            bboxes.append((int(b.group(3)), int(b.group(4))))
         continue
     m = BATCH.search(line)
     if m:
@@ -376,8 +411,26 @@ mean = sum(gaps) / n * 1000.0
 print("sends: %d over %.1f s" % (len(t), span))
 print("send-to-send gap: mean %.1f ms  p50 %.0f ms  p90 %.0f ms  "
       "p99 %.0f ms" % (mean, pct(0.5), pct(0.9), pct(0.99)))
-print("%.2f sends/s = %.2f pairs/s per monitor (2 monitors)"
-      % (len(t) / span, len(t) / span / 2.0))
+nmon = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+
+# --- what geometry did the SESSION actually run at? ----------------------
+# The client's monitor list is what we asked for; the damage bboxes are what
+# we got. They diverged silently on 2026-07-31 (client 3840x2160, session
+# 1024x768 — a 16x pixel difference) and the run had to be thrown away, so
+# state the served geometry next to every number taken from it.
+if bboxes:
+    mw = max(b[0] for b in bboxes)
+    mh = max(b[1] for b in bboxes)
+    print("session geometry (max damage extent): %dx%d = %.2f Mpx over "
+          "%d damage records" % (mw, mh, mw * mh / 1e6, len(bboxes)))
+    if mw * mh < 2e6:
+        print("         GEOMETRY WARNING: the session served under 2 Mpx. "
+              "If a 4K run was intended, the client fell back to its "
+              "default size (/size is mandatory without /multimon) and "
+              "this is NOT a 4K measurement.")
+
+print("%.2f sends/s = %.2f pairs/s per monitor (%d monitor%s)"
+      % (len(t) / span, len(t) / span / nmon, nmon, "" if nmon == 1 else "s"))
 
 # --- saturation evidence (BACKLOG #52: is the pipeline actually full?) ---
 per_surf = {}
@@ -406,7 +459,16 @@ if per_surf:
     print("damage coverage: %s"
           % "  ".join("surface %d: %d" % (s, c)
                       for s, c in sorted(counts.items())))
-    if len(counts) < 2 or hi > 3 * max(1, lo):
+    if nmon == 1:
+        if len(counts) != 1:
+            print("         COVERAGE WARNING: E_MONITORS=1 but %d surfaces "
+                  "were damaged — the client presented more than one "
+                  "monitor and this is not a single-monitor run"
+                  % len(counts))
+        else:
+            print("         one monitor, one surface — this is the "
+                  "single-monitor control (BACKLOG #64)")
+    elif len(counts) < 2 or hi > 3 * max(1, lo):
         print("         COVERAGE WARNING: one monitor carried the run "
               "(%d vs %d). This is the one-active-one-idle regime "
               "(BACKLOG #53), NOT two-monitor batching — an E5 ratio from "

@@ -1307,20 +1307,143 @@ what a 1.41x says is needed.
 
 ---
 
-## #64 — capture/encode NEVER overlap on multimon: `inflight=0` always, and widening the window does not fix it (TODO, HIGH — BLOCKS #63)
+## #64 — WITHDRAWN 2026-07-31: the "capture/encode never overlap" finding was a measurement error, twice over
 
-**The observation.** Across two 180 s T4 runs, `GFX_TRACE enc` reports
+**This item was filed on evidence that does not support it, and both
+pieces of that evidence have now been shown to be artefacts. Overlap is a
+PRD requirement, the PRD already states where it does and does not hold,
+and the corrected measurement agrees with the PRD.** What survives is a
+harness defect list and one genuinely open question (below), not a bug in
+the pipeline. Left in full rather than deleted, because how it went wrong
+is the reusable part.
+
+### Error 1 — `inflight` does not measure capture/encode overlap
+
+`inflight` in `GFX_TRACE enc` is
+`pairs_submitted - pairs_returned` **inside one ffmpeg child**
+(`xrdp_ffmpeg_avc444_inflight`, `xrdp_encoder_ffmpeg.c:2038`), logged on
+the same call that submitted the frame. The shipped args are
+`-tune zerolatency` (libx264) / `-async_depth 1` (VAAPI), which by design
+return the coded picture on the submitting call — the accessor's own
+comment says so: *"zero with the shipped low-latency args"*. Confirmed on
+the archived trace: **`rv=READY` on 2018/2018 samples**, i.e. every
+submission returned synchronously.
+
+So `inflight == 0` is the DESIGNED value. It cannot be anything else, at
+any monitor count, at any ack-window size, on any box. It is a statement
+about one encoder child's internal queue depth, **not** about whether
+xorgxrdp's capture runs concurrently with xrdp's encode. Hypothesis 1
+below was therefore probed against a metric that was incapable of moving,
+which is why it "did not respond" to `fif=4`.
+
+*Quality-gate check 2 exists for exactly this and still did not catch it:
+the check asks "did the intervention change the mechanism it targets", and
+the answer was correctly "no" — but the conclusion drawn was "a serialiser
+is blocking it" when the available conclusion was "this metric cannot
+show it". Amend the check: when a mechanism's telemetry does not move,
+rule out "the telemetry cannot move" BEFORE reaching for a blocker.*
+
+### Error 2 — the timestamp check paired events by cycle window
+
+The fallback evidence was a timestamp gap: `last=1` of cycle N to the
+batch arm of cycle N+1, positive on 1010/1010 cycles. That pairing is
+wrong. The `last=1` falling inside cycle N is the close of the frame
+captured in cycle **N-1**, because the next cycle arms *before* the
+previous frame's final send goes out. Visible directly in the raw trace:
+
+```
+batch cycle=2                                    .161
+send last=1 frame_id=1 id_server=0               .168   <- closes frame 0
+send last=0            id_server=1               .171   <- frame 1 starts
+enc submitted_seq=1                              .179
+batch cycle=3                                    .192   <- ARMS 3 ms BEFORE
+send last=1 frame_id=2 id_server=1               .195   <- frame 1 closes
+```
+
+The arithmetic said so before the trace did: on the single-monitor run the
+window pairing produced **`encode + assembly = -3.3 ms`**, a negative
+segment, because service (8.2 ms) came out *less than* capture (11.5 ms).
+A negative duration is the pairing confessing, and it was the thing that
+stopped the run from being reported.
+
+`e52_period_decompose.py` now pairs by frame identity (`id_server`) and
+measures `capture arm of frame N+1 - last=1 of frame N`. Re-run on the
+same archived traces:
+
+| run | overlapping cycles | median gap |
+|---|---|---|
+| 2 monitors, 4K+1440p, textflood | **1010 / 2015 (50.1 %)** | −11 ms |
+| 1 monitor (geometry void, see below) | **4634 / 6684 (69.3 %)** | −2 ms |
+
+**Capture and encode DO overlap.** The negative gap is the overlap.
+
+### What the PRD already said — and it matches
+
+PRD §"Concurrency state of the encode pipeline" specifies:
+
+> `capture ‖ encode` — **YES for m = 1, shipped** (FR-CAPTURE-8);
+> **partial and accidental for m ≥ 2** … the overlap that occurs is
+> *cross-monitor* interleaving, while the two-slot mechanism itself is
+> inert — `rect_id` advances by m between a monitor's consecutive sends
+
+The measured 50.1 % at m=2 is precisely "cross-monitor interleaving":
+consecutive `id_server` values alternate between the two monitors, so
+every second pair overlaps by construction. The spec predicted the number
+before it was measured. **Nothing here is a regression against the PRD.**
+
+### Methodology failure this exposed (owner directive, 2026-07-31)
+
+A PRD-required property was chased with a 180 s remote run on the T4 as
+the FIRST experiment, with no CI evidence presented and no local ladder.
+Correct order, binding from now on:
+
+1. **CI first.** `make check` — run it and quote it before any live claim
+   about a specified property. *(Run 2026-07-31: **152/152 PASS**,
+   including `test_cap_budget_cap2_reaches_depth_two`,
+   `test_cap_budget_slot_alternates_per_monitor`, and
+   `test_ffmpeg_pump_set_four_views_one_thread`. The accounting that
+   makes overlap possible is covered; wall-clock overlap is not — see the
+   open item below.)*
+2. **Local, short, cheap.** 5 s on the dev box (AMD VAAPI) at 1080p, then
+   5 s at 4K. Same analysis script, same assertion.
+3. **Only then the T4**, and only at the duration the question needs.
+
+A 180 s run is for a *rate*; a binary property like "do these two stages
+ever overlap" is answered by seconds of trace. Escalate resolution and
+duration only when the cheap rung passes and the question survives.
+
+### Still open (the part that is real)
+
+`capture ‖ encode` has **no CI assertion** — the state machine is unit
+tested, the wall-clock property is not. Add one: drive the decomposer's
+frame-identity pairing over a short recorded trace and assert the overlap
+fraction is non-zero at m=1. That is a deterministic check on a committed
+fixture, so it belongs in `tests/`, not in `PR-demo/`.
+
+Also unresolved and NOT explained by any of the above: the 2-monitor
+period is 173.7 ms with 132.1 ms of it inside our pipeline on a box at
+1.33 of 4 cores. Overlap existing at 50 % does not make that fast. The
+serial-cost question is real; the "never overlaps" framing was not.
+
+### Superseded observation (kept for the record)
+
+Across two 180 s T4 runs, `GFX_TRACE enc` reported
 `inflight=0` on **every single sample** — 2018/2018 at `fif=2` and
-2084/2084 at `fif=4`. The encoder is idle at the moment of every
-submission. FR-CAPTURE-8 (#37) exists to make capture of frame N+1 overlap
-encode of frame N; on this two-monitor configuration it never does.
+2084/2084 at `fif=4`. Per Error 1 this is the designed value, not a
+finding.
 
 The measured cost: the period is a strictly serial chain —
 capture+pack 63.7 ms, then encode+assembly 68.4 ms, then 41.5 ms idle —
 132.1 ms of 173.7 ms (76 %) inside our pipeline, on a box running at
 **1.33 of 4 cores with nothing pinned** (`session_cpu_split.txt`).
 
-### Hypothesis 1 — the global ack window. FALSIFIED 2026-07-31.
+### Hypothesis 1 — the global ack window. Probed against an invalid metric; verdict WITHDRAWN.
+
+*(The probe below was run before Error 1 was known. Its `inflight`
+readings prove nothing either way — `inflight` cannot move. The
+rate/idle regressions it recorded are still real numbers and still
+reproduce the bufferbloat the PRD predicted for a global pool, so the
+"do not ship a global pool" conclusion stands on that evidence alone.)*
 
 xrdp releases xorgxrdp's capture slots only via
 `xrdp_mm_update_module_ack`: `if (frame_id_client + fif > frame_id_server)`
