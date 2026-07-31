@@ -1275,280 +1275,143 @@ withdrawal. The instrument cannot distinguish a pinned slot from
 ordinary saturation, and static analysis shows the ack was an echo
 all along.)*
 
-The blocking chain is now LINEAR: **#64 → #65 → #66**, then the #67
-benchmark re-runs. Nothing else advances until its predecessor closes.
-*(Amended with the #64 withdrawal: the chain's head is now the m=1
-ms-per-stage decomposition (rung 2, local); #65's m≥2 window item
-stands on its own arithmetic and no longer waits on #64.)*
+The blocking chain is LINEAR (renumbered 2026-07-31 after the m=1
+serializer was measured): **#70 → #71 → #72 → #73**. #70 is the eager
+slot-release ack (the head, THE NEXT STEP); #71 (was #65) the
+per-monitor window; #72 (was #66) motion-gated 4:2:0; #73 (was #67)
+the T4 headline re-runs. Nothing else advances until its predecessor
+closes. *(Earlier forms of this chain — "#64 → #65 → #66" and its
+amendments — are preserved at commit `0db74f6e`.)*
 
-## #64 — rect_id ack protocol upgrade: ack-on-consume with echoed identity (**WITHDRAWN as THE BLOCKER, 2026-07-31** — root cause refuted by static analysis; impl checkpointed on `wip/fr_ack_1_checkpoint`, retained as a robustness fix only)
+## #64 — rect_id ack ghost (CLOSED 2026-07-31 — root cause refuted; the real serializer measured to 0.0 ms unattributed and tracked forward as #70)
 
-### WITHDRAWAL (2026-07-31) — the filed ghost does not exist; the probe numbers are the healthy pipeline's signature
+Filed as: "xrdp acks with its own count, the value drifts, and a ghost
+frame pins one FR-CAPTURE-8 slot forever — capture‖encode structurally
+impossible." Wrong in mechanism; the SYMPTOM (ack-paced capture, one
+slot never usable) was real and is now measured, not argued:
 
-FR-ACK-1 was implemented exactly as specified (CI green, 380/380,
-five additive tests) and is checkpointed on `wip/fr_ack_1_checkpoint`
-(xrdp `8bd989c0`, xorgxrdp `59210b2`, reassessment `0b295631`). The
-post-implementation static review then refuted the filing's root
-cause, so the item's BLOCKER status is withdrawn on this stem:
+* **The ack was always an echo** (`frame_id_server = enc_done->frame_id`
+  is its sole assignment; zero drift over 494 live frames), and the
+  consume-no-output paths acked anyway. What those paths actually lose
+  is the REGION — the one part of the filing worth keeping, revived in
+  #70's failure semantics.
+* **The 340/1004/0 uprobe histogram fits the ghost, the healthy AND the
+  serial timeline equally** — it discriminated nothing and carried
+  three successive wrong verdicts (quality gate 2b). The load-bearing
+  datum was the 0/205 ordering trace all along.
+* **The 2026-07-31 T4 redo falsified both follow-up hypotheses** — H1
+  "Xorg applies the ack late" (measured 0.8 ms) and H2 "CPU
+  starvation" (8 vCPU moved the period 7 %; no thread starved) — and
+  attributed the full 113.6 ms cycle with 0.0 ms unattributed. The
+  serializer is the ack's EMISSION POINT: it rides the frame's own
+  last enc_done, after the entire encode→rewrite→assembly→egress
+  tail, while the fif window is OPEN at every emission. Design
+  consequence and next step: **#70**.
 
-* **The ack value was always an echo.** `frame_id_server` has one
-  assignment in the tree — `xrdp_mm.c xrdp_mm_process_enc_done:
-  frame_id_server = enc_done->frame_id` — the id parsed from the
-  ENDFRAME xorgxrdp wrote from its own `rect_id`. It is incremented
-  nowhere. The filing's drift term `r − S` has no code to accumulate
-  in; corroborated by zero measured ack drift over 494 live frames.
-* **The consume-without-output paths acked anyway.** On `rv=PENDING` /
-  dropped pair only the WIRETOSURFACE command returns NULL; the loop
-  reaches the ENDFRAME, whose PDU is built unconditionally and was
-  queued with the echoed id. No slot pin. What those paths actually
-  lose is the REGION (stale content until unrelated damage) plus the
-  rare unacked mid-message hard-error returns — real defects, and the
-  only parts of FR-ACK-1 worth keeping (Invariant III, totality, a
-  leak fix). No throughput change should be predicted from them.
-* **The proof table below re-reads as the HEALTHY depth-2 signature.**
-  Under saturation, capture N+1 is admitted at ack(N−1) and runs while
-  N encodes: `rack = rid−1` at every admission, `rid−2` until the next
-  ack, `rid` only if the pipeline drains — i.e. 340/1004/0, exactly
-  the histogram. `rack = rid−2` during encode is TWO frames in flight:
-  the overlap this item declared impossible, present in its own
-  strongest row. Ghost and saturation are indistinguishable in that
-  instrument (CLAUDE.md quality gate 2b, missed again here).
-* **Redirect.** The open m=1 question is now "what are the ms per
-  stage of the ~120 ms cycle" — rung 2, local fleet, rect_id-paired
-  capture and encode timestamps, before any further protocol claim.
-  Candidates with in-tree support: per-frame work is genuinely
-  ~90–120 ms on the T4 (#55's 87–98 ms/send, #59's saturated Xorg,
-  #60's bimodality); and for REAL (non-oracle) clients the xup ack is
-  gated behind the egfx client window (`xrdp_mm.c
-  xrdp_mm_update_module_frame_ack`), coupling capture admission to
-  client decode — invisible on the oracle rig. #65's m≥2 premise
-  (global fif window) is arithmetic and stands. FR-PROC-7 (#40,
-  breadth+depth) is the lever the cycle numbers point at.
+Complete history in git — this section was ~260 lines; its full text,
+the filing, the invariant proofs, the withdrawal, the reconciliation
+and both hypothesis registrations are preserved at commit `0db74f6e`:
+`c2cb4008` honesty lesson · `8bd989c0`/`0b295631` + xorgxrdp `59210b2`
+FR-ACK-1 implementation checkpoint (`wip/fr_ack_1_checkpoint`, CI
+green 380/380 — kept, it is #70's machinery) · `e8d00594` withdrawal ·
+`0040e603` reconciliation · `5e979206` H2 registration · `0db74f6e`
+T4 redo + resolution · `b245c1a1` client-rig statelessness (the two
+harness bugs the redo surfaced). PRD: FR-ACK-1-as-filed moved to
+Non-goals (NG-9).
 
-### RECONCILIATION (2026-07-31, same day, joint-evidence pass): the serialization is REAL; the serializer is not the protocol
+## #70 — Eager slot-release ack: ack(N) fires at max(absorb N, egress N−1) (TODO — **THE NEXT STEP**; supersedes #64/FR-ACK-1 with a corrected rationale and an earlier emission point)
 
-The withdrawal above corrected the ROOT CAUSE but its "healthy
-signature" reading overcorrected the SYMPTOM. The uprobe histogram
-fits the healthy and the serial timeline equally well — it
-discriminates nothing, and using it to argue "healthy" repeats the
-same instrument error as using it to argue "ghost" (quality gate 2b,
-third strike on one histogram). The load-bearing datum is the
-discarded run's **0/205 ordering trace** (`recv(N+1) < send(N)` in 0
-of 205 frames): its dismissal ("convicts the producer") was VOIDED by
-#65 step 0 (producer 27.66 fps, p50 2 damage frames pending during
-every encode) and never revisited — a stale annotation, not fake
-data. Un-confounded, it says the encoder IDLES between every pair of
-frames at m=1 on the T4. The serialization is real.
+The m=1 pipeline has four stages — capture, ffmpeg, LTR rewrite, net
+egress — and the shipped ack releases the next capture only after the
+LAST of them (`mod_frame_ack` rides the frame's last=1 enc_done, ~3 ms
+after the final transport write). Every stage serializes behind every
+other. Measured basis (T4 redo 2026-07-31, commit `0db74f6e`, captures
+`i55_t4_cond{A,B}*`; legs sum = period, 0.0 ms unattributed):
 
-Joint constraint from all three instruments: the budget had capacity
-at every admission (probe), xrdp emits the ack immediately at
-encode-done and nothing blocks it (verified: every write on both the
-client and xup sockets is `trans_write_copy_s` — non-blocking,
-queued; the ack does not wait behind the payload), yet outstanding=0
-was observed at ZERO of 1344 callback entries — the 4 ms-rearmed
-timer beats the ack into the gate every cycle. Therefore the ack's
-XORG-SIDE APPLICATION latency is ≳30 ms consistently, or the
-raw-offset uprobe misread the field (un-audited; must be
-cross-checked by a log line in the next instrument).
-
-**RESOLVED 2026-07-31 (T4 redo — BOTH hypotheses falsified; the
-serializer is measured, named, and closes to 0.0 ms).** The owner
-re-provisioned the T4 (8 vCPU this time, same Cascade Lake + Tesla T4)
-and directed a redo for H1 + H2. Same debs as the 07-31 series
-(xrdp `52b8798839ad`, xorgxrdp `d77d05463e52`), m=1 at a true
-3840×2160, textflood, oracle client. Instrument:
-`PR-demo/t4_profile/i55_h1h2_uprobe.sh` (uprobes on the deployed
-binaries, one perf clock, per-thread schedstat two-read) +
-`i55_analyze.py`; captures `i55_t4_condB_pinned_v5_20260731`
-(CPUAffinity=0,1,4,5 — the original 2-physical-core shape, gate run
-118.3 ms = 1.04× of the 122.6 ms series: regime reproduced) and
-`i55_t4_condA_8vcpu_20260731` (unrestricted).
-
-- **H1 falsified.** aemit→xrecv (module ack emitted by xrdp → Xorg
-  services the xup fd) is **0.8 ms mean, p90 3.8, max 8.8** under
-  full load, pinned. There is no tens-of-ms Xorg ack-apply latency.
-  `rdpClientConProcessMsgClientRegionEx` is inlined in this build;
-  apply is observed at `rdpClientConRecv.isra.0` — a symbol probe,
-  not a raw-offset read.
-- **H2 falsified** (owner criterion: "closed if 8 cores stays 8 fps").
-  Unrestricted 8 vCPU: 109.8 ms / 9.2 sends/s vs pinned 118.3 / 8.8 —
-  2× CPU bought 7 %. Scheduler delay ≤0.2 % on every pipeline thread
-  unrestricted, ≤5 % pinned. Nobody starves; nothing waits for a core.
-- **The serialization, exactly** (legs sum 113.5 ms vs period 113.6 —
-  0.0 ms unattributed; table in the capture README): Xorg capture+pack
-  **8.7** → msg62 handoff + NVENC encode of both views **24.1** →
-  worker-thread LTR rewrite + NUT demux of ~3.5 MB/frame **35.8**
-  (zero pump polls inside the window: the worker is WORKING, not
-  waiting) → EGFX assembly **9.1** → main-thread drain of the two
-  ~1.6–2.0 MB EGFX writes **30.4**, and the module ack is emitted
-  only after the LAST write → ack transit **0.8** → deferred timer
-  **4.6** → next capture. The deferred timer fired 1074× and captured
-  264× — every refusal while the previous frame's ack was
-  outstanding. **Capture admission is gated on the module ack, and
-  the module ack is chained to the completion of the entire
-  encode→rewrite→assemble→drain pipeline; the one event that would
-  admit the next capture is emitted last.** That is why capture ‖
-  encode is 0/205 at 4K while every gate "admits" it.
-- **Consequence for the levers:** the two fat serial blocks are the
-  worker rewrite (35.8 ms, single-thread CPU) and the send drain
-  (30.4 ms, main thread). FR-PROC-7 Lever 2 (#40) overlapping frame
-  N+1's capture+encode with frame N's rewrite+drain attacks ~66 ms of
-  a 113 ms cycle; emitting the module ack at consume time rather than
-  after the last write (FR-ACK-1's ack-on-consume, parked on
-  `wip/fr_ack_1_checkpoint`) is the protocol half of the same fix.
-- **Instrument corrections recorded:** (a)
-  `xrdp_ffmpeg_avc444_encode_pair` gets ZERO hits on this build — the
-  #45 batch path calls `pump_set`; the first probe run measured a
-  dead symbol. (b) GFX_TRACE writes `avc dmg`/`enc`/`send` inside the
-  EMIT pass, so `e52_flood_analyze.py`'s "dmg→collected→last=1" spans
-  are within-emit stamps and its "last=1→next own dmg" wait CONTAINS
-  the next frame's rewrite; the 07-31 segment labels ("capture+pack
-  46.7 / idle 35.6") were mis-attributed and are superseded by the
-  uprobe table. (c) Two client-rig statefulness bugs voided four runs
-  before a clean pair existed — see CLAUDE.md "Client-rig
-  statelessness" and the VOID READMEs under
-  `captures/i55_t4_condB_pinned_{,v2_,v3_,v4_}20260731`.
-
-The hypotheses below are retained unedited as the record of what the
-redo was designed to decide.
-
-**Alternative hypothesis (H2, owner 2026-07-31): plain CPU
-oversubscription.** The T4 is 4 vCPU = 2 physical cores and the run
-held Xorg ~100% + textflood ~85% (producer design A, 24.1 ms/frame)
-+ ffmpeg + xrdp + the ssh tunnel — scheduler starvation would inflate
-exactly the latencies H1 names. Evidence AGAINST it being primary:
-#52/#54 measured the same idle-gap shape ON THE 32-CORE DEV BOX with
-the worker 32% busy and flow control never binding — "the wait is the
-capture handoff" — which no core count can cause; the surviving
-mechanism is single-threaded (one Xorg thread owns blits, pack,
-timer, and ack-apply). H2 remains plausible as an AMPLIFIER on the
-T4, and FR-BENCH-1 req 3 already names the producer-core confound
-(design B at 7.1 ms/frame is the sanctioned fix, NOT a bigger
-instance — 4 vCPU is the named target and resizing changes what the
-benchmark means, quality gate 5). Discriminator, free and local: run
-the #55 instrument on a fleet arm normally AND pinned to a
-2-physical-core cpuset with the producer inside; record per-thread
-scheduling delay (runnable-vs-running) beside the stage stamps. Gap
-persists both ways with low sched delay → H1; gap tracks the cpuset →
-H2, fix the producer first.
-
-**Leading hypothesis (H1): the serializer is the Xorg main thread's
-event-loop latency applying the xup ack.** The ack arrives on a
-`SetNotifyFd` fd serviced only when dispatch yields; #59 measured
-that thread saturated (producer blits + the 20 ms pack = the
-bottleneck thread). Cycle ≈ E + (ack-apply latency + timer + pack)
-≈ E + 40–70 ms, closing with #55's 87–98 ms/send band, giving #60's
-bimodality a mechanism (loop latency varies with blit backlog), and
-explaining why fif=4 was a no-op (the delay is downstream of xrdp's
-window). Falsifiable locally: same xorgxrdp, fleet arm, loopback
-client — if the idle gap reproduces, root-cause in the Xorg loop for
-free; if local is healthy, the residual suspect is the ssh-tunnel
-client path and ONLY then does the T4 earn a re-provision, with a
-specific number to confirm. Instrument spec lives in task #55:
-rect_id-paired ms stamps at pack start/end, msg62 write/read, encode
-start/end (encoder thread, not main-thread log order), ack emit, ack
-APPLY.
-
-The filing below is retained unedited as the record of the claim and
-its instrument.
-
-### The proof (uprobes on the live deployed d77d054, 2026-07-31)
-
-Captures `e52_t4_ackpace_probe_20260731` + `e52_t4_ackpace_vars_20260731`,
-`PR-demo/t4_profile/xorg_ackpace_uprobe.sh` (ACKPACE_VARS=1 reads
-`rect_id`/`rect_id_ack` at callback entry by raw offset):
-
-| fact | value |
+| leg | ms (pinned / 8 vCPU) |
 |---|---|
-| timers armed (`rdpScheduleDeferredUpdate.part.0`) | 97/s |
-| callback fired | 33/s — timer is LIVE |
-| callbacks seeing outstanding=1 | 340 → **all 340 captured** |
-| callbacks seeing outstanding=2 | 1004 → all refused |
-| callbacks seeing outstanding=0 | **0 in 1344 samples** |
+| capture + pack (Xorg) | 8.7 / 8.4 |
+| handoff + NVENC encode | 24.1 / 26.5 |
+| worker LTR rewrite (~3.5 MB, zero pump polls: working, not waiting) | 35.8 / 32.8 |
+| EGFX assembly | 9.1 / 9.2 |
+| main-thread egress drain (ack emitted only after the last write) | 30.4 / 27.4 |
+| ack transit + deferred timer | 5.4 / 5.3 |
+| **period** | **113.6 / 109.5** |
 
-Every component is doing its job — producer saturating (27.66 fps),
-timer firing, budget refusing exactly at cap. The serializer is
-arithmetic: **the ack value permanently trails the producer's
-`rect_id` by one beyond true in-flight** (`rack = rid−1` at every
-capture, `rid−2` during every encode, `rid` never). One of the two
-FR-CAPTURE-8 slots is pinned by a ghost — a frame xrdp long since
-disposed of — so capture‖encode is impossible for the session,
-regardless of window size (why fif=4 changed nothing).
+**The change.** Emit the module ack for capture N when BOTH hold:
 
-Root cause: xrdp acks with **its own count of encoded-and-sent frames**
-(`frame_id_server`), not an echo of the incoming id. Any paint msg
-consumed without a sent frame — AVC444 `rv=PENDING` warmup, error
-paths, ship-the-pair-or-nothing drops (`xrdp_encoder.c` "no pair;
-client keeps prior content") — desyncs the counters, and cumulative
-arithmetic makes one miss permanent. The weakness is inherited from
-upstream's protocol (which cannot express "consumed, nothing shown");
-the consume-without-send paths that trigger it are ours; our budget=2
-converted upstream's would-be freeze into a silent 50 % degradation.
+* **absorb(N)** — the encoder children have fully drained N's
+  vmsplice'd input. The pages are BORROWED capture shmem (FR-PROC-6,
+  no copy, no GIFT), so the slot is lossy until the pipe drains;
+  collect return is the already-proven marker (the collect path
+  hard-fails if input is not fully spliced), a mid-encode FIONREAD==0
+  check is the earliest admissible one.
+* **egress(N−1)** — the previous frame's last EGFX write has been
+  handed to the transport.
 
-### The upgrade (spec lives in PRD FR-ACK-1, with the invariant proofs)
+The xup ack stays the ONLY flow-control token: no new queues, no new
+windows, frames past capture ≤ 2 forever — the existing FR-CAPTURE-8
+ring finally used at its designed depth. Condition (b) is what makes
+it BACKPRESSURE: absorb-only acking would let the tail queue grow at
+damage rate against a ~45 ms/frame worker (bufferbloat, the exact
+shape the PRD forbids). fif stays the outer network gate; a slow
+client pushes the last write later, which pushes the ack later.
 
-Every consumed rect is acked with its **echoed id** and a `displayed`
-bit; `displayed=0` returns the frame's region to the dirty region.
-Slot liveness by identity, content completeness by re-dirty, bounds
-unchanged (≤2/monitor — the discard-when-fast valve stays in the dirty
-region, upstream of capture, untouched).
+**Pre-registered prediction** (named before any run): period →
+(capture+absorb + tail)/2 ≈ **55–57 ms (~18 fps)** at m=1 4K textflood
+on the T4, vs 113.6 today; resource floor ≈ 45 ms (worker
+rewrite+assembly), which then becomes the next lever (FR-PROC-7 /
+#40-#41 territory). Latency: off saturation nothing changes (no queue
+forms); at saturation per-frame in-pipe time may grow by up to one
+rewrite leg while event-to-glass IMPROVES (sampling delay collapses
+113→~40 ms) — the +2-frames regime the PRD forbade is the K≥2 shape,
+which the depth-2 token bound excludes by construction.
 
-### Exact change places and blast radius
+**Step 0 — off-by-one audit (prerequisite).** The July histogram (340
+captures @ outstanding=1, 1004 refusals @ 2, 0 @ 0 — raw-offset
+uprobe, UN-AUDITED) implies the ack VALUE chain trails the newest
+capture by one, which wastes a slot under ANY emission policy. Add the
+identity-carrying log line, cross-check the offsets, and fix or
+explain the off-by-one first — otherwise #70's depth-2 cannot
+materialize and the prediction is void.
 
-* `xrdp/xrdp_encoder.c` — the consume-no-output paths (both
-  `enc_rv != XRDP_FFMPEG_PAIR_READY` sites and the error returns in
-  the avc444 wiretosurface handlers) emit a zero-byte `enc_done`
-  carrying the incoming frame id + a new `ENC_DONE_FLAGS` displayed=0
-  bit, instead of returning NULL silently.
-* `xrdp/xrdp_mm.c` — `xrdp_mm_process_enc_done` acks the ECHOED id
-  (kills the parallel-counter identity assumption); handles
-  `comp_bytes==0` displayed=0 without touching the EGFX send path.
-* `xup/xup.c` — `send_paint_rect_ex_ack` carries displayed in the
-  existing `flags` argument (wire-compatible; old peers ignore it).
-* xorgxrdp `module/rdpClientCon.c` — a small per-outstanding region
-  ring beside the budget entries; on displayed=0, re-union that
-  frame's region into `dirtyRegion`. `xup_cap_budget` itself is
-  UNCHANGED (its accounting was proven correct by the probe).
-* NOT touched: EGFX client wire, auth/session paths, capture layout,
-  encoder children, LTR chain. Happy-path byte streams identical.
+**Correctness machinery (revived from `wip/fr_ack_1_checkpoint`).**
+The early ack decouples slot-release from content disposition, so
+every post-consume failure — pair timeout/child recreate, rewrite
+failure, oversize skip, teardown, the checkpoint's known
+alloc-failure corner — MUST emit NOT_DISPLAYED + region-return or a
+stale rectangle survives on screen. Echoed identity, ack totality
+(single exhaustive exit), the displayed flag in the msg106 flags word,
+and the split Xorg structures (`xup_cap_budget` ring vs
+`cap_sent_region`) come from the checkpoint as-is. What changes vs
+FR-ACK-1-as-filed: the rationale (concurrency, not a ghost) and the
+emission point (max(absorb N, egress N−1), not last-EGFX-byte).
 
-### CI — old and new (the pair that completely defines the change)
+**Hard safety invariant — CI-pinned, never probed-for after the
+fact:** the consumed-ack is emitted strictly after the vmsplice pipe
+drains. Violated, Xorg overwrites borrowed pages mid-read: silently
+corrupted encodes, the worst failure class in the pipeline.
 
-Old (passing today, and insufficient — they model a lossless consumer):
-`test_cap_budget_*` (accounting), `test_overlap_m1_*` /
-`test_overlap_model_*` (joint admission model, 161/161).
+**Blast radius.** Server-internal + private xup protocol only; EGFX /
+client wire and bitstream untouched. xup contract version bump — an
+old xorgxrdp receiving an early ack frees the slot with no region
+safety behind it, so mixed deployments are contract-gated. One new
+"consumed" message on the existing worker→main enc_done queue seam
+(ordering natural: it precedes the frame's data on the same queue).
+Single-worker nuance: absorb(N+1) waits for the worker to finish
+rewrite(N); the overlap is staggered per resource (capture ‖ worker
+tail, encode ‖ egress) and still ≈halves the period.
 
-New, in `tests/xrdp/test_avc444_multimon.c`:
-1. `test_overlap_lossy_encode_wedges_without_consume_ack` — RED
-   ratchet: drive_pipeline gains a loss mask; under today's
-   ack-only-on-send semantics one lost frame pins the model at
-   depth cap−1 forever (the live ghost, reproduced in logic).
-2. `test_overlap_consume_ack_restores_depth` — with ack-on-consume,
-   outstanding returns to 0 and sustained depth 2 recurs under any
-   loss mask (Invariants I+II in model form).
-3. `test_ack_value_is_echoed_identity` — ack ids equal producer ids
-   under arbitrary loss patterns; no drift term can exist.
-4. `test_dropped_frame_region_returns_to_dirty` — Invariant III: a
-   displayed=0 frame's region re-enters dirty and is captured by a
-   later frame.
-5. A serialization test for the displayed bit in the xup ack message.
+**Escalation ladder.** (1) CI: the checkpoint's five joint-model
+tests plus an eager-emission model with the (a)&&(b) condition and
+failure injection; (2) local fleet arm, 5 s: negative arm gaps at
+m=1, outstanding=0 callback entries appear; (3) T4 last, 30 s gate
+run against the 55–57 ms prediction, decomposed with the #55 i55
+instrument (`i55_h1h2_uprobe.sh` + `i55_analyze.py`).
 
-Mechanism check after the fix (fleet arm, LOCAL): outstanding=0
-callbacks appear, arm gaps go negative at m=1, sustained depth 2.
+## #71 (was #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
 
-### Deployment status (owner, 2026-07-31)
-
-The deployed pair (xrdp-dev `52b8798839ad` + xorgxrdp-dev `d77d054`)
-**displays correctly onscreen from the owner's UWP (Windows) and macOS
-clients** — the ack ghost costs throughput and latency, not visual
-correctness, consistent with every wire audit passing. **The T4 is
-DECOMMISSIONED** until #64 (single-mon) and #65 (multi-mon) are closed
-locally on the fleet; #67 re-provisions it (DEPLOY_RUNBOOK from bare
-AMI) for the headline re-measurement only.
-
-## #65 — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — no longer blocked by #64 per its withdrawal; the global-window arithmetic stands on its own CI pin)
-
-At m≥2 two further issues sit ON TOP of the #64 ghost:
+At m≥2 two further issues sit ON TOP of the m=1 serializer (#70):
 
 1. **The xrdp ack window is global while the budget is per-monitor.**
    `xrdp_gfx_ack_window_open` (fif=2, global) admits ~1 outstanding
@@ -1560,7 +1423,7 @@ At m≥2 two further issues sit ON TOP of the #64 ghost:
 2. **The m≥2 serial cost is real and unexplained by overlap alone.**
    173.7 ms period with 132.1 ms inside our pipeline at 1.33 of 4
    cores; the 50.1 % cross-monitor interleaving does not make it
-   fast. After #64, re-decompose: how much was the ghost, how much is
+   fast. After #70, re-decompose: how much was the ack pacing, how much is
    step 7's whole-set drain (a late monitor holds the set), how much
    is genuinely serial assembly.
 
@@ -1568,7 +1431,7 @@ Acceptance: per-monitor window (never a pool), CI updated
 deliberately, fleet-arm decomposition showing per-monitor depth 2 at
 m=2, negative arm gaps on both monitors.
 
-## #66 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (was #63; blocked by #65 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #64/#65 concurrency first)
+## #72 (was #66, earlier #63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (blocked by #71 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #70/#71 concurrency first)
 
 Motivated by #62's measured decomposition, not by intuition. On the T4 with
 the textflood payload the 173.7 ms period is:
@@ -1628,7 +1491,7 @@ what a 1.41x says is needed.
 * the E5-2 pair re-run and DECOMPOSED, not just rated;
 * a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
 
-## #67 — T4 benchmark re-runs under restored concurrency (blocked by the m=1 ms decomposition + #65; #64 withdrawn as a prerequisite; #66 optional but preferred)
+## #73 (was #67) — T4 benchmark re-runs under restored concurrency (blocked by #70 + #71; #72 optional but preferred)
 
 The numbers the PR sells, re-measured on the representative box once
 the mechanism is proven locally. Requires re-provisioning the T4 from
@@ -1639,13 +1502,13 @@ measurable with no ad-hoc steps).
   saturation checks green in the VERDICT (producer stamps are now
   default-on).
 * Re-verdict #62's 1.41× (annotated producer-confounded-then-cleared;
-  with the ghost fixed both arms should shift — quote old vs new).
+  with the serializer fixed (#70) both arms should shift — quote old vs new).
 * Owner onscreen walk (T4 protocol §6): UWP + macOS visual pass was
   informally confirmed 2026-07-31 pre-fix; repeat on the fixed build.
 
 ---
 
-## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**; **2026-07-31 verdict annotated: producer-confounded, re-run under #67** — the 1.41× may understate the batch if both arms were paced by the same 8 fps producer, per FR-BENCH-1)
+## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**; **2026-07-31 verdict annotated: producer-confounded, re-run under #73 (was #67)** — the 1.41× may understate the batch if both arms were paced by the same 8 fps producer, per FR-BENCH-1)
 
 Closes the instrument half of #61. #59 established that the xterm payload
 makes E5-2 measure the X server rather than our pipeline; `PR-demo/textflood/`

@@ -168,6 +168,22 @@ the actual color conversion.
 
 xrdp demuxes NUT and inspects/normalizes H.264 NAL units. It does not decode the H.264 pictures. The RDP client is the decoder.
 
+### NG-9: FR-ACK-1 as filed — the rect_id "ghost" fix (withdrawn 2026-07-31)
+
+Specified and implemented in one day as the #64 correctness BLOCKER,
+then refuted by static analysis the same day: the ack value is an echo
+(`frame_id_server = enc_done->frame_id`, sole assignment; zero drift
+over 494 live frames) and the filed ghost does not exist. Not a
+requirement. The surviving machinery (echoed identity, ack totality,
+displayed flag, region return) is specified under **BACKLOG #70**,
+the eager slot-release ack, whose rationale is concurrency — the
+2026-07-31 T4 measurement attributed the whole 113.6 ms m=1 cycle and
+located the serializer at the ack's emission point. History:
+implementation checkpoint `wip/fr_ack_1_checkpoint` (xrdp
+`8bd989c0`/`0b295631`, xorgxrdp `59210b2`, CI green 380/380);
+withdrawal `e8d00594`; reconciliation `0040e603`; measured resolution
+`0db74f6e` (the FR's full former text lives at that commit).
+
 ---
 
 ## 5. Terminology
@@ -968,7 +984,7 @@ A run that fails either check is **producer-limited: it is not an E5
 result and can neither confirm nor falsify any pipeline property.** It
 is reported as VOID with the producer's own rate beside the pipeline's.
 
-**Status: PASSING as measured (#65 step 0, 2026-07-31, T4 m=1
+**Status: PASSING as measured (#65 step 0 — chain since renumbered, now #71, 2026-07-31, T4 m=1
 3840×2160).** With `--stamps` telemetry (default-on): the producer runs
 at **27.66 fps** against the pipeline's 8.21 sends/s — 1.7× over the
 floor, p50 2 fresh damage frames pending during every encode. Both
@@ -977,7 +993,8 @@ filed on "textflood delivered 8.19 fps", which conflated the PIPELINE's
 send rate with the producer's frame rate — exactly the unverifiable
 inference this FR's verify-per-run rule exists to forbid, and its own
 step-0 instrumentation is what caught it. The serializer is the
-pipeline's ack-paced capture (BACKLOG #64, FR-ACK-1): the capture arm is
+pipeline's ack-paced capture (BACKLOG #70; measured to 0.0 ms
+unattributed, commit `0db74f6e`): the capture arm is
 phase-locked to the previous frame's ack (stdev 11.8 ms) and
 uncorrelated with damage arrival (stdev 30.7 ms), while the per-monitor
 budget's second slot is never used.
@@ -1001,8 +1018,9 @@ a **5× gap that no bench above explains**. The open hypothesis is the
 serialized `render → XShmPutImage → XSync` loop paying the X thread's
 own per-frame work (blit copy, damage, the ~20 ms capture pack) inside
 every `XSync`, plus possible phase effects with the deferred-update
-timer — to be decomposed by #65 step 0 (producer-side timestamps),
-which is why instrumentation precedes any redesign. Design consequence:
+timer. Since decomposed: the i55 uprobe redo (commit `0db74f6e`)
+located the pacer in the pipeline's ack emission, not the producer —
+see BACKLOG #70. Design consequence:
 the fix is **decoupling** (render the next frame during the previous
 frame's sync; bound outstanding blits at 2), and design B is preferred
 over the ring because it keeps live per-frame CPU text rendering
@@ -1015,99 +1033,19 @@ same producer and the batch's true gain understated; the m=1 "0/205
 overlap" T4 run convicts the producer, not the pipeline; and the PRD's
 `capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
 holding, which its 1600×912 evidence satisfied and 4K does not.
-Tracked under the linear chain **BACKLOG #64 → #65 → #66** (renumbered 2026-07-31; this paragraph's original filing said “#65 producer fix blocks everything”, which step 0 then falsified — the blocker is FR-ACK-1/#64).
+Tracked under the linear chain **BACKLOG #70 → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
 
-### FR-ACK-1: The rect_id ack protocol — ack-on-consume with echoed identity (specified 2026-07-31; BACKLOG #64)
+### FR-ACK-1: WITHDRAWN 2026-07-31 — see NG-9 and BACKLOG #70
 
-**Why this FR exists.** The inherited ack protocol has xrdp acknowledge
-xorgxrdp's captures with xrdp's OWN count of encoded-and-sent frames
-(`frame_id_server`). It therefore cannot express "your rect was
-consumed but produced no output frame" — and the AVC444 backend has
-exactly such paths (`rv=PENDING` warmup, error returns, the
-ship-the-pair-or-nothing drop). Measured consequence (BACKLOG #64,
-uprobes on the live deployed build): the ack value permanently trails
-the producer's `rect_id` by one beyond true in-flight, one of
-FR-CAPTURE-8's two capture slots is pinned forever by a ghost frame,
-and `capture ‖ encode` is structurally impossible for the whole
-session. A single unexpressed event becomes a permanent capacity loss
-because the ack is cumulative arithmetic over mismatched counters.
-
-**Definitions.** Producer P (xorgxrdp) assigns each capture send a
-sequence number `r` (`rect_id`), strictly increasing by 1. Consumer C
-(xrdp) receives paint msgs over the xup socket — a reliable, in-order,
-lossless local byte stream. `A` is the cumulative ack value held by P
-(`rect_id_ack`); `out(t) = |{ r sent, r > A }|` is P's outstanding
-count, gated per monitor at `cap = 2` before every send.
-
-**The upgraded protocol.**
-
-1. **Echoed identity.** Every ack carries the `r` of a specific
-   received paint msg, copied from that msg — never a value derived
-   from any counter C maintains itself.
-2. **Ack-on-consume (totality).** For EVERY received paint msg, C
-   emits exactly one ack for its `r` when the msg reaches a terminal
-   state, which is one of: (a) encoded and last EGFX byte sent —
-   `displayed=1`; (b) consumed with no output frame (warmup PENDING,
-   encoder error, pair dropped) — `displayed=0`. There is no third
-   terminal state short of connection teardown.
-3. **Content return.** On `displayed=0`, P re-unions that frame's
-   captured region into the dirty region.
-4. **Cumulative apply (unchanged wire semantics).** P applies
-   `A := max(A, r)`; acks are emitted in nondecreasing `r` (C's single
-   worker reaches terminal states in dequeue order).
-
-**Invariant I — slot liveness.** *For every `r` sent by P, eventually
-`A ≥ r`.* Proof: the transport delivers every msg, in order (reliable
-FIFO). Each delivered msg is dequeued by the one worker in finite time
-(the fifo is bounded by Invariant II, and each service terminates —
-encode timeouts are enforced). Rule 2's case split is exhaustive AT the
-single dequeue-service site: every dequeued msg reaches (a) or (b),
-each of which emits an ack for the echoed `r`; msgs queued at teardown
-are covered by the existing reset (new connection ⇒ fresh counters;
-resize ⇒ `INT_MAX` ack). By rule 1 the ack's value IS `r` — no drift
-term exists to subtract. Hence every `r` is eventually covered. ∎
-*(Contrast, old protocol: ack value = S = |frames C sent|, and
-`r − S = |consumed-without-output events|` is monotonically
-nondecreasing — a single event makes `A < r` PERMANENT. That is the
-measured bug, not a tail risk.)*
-
-**Invariant II — bounded outstanding (no backlog, latency unchanged).**
-*At all times, per monitor, `out ≤ cap = 2`.* Proof: unchanged from
-FR-CAPTURE-8/step 6 — the producer-side budget refuses the send that
-would exceed cap, and this FR adds no queueing anywhere. What this FR
-restores is PROGRESS: by Invariant I, `out` strictly decreases after
-every consumption, so capture admission recurs — the old protocol
-satisfied the bound but not progress (it converged to `out = cap`
-forever, i.e., serial capture). The "discard frames when the producer
-is too fast" behaviour is NOT in this pipeline segment and is
-untouched: coalescing happens in the dirty region UPSTREAM of capture
-(newest content wins by union), which is the sanctioned lossy valve;
-everything from captured slot to wire remains bounded-lossless. ∎
-
-**Invariant III — content completeness (eventual consistency).**
-*Every damaged region is eventually encoded-and-sent, or returns to
-the dirty region.* Proof: capture moves region D from dirty into frame
-`r`. Terminal (a) ships it. Terminal (b) acks `displayed=0` and rule 3
-re-unions D into dirty; by Invariant II's progress, a later capture
-takes it again (possibly coalesced with newer damage over the same
-pixels — which is overwrite-by-newer, not loss). No third terminal
-exists (Invariant I's exhaustiveness), so no pixel is silently
-dropped. ∎
-
-**Compatibility.** The `displayed` bit rides the existing `flags`
-argument of `send_paint_rect_ex_ack`; an old xorgxrdp ignores it
-(today's behaviour), and a new xorgxrdp under an old xrdp simply never
-receives `displayed=0` — identical to today. Happy-path byte streams
-are unchanged. No EGFX/client-facing wire change; both ends of the xup
-protocol are ours.
-
-**CI (defines the FR).** BACKLOG #64 lists the five tests: a RED
-ratchet reproducing the ghost in the joint model under a loss mask;
-ack-on-consume restoring depth under any loss mask (Inv. I+II);
-echoed-identity under arbitrary loss (no drift term); dropped-region
-re-dirty (Inv. III); serialization of the displayed bit. The live
-mechanism check is categorical: outstanding=0 callback entries appear
-and arm gaps go negative at m=1 on a fleet arm — no T4 required.
+The filing (ack-on-consume as the fix for a rect_id "ghost") was
+refuted the same day it was specified: the ack value is an echo and
+never drifted. Its machinery — echoed identity, ack totality, the
+displayed flag, region return on non-display — survives verbatim in
+**BACKLOG #70** (eager slot-release ack) with the corrected rationale
+(concurrency, not correctness) and an earlier emission point
+(max(absorb N, egress N−1)). Full former text of this FR, with the
+invariant proofs, is preserved at commit `0db74f6e`; history pointers
+in NG-9.
 
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 
