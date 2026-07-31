@@ -549,7 +549,11 @@ main(int argc, char **argv)
                         CWOverrideRedirect | CWBackPixel | CWEventMask,
                         &attr);
     XStoreName(dpy, win, title);
-    XMapRaised(dpy, win);
+    /* the map is DEFERRED to the top of the render loop: mapping here
+       presents a black full-root window for the whole SHM/corpus/font
+       setup, and the session's capture timer reliably catches it as one
+       black frame (oracle black-frame check FAILs, 2026-07-31, pictures
+       62/68). The window is mapped only when frame 0 is ready to blit. */
     gc = XCreateGC(dpy, win, 0, NULL);
     memset(&shminfo, 0, sizeof(shminfo));
     image = XShmCreateImage(dpy, visual, depth, ZPixmap, NULL, &shminfo,
@@ -653,6 +657,13 @@ main(int argc, char **argv)
         draw_frame(cr, &cp, offset, width, rows, line_height, fext.ascent);
         cairo_surface_flush(surf);
         t_render = now_ms();
+        if (frame == 0)
+        {
+            /* first frame is rendered: map and blit in one request batch
+               so no bare-background window is ever presented (see the
+               deferred-map comment at XCreateWindow) */
+            XMapRaised(dpy, win);
+        }
         XShmPutImage(dpy, win, gc, image, 0, 0, 0, 0, width, height, False);
         t_blit = now_ms();
         /* XSync, not XFlush: without it the client races ahead of the

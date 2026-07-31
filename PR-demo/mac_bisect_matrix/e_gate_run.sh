@@ -189,12 +189,26 @@ then
 fi
 
 # --- client-side X server at the E3 target geometry ----------------------
-if ! DISPLAY=$CLI xrandr --query >/dev/null 2>&1; then
-    echo "starting dummy Xorg on $CLI ($(basename "$XCONF")) ..."
-    setsid Xorg "$CLI" -config "$XCONF" -noreset \
-        -logfile "$OUT/client-xorg.log" </dev/null >/dev/null 2>&1 &
-    sleep 4
+# STATELESS, always (owner directive 2026-07-31): never adopt a dummy X
+# server another run left behind. An adopted server carries the previous
+# run's RandR state — on 2026-07-31 a leftover :94 held a mode NAMED
+# 3840x2160R with 2560x1440 timings, setup_monitors "passed", and two T4
+# runs measured a 3.69 Mpx workload labelled 4K. Kill whatever answers on
+# $CLI, start fresh from the config file, and tear it down at the end.
+CLI_XPID=$(cat "/tmp/.X${CLI#:}-lock" 2>/dev/null | tr -d ' ')
+if [ -n "$CLI_XPID" ] && kill -0 "$CLI_XPID" 2>/dev/null; then
+    echo "killing leftover X server on $CLI (pid $CLI_XPID)"
+    kill -TERM "$CLI_XPID" 2>/dev/null
+    for i in 1 2 3 4 5; do
+        kill -0 "$CLI_XPID" 2>/dev/null || break
+        sleep 1
+    done
 fi
+echo "starting dummy Xorg on $CLI ($(basename "$XCONF")) ..."
+setsid Xorg "$CLI" -config "$XCONF" -noreset \
+    -logfile "$OUT/client-xorg.log" </dev/null >/dev/null 2>&1 &
+CLI_XPID=$!
+sleep 4
 DISPLAY=$CLI \
     MM_MONITORS=$NMON \
     MM_MODE0=${E_MODE0:-2560x1440_60} MM_MODE1=${E_MODE1:-3840x2400R} \
@@ -311,6 +325,8 @@ if pgrep -g "$CLIENT_PGID" >/dev/null 2>&1; then
     echo "WARNING: client process group $CLIENT_PGID survived teardown —" \
          "the next run's window will be contaminated" >&2
 fi
+# stateless client rig: the dummy X server this run started dies with it
+kill -TERM "$CLI_XPID" 2>/dev/null
 if [ "$MODE" = oracle ]; then
     mv /tmp/oracle_avc_s*.bin "$DUMPDIR"/ 2>/dev/null
     du -cb "$DUMPDIR"/*.bin 2>/dev/null | tail -1 \

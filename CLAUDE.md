@@ -397,3 +397,24 @@ was declared unacceptable. Binding rules for all future T4 testing:
   xrdp/xorgxrdp installed — the full deb install flow (DEPLOY_RUNBOOK)
   plus persistent-harness install must bring it from bare to measurable
   without ad-hoc steps.
+
+### Client-rig statelessness (owner directive, 2026-07-31)
+
+- **Test-client scripts must be stateless: never adopt an already-running
+  client X server, and always tear down what they start.** A leftover
+  server carries the previous run's RandR state. Real incident
+  (2026-07-31): a reused `:94` dummy held a mode NAMED `3840x2160R` that
+  had been created with the default 2560x1440 modeline (MM_MODE0
+  overridden without MM_MODELINE0); the count-only monitor check printed
+  "OK: 3840x2160R", the oracle client clamped the session to its real
+  2560x1440 screen, and two T4 gate runs measured a 3.69 Mpx workload
+  labelled 4K. `e_gate_run.sh` now kills whatever answers on `$CLI` and
+  starts fresh from its config, killing it again on exit; and
+  `setup_monitors.sh` verifies the ACTIVE pixel geometry of each output
+  against the WxH promised by the mode NAME, failing loudly on mismatch.
+  A mode name proves nothing about its timings.
+- Same rule for payload autostarts: the payload must be disarmed for any
+  session a measurement does not own — the armed textflood autostarted
+  into the SMOKE GATE's login on 2026-07-31 and buried its color-key
+  window (edge 0.019, `got=black` on every key). The gate was right to
+  refuse; disarm before smoking, re-arm before measuring.

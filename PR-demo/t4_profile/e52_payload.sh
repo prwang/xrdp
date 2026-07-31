@@ -197,6 +197,18 @@ if [ "$KIND" = textflood ]; then
     # image per frame over MIT-SHM, instead of as a stream of XRender
     # glyph requests the X server has to draw on the thread that also
     # runs our capture. See PR-demo/textflood/README.md.
+    #
+    # Start IMMEDIATELY — do not add a settle/wait here. A 2026-07-31
+    # "wait for stable root" guard (added when a run damaged only
+    # 2560x1440 inside a supposed 4K session) was chasing a phantom: the
+    # session really WAS 2560x1440 — the CLIENT side had created a RandR
+    # mode named 3840x2160R with 2560x1440 timings (see
+    # multimon_offline/setup_monitors.sh geometry check). textflood's
+    # one-shot root read was correct all along. The wait itself then
+    # CAUSED a red: it left the bare desktop on screen for ~4 s and the
+    # desktop passes through an all-black state that the oracle
+    # black-frame check catches (1 black frame, pictures 62-68, three
+    # runs in a row; zero without the wait).
     exec textflood --corpus "$CORPUS" --title "$E52_TITLE" --step 25
 fi
 

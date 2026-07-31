@@ -63,6 +63,30 @@ if [ "${n:-0}" -ne "$MONITORS" ]; then
     fi
     exit 1
 fi
+# Verify the ACTIVE pixel geometry, not just the monitor count. A RandR
+# mode is picked BY NAME: if "3840x2160R" was ever created against the
+# wrong modeline (2026-07-31: MM_MODE0 overridden without MM_MODELINE0, so
+# --newmode built a mode NAMED 3840x2160R with the default 2560x1440
+# timings), the count check passes, this script printed the requested name
+# as "OK", and the run silently measured the wrong workload. The mode
+# name's WxH prefix is the contract; the active geometry must match it.
+check_geo() {
+    out=$1; mode=$2
+    want=$(echo "$mode" | grep -oE '^[0-9]+x[0-9]+')
+    got=$(xrandr --listmonitors 2>/dev/null | awk -v o="$out" \
+        '$0 ~ o {for (i=1;i<=NF;i++) if ($i ~ /^[0-9]+\/[0-9]+x[0-9]+\/[0-9]+/) {
+             split($i, a, "/"); split(a[2], b, "x"); split(a[3], c, "+");
+             print a[1] "x" b[2]; exit}}')
+    if [ -n "$want" ] && [ "$got" != "$want" ]; then
+        echo "FAIL: $out active geometry is '$got' but mode '$mode'" >&2
+        echo "  promises '$want' — a mode with this name exists with the" >&2
+        echo "  WRONG timings. Delete it (xrandr --delmode $out $mode;" >&2
+        echo "  xrandr --rmmode $mode) or pass the matching MM_MODELINE." >&2
+        exit 1
+    fi
+}
+check_geo DUMMY0 "$MODE0"
+[ "$MONITORS" -eq 2 ] && check_geo DUMMY1 "$MODE1"
 if [ "$MONITORS" -eq 2 ]; then
     echo "OK: 2 monitors ($MODE0 at $POS0, $MODE1 at $POS1)"
 else
