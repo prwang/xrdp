@@ -1351,6 +1351,26 @@ XORG-SIDE APPLICATION latency is ≳30 ms consistently, or the
 raw-offset uprobe misread the field (un-audited; must be
 cross-checked by a log line in the next instrument).
 
+**Alternative hypothesis (H2, owner 2026-07-31): plain CPU
+oversubscription.** The T4 is 4 vCPU = 2 physical cores and the run
+held Xorg ~100% + textflood ~85% (producer design A, 24.1 ms/frame)
++ ffmpeg + xrdp + the ssh tunnel — scheduler starvation would inflate
+exactly the latencies H1 names. Evidence AGAINST it being primary:
+#52/#54 measured the same idle-gap shape ON THE 32-CORE DEV BOX with
+the worker 32% busy and flow control never binding — "the wait is the
+capture handoff" — which no core count can cause; the surviving
+mechanism is single-threaded (one Xorg thread owns blits, pack,
+timer, and ack-apply). H2 remains plausible as an AMPLIFIER on the
+T4, and FR-BENCH-1 req 3 already names the producer-core confound
+(design B at 7.1 ms/frame is the sanctioned fix, NOT a bigger
+instance — 4 vCPU is the named target and resizing changes what the
+benchmark means, quality gate 5). Discriminator, free and local: run
+the #55 instrument on a fleet arm normally AND pinned to a
+2-physical-core cpuset with the producer inside; record per-thread
+scheduling delay (runnable-vs-running) beside the stage stamps. Gap
+persists both ways with low sched delay → H1; gap tracks the cpuset →
+H2, fix the producer first.
+
 **Leading hypothesis (H1): the serializer is the Xorg main thread's
 event-loop latency applying the xup ack.** The ack arrives on a
 `SetNotifyFd` fd serviced only when dispatch yields; #59 measured
