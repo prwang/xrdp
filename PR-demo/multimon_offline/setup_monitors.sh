@@ -41,7 +41,27 @@ for out in DUMMY0 DUMMY1; do
     [ "$MODE1" != "$MODE0" ] && xrandr --addmode "$out" "$MODE1" 2>/dev/null
 done
 
-xrandr --output DUMMY0 --mode "$MODE0" --pos "$POS0" --primary 2>&1
+# The screen (framebuffer) does NOT always grow to fit a larger mode:
+# xrandr leaves the CRTC clamped to the current screen size and reports
+# the new mode as current anyway -- DUMMY0 read "3840x2400R 59.96*" with
+# a 2560x1440 screen and a 2560x1440 output rectangle (2026-07-31, the
+# run that check_geo below refused). Size it explicitly from the layout
+# in the SAME xrandr call, so the mode and the room for it arrive
+# together. A --fb larger than the driver's Virtual is refused loudly
+# here rather than silently clamped later.
+fb_w=$(echo "$MODE0" | sed 's/x.*//')
+fb_h=$(echo "$MODE0" | sed 's/^[0-9]*x//; s/[^0-9].*$//')
+if [ "$MONITORS" -eq 2 ]; then
+    m1_w=$(echo "$MODE1" | sed 's/x.*//')
+    m1_h=$(echo "$MODE1" | sed 's/^[0-9]*x//; s/[^0-9].*$//')
+    p1_x=$(echo "$POS1" | sed 's/x.*//')
+    p1_y=$(echo "$POS1" | sed 's/^[0-9]*x//')
+    [ $((p1_x + m1_w)) -gt "$fb_w" ] && fb_w=$((p1_x + m1_w))
+    [ $((p1_y + m1_h)) -gt "$fb_h" ] && fb_h=$((p1_y + m1_h))
+fi
+
+xrandr --fb "${fb_w}x${fb_h}" \
+       --output DUMMY0 --mode "$MODE0" --pos "$POS0" --primary 2>&1
 if [ "$MONITORS" -eq 2 ]; then
     xrandr --output DUMMY1 --mode "$MODE1" --pos "$POS1" 2>&1
 else

@@ -225,8 +225,17 @@ tail -1 "$OUT/client-monitors.txt"
 # container's life: mark both and read only this run's window. Skipping
 # this turned a 60 s measurement into 2.2 h of accumulated lines on
 # 2026-07-29.
-MARK_X=$(srv "wc -l < /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
+# Mark the FILE, not just a line count: a run that creates a new session
+# gets a new .xorgxrdp.<display>.log, and a count taken from the previous
+# run's file then skips the whole of the new one. Measured 2026-07-31:
+# a #70 A/B re-run collected a ZERO-BYTE session log and the capture legs
+# silently vanished from the analysis.
+MARK_XLOG=$(srv "ls -t /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1" \
     | tr -d ' \r')
+MARK_X=0
+if [ -n "$MARK_XLOG" ]; then
+    MARK_X=$(srv "wc -l < '$MARK_XLOG' 2>/dev/null" | tr -d ' \r')
+fi
 MARK_X=${MARK_X:-0}
 # xrdp logs to /var/log/xrdp.log INSIDE the pod (xrdp.ini LogFile), not to
 # the container's stdout: kubectl logs carries only the entrypoint's own
@@ -337,7 +346,19 @@ fi
 XLOG=$(srv "ls -t /home/$SU/.xorgxrdp.*.log 2>/dev/null | head -1")
 [ -n "$XLOG" ] || fail "no session Xorg log on $SRV_NAME — did the login fail? \
 see $OUT/client.log"
-srv_cat "$XLOG" | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
+XLINES=$(srv "wc -l < '$XLOG' 2>/dev/null" | tr -d ' \r')
+XLINES=${XLINES:-0}
+if [ "$XLOG" != "$MARK_XLOG" ] || [ "$XLINES" -lt "$MARK_X" ]; then
+    # Either a different file, or the SAME name reopened by a new
+    # session (a cold run truncates .xorgxrdp.<display>.log, so the
+    # mark is past the end and the window comes out empty). Both mean
+    # every line in it belongs to this run.
+    echo "session Xorg log is this run's own ($XLOG, $XLINES lines," \
+         "mark was $MARK_X); taking it whole"
+    srv_cat "$XLOG" > "$OUT/session-xorg.log"
+else
+    srv_cat "$XLOG" | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
+fi
 srv_cat /var/log/xrdp.log | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
 grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
 

@@ -1,0 +1,108 @@
+# Arm U: BACKLOG #70 CONTROL — the eager slot-release ack pair, knob OFF.
+#
+# arm-u and arm-v run the SAME xrdp deb (348a16dde3f3) and the SAME
+# xorgxrdp deb (10fa3aa23033) and differ in ONE gfx.toml line,
+# eager_slot_ack. That is the whole design of this A/B: a config-only
+# delta cannot be confounded by a build difference, and arm-u also
+# proves the claim that with the knob off the shipped ack pacing is
+# unchanged.
+#
+# XRDP_ACK_TRACE=1 is what the measurement is read from: xrdp stamps
+# msgin/submit/absorb/egress/ack and xorgxrdp stamps the capture leg,
+# all in CLOCK_MONOTONIC us on one system-wide clock, so the capture of
+# frame N+1 and the tail of frame N can be INTERSECTED and the
+# concurrency stated in milliseconds. The `ack=` field on the capture
+# line is also #70 step 0's instrument: id - ack at capture admission
+# says whether a capture slot is permanently dead.
+#
+# SESSION_KIND=codeflood: damage must arrive faster than the pipeline
+# drains it or the payload, not the server, sets the interval (#52).
+#
+# RDP endpoint on the host: 127.0.0.1:40020.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-arm-u
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: arm-u
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: arm-u
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: arm-u
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:348a16dde3f3.xx10fa3aa
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "codeflood"
+            - name: ARM_LABEL
+              value: "U: #70 CONTROL - eager_slot_ack OFF (port 40020)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+          ports:
+            - containerPort: 3389
+              hostPort: 40020
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-arm-u

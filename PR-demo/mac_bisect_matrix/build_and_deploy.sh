@@ -29,6 +29,11 @@ DIST=${DIST:-/work/dist}
 # logs the capture slot actually used, per monitor, per frame). It exists
 # to answer that one gate and is retired with it:
 #   build_and_deploy.sh arm-q
+# arm-u / arm-v are the BACKLOG #70 A/B pair: the SAME two debs on
+# both, differing only in gfx.toml's eager_slot_ack. They are deployed
+# together or not at all -- an eager measurement with no control arm
+# has no baseline:
+#   build_and_deploy.sh arm-u arm-v
 # arm-s / arm-t are the BACKLOG #52 (E5-2) PAIR: the same xorgxrdp and
 # the same encoder config, xrdp with (arm-s) and without (arm-t) #45
 # steps 5+7, both running SESSION_KIND=codeflood so the payload does not
@@ -65,6 +70,14 @@ declare -A ARM_XORG_DEB=(
     # coverage intersect and per-monitor slot (xorgxrdp d77d05463e52),
     # paired with the xrdp deb carrying steps 0-7
     [arm-r]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
+    # arm-u/arm-v: the BACKLOG #70 A/B. SAME xrdp deb and SAME xorgxrdp
+    # deb on both -- the only difference between the arms is one
+    # gfx.toml line (eager_slot_ack), so a build difference cannot
+    # confound the comparison. The xorgxrdp side carries the SLOT_ONLY
+    # ack and the +1 held-region entry; the xup contract moved to
+    # 20260731, so this xorgxrdp pairs ONLY with this xrdp.
+    [arm-u]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [arm-v]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -75,6 +88,8 @@ declare -A ARM_TAG=(
     [arm-r]=f7acb5979788.xxd77d054
     [arm-s]=52b8798839ad.xxd77d054
     [arm-t]=5dae11f63adb.xxd77d054
+    [arm-u]=348a16dde3f3.xx10fa3aa
+    [arm-v]=348a16dde3f3.xx10fa3aa
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -94,6 +109,9 @@ declare -A TAG_DEB=(
     # arm-t (#52 E5-2 baseline): #45 steps 0-4 only (a0d9e773) + the same
     # log clock fix, from branch bench/e52-arm-t-baseline
     [5dae11f63adb.xxd77d054]="xrdp-dev_0.10.80+git20260730013437.5dae11f63adb_amd64.deb"
+    # arm-u/arm-v (BACKLOG #70): the eager slot-release ack, off by
+    # default in the binary and turned on per arm by gfx.toml
+    [348a16dde3f3.xx10fa3aa]="xrdp-dev_0.10.80+git20260731212249.348a16dde3f3_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

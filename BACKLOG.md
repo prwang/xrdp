@@ -1319,7 +1319,7 @@ T4 redo + resolution · `b245c1a1` client-rig statelessness (the two
 harness bugs the redo surfaced). PRD: FR-ACK-1-as-filed moved to
 Non-goals (NG-9).
 
-## #70 — Eager slot-release ack: ack(N) fires at max(absorb N, egress N−1) (TODO — **THE NEXT STEP**; supersedes #64/FR-ACK-1 with a corrected rationale and an earlier emission point)
+## #70 — Eager slot-release ack: ack(N) fires at max(absorb N, egress N−1) (DONE 2026-07-31 — shipped behind a default-off knob, CI 174/174, local A/B **1.11× and encode‖tail 4.8 → 8.5 ms**; step 0 answered NO; the remaining serializer is the worker thread → #40/#41)
 
 The m=1 pipeline has four stages — capture, ffmpeg, LTR rewrite, net
 egress — and the shipped ack releases the next capture only after the
@@ -1464,6 +1464,54 @@ bufferbloats visibly — its egress backlog is a function of run length
 (200 ticks → 400 ticks grows it) while the (a)&&(b) arm stays at 2 for
 any run length. That is the PRD-forbidden shape, and it is why (b) is
 not optional.
+
+### Rung 2 (local fleet) RESULT — it unblocks the encode; 1.11× overall
+
+arm-u / arm-v, `captures/i70_local_eager_ack_ab_20260731/README.md`.
+SAME xrdp deb (`348a16dde3f3`) and SAME xorgxrdp deb (`10fa3aa23033`)
+on both arms, differing in one gfx.toml line. m=1, 2560x1440 =
+3.69 Mpx, codeflood, AMD VAAPI, 60 s, two runs per arm.
+**Not comparable to the T4 series** (different Mpx, encoder and box).
+
+| | control | eager | |
+|---|---|---|---|
+| period | 36.6 / 37.1 ms | 33.0 / 33.6 ms | **1.11×** |
+| encode (submit→absorb) | 19.9 ms | 20.5 ms | |
+| tail (absorb→egress) | 18.0 ms | 19.7 ms | |
+| **encode(N+1) ‖ tail(N)** | **4.8 ms**, p50 **0.0** | **8.5 ms**, p50 **10.3** | **+77 %** |
+| encode share of tail | 27 % | 43 % | |
+| slot acks | 0 | one per frame | |
+
+**The mechanism moved, in milliseconds.** The control's MEDIAN
+concurrent-encode time is zero — half its frames overlap nothing —
+against 10.3 ms eager. Legs close to 0.3 ms unattributed on the eager
+arm (the control's 2.8 ms is the idle gap its later ack creates, and is
+part of the result). Live correctness held: wire audit 7/7, zero black
+frames, zero rewrite failures, zero budget assertions, **zero
+region-map overflows** — the +1 sizing CI forced is sufficient in
+practice too.
+
+**Why only 1.11×:** the single encoder worker does the submit/collect
+wait AND the LTR rewrite serially, so the ack can only overlap the part
+of the tail that is not the worker — and 8.5 ms of a 19.7 ms tail is
+about that part. **The remaining serializer is the worker thread, not
+the ack.** That is #40/#41 (FR-PROC-7 submit/collect with bounded
+worker admission), already named here as #70's co-requisite; it is now
+the measured next lever rather than a predicted one.
+
+### Step 0 — ANSWERED, and the answer is NO. The July claim is retired.
+
+`e41bcb59` concluded from raw-offset uprobes that the ack "trails its
+rect_id by one frame beyond true in-flight — one slot pinned forever by
+a ghost". The identity-carrying log line refutes it. Over 3289 capture
+admissions across both arms, `(id-1) − ack` is +1 on all but 3: at the
+admission of frame N the previously sent frame N−1 is still in the
+pipeline and **cannot legitimately be acked**, so `ack = N−2` is
+exactly what a correct cumulative ack looks like. The producer runs at
+its designed depth of two. There is no dead slot and #70 never depended
+on one. The raw-offset instrument could not tell "correctly one behind"
+from "wrongly one behind" because it never carried the frame's
+identity — the same lesson as #64.
 
 Instrument for rungs 2–3: `XRDP_ACK_TRACE=1` (separate from
 `XRDP_GFX_TRACE`, so a timing run does not pay for per-rect tracing)
