@@ -929,7 +929,7 @@ Three durable qualifications on that number:
 
 So the honest bound is: best case ≈ 48 ms (one encode term removed) ⇒ ~21 fps; the advertised "~20 ms ⇒ ~40 fps" only follows if the 28 ms remainder is itself per-child work. **Attributing that 28 ms with `PR-demo/t4_profile/frame_accounting.sh` is a prerequisite to quoting any speed-up**, not a follow-up. Two further ceilings sit above it: the frame period is `max(capture, encode_pair)` under FR-CAPTURE-8, so a capture stage that is currently hidden can become the new bottleneck and absorb the whole win; and the *client* can be the binding constraint entirely — xfreerdp's software 4:4:4 reconstruction measured ~65 ms/frame at the owner layout, capping end-to-end at ~15 fps regardless of server speed (§FR-PROC-7 clause 9). **Confirmed at dual-monitor 2560×1440 + 3840×2400 on 2026-07-29** (BACKLOG #45; one arm, 60 s each, back to back): the rendering client delivered 5.94 sends/s (2.97 pairs/s per monitor, send-gap mean 169 ms) against the oracle client's 19.57 sends/s (9.79 pairs/s per monitor, mean **51.1 ms**) — **client-bound by 3.29×**, the client costing ~117 ms per surface frame on top of the server's 51 ms. Consequence: a server-side speed-up is chased and gated on the **oracle frame interval** (the send-to-send interval with a client that acks before decode/present); the rendering client's rate is reported beside it as the end-to-end figure but cannot show a server gain until the client side moves. Report the T4 gain per client (mstsc / macOS / xfreerdp), each as a frame period, and say which of the two instruments produced each number.
 
-### FR-BENCH-1: The saturating-producer contract (owner directive, 2026-07-31 — FAILING, blocks FR-PROC-7 / #63 / all 4K E5-2 verdicts)
+### FR-BENCH-1: The saturating-producer contract (owner directive, 2026-07-31 — PASSING as measured; the per-run verification below is what caught its own filing being wrong)
 
 The benchmark producer (`PR-demo/textflood/`) exists to make the
 pipeline the bottleneck. Its design intent is three requirements, in
@@ -968,12 +968,19 @@ A run that fails either check is **producer-limited: it is not an E5
 result and can neither confirm nor falsify any pipeline property.** It
 is reported as VOID with the producer's own rate beside the pipeline's.
 
-**Status: FAILING (measured 2026-07-31, T4 m=1 3840×2160).** textflood
-delivered 8.19 fps — equal to the pipeline period (122.6 ms) — and the
-fifo was empty at all 205 completions (overlap gap min +7 ms, never
-negative). The `XSync` comment states its purpose as "the client must
-not race ahead of the server", which is this contract INVERTED: the
-producer must race ahead, up to the 2-slot capture bound.
+**Status: PASSING as measured (#65 step 0, 2026-07-31, T4 m=1
+3840×2160).** With `--stamps` telemetry (default-on): the producer runs
+at **27.66 fps** against the pipeline's 8.21 sends/s — 1.7× over the
+floor, p50 2 fresh damage frames pending during every encode. Both
+verification checks green. The section's original FAILING status was
+filed on "textflood delivered 8.19 fps", which conflated the PIPELINE's
+send rate with the producer's frame rate — exactly the unverifiable
+inference this FR's verify-per-run rule exists to forbid, and its own
+step-0 instrumentation is what caught it. The serializer is the
+pipeline's ack-paced capture (BACKLOG #64c): the capture arm is
+phase-locked to the previous frame's ack (stdev 11.8 ms) and
+uncorrelated with damage arrival (stdev 30.7 ms), while the per-monitor
+budget's second slot is never used.
 
 **Compute is NOT the constraint (recon 2026-07-31,
 `PR-demo/textflood/ring_recon.c`, run ON the T4, offline).** An earlier

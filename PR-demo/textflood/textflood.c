@@ -67,9 +67,14 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
 
 #define DEF_CORPUS "/usr/local/share/code_corpus.ansi"
+/* FR-BENCH-1: the producer must log its own frame timestamps so a gate
+   run can verify saturation instead of assuming it. Default ON; the
+   file is one short line per frame (~8/s), overridable with --stamps. */
+#define DEF_STAMPS "/tmp/e52_textflood_stamps.tsv"
 #define DEF_TITLE "E52FLOOD"
 #define DEF_FONT "DejaVu Sans Mono"
 #define DEF_FONT_SIZE 14.0
@@ -107,6 +112,16 @@ struct corpus
     struct line *lines;
     int nlines;
 };
+
+/*****************************************************************************/
+static double
+now_ms(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec * 1000.0 + ts.tv_nsec / 1e6;
+}
 
 /*****************************************************************************/
 /* Append one run to a line. Runs are short and lines few, so a realloc
@@ -370,10 +385,13 @@ usage(void)
            "  --size N        font size in px (default %.0f)\n"
            "  --step N        lines advanced per frame (default %d)\n"
            "  --frames N      stop after N frames (default: forever)\n"
+           "  --stamps PATH   per-frame timing tsv (default %s;\n"
+           "                  FR-BENCH-1 producer telemetry)\n"
            "  --managed       let the window manager place the window\n"
            "                  (default: override-redirect, full root)\n"
            "  -h, --help      this text\n",
-           DEF_CORPUS, DEF_TITLE, DEF_FONT, DEF_FONT_SIZE, DEF_STEP);
+           DEF_CORPUS, DEF_TITLE, DEF_FONT, DEF_FONT_SIZE, DEF_STEP,
+           DEF_STAMPS);
 }
 
 /*****************************************************************************/
@@ -410,7 +428,14 @@ main(int argc, char **argv)
     int offset;
     long frame;
     double line_height;
+    const char *stamps_path;
+    FILE *stf;
+    double t_loop;
+    double t_render;
+    double t_blit;
+    double t_sync;
 
+    stamps_path = DEF_STAMPS;
     corpus_path = DEF_CORPUS;
     title = DEF_TITLE;
     font = DEF_FONT;
@@ -457,6 +482,10 @@ main(int argc, char **argv)
         else if (strcmp(argv[ai], "--frames") == 0)
         {
             max_frames = atol(argv[++ai]);
+        }
+        else if (strcmp(argv[ai], "--stamps") == 0)
+        {
+            stamps_path = argv[++ai];
         }
         else
         {
@@ -577,6 +606,29 @@ main(int argc, char **argv)
            "font %s %.0fpx, subpixel RGB\n",
            width, height, rows, cp.nlines, step, font, font_size);
     fflush(stdout);
+    stf = NULL;
+    if (stamps_path[0] != 0)
+    {
+        stf = fopen(stamps_path, "w");
+        if (stf == NULL)
+        {
+            fprintf(stderr, "textflood: cannot write stamps to %s "
+                    "(continuing without)\n", stamps_path);
+        }
+        else
+        {
+            struct timespec rt;
+
+            clock_gettime(CLOCK_REALTIME, &rt);
+            /* epoch anchor so a frame's monotonic stamp can be laid
+               next to the server's GFX_TRACE wall clock */
+            fprintf(stf, "# textflood %dx%d step=%d epoch_ms=%.3f "
+                    "mono_ms=%.3f\n", width, height, step,
+                    rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
+            fprintf(stf, "frame\tloop_start_ms\trender_ms\tblit_ms"
+                    "\tsync_ms\n");
+        }
+    }
     offset = 0;
     frame = 0;
     for (;;)
@@ -597,13 +649,30 @@ main(int argc, char **argv)
                 }
             }
         }
+        t_loop = now_ms();
         draw_frame(cr, &cp, offset, width, rows, line_height, fext.ascent);
         cairo_surface_flush(surf);
+        t_render = now_ms();
         XShmPutImage(dpy, win, gc, image, 0, 0, 0, 0, width, height, False);
+        t_blit = now_ms();
         /* XSync, not XFlush: without it the client races ahead of the
            server and the measured send interval becomes this program's
            loop rate rather than the pipeline's. */
         XSync(dpy, False);
+        t_sync = now_ms();
+        if (stf != NULL)
+        {
+            /* the split #65 step 0 exists to measure: how much of the
+               producer's period is its own render, and how much is
+               waiting on the X server inside XSync */
+            fprintf(stf, "%ld\t%.3f\t%.3f\t%.3f\t%.3f\n", frame, t_loop,
+                    t_render - t_loop, t_blit - t_render,
+                    t_sync - t_blit);
+            if ((frame & 15) == 0)
+            {
+                fflush(stf);
+            }
+        }
         offset = (offset + step) % cp.nlines;
         frame++;
         if (max_frames > 0 && frame >= max_frames)
@@ -612,6 +681,10 @@ main(int argc, char **argv)
         }
     }
 done:
+    if (stf != NULL)
+    {
+        fclose(stf);
+    }
     cairo_destroy(cr);
     cairo_surface_destroy(surf);
     cairo_font_options_destroy(fo);

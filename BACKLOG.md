@@ -1245,7 +1245,7 @@ Present requests, so the path stops being fed instead.
 
 ---
 
-## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (**BLOCKED on #65** — was TODO, NEXT; its gate numbers would be producer-confounded until FR-BENCH-1 passes, and FR-PROC-7's preemption signal needs a saturating producer to be testable at all)
+## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (**BLOCKED on #64c** — was blocked on #65 until step 0 exonerated the producer; FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which the ack-paced capture (#64c) prevents regardless of producer speed)
 
 Motivated by #62's measured decomposition, not by intuition. On the T4 with
 the textflood payload the 173.7 ms period is:
@@ -1775,7 +1775,62 @@ absent (no silent inert leg anywhere) or keep an explicitly-reported skip.
 
 ---
 
-## #65 — textflood violates the saturating-producer contract (TODO, **BLOCKING** — owner directive 2026-07-31; blocks #63, #64b re-run, FR-PROC-7, and every 4K E5-2 verdict)
+## #64c — capture is ACK-PACED: xorgxrdp waits for the previous frame's ack despite free budget and pending damage (TODO, HIGH — **the blocking item**; blocks #63 / FR-PROC-7)
+
+**Found by #65 step 0 (2026-07-31, capture
+`captures/e52_t4_textflood_m1_4k_step0_20260731/`), which exonerated
+the producer.** Instrumented textflood measured itself at **27.66 fps**
+against the pipeline's 8.21 sends/s — 3.4× over, and 1.7× over the
+FR-BENCH-1 floor. p50 **2 fresh frames of damage arrive during every
+encode**. The cross-correlation (producer stamps epoch-anchored against
+the trace's wall clock, same box):
+
+```
+capture arm - latest BLIT before it   stdev 30.7 ms  (uncorrelated)
+capture arm - previous frame LAST=1   stdev 11.8 ms  (phase-locked, p50 35)
+```
+
+The capture is scheduled by the previous frame's ACK, not by damage.
+The ~35 ms delay decomposes exactly: ack (~1) + timer (4–16) + X-side
+capture+pack (~15–20) + xup transit.
+
+**The contradiction:** every deployed code path says the second capture
+is admitted — `CC_GFX_AVC444` and `msFrameInterval 16` confirmed from
+the live session log; per-monitor budget cap 2 with a break-not-skip
+scan; `rdpCapRect` unions dirty with the slot-missing region; damage
+paths call `rdpScheduleDeferredUpdate` (`rdpClientCon.c:3925`,
+`rdpDraw.c:228`); the deployed xorgxrdp is exactly the tree read
+(d77d054, clean). Yet depth 2 is never reached: 0 negative arm gaps in
+411 frames across two runs, fifo empty at every completion, `budget
+exceeded` = 0 (the gate is never even asked).
+
+**Decisive probe:** extend `PR-demo/t4_profile/xorg_capture_uprobe.sh`
+to `rdpDeferredUpdateCallback`, `rdpScheduleDeferredUpdate`, and
+`rdpCapRect`; count, during encode windows: callback entries, and which
+exit each takes (top capacity gate / per-monitor break / empty dirty
+intersect / captured). One 40 s run separates: timer never fires while
+a frame is outstanding (schedule suppressed) vs fires-and-refuses
+(a gate not visible at INFO) vs captures-but-never-sends.
+
+Acceptance: the serializer named by count; a one-line mechanism
+statement in the PRD concurrency table; then the fix, whose mechanism
+check is negative arm gaps appearing at m=1 (sustained depth 2).
+
+## #65 — textflood violates the saturating-producer contract (**CLOSED 2026-07-31 — premise falsified by its own step 0**; the producer measures 27.66 fps ≥ the 16.4 floor)
+
+**CLOSED: step 0 falsified the premise this item was filed on.** The
+producer's own telemetry (now default-on) measures 27.66 fps in
+session — the pipeline consumes every ~4th frame. What this item DID
+deliver: the `--stamps` instrumentation (kept, it is FR-BENCH-1's
+required telemetry), ring_recon.c, and the cross-correlation method
+that found the real serializer (#64c). The redesigns below (scroll +
+strip, pre-rendered ring) are NOT needed and are not built — recorded
+here so they are not resurrected without a new failing measurement.
+Original filing kept below for the record; note its "8.19 fps
+producer" premise conflated the pipeline's send rate with the
+producer's frame rate, an inference no telemetry could check until
+step 0 existed — which is the whole argument for FR-BENCH-1's
+verify-per-run rule.
 
 **The core bug moved to the producer.** PRD **FR-BENCH-1** (added with
 this item) states the design intent textflood was built to and now
