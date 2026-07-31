@@ -1789,29 +1789,43 @@ number gated on this producer is producer-confounded until fixed —
 which is why this blocks everything downstream, per the owner
 directive.
 
-Root cause in the producer: `draw_frame (cairo, ~100 ms at 8.3 Mpx) →
-XShmPutImage → XSync`, one thread, zero internal pipelining. The XSync
-comment ("without it the client races ahead of the server") is
-FR-BENCH-1 inverted — the producer MUST race ahead, up to the 2-slot
-capture bound. A single live render thread mathematically cannot
-saturate 4K on the reference CPU (~100 ms/frame → ≤10 fps regardless
-of buffering), and N render threads would burn the cores the pipeline
-needs on a 4-vCPU box (footprint clause). So:
+Root cause in the producer: the serialized
+`draw_frame → XShmPutImage → XSync` loop, one thread, zero internal
+pipelining. The XSync comment ("without it the client races ahead of
+the server") is FR-BENCH-1 inverted — the producer MUST race ahead, up
+to the 2-slot capture bound.
 
-- **Step 0 — instrument first.** `--selftest N`: render+blit N frames,
-  report the producer's own fps and per-frame timestamps. No
-  measurement runs before the producer can report its own rate.
-- **Step 1 — standalone baseline on the T4**: split render cost vs
-  blit cost at 1080p and 4K. Recorded next to the pipeline's sends/s.
-- **Step 2 — pre-rendered frame ring.** Render R distinct corpus
-  frames at startup (cairo, same subpixel-AA text — requirement 2
-  intact), then blit them cyclically: full-frame damage every frame at
-  memcpy cost, steady-state producer CPU ≈ one blit (requirement 3
-  intact), rate bounded by the blit (~10 ms → well over 2× any
-  pipeline rate). Keep `XSync` per blit — pacing then comes from the
-  X server's consumption, which is the correct back-pressure; the ring
-  just guarantees a frame is always ready. Memory: R=16 at 4K ≈
-  0.5 GB, fine on the T4's 16 GB.
+**Step 1 recon DONE 2026-07-31 (`ring_recon.c`, run ON the T4,
+offline) — and it corrected this item's own first draft.** The draft
+claimed "~100 ms cairo render, ≤10 fps regardless of buffering"; that
+was an unmeasured inference and it is FALSIFIED: the verbatim shipped
+render loop computes **24.1 ms/frame = 41.4 fps** on the T4 at 4K
+(2.5× over the 16.4 fps floor). Scroll+strip renders at 7.1 ms
+(141 fps, 8.6×); a ring memcpy at 6.8 ms (147 fps); two concurrent
+frame copies sustain 8.8 GB/s — neither compute nor bandwidth is the
+wall. **Open anomaly (quality gate check 1): the producer computes
+41 fps offline but delivered 8.19 fps deployed — a 5× gap no offline
+bench explains.** Leading hypothesis: each `XSync` pays the X thread's
+per-frame work (blit copy, damage accounting, the ~20 ms capture pack
+when the timer lands inside the sync) and the loop never renders
+during the wait. Step 0 decides it.
+
+- **Step 0 — instrument first.** `--selftest N` (offline fps, now
+  effectively answered by ring_recon) plus in-session per-frame
+  timestamps split into render / blit / XSync-wait. No redesign lands
+  before the 5× gap is attributed. Cheap: ~15 lines in textflood.
+- **Step 2 — decouple, keep live rendering (design B).** memmove
+  scroll + strip render (live per-frame CPU text rendering kept —
+  the owner's stated intent), double-buffered so the next frame
+  renders during the previous frame's sync, at most 2 outstanding
+  blits. At a 25 fps target this costs ~18 % of one core
+  (footprint clause). Full-frame damage is preserved: every pixel
+  moves every frame.
+- **Step 2-fallback — pre-rendered frame ring** (steady state = one
+  6.8 ms memcpy, R=16 ≈ 0.5 GB) ONLY if in-session measurement shows
+  design B still producer-limited — per the strict honesty rule the
+  fallback is not wired in silently; switching to it is a recorded
+  decision.
 - **Step 3 — harness enforcement.** `e_gate_run.sh` VERDICT prints the
   producer's selftest rate and the in-run saturation observable
   (negative overlap-gap fraction from `e52_period_decompose.py`) and

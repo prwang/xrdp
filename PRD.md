@@ -971,17 +971,37 @@ is reported as VOID with the producer's own rate beside the pipeline's.
 **Status: FAILING (measured 2026-07-31, T4 m=1 3840×2160).** textflood
 delivered 8.19 fps — equal to the pipeline period (122.6 ms) — and the
 fifo was empty at all 205 completions (overlap gap min +7 ms, never
-negative). The failure is structural: `draw_frame` (cairo, ~8.3 Mpx
-subpixel text), `XShmPutImage`, and `XSync` run sequentially in one
-thread, so the producer's period is render + blit + sync with zero
-internal pipelining — and the `XSync` comment states its purpose as "the
-client must not race ahead of the server", which is this contract
-INVERTED: the producer must race ahead, up to the 2-slot capture bound.
-A single render thread at ~100 ms/frame cannot exceed 10 fps at 4K on
-the reference CPU regardless of buffering, so the fix must remove the
-per-frame render from the steady-state path (e.g. a pre-rendered frame
-ring: full-frame subpixel-text damage every frame at blit cost,
-requirements 2 and 3 intact) rather than merely overlap it.
+negative). The `XSync` comment states its purpose as "the client must
+not race ahead of the server", which is this contract INVERTED: the
+producer must race ahead, up to the 2-slot capture bound.
+
+**Compute is NOT the constraint (recon 2026-07-31,
+`PR-demo/textflood/ring_recon.c`, run ON the T4, offline).** An earlier
+revision of this paragraph asserted "~100 ms cairo render, a single
+render thread cannot exceed 10 fps" — that number was an unmeasured
+inference and the recon falsifies it:
+
+| producer design | T4 ms/frame | fps | vs 16.4 fps floor |
+|---|---|---|---|
+| A full-frame live render (shipped loop, verbatim) | 24.1 | 41.4 | 2.5× |
+| B memmove scroll + strip render (live text kept) | 7.1 | 141 | 8.6× |
+| C pre-rendered ring (steady state = 1 memcpy) | 6.8 | 147 | 9.0× |
+
+Two concurrent frame-sized copies sustain 8.8 GB/s aggregate (near-2×
+single-thread) — memory bandwidth is not the wall at this depth either.
+So the producer computes 41 fps offline yet delivers 8.19 fps deployed:
+a **5× gap that no bench above explains**. The open hypothesis is the
+serialized `render → XShmPutImage → XSync` loop paying the X thread's
+own per-frame work (blit copy, damage, the ~20 ms capture pack) inside
+every `XSync`, plus possible phase effects with the deferred-update
+timer — to be decomposed by #65 step 0 (producer-side timestamps),
+which is why instrumentation precedes any redesign. Design consequence:
+the fix is **decoupling** (render the next frame during the previous
+frame's sync; bound outstanding blits at 2), and design B is preferred
+over the ring because it keeps live per-frame CPU text rendering
+(requirement 2 in its strictest reading) at an 8.6× compute margin and
+~18 % of one core at a 25 fps target (requirement 3). The ring remains
+the fallback if in-session measurement shows even B producer-limited.
 Consequences until fixed: the 2026-07-31 m=2 textflood A/B (1.41×) is
 annotated as producer-confounded — both arms may have been paced by the
 same producer and the batch's true gain understated; the m=1 "0/205
