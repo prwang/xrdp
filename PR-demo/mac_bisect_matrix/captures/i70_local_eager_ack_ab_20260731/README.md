@@ -75,6 +75,67 @@ non-worker part. **The remaining serializer is the worker thread, not
 the ack** — BACKLOG #40/#41 (FR-PROC-7 submit/collect construction with
 bounded worker admission), which #70 already names as its co-requisite.
 
+### CORRECTION (2026-07-31, same day): where the time actually is
+
+The paragraph above is right that the ack is no longer the constraint
+and wrong about what replaced it. Two follow-up measurements, both
+cheap, both from the archived traces and an offline bench — no new
+fleet run:
+
+**1. The LTR rewrite is NOT in the tail, and it is not heavy.** It runs
+inside `collect_pair`, i.e. BEFORE the `absorb` stamp, so it is part of
+the measured 20.5 ms submit→absorb "encode" leg, mixed with the child's
+own encode wait. `tools/avc444_ltr_rewrite_bench.c` links the SHIPPED
+`xrdp_h264_annexb.o` (not a copy) and runs it over real 2560x1440
+h264_vaapi CQP-20 Annex-B at 900 KB/pair — within 9 % of this session's
+measured 984 KB/frame:
+
+```
+rewrite  per PAIR 1.750 ms   1.94 ns/byte   4800 packets, 0 failures
+copy-in  per PAIR 0.028 ms
+```
+
+Scaled to 984 KB/frame that is **~1.9 ms/frame — about 9 % of the
+encode leg and 6 % of the period.** The PRD's premise that the NUT
+packet is cheap to convert is NOT refuted by anything measured here.
+
+**2. The tail is dominated by the MAIN thread, not the worker.**
+Splitting tail(N) at the first `GFX_TRACE send` for that frame (the
+instant the main thread begins writing it) — all three events are lines
+in one log read in one clock, 1 ms resolution, and the split reproduces
+the monotonic-clock tail means exactly:
+
+| | control | eager |
+|---|---|---|
+| tail absorb→egress | 18.0 ms | 19.7 ms |
+| worker: absorb→first send | 2.6 ms | 7.0 ms |
+| **main: first send→egress** | **15.4 ms** | **12.7 ms** |
+
+1557/1557 and 1729/1729 frames ordered correctly, so the id pairing
+(`id_server` is 0-based, the ACK_TRACE id is 1-based) is sound.
+
+So the largest single serial segment in the cycle is the main thread
+handing ~1.2 MB of PDUs per frame to the transport. Note the worker
+column is emit **plus** handoff latency: it rises 2.6 → 7.0 ms between
+arms doing identical work, because in the eager arm the main thread is
+still writing frame N−1 when N is enqueued. That is a queue, not extra
+work.
+
+**Open, and NOT concluded here:** whether those 12.7 ms are the server's
+own send cost or backpressure from the oracle client decoding two
+450 KB views per frame. 1.2 MB × 30 fps = 288 Mbit/s; a client that
+cannot drain that fills the socket and blocks the writer. Distinguishing
+"server-bound" from "client-bound" needs a socket-level measurement and
+is the question to answer BEFORE #40 is assumed to be the next lever.
+
+## What is still unattributed
+
+`absorb(N) → submit(N+1)` is 8.5 ms (p50) in the eager arm with frame
+N+1 already queued, of which ~7.0 ms is accounted for above as emit +
+handoff. The rewrite (1.9 ms) is not in this window, and the vmsplice
+feed is not either (`SPLICE_F_NONBLOCK`, driven inside the pump). An
+emit-boundary stamp would close it; it has not been added.
+
 ## Step 0 — ANSWERED, and the answer is NO
 
 The July probe (`e41bcb59`) concluded from raw-offset uprobes that "the
