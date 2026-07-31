@@ -702,6 +702,162 @@ START_TEST(test_overlap_m1_closed_ack_window_is_serial)
 }
 END_TEST
 
+/* --- adversarial: the model must RED on constructs that cannot happen ---
+ *
+ * drive_pipeline() is a model, and a model that cannot be wrong proves
+ * nothing. Two silent modelling errors already slipped through while
+ * writing the tests above -- acking in the same tick as the send, and a
+ * 1-tick encode -- and BOTH made every configuration read depth 1, so a
+ * "depth == 1" assertion passed for the wrong reason. These pin the
+ * model's own invariants so the next such error fails loudly instead of
+ * quietly agreeing with whatever was expected.
+ */
+START_TEST(test_overlap_model_never_exceeds_its_own_bounds)
+{
+    int cap;
+    int fif;
+    int mon;
+
+    /* A capture that is outstanding occupies a slot AND a window entry,
+     * so depth can never exceed either bound. A model that reports more
+     * has invented capacity: it would let a future "the fix works" claim
+     * pass on arithmetic that no shipped code can produce. */
+    for (mon = 1; mon <= 3; ++mon)
+    {
+        for (cap = 1; cap <= 3; ++cap)
+        {
+            for (fif = 1; fif <= 6; ++fif)
+            {
+                int d = drive_pipeline(mon, cap, fif, 2, 32);
+
+                ck_assert_int_le(d, cap);
+                ck_assert_int_le(d, fif);
+                ck_assert_int_ge(d, 0);
+            }
+        }
+    }
+}
+END_TEST
+
+START_TEST(test_overlap_model_zero_capacity_yields_no_captures)
+{
+    /* A window shut to nothing must produce NO captures: fif = 0 makes
+     * frame_id_client + 0 > frame_id_server false from the first frame.
+     * A model that still reports depth here is admitting work through a
+     * closed gate, which is the exact failure mode that would make a
+     * broken flow-control change look healthy. */
+    ck_assert_int_eq(drive_pipeline(1, 2, 0, 2, 32), 0);
+    ck_assert_int_eq(drive_pipeline(2, 2, 0, 2, 32), 0);
+
+    /* cap = 0 does NOT mean "no captures": xup_cap_budget_clamp_cap()
+     * floors the cap at 1 by design, so a degenerate or unset cap
+     * degrades to a serial pipeline rather than wedging the session
+     * entirely. Asserting 0 here was this test's own first draft and it
+     * failed against the shipped floor -- pinned so the floor cannot be
+     * removed silently. */
+    ck_assert_int_eq(drive_pipeline(1, 0, 2, 2, 32), 1);
+    ck_assert_int_eq(drive_pipeline(1, -5, 2, 2, 32), 1);
+    /* and the ceiling: a cap above the slot count cannot buy depth the
+     * shmem layout has no slots for */
+    ck_assert_int_le(drive_pipeline(1, 99, 8, 4, 48),
+                     XUP_CAP_AVC444_SLOT_COUNT);
+}
+END_TEST
+
+START_TEST(test_overlap_model_instant_ack_cannot_overlap)
+{
+    /* THE IMPOSSIBLE CONSTRUCT, pinned. enc_ticks = 1 means the frame is
+     * acknowledged in the same tick it was sent, so nothing can ever be
+     * outstanding while the next capture is admitted. Depth MUST be 1 at
+     * every window size -- if this ever reads >= 2 the model is
+     * overlapping frames that were already retired, and every positive
+     * result above becomes meaningless.
+     *
+     * This is not hypothetical: the first version of drive_pipeline()
+     * acked inside the capture loop and reported depth 1 for m=1 fif=2
+     * (no overlap) and depth 2 for m=1 fif=1 (overlap with a SMALLER
+     * window) -- an inversion that only showed up because the controls
+     * disagreed with each other.
+     *
+     * enc_ticks = 0, not 1: one tick of latency still leaves the frame
+     * outstanding across the next tick's capture attempt, so it legally
+     * reaches depth 2. Asserting this at enc_ticks = 1 was this test's
+     * own first draft and it failed -- which is the point of writing it. */
+    int fif;
+
+    for (fif = 1; fif <= 8; ++fif)
+    {
+        ck_assert_int_eq(drive_pipeline(1, 2, fif, 0, 32), 1);
+        ck_assert_int_eq(drive_pipeline(2, 2, fif, 0, 32), 1);
+    }
+    /* one tick of latency is the SHALLOWEST setting that can overlap,
+     * and it must -- otherwise the positive m=1 result above is riding
+     * on the latency parameter rather than on the gates */
+    ck_assert_int_ge(drive_pipeline(1, 2, 2, 1, 32), 2);
+}
+END_TEST
+
+START_TEST(test_cap_budget_two_gates_agree)
+{
+    /* xup_cap_budget has TWO gates on the same rule: has_capacity()
+     * predicts, record_send() enforces. They must agree exactly.
+     *
+     * Found by mutation testing 2026-07-31: deleting the has_capacity()
+     * call from the pipeline model changed NOTHING, because record_send()
+     * refuses over-cap sends on its own. That is good defence in depth
+     * and it was entirely unasserted -- so a change that broke the
+     * PREDICTOR while leaving the enforcer intact (or vice versa) would
+     * pass CI, and callers that branch on has_capacity() without checking
+     * record_send()'s return would silently drop frames. */
+    struct xup_cap_budget b;
+    int cap;
+    int i;
+    int mon;
+
+    for (cap = 1; cap <= XUP_CAP_AVC444_SLOT_COUNT; ++cap)
+    {
+        xup_cap_budget_reset(&b);
+        for (mon = 0; mon < 2; ++mon)
+        {
+            int rect_id = 0;
+
+            for (i = 0; i < 8; ++i)
+            {
+                int predicted = xup_cap_budget_has_capacity(&b, mon, 0,
+                                                            cap);
+                int refused;
+
+                ++rect_id;
+                refused = xup_cap_budget_record_send(&b, mon, rect_id, 0,
+                                                     cap) != 0;
+                /* predicted capacity <=> the send was accepted */
+                ck_assert_int_eq(predicted, refused ? 0 : 1);
+            }
+        }
+    }
+}
+END_TEST
+
+START_TEST(test_overlap_model_widening_window_never_reduces_depth)
+{
+    /* Monotonicity. Relaxing a gate cannot make the pipeline shallower;
+     * if it does, the model has a bookkeeping bug (an off-by-one in the
+     * pending queue, or retiring against the wrong id). This is the
+     * invariant that the fif=4 probe SHOULD have been checked against
+     * before it was read as evidence (BACKLOG #64). */
+    int fif;
+    int prev = 0;
+
+    for (fif = 1; fif <= 8; ++fif)
+    {
+        int d = drive_pipeline(1, 4, fif, 3, 48);
+
+        ck_assert_int_ge(d, prev);
+        prev = d;
+    }
+}
+END_TEST
+
 START_TEST(test_overlap_m2_global_window_pins_each_monitor_to_one)
 {
     /* PRD, measured and stated: at m >= 2 the overlap is "partial and
@@ -750,6 +906,11 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc, test_overlap_m1_single_slot_is_serial);
     tcase_add_test(tc, test_overlap_m1_closed_ack_window_is_serial);
     tcase_add_test(tc, test_overlap_m2_global_window_pins_each_monitor_to_one);
+    tcase_add_test(tc, test_overlap_model_never_exceeds_its_own_bounds);
+    tcase_add_test(tc, test_overlap_model_zero_capacity_yields_no_captures);
+    tcase_add_test(tc, test_overlap_model_instant_ack_cannot_overlap);
+    tcase_add_test(tc, test_overlap_model_widening_window_never_reduces_depth);
+    tcase_add_test(tc, test_cap_budget_two_gates_agree);
     suite_add_tcase(s, tc);
     return s;
 }
