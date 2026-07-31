@@ -14,6 +14,35 @@
  * xrdp_mm.c:1171). */
 #define XRDP_AVC444_SURFACE_ALT 16
 
+/**
+ * Is the GFX ack window open for one more frame?
+ *
+ * This is the xrdp HALF of the flow control that decides whether capture
+ * of frame N+1 may overlap encode of frame N (PRD "Concurrency state of
+ * the encode pipeline": capture || encode is YES for m = 1). xorgxrdp
+ * owns the other half — the per-monitor xup_cap_budget in
+ * common/xup_client_info.h — and a capture happens only when BOTH admit
+ * it. xorgxrdp's rect_id_ack advances only when this predicate lets
+ * mod_frame_ack through, so a window closed here pins the capture side
+ * to one outstanding frame no matter how many slots it has.
+ *
+ * Extracted from the xrdp_mm_update_module_ack call site so the joint
+ * state machine is unit-testable: overlap at m = 1 is a PRD requirement
+ * and had no CI assertion until BACKLOG #64 (test_avc444_multimon.c).
+ * Behaviour is unchanged — this is the same comparison, by name.
+ *
+ * @param frame_id_client  last frame id the client has acknowledged
+ * @param frame_id_server  last frame id the server has sent
+ * @param frames_in_flight window size (DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT)
+ * @return != 0 if another frame may be admitted
+ */
+static inline int
+xrdp_gfx_ack_window_open(int frame_id_client, int frame_id_server,
+                         int frames_in_flight)
+{
+    return frame_id_client + frames_in_flight > frame_id_server;
+}
+
 #define ENC_IS_BIT_SET(_flags, _bit) (((_flags) & (1 << (_bit))) != 0)
 #define ENC_SET_BIT(_flags, _bit) do { _flags |= (1 << (_bit)); } while (0)
 #define ENC_CLR_BIT(_flags, _bit) do { _flags &= ~(1 << (_bit)); } while (0)

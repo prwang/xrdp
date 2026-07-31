@@ -1612,7 +1612,8 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
     else
     {
         int fif = encoder->frames_in_flight;
-        if (encoder->frame_id_client + fif > encoder->frame_id_server)
+        if (xrdp_gfx_ack_window_open(encoder->frame_id_client,
+                                     encoder->frame_id_server, fif))
         {
             if (encoder->frame_id_server > encoder->frame_id_server_sent)
             {

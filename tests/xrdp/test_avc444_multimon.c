@@ -7,6 +7,7 @@
 #include "xrdp.h"
 #include "xrdp_client_info.h"
 #include "xup_client_info.h"
+#include "xrdp_encoder.h"
 #include "test_xrdp.h"
 
 /* Exercises xrdp_mm_avc444_probe_dims(): the external ffmpeg AVC backend is
@@ -566,6 +567,158 @@ START_TEST(test_cap_budget_ack_everything_retires_all)
 END_TEST
 
 /******************************************************************************/
+/* capture || encode: the JOINT flow control, both halves at once.
+ *
+ * The two halves live in different processes and are separately tested
+ * above (xup_cap_budget) and by construction (xrdp_gfx_ack_window_open).
+ * Neither alone decides whether capture of frame N+1 overlaps encode of
+ * frame N — a capture happens only when BOTH admit it, and the coupling
+ * is that xorgxrdp's rect_id_ack advances ONLY when the xrdp window lets
+ * mod_frame_ack through. This models that loop.
+ *
+ * PRD "Concurrency state of the encode pipeline" requires capture ||
+ * encode at m = 1, and it had no CI assertion until BACKLOG #64 — where
+ * a 180 s remote run was spent on a property that a unit test settles.
+ * The wall-clock claim is NOT what is asserted here (a unit test cannot
+ * measure wall clock); what is asserted is that the shipped predicates
+ * ADMIT the overlap at m = 1 and refuse it when either half is closed.
+ * That is the part a code change can regress.
+ *
+ * drive_pipeline() runs the loop for `frames` sends and returns the
+ * maximum number of captures outstanding at any instant — the pipeline
+ * depth. Depth >= 2 is overlap; depth 1 is a serial pipeline.
+ */
+#define DRIVE_MAX_PENDING 64
+
+static int
+drive_pipeline(int monitors, int cap, int fif, int enc_ticks, int ticks)
+{
+    struct xup_cap_budget b;
+    int frame_id_server = 0;    /* frames xrdp has sent */
+    int frame_id_client = 0;    /* frames the client has acknowledged */
+    int rect_id = 0;            /* xorgxrdp's cumulative capture id */
+    int rect_id_ack = 0;        /* how far mod_frame_ack has released it */
+    /* frames sent but not yet acknowledged, oldest first: the round trip
+     * is what creates the overlap, so it must be modelled explicitly */
+    int pend_frame[DRIVE_MAX_PENDING];
+    int pend_rect[DRIVE_MAX_PENDING];
+    int pend_due[DRIVE_MAX_PENDING];
+    int pend_n = 0;
+    int max_depth = 0;
+    int i;
+    int mon;
+
+    xup_cap_budget_reset(&b);
+    for (i = 0; i < ticks; ++i)
+    {
+        /* CAPTURE STAGE. A capture happens only when BOTH halves admit
+         * it: xorgxrdp's per-monitor slot budget and xrdp's global ack
+         * window. This is the coupling under test. */
+        for (mon = 0; mon < monitors; ++mon)
+        {
+            int depth;
+
+            if (!xrdp_gfx_ack_window_open(frame_id_client,
+                                          frame_id_server, fif))
+            {
+                break;
+            }
+            if (!xup_cap_budget_has_capacity(&b, mon, rect_id_ack, cap))
+            {
+                continue;
+            }
+            ++rect_id;
+            if (xup_cap_budget_record_send(&b, mon, rect_id,
+                                           rect_id_ack, cap) != 0)
+            {
+                continue;
+            }
+            ++frame_id_server;
+            if (pend_n < DRIVE_MAX_PENDING)
+            {
+                pend_frame[pend_n] = frame_id_server;
+                pend_rect[pend_n] = rect_id;
+                pend_due[pend_n] = i + enc_ticks;
+                ++pend_n;
+            }
+            /* outstanding captures for THIS monitor right now; >= 2 means
+             * frame N+1 was captured while N was still unretired */
+            depth = xup_cap_budget_retire(&b, mon, rect_id_ack);
+            if (depth > max_depth)
+            {
+                max_depth = depth;
+            }
+        }
+
+        /* COMPLETION STAGE: a frame captured at tick T is acknowledged at
+         * T + enc_ticks, and that ack is the ONLY thing that advances
+         * rect_id_ack. The latency is the whole point -- two capture
+         * slots exist because the encode outlasts the capture, so with
+         * enc_ticks = 1 nothing could ever run ahead and every
+         * configuration would trivially read depth 1. */
+        while (pend_n > 0 && pend_due[0] <= i)
+        {
+            int k;
+
+            frame_id_client = pend_frame[0];
+            rect_id_ack = pend_rect[0];
+            for (k = 1; k < pend_n; ++k)
+            {
+                pend_frame[k - 1] = pend_frame[k];
+                pend_rect[k - 1] = pend_rect[k];
+                pend_due[k - 1] = pend_due[k];
+            }
+            --pend_n;
+        }
+    }
+    return max_depth;
+}
+
+START_TEST(test_overlap_m1_capture_and_encode_do_overlap)
+{
+    /* THE REQUIREMENT: one monitor, shipped cap of 2 and shipped window
+     * of 2 (DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT). Frame N+1's capture must
+     * be admitted while frame N is still outstanding. */
+    ck_assert_int_ge(drive_pipeline(1, 2, 2, 2, 32), 2);
+}
+END_TEST
+
+START_TEST(test_overlap_m1_single_slot_is_serial)
+{
+    /* Control: the SAME loop with one capture slot must NOT overlap. If
+     * this ever reaches 2 the model is admitting captures the budget did
+     * not grant, and the test above proves nothing. */
+    ck_assert_int_eq(drive_pipeline(1, 1, 2, 2, 32), 1);
+}
+END_TEST
+
+START_TEST(test_overlap_m1_closed_ack_window_is_serial)
+{
+    /* Control: slots are available (cap 2) but the xrdp window is 1, so
+     * rect_id_ack never advances far enough to free the second slot.
+     * This is the coupling — the capture side cannot overlap on its own,
+     * which is why BOTH halves belong in one test. */
+    ck_assert_int_eq(drive_pipeline(1, 2, 1, 2, 32), 1);
+}
+END_TEST
+
+START_TEST(test_overlap_m2_global_window_pins_each_monitor_to_one)
+{
+    /* PRD, measured and stated: at m >= 2 the overlap is "partial and
+     * accidental" — cross-monitor interleaving, while the two-slot
+     * mechanism is inert PER MONITOR, because the global window of 2 is
+     * consumed by 2 monitors at one frame each. Pinned here so that a
+     * change making the window per-monitor shows up as a deliberate
+     * test update rather than a silent behaviour change. */
+    ck_assert_int_eq(drive_pipeline(2, 2, 2, 2, 32), 1);
+    /* and the fix, when it comes: a window of 2 PER monitor restores
+     * per-monitor depth 2 without a global pool (which the PRD forbids
+     * for bufferbloat) */
+    ck_assert_int_ge(drive_pipeline(2, 2, 2 * 2, 2, 32), 2);
+}
+END_TEST
+
+/******************************************************************************/
 Suite *
 make_suite_avc444_multimon(void)
 {
@@ -593,6 +746,10 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc, test_cap_budget_two_monitors_never_reach_three);
     tcase_add_test(tc, test_cap_budget_slot_alternates_per_monitor);
     tcase_add_test(tc, test_cap_budget_ack_everything_retires_all);
+    tcase_add_test(tc, test_overlap_m1_capture_and_encode_do_overlap);
+    tcase_add_test(tc, test_overlap_m1_single_slot_is_serial);
+    tcase_add_test(tc, test_overlap_m1_closed_ack_window_is_serial);
+    tcase_add_test(tc, test_overlap_m2_global_window_pins_each_monitor_to_one);
     suite_add_tcase(s, tc);
     return s;
 }
