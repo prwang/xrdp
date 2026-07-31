@@ -1307,6 +1307,108 @@ what a 1.41x says is needed.
 
 ---
 
+## #64 — capture/encode NEVER overlap on multimon: `inflight=0` always, and widening the window does not fix it (TODO, HIGH — BLOCKS #63)
+
+**The observation.** Across two 180 s T4 runs, `GFX_TRACE enc` reports
+`inflight=0` on **every single sample** — 2018/2018 at `fif=2` and
+2084/2084 at `fif=4`. The encoder is idle at the moment of every
+submission. FR-CAPTURE-8 (#37) exists to make capture of frame N+1 overlap
+encode of frame N; on this two-monitor configuration it never does.
+
+The measured cost: the period is a strictly serial chain —
+capture+pack 63.7 ms, then encode+assembly 68.4 ms, then 41.5 ms idle —
+132.1 ms of 173.7 ms (76 %) inside our pipeline, on a box running at
+**1.33 of 4 cores with nothing pinned** (`session_cpu_split.txt`).
+
+### Hypothesis 1 — the global ack window. FALSIFIED 2026-07-31.
+
+xrdp releases xorgxrdp's capture slots only via
+`xrdp_mm_update_module_ack`: `if (frame_id_client + fif > frame_id_server)`
+with `fif = DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT = 2`, a **global** counter,
+while xorgxrdp's `xup_cap_budget` is **per monitor**. At 2 monitors
+`frame_id_server` advances 2 per cycle, so a global window of 2 admits
+1 outstanding frame per monitor and cancels the second slot.
+
+**This is exactly the defect PRD § already flagged on 2026-07-29** ("the
+budget is global while the slots are per-monitor, so at m monitors this
+allows only one frame in flight per monitor"), and the PRD's remedy is
+**≤ 2 outstanding PER MONITOR — never a global pool of 2m**, because a
+pool "lets one damaged monitor run 4-deep on 2 slots: bufferbloat, +2
+frames latency, slot aliasing". Assigned to #45 step 6; xorgxrdp's half
+was implemented (per-monitor `xup_cap_budget`), xrdp's ack window was not.
+
+Probed with the existing `XRDP_GFX_FRAMES_IN_FLIGHT=4` knob — **the
+forbidden global-pool shape, run only as a diagnostic** and reverted the
+same session (capture:
+`captures/e52_t4_fif4_PROBE_REVERTED_20260731/`):
+
+| | fif=2 | fif=4 (global pool) |
+|---|---|---|
+| `inflight` | 0 / 2018 | **0 / 2084 — unchanged** |
+| mean per send | 87.0 ms | **98.1 ms (worse)** |
+| idle window | 41.5 ms | **63.2 ms (worse)** |
+| final ack -> next batch | 23.5 ms | 19.2 ms |
+
+The window demonstrably took effect (`fif=4` on all 8328 send lines) and
+acks did return sooner, yet **no concurrency appeared and latency rose** —
+the PRD's predicted bufferbloat, reproduced. So the global ack window is
+**not** the binding constraint, and making it per-monitor (the correct fix
+per the PRD) is necessary for correctness but is **not sufficient** to
+close this item. Do not implement it and declare victory.
+
+### Open hypotheses, in the order to test them
+
+**H2 — the deferred-update callback is never re-entered while an encode is
+outstanding.** `rdpDeferredUpdateCallback` captures BOTH monitors in one
+pass (step 7 batching) and returns; a second capture requires the timer to
+re-arm via `rdpScheduleDeferredUpdate`, which early-returns while
+`updateScheduled` is TRUE. If the re-arm is coupled to the send/ack rather
+than to damage, capture can never run ahead regardless of budget.
+**Decisive test:** uprobe counts of `rdpDeferredUpdateCallback` entries vs
+`rdpCapRect` calls over 40 s. If entries >> captures, the callback is
+firing and being denied at the capacity gate (-> H3). If entries ~= captures
+(~1 per period), the callback is not being scheduled and H2 is confirmed.
+`PR-demo/t4_profile/xorg_capture_uprobe.sh` already does this shape; add
+the two symbols.
+
+**H3 — the capacity gate denies despite free slots.** `xup_cap_budget`
+retires on `rect_id_ack`; if `rect_id_ack` only advances once per cycle,
+`count[mon]` never drops below the cap in time. Distinguished from H2 by
+the same uprobe, plus logging `rect_id`/`rect_id_ack` per pass.
+
+**H4 — the batch itself serialises.** Step 7 arms all 4 children on ONE
+deadline and waits for the set. If the pump set is drained synchronously
+before the callback returns, then by construction nothing is in flight
+when the next submission happens — which would explain `inflight=0`
+independently of any budget, and would mean #45 step 7 traded pipelining
+for batching. **This is the hypothesis most consistent with the evidence**
+(it predicts `inflight=0` exactly, under any window size) and should be
+tested first if the uprobe shows the callback is firing normally.
+
+### Why this blocks #63
+
+#63 (4:2:0 during motion) removes work from the serial chain — worth
+~45 % of the encode segment and ~half the pack. But if the chain is serial
+because of H4, the same serialisation will bound the result afterwards,
+and #63's measured win will be smaller than its arithmetic predicts.
+Establish the cause here first, so #63 is measured against a pipeline
+whose concurrency behaviour is understood.
+
+### Acceptance criteria
+
+* the serialiser NAMED, with a uprobe or trace count that distinguishes
+  H2/H3/H4 — not an inference from a stripped stack (#59's lesson);
+* the fix keeps **per-monitor** accounting on both sides of the xup
+  boundary; a global pool of 2m is a spec violation regardless of what it
+  measures;
+* `inflight > 0` observed on a material fraction of samples — the
+  mechanism check, and the thing that decides whether the fix worked
+  (a rate improvement without it is not evidence);
+* E5-2 pair re-run and DECOMPOSED with `e52_period_decompose.py`;
+* unit tests under `tests/` for the budget/scheduling logic changed.
+
+---
+
 ## #56 — A cold GPU makes the first login fall back to RFX, silently (TODO, HIGH)
 
 Found on the T4 on 2026-07-30 (#55). On the **first RDP connection after

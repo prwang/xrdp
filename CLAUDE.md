@@ -147,6 +147,52 @@ Concretely:
   cause unknown, fix not validated", capture forensics, and root-cause on
   the real path. The backlog fallback item was withdrawn (see `BACKLOG.md`).
 
+## Scientific quality gate (owner directive, 2026-07-31)
+
+**No number reaches the owner until it has been checked against the five
+questions below.** The owner's time is not the place where nonsense
+results get caught. If a check trips, the anomaly is reported FIRST — with
+a hypothesis for what could produce it — and investigated before the
+number is offered as a result. A result that does not make sense is not a
+result; it is a bug in the experiment until proven otherwise.
+
+Run all five, every time, before presenting:
+
+1. **Do the numbers agree with each other?** Recompute the derived
+   quantities from the raw ones and check they close. Rates against
+   counts and durations, segments against totals, per-monitor against
+   aggregate. *(Missed 2026-07-31: a VERDICT printed "baseline 51.1 ms ->
+   0.42x" from a stale default `E5_BASE_MS` and was passed over.)*
+2. **Did the intervention actually change the mechanism it targets?**
+   A knob that was set but produced no change in the mechanism's own
+   telemetry has not been tested — it has failed to apply, or the
+   mechanism is not what was believed. Report that, not the downstream
+   rate. *(Missed 2026-07-31: `XRDP_GFX_FRAMES_IN_FLIGHT=4` was applied,
+   `fif=4` confirmed on the wire, and `inflight` stayed 0 on all 2084
+   samples — the concurrency the change existed to create never appeared,
+   yet the rate was reported first.)*
+3. **Does the change violate a written spec?** Grep `PRD.md` and
+   `BACKLOG.md` for the mechanism BEFORE running, not after. The PRD had
+   already forbidden the exact global-pool shape probed on 2026-07-31,
+   naming its predicted symptoms — bufferbloat, +2 frames latency, slot
+   aliasing — and the probe reproduced them.
+4. **Is it a regression against a previous recorded measurement?** Any
+   metric that moved the wrong way versus a number already in
+   `BACKLOG.md`/`PRD.md`/a capture README must be surfaced with the
+   comparison, not quietly superseded. *(2026-07-31: fif=4 measured 98.1 ms
+   against fif=2's 87.0 ms, and textflood 87.0 ms against codeflood's
+   46-72 ms.)*
+5. **Is the comparison apples-to-apples?** A ratio is only meaningful
+   within one payload, one client, one resolution set. If the workload
+   changed, say so before quoting the number, and do not compare it to the
+   old series.
+
+Corollary: **an experiment that fails its own mechanism check is a red
+result.** It does not become a green one by having a plausible rate
+attached. State plainly that the hypothesis was falsified, revert the
+change, and record the next open hypothesis rather than reaching for the
+nearest explanation.
+
 ## Demo & reproduction scaffolding
 
 - **`PR-demo/`** holds box-specific reproduction harnesses (and their committed
