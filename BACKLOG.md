@@ -1245,7 +1245,153 @@ Present requests, so the path stops being fed instead.
 
 ---
 
-## #63 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (**BLOCKED on #64c** — was blocked on #65 until step 0 exonerated the producer; FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which the ack-paced capture (#64c) prevents regardless of producer speed)
+## Corrected-attribution record (2026-07-31, compressed)
+
+Four superseded analyses of "why is the E5-2 pipeline serial", kept as
+one paragraph each; full text in git history (46207bd7, f5e01aec,
+6cb07227, 94d5c1ec) and in the capture READMEs.
+
+1. **"`inflight=0` proves no overlap" — invalid metric.** `inflight` is
+   one ffmpeg child's internal queue depth, zero by design under
+   `-tune zerolatency`. The fif=4 probe against it was aimed at a value
+   that cannot move (`e52_t4_fif4_PROBE_REVERTED_20260731`).
+2. **"0/205 frames overlap" — mis-paired events.** Cycle-window pairing
+   attributed sends to the wrong frame (negative −3.3 ms segment was
+   the tell); frame-identity pairing plus the later probes show the
+   capture side pipelining is *admitted* but *starved by the ack*.
+3. **"The producer starves the pipeline" — conflated counters.** The
+   "8.19 fps producer" was the pipeline's send rate wearing the
+   producer's name; instrumented textflood measures 27.66 fps, 3.4×
+   the pipeline (`e52_t4_textflood_m1_4k_step0_20260731`). FR-BENCH-1
+   PASSES as measured.
+4. **"~100 ms cairo render" — unmeasured inference.** ring_recon
+   measured 24.1 ms on the T4; compute was never the constraint.
+
+What survived every correction: the uprobe result below (#64), which
+closes the chain with counters read from the live gates themselves.
+
+The blocking chain is now LINEAR: **#64 → #65 → #66**, then the #67
+benchmark re-runs. Nothing else advances until its predecessor closes.
+
+## #64 — rect_id ack protocol upgrade: ack-on-consume with echoed identity (TODO, **THE BLOCKER** — single-monitor capture‖encode; local-only, no T4 needed)
+
+### The proof (uprobes on the live deployed d77d054, 2026-07-31)
+
+Captures `e52_t4_ackpace_probe_20260731` + `e52_t4_ackpace_vars_20260731`,
+`PR-demo/t4_profile/xorg_ackpace_uprobe.sh` (ACKPACE_VARS=1 reads
+`rect_id`/`rect_id_ack` at callback entry by raw offset):
+
+| fact | value |
+|---|---|
+| timers armed (`rdpScheduleDeferredUpdate.part.0`) | 97/s |
+| callback fired | 33/s — timer is LIVE |
+| callbacks seeing outstanding=1 | 340 → **all 340 captured** |
+| callbacks seeing outstanding=2 | 1004 → all refused |
+| callbacks seeing outstanding=0 | **0 in 1344 samples** |
+
+Every component is doing its job — producer saturating (27.66 fps),
+timer firing, budget refusing exactly at cap. The serializer is
+arithmetic: **the ack value permanently trails the producer's
+`rect_id` by one beyond true in-flight** (`rack = rid−1` at every
+capture, `rid−2` during every encode, `rid` never). One of the two
+FR-CAPTURE-8 slots is pinned by a ghost — a frame xrdp long since
+disposed of — so capture‖encode is impossible for the session,
+regardless of window size (why fif=4 changed nothing).
+
+Root cause: xrdp acks with **its own count of encoded-and-sent frames**
+(`frame_id_server`), not an echo of the incoming id. Any paint msg
+consumed without a sent frame — AVC444 `rv=PENDING` warmup, error
+paths, ship-the-pair-or-nothing drops (`xrdp_encoder.c` "no pair;
+client keeps prior content") — desyncs the counters, and cumulative
+arithmetic makes one miss permanent. The weakness is inherited from
+upstream's protocol (which cannot express "consumed, nothing shown");
+the consume-without-send paths that trigger it are ours; our budget=2
+converted upstream's would-be freeze into a silent 50 % degradation.
+
+### The upgrade (spec lives in PRD FR-ACK-1, with the invariant proofs)
+
+Every consumed rect is acked with its **echoed id** and a `displayed`
+bit; `displayed=0` returns the frame's region to the dirty region.
+Slot liveness by identity, content completeness by re-dirty, bounds
+unchanged (≤2/monitor — the discard-when-fast valve stays in the dirty
+region, upstream of capture, untouched).
+
+### Exact change places and blast radius
+
+* `xrdp/xrdp_encoder.c` — the consume-no-output paths (both
+  `enc_rv != XRDP_FFMPEG_PAIR_READY` sites and the error returns in
+  the avc444 wiretosurface handlers) emit a zero-byte `enc_done`
+  carrying the incoming frame id + a new `ENC_DONE_FLAGS` displayed=0
+  bit, instead of returning NULL silently.
+* `xrdp/xrdp_mm.c` — `xrdp_mm_process_enc_done` acks the ECHOED id
+  (kills the parallel-counter identity assumption); handles
+  `comp_bytes==0` displayed=0 without touching the EGFX send path.
+* `xup/xup.c` — `send_paint_rect_ex_ack` carries displayed in the
+  existing `flags` argument (wire-compatible; old peers ignore it).
+* xorgxrdp `module/rdpClientCon.c` — a small per-outstanding region
+  ring beside the budget entries; on displayed=0, re-union that
+  frame's region into `dirtyRegion`. `xup_cap_budget` itself is
+  UNCHANGED (its accounting was proven correct by the probe).
+* NOT touched: EGFX client wire, auth/session paths, capture layout,
+  encoder children, LTR chain. Happy-path byte streams identical.
+
+### CI — old and new (the pair that completely defines the change)
+
+Old (passing today, and insufficient — they model a lossless consumer):
+`test_cap_budget_*` (accounting), `test_overlap_m1_*` /
+`test_overlap_model_*` (joint admission model, 161/161).
+
+New, in `tests/xrdp/test_avc444_multimon.c`:
+1. `test_overlap_lossy_encode_wedges_without_consume_ack` — RED
+   ratchet: drive_pipeline gains a loss mask; under today's
+   ack-only-on-send semantics one lost frame pins the model at
+   depth cap−1 forever (the live ghost, reproduced in logic).
+2. `test_overlap_consume_ack_restores_depth` — with ack-on-consume,
+   outstanding returns to 0 and sustained depth 2 recurs under any
+   loss mask (Invariants I+II in model form).
+3. `test_ack_value_is_echoed_identity` — ack ids equal producer ids
+   under arbitrary loss patterns; no drift term can exist.
+4. `test_dropped_frame_region_returns_to_dirty` — Invariant III: a
+   displayed=0 frame's region re-enters dirty and is captured by a
+   later frame.
+5. A serialization test for the displayed bit in the xup ack message.
+
+Mechanism check after the fix (fleet arm, LOCAL): outstanding=0
+callbacks appear, arm gaps go negative at m=1, sustained depth 2.
+
+### Deployment status (owner, 2026-07-31)
+
+The deployed pair (xrdp-dev `52b8798839ad` + xorgxrdp-dev `d77d054`)
+**displays correctly onscreen from the owner's UWP (Windows) and macOS
+clients** — the ack ghost costs throughput and latency, not visual
+correctness, consistent with every wire audit passing. **The T4 is
+DECOMMISSIONED** until #64 (single-mon) and #65 (multi-mon) are closed
+locally on the fleet; #67 re-provisions it (DEPLOY_RUNBOOK from bare
+AMI) for the headline re-measurement only.
+
+## #65 — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — blocked by #64)
+
+At m≥2 two further issues sit ON TOP of the #64 ghost:
+
+1. **The xrdp ack window is global while the budget is per-monitor.**
+   `xrdp_gfx_ack_window_open` (fif=2, global) admits ~1 outstanding
+   per monitor at m=2 and halves the intended per-monitor depth. The
+   PRD forbids widening the global pool (bufferbloat, measured
+   2026-07-31: 98.1 ms vs 87.0 ms); the spec shape is ≤2 PER MONITOR.
+   Pinned in CI: `test_overlap_m2_global_window_pins_each_monitor_to_one`
+   documents today's behaviour and flips on the fix.
+2. **The m≥2 serial cost is real and unexplained by overlap alone.**
+   173.7 ms period with 132.1 ms inside our pipeline at 1.33 of 4
+   cores; the 50.1 % cross-monitor interleaving does not make it
+   fast. After #64, re-decompose: how much was the ghost, how much is
+   step 7's whole-set drain (a late monitor holds the set), how much
+   is genuinely serial assembly.
+
+Acceptance: per-monitor window (never a pool), CI updated
+deliberately, fleet-arm decomposition showing per-monitor depth 2 at
+m=2, negative arm gaps on both monitors.
+
+## #66 — 4:2:0 while the screen is in motion, 4:4:4 when it settles (was #63; blocked by #65 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #64/#65 concurrency first)
 
 Motivated by #62's measured decomposition, not by intuition. On the T4 with
 the textflood payload the 173.7 ms period is:
@@ -1305,627 +1451,24 @@ what a 1.41x says is needed.
 * the E5-2 pair re-run and DECOMPOSED, not just rated;
 * a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
 
----
+## #67 — T4 benchmark re-runs under restored concurrency (blocked by #64+#65; #66 optional but preferred)
 
-## #64 — WITHDRAWN 2026-07-31: the "capture/encode never overlap" finding was a measurement error, twice over
+The numbers the PR sells, re-measured on the representative box once
+the mechanism is proven locally. Requires re-provisioning the T4 from
+bare AMI (DEPLOY_RUNBOOK + persistent-harness install — it must reach
+measurable with no ad-hoc steps).
 
-**This item was filed on evidence that does not support it, and both
-pieces of that evidence have now been shown to be artefacts. Overlap is a
-PRD requirement, the PRD already states where it does and does not hold,
-and the corrected measurement agrees with the PRD.** What survives is a
-harness defect list and one genuinely open question (below), not a bug in
-the pipeline. Left in full rather than deleted, because how it went wrong
-is the reusable part.
-
-### Error 1 — `inflight` does not measure capture/encode overlap
-
-`inflight` in `GFX_TRACE enc` is
-`pairs_submitted - pairs_returned` **inside one ffmpeg child**
-(`xrdp_ffmpeg_avc444_inflight`, `xrdp_encoder_ffmpeg.c:2038`), logged on
-the same call that submitted the frame. The shipped args are
-`-tune zerolatency` (libx264) / `-async_depth 1` (VAAPI), which by design
-return the coded picture on the submitting call — the accessor's own
-comment says so: *"zero with the shipped low-latency args"*. Confirmed on
-the archived trace: **`rv=READY` on 2018/2018 samples**, i.e. every
-submission returned synchronously.
-
-So `inflight == 0` is the DESIGNED value. It cannot be anything else, at
-any monitor count, at any ack-window size, on any box. It is a statement
-about one encoder child's internal queue depth, **not** about whether
-xorgxrdp's capture runs concurrently with xrdp's encode. Hypothesis 1
-below was therefore probed against a metric that was incapable of moving,
-which is why it "did not respond" to `fif=4`.
-
-*Quality-gate check 2 exists for exactly this and still did not catch it:
-the check asks "did the intervention change the mechanism it targets", and
-the answer was correctly "no" — but the conclusion drawn was "a serialiser
-is blocking it" when the available conclusion was "this metric cannot
-show it". Amend the check: when a mechanism's telemetry does not move,
-rule out "the telemetry cannot move" BEFORE reaching for a blocker.*
-
-### Error 2 — the timestamp check paired events by cycle window
-
-The fallback evidence was a timestamp gap: `last=1` of cycle N to the
-batch arm of cycle N+1, positive on 1010/1010 cycles. That pairing is
-wrong. The `last=1` falling inside cycle N is the close of the frame
-captured in cycle **N-1**, because the next cycle arms *before* the
-previous frame's final send goes out. Visible directly in the raw trace:
-
-```
-batch cycle=2                                    .161
-send last=1 frame_id=1 id_server=0               .168   <- closes frame 0
-send last=0            id_server=1               .171   <- frame 1 starts
-enc submitted_seq=1                              .179
-batch cycle=3                                    .192   <- ARMS 3 ms BEFORE
-send last=1 frame_id=2 id_server=1               .195   <- frame 1 closes
-```
-
-The arithmetic said so before the trace did: on the single-monitor run the
-window pairing produced **`encode + assembly = -3.3 ms`**, a negative
-segment, because service (8.2 ms) came out *less than* capture (11.5 ms).
-A negative duration is the pairing confessing, and it was the thing that
-stopped the run from being reported.
-
-`e52_period_decompose.py` now pairs by frame identity (`id_server`) and
-measures `capture arm of frame N+1 - last=1 of frame N`. Re-run on the
-same archived traces:
-
-| run | overlapping cycles | median gap |
-|---|---|---|
-| 2 monitors, 4K+1440p, textflood | **1010 / 2015 (50.1 %)** | −11 ms |
-| 1 monitor (geometry void, see below) | **4634 / 6684 (69.3 %)** | −2 ms |
-
-**Capture and encode DO overlap.** The negative gap is the overlap.
-
-### What the PRD already said — and it matches
-
-PRD §"Concurrency state of the encode pipeline" specifies:
-
-> `capture ‖ encode` — **YES for m = 1, shipped** (FR-CAPTURE-8);
-> **partial and accidental for m ≥ 2** … the overlap that occurs is
-> *cross-monitor* interleaving, while the two-slot mechanism itself is
-> inert — `rect_id` advances by m between a monitor's consecutive sends
-
-The measured 50.1 % at m=2 is precisely "cross-monitor interleaving":
-consecutive `id_server` values alternate between the two monitors, so
-every second pair overlaps by construction. The spec predicted the number
-before it was measured. **Nothing here is a regression against the PRD.**
-
-### Methodology failure this exposed (owner directive, 2026-07-31)
-
-A PRD-required property was chased with a 180 s remote run on the T4 as
-the FIRST experiment, with no CI evidence presented and no local ladder.
-Correct order, binding from now on:
-
-1. **CI first.** `make check` — run it and quote it before any live claim
-   about a specified property. *(Run 2026-07-31: **152/152 PASS**,
-   including `test_cap_budget_cap2_reaches_depth_two`,
-   `test_cap_budget_slot_alternates_per_monitor`, and
-   `test_ffmpeg_pump_set_four_views_one_thread`. The accounting that
-   makes overlap possible is covered; wall-clock overlap is not — see the
-   open item below.)*
-2. **Local, short, cheap.** 5 s on the dev box (AMD VAAPI) at 1080p, then
-   5 s at 4K. Same analysis script, same assertion.
-3. **Only then the T4**, and only at the duration the question needs.
-
-A 180 s run is for a *rate*; a binary property like "do these two stages
-ever overlap" is answered by seconds of trace. Escalate resolution and
-duration only when the cheap rung passes and the question survives.
-
-### CI assertion — DONE 2026-07-31 (`7058ab97`)
-
-`xrdp_gfx_ack_window_open()` extracted from `xrdp_mm_update_module_ack`
-(by name, unchanged) into `xrdp_encoder.h` so the joint flow control is
-testable, and `drive_pipeline()` in `test_avc444_multimon.c` models the
-loop over BOTH real predicates. Four assertions, three of them controls:
-
-| config | depth | meaning |
-|---|---|---|
-| m=1 cap=2 fif=2 | **≥ 2** | the requirement |
-| m=1 cap=1 | 1 | no slots, no overlap |
-| m=1 cap=2 fif=1 | 1 | slots free, window shut — the cross-process coupling |
-| m=2 cap=2 fif=2 | 1 | the PRD's "inert per monitor" at m≥2 |
-| m=2 cap=2 fif=4 | ≥ 2 | what a per-monitor window would restore |
-
-`make check` **156/156 PASS**. Two modelling errors were caught by the
-controls while writing it (acking in the same tick as the send; a 1-tick
-encode) — both would have made every configuration read depth 1.
-
-### #64b — m=1 at 4K on the T4 does not overlap AT ALL (RESOLVED 2026-07-31: H-c — the PRODUCER is the serialiser; fix tracked as #65, which BLOCKS everything downstream)
-
-**Resolution.** Read the shipped gates instead of running more arms
-(escalation ladder rung 0, in hindsight the right first move):
-
-- xorgxrdp's `rdpDeferredUpdateCallback` DOES admit a second capture at
-  depth 1 — per-monitor budget of 2, checked per monitor with a
-  break-not-skip scan (`rdpClientCon.c`, verified 2026-07-31 in the
-  `d77d054` tree). The flow-control layer is not the serialiser.
-- `rdpScheduleDeferredUpdate` paces at `msFrameInterval` = 16 ms — a
-  16 ms timer cannot produce an 87 ms serialisation.
-- `budget exceeded` / `third capture` = 0 on every run: the gate was
-  never even ASKED for a second slot.
-
-So the second slot is never exercised because **no second frame of
-damage ever exists during an encode: textflood produces at 8.19 fps —
-equal to the pipeline's own period.** Its loop is
-`cairo render (~100 ms at 8.3 Mpx) → XShmPutImage → XSync`, single
-thread, zero internal pipelining. H-c, with the mechanism named. H-a
-and H-b are moot for this observation (the resolution sweep would have
-measured textflood's render cost against pixels, not the pipeline).
-
-The m=1 T4 row therefore convicts the producer, not the pipeline, and
-the finding moved into the PRD as **FR-BENCH-1** (the
-saturating-producer contract, FAILING). Fix is **#65**.
-
-Ladder run 2026-07-31, capture
-`captures/e52_t4_textflood_m1_4k_20260731/`:
-
-| rung | m | geometry | payload | overlap |
-|---|---|---|---|---|
-| CI | 1 | n/a | n/a | **admitted** (156/156) |
-| local arm-s | 1 | 1920×1080 | codeflood | 7/86 = **8.1 %** |
-| local arm-s | 1 | 3840×2160 | codeflood | 4/53 = **7.5 %** |
-| **T4** | 1 | 3840×2160 | textflood | **0/205 = 0.0 %** |
-
-**This is a regression against a number already in the PRD** (quality
-gate check 4). PRD "Concurrency state of the encode pipeline" records
-`capture ‖ encode` = **"YES for m = 1, shipped"**, measured at 1600×912
-where *"capture is fully hidden"* — frame period equalled encode
-duration while `cap->enc_entry` added 23.8 ms that never reached the
-period. At 3840×2160 on the same box, nothing is hidden: 0 of 205
-frames, and the gap's **minimum is +7 ms — never once negative**.
-
-Period decomposition (122.6 ms mean): capture+pack 46.7, encode+assembly
-40.7, idle 35.6. Closes to 122.9 ≈ 122.6.
-
-**Not the capture budget.** `budget exceeded` and `third capture` are 0
-on the T4 run and both local runs — the capture side never hit its own
-capacity limit. It never had a second frame to capture while the first
-was encoding, so the serialiser is upstream of the slot accounting.
-
-**Open hypotheses**, in order of fit to `min = +7 ms never crossed`:
-
-- **H-a: resolution-dependent, and the PRD's m=1 evidence is stale.**
-  The "fully hidden" measurement was at 1600×912 = 1.46 Mpx; this is
-  8.29 Mpx. If capture cost scales past encode cost, the two stages stop
-  interleaving. Test: sweep m=1 on the T4 at 1600×912, 1920×1080,
-  2560×1440, 3840×2160 with ONE payload and plot overlap % against
-  pixels. Cheap — 5–10 s per point, and it either reproduces the PRD's
-  own number at its own resolution or falsifies it.
-- **H-b: the damage/deferred-update timer gates it.** 29 % of the period
-  is idle awaiting damage, and the m=2 run's minimum gap was exactly
-  4.0 ms = `MIN_MS_TO_WAIT_FOR_MORE_UPDATES`. If the next capture cannot
-  arm until a timer fires, overlap is structurally impossible regardless
-  of slots. Test: the `rdpDeferredUpdateCallback` vs `rdpCapRect` uprobe.
-- **H-c: payload, not pipeline.** textflood damages the whole root every
-  frame; there may be no second frame's damage pending to capture. Test:
-  run the T4 m=1 with codeflood so the local and T4 rows share a payload
-  — the one comparison this ladder is currently missing.
-
-**Do H-a and H-c first**: both are short local-then-T4 runs, and H-c is
-the confound that currently prevents attributing the local-8 %/T4-0 %
-difference to anything at all (different payload AND different hardware —
-CLAUDE.md stand-in rule forbids reading it as nvenc-vs-VAAPI).
-
-### Still open (the m≥2 serial cost)
-
-The 2-monitor period is 173.7 ms with 132.1 ms of it inside our pipeline
-on a box at 1.33 of 4 cores. The 50.1 % overlap there is cross-monitor
-interleaving, exactly as the PRD describes, and it does not make that
-fast. The serial-cost question is real; the "never overlaps" framing was
-not.
-
-### Superseded observation (kept for the record)
-
-Across two 180 s T4 runs, `GFX_TRACE enc` reported
-`inflight=0` on **every single sample** — 2018/2018 at `fif=2` and
-2084/2084 at `fif=4`. Per Error 1 this is the designed value, not a
-finding.
-
-The measured cost: the period is a strictly serial chain —
-capture+pack 63.7 ms, then encode+assembly 68.4 ms, then 41.5 ms idle —
-132.1 ms of 173.7 ms (76 %) inside our pipeline, on a box running at
-**1.33 of 4 cores with nothing pinned** (`session_cpu_split.txt`).
-
-### Hypothesis 1 — the global ack window. Probed against an invalid metric; verdict WITHDRAWN.
-
-*(The probe below was run before Error 1 was known. Its `inflight`
-readings prove nothing either way — `inflight` cannot move. The
-rate/idle regressions it recorded are still real numbers and still
-reproduce the bufferbloat the PRD predicted for a global pool, so the
-"do not ship a global pool" conclusion stands on that evidence alone.)*
-
-xrdp releases xorgxrdp's capture slots only via
-`xrdp_mm_update_module_ack`: `if (frame_id_client + fif > frame_id_server)`
-with `fif = DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT = 2`, a **global** counter,
-while xorgxrdp's `xup_cap_budget` is **per monitor**. At 2 monitors
-`frame_id_server` advances 2 per cycle, so a global window of 2 admits
-1 outstanding frame per monitor and cancels the second slot.
-
-**This is exactly the defect PRD § already flagged on 2026-07-29** ("the
-budget is global while the slots are per-monitor, so at m monitors this
-allows only one frame in flight per monitor"), and the PRD's remedy is
-**≤ 2 outstanding PER MONITOR — never a global pool of 2m**, because a
-pool "lets one damaged monitor run 4-deep on 2 slots: bufferbloat, +2
-frames latency, slot aliasing". Assigned to #45 step 6; xorgxrdp's half
-was implemented (per-monitor `xup_cap_budget`), xrdp's ack window was not.
-
-Probed with the existing `XRDP_GFX_FRAMES_IN_FLIGHT=4` knob — **the
-forbidden global-pool shape, run only as a diagnostic** and reverted the
-same session (capture:
-`captures/e52_t4_fif4_PROBE_REVERTED_20260731/`):
-
-| | fif=2 | fif=4 (global pool) |
-|---|---|---|
-| `inflight` | 0 / 2018 | **0 / 2084 — unchanged** |
-| mean per send | 87.0 ms | **98.1 ms (worse)** |
-| idle window | 41.5 ms | **63.2 ms (worse)** |
-| final ack -> next batch | 23.5 ms | 19.2 ms |
-
-The window demonstrably took effect (`fif=4` on all 8328 send lines) and
-acks did return sooner, yet **no concurrency appeared and latency rose** —
-the PRD's predicted bufferbloat, reproduced. So the global ack window is
-**not** the binding constraint, and making it per-monitor (the correct fix
-per the PRD) is necessary for correctness but is **not sufficient** to
-close this item. Do not implement it and declare victory.
-
-### Open hypotheses, in the order to test them
-
-**H2 — the deferred-update callback is never re-entered while an encode is
-outstanding.** `rdpDeferredUpdateCallback` captures BOTH monitors in one
-pass (step 7 batching) and returns; a second capture requires the timer to
-re-arm via `rdpScheduleDeferredUpdate`, which early-returns while
-`updateScheduled` is TRUE. If the re-arm is coupled to the send/ack rather
-than to damage, capture can never run ahead regardless of budget.
-**Decisive test:** uprobe counts of `rdpDeferredUpdateCallback` entries vs
-`rdpCapRect` calls over 40 s. If entries >> captures, the callback is
-firing and being denied at the capacity gate (-> H3). If entries ~= captures
-(~1 per period), the callback is not being scheduled and H2 is confirmed.
-`PR-demo/t4_profile/xorg_capture_uprobe.sh` already does this shape; add
-the two symbols.
-
-**H3 — the capacity gate denies despite free slots.** `xup_cap_budget`
-retires on `rect_id_ack`; if `rect_id_ack` only advances once per cycle,
-`count[mon]` never drops below the cap in time. Distinguished from H2 by
-the same uprobe, plus logging `rect_id`/`rect_id_ack` per pass.
-
-**H4 — the batch itself serialises.** Step 7 arms all 4 children on ONE
-deadline and waits for the set. If the pump set is drained synchronously
-before the callback returns, then by construction nothing is in flight
-when the next submission happens — which would explain `inflight=0`
-independently of any budget, and would mean #45 step 7 traded pipelining
-for batching. **This is the hypothesis most consistent with the evidence**
-(it predicts `inflight=0` exactly, under any window size) and should be
-tested first if the uprobe shows the callback is firing normally.
-
-### Why this blocks #63
-
-#63 (4:2:0 during motion) removes work from the serial chain — worth
-~45 % of the encode segment and ~half the pack. But if the chain is serial
-because of H4, the same serialisation will bound the result afterwards,
-and #63's measured win will be smaller than its arithmetic predicts.
-Establish the cause here first, so #63 is measured against a pipeline
-whose concurrency behaviour is understood.
-
-### Acceptance criteria
-
-* the serialiser NAMED, with a uprobe or trace count that distinguishes
-  H2/H3/H4 — not an inference from a stripped stack (#59's lesson);
-* the fix keeps **per-monitor** accounting on both sides of the xup
-  boundary; a global pool of 2m is a spec violation regardless of what it
-  measures;
-* `inflight > 0` observed on a material fraction of samples — the
-  mechanism check, and the thing that decides whether the fix worked
-  (a rate improvement without it is not evidence);
-* E5-2 pair re-run and DECOMPOSED with `e52_period_decompose.py`;
-* unit tests under `tests/` for the budget/scheduling logic changed.
+* E5-2 m=1 4K and the m=2 A/B, decomposed, with FR-BENCH-1's two
+  saturation checks green in the VERDICT (producer stamps are now
+  default-on).
+* Re-verdict #62's 1.41× (annotated producer-confounded-then-cleared;
+  with the ghost fixed both arms should shift — quote old vs new).
+* Owner onscreen walk (T4 protocol §6): UWP + macOS visual pass was
+  informally confirmed 2026-07-31 pre-fix; repeat on the fixed build.
 
 ---
 
-## #56 — A cold GPU makes the first login fall back to RFX, silently (TODO, HIGH)
-
-Found on the T4 on 2026-07-30 (#55). On the **first RDP connection after
-boot**, `xrdp_mm_egfx_caps_advertise`'s ffmpeg verification times out and
-xrdp drops H.264 entirely:
-
-```
-xrdp_ffmpeg: probe TIMEOUT: no verdict within the deadline (cold encoder/device
-  init? child still starting?) (dump_extra=1, 3840x2400, packets=0, elapsed=4008 ms)
-  ffmpeg verification FAILED (TIMEOUT); removing external AVC candidate
-Codec search order is H264, RFX
-Matched RFX mode
-```
-
-Measured on the same box: `h264_nvenc` at 3840×2400 takes **3.95 s** cold
-and **1.40 s** warm. The probe deadline is ~4 s, so the cold path lands on
-top of it. With NVIDIA persistence mode off (the default) the driver is
-unloaded whenever no CUDA process is running, so this is not a
-once-per-boot event — it is *every* connection that follows an idle gap.
-
-Why it matters beyond the benchmark: the session comes up **looking fine**.
-The user gets RFX, at RFX quality, with no error anywhere except one WARN
-line in `xrdp.log`, and no retry — the AVC candidate is *removed* for the
-life of the connection. This is exactly the failure shape CLAUDE.md's
-strict-honesty rule is about: a fallback that converts a loud failure into
-a silent degradation.
-
-Options, none chosen yet (needs owner sign-off — a shipped fallback change):
-* make the probe deadline resolution- and encoder-aware rather than a flat
-  4 s, and log at ERROR when it fires;
-* warm the encoder once at xrdp start instead of at first connect;
-* re-probe on the next connection rather than removing the candidate for
-  the session;
-* document `nvidia-smi -pm 1` as a deployment requirement (what #55 did as
-  a workaround, recorded in the capture READMEs).
-
-Acceptance: a cold-boot first connection negotiates AVC444, proven by
-`xrdp.log` + a wire audit, with no persistence-mode workaround; and a probe
-timeout that *does* happen is loud.
-
----
-
-## #57 — xrdp-dev debs stop at a conffile prompt in non-interactive installs (TODO)
-
-`apt-get install -y /tmp/xrdp-dev_*.deb` on the T4 (2026-07-30) halted at
-`Configuration file '/etc/xrdp/cert.pem' ... What would you like to do about
-it ?` and then `dpkg: error processing package xrdp-dev (--configure): end of
-file on stdin at conffile prompt`, leaving xrdp-dev unpacked but not
-configured. `/etc/xrdp/rsakeys.ini` does the same. Both files are legitimately
-modified on any box that has ever generated its own key/cert, i.e. every
-deployed box.
-
-Workaround in use: `-o Dpkg::Options::=--force-confold`, now in the T4
-protocol and DEPLOY_RUNBOOK. Real fix: these are generated-at-install
-artifacts, not admin configuration — they should not be shipped as
-conffiles at all. Small, self-contained packaging change; belongs with the
-clean-room port (#46) rather than the dev branch.
-
----
-
-## #58 — The black-frame check cannot tell a login paint-in from a dropout (TODO)
-
-`oracle_black_frame_check.py` flags any black main-view picture with
-`0 < i < n-2` as mid-stream and FAILs the run. On the T4 that fires on
-every capture, because the session is XFCE and takes ~1.3 s to paint after
-`E_COLD=1` logs the previous one off: main-view luma is 0 through picture
-28, 0.77 at picture 30, 118.9 by picture 40, and zero black pictures in the
-remaining ~3 800. The fleet pods never showed it because they run the
-payload with no desktop and paint immediately.
-
-A check that FAILs every good run gets ignored, which is worse than not
-having it. Fix: treat a **leading contiguous run** of black pictures that
-ends in a monotone ramp as startup (report it, do not fail on it), and keep
-failing on any black picture after the first painted one. Needs a unit test
-built from both shapes — a synthetic startup ramp and a synthetic
-mid-stream dropout — so the distinction is pinned.
-
-Until then the #55 captures carry the FAIL in `VERDICT.txt` with the
-decode evidence beside it, rather than an edited verdict.
-
----
-
-## #40 — FR-PROC-7 preemptive aux (sparse aux cadence)
-
-Submit/collect construction plus all three policies (preempt, breadth,
-depth) with per-policy unit tests. Spec: `PRD.md` FR-PROC-7. Prerequisite
-FR-CAPTURE-8 is shipped; the submit/collect split is shared with #45, so
-sequence #45 first.
-
-**Hard ordering, not a preference (#45 D12).** #45's paired refresh gives
-both children an IDENTICAL frame-indexed `-force_key_frames` schedule, which
-assumes 1:1 main/aux pairing. A sparse aux cadence breaks that assumption:
-the aux child no longer sees the same frame indices, so its schedule must be
-re-derived from its own index or its cuts land on the wrong pictures — and
-the observed-vs-scheduled runtime check would then fail every pair. #40 may
-NOT land before #45, and this FR's spec must be amended when it does.
-
-## #41 — Deploy FR-PROC-7 + measure
-
-Smoke gate, colour-edge check, combined fps on the T4 and the fleet.
-
-## #46 — Clean-room upstream port
-
-Rebuild the feature as reviewable slices against fresh `origin/devel`.
-Locked decisions, exclusions, base-ref rules and acceptance criteria are in
-`PRD.md` §17 "Clean-room upstream port". Note the pre-existing astyle drift
-in files this branch does not own (`xrdp_avc444_caps.c`, the rfx block of
-`xrdp_encoder.c`, `xrdp_types.h`, `xup_client_info.h`,
-`tests/.../repro_mbparity/*`) must be resolved in that pass —
-`scripts/run_astyle.sh -v 3.4.14`, never the system astyle 3.1.
-
----
-
-## #49 — CI never runs the ffmpeg-path tests; nine of them report PASS anyway
-
-Found 2026-07-29 while checking whether CI gated the frame_num-wrap re-key
-timing (PRD FR-H264-8). It does not, and the problem is not specific to
-that test.
-
-`tests/xrdp/test_avc444_ffmpeg.c` gates **nine** tests on
-`XRDP_TEST_FFMPEG_PATH`. The CI `unittests` step runs a bare `make check`
-(`.github/workflows/build.yml:180`) and never sets it, so all nine return
-early. Check has no skip verdict, so each is reported `ok N ... Passed`.
-CI has therefore been green on this file while executing none of it —
-including `test_ffmpeg_encode_pair`, the standing regression guard for the
-content/region desync that froze mstsc on stale frames, and
-`test_ffmpeg_single_sps_per_keyframe`, the guard for the duplicated-SPS
-config that rendered black on the macOS Windows App. A green suite that
-proves nothing is exactly the failure mode the strict-honesty rule exists
-to prevent.
-
-Done already: `have_ffmpeg()` now logs a WARNING on every skip naming the
-file and saying the PASS proves nothing, so `test-suite.log` (which CI
-uploads on failure) shows it.
-
-Scope: make CI actually run them. The runner is `ubuntu-latest`, which
-ships ffmpeg with libx264, so the likely fix is one line — set
-`XRDP_TEST_FFMPEG_PATH=/usr/bin/ffmpeg` on the unittests step, after
-confirming the build dependency script installs a usable ffmpeg on every
-matrix leg (and skipping the variable on legs where it does not, rather
-than failing them). Measure the added runtime first: the LTR re-key test
-alone drives 32 pair encodes.
-
-Open question for the owner: whether CI should HARD FAIL when ffmpeg is
-absent (no silent inert leg anywhere) or keep an explicitly-reported skip.
-
-## Owner-blocked
-
-- **Owner sign-off** on making `aux_ltr_chain` the default (after #45
-  lands and the gates are re-run).
-
----
-
-## #64c — capture is ACK-PACED: xorgxrdp waits for the previous frame's ack despite free budget and pending damage (TODO, HIGH — **the blocking item**; blocks #63 / FR-PROC-7)
-
-**Found by #65 step 0 (2026-07-31, capture
-`captures/e52_t4_textflood_m1_4k_step0_20260731/`), which exonerated
-the producer.** Instrumented textflood measured itself at **27.66 fps**
-against the pipeline's 8.21 sends/s — 3.4× over, and 1.7× over the
-FR-BENCH-1 floor. p50 **2 fresh frames of damage arrive during every
-encode**. The cross-correlation (producer stamps epoch-anchored against
-the trace's wall clock, same box):
-
-```
-capture arm - latest BLIT before it   stdev 30.7 ms  (uncorrelated)
-capture arm - previous frame LAST=1   stdev 11.8 ms  (phase-locked, p50 35)
-```
-
-The capture is scheduled by the previous frame's ACK, not by damage.
-The ~35 ms delay decomposes exactly: ack (~1) + timer (4–16) + X-side
-capture+pack (~15–20) + xup transit.
-
-**The contradiction:** every deployed code path says the second capture
-is admitted — `CC_GFX_AVC444` and `msFrameInterval 16` confirmed from
-the live session log; per-monitor budget cap 2 with a break-not-skip
-scan; `rdpCapRect` unions dirty with the slot-missing region; damage
-paths call `rdpScheduleDeferredUpdate` (`rdpClientCon.c:3925`,
-`rdpDraw.c:228`); the deployed xorgxrdp is exactly the tree read
-(d77d054, clean). Yet depth 2 is never reached: 0 negative arm gaps in
-411 frames across two runs, fifo empty at every completion, `budget
-exceeded` = 0 (the gate is never even asked).
-
-**PROBE RUN 2026-07-31 (`xorg_ackpace_uprobe.sh`, two runs, captures
-`e52_t4_ackpace_probe_20260731` + `e52_t4_ackpace_vars_20260731`) — the
-serializer is named: THE ACK UNDERCOUNTS BY ONE and a capture slot is
-permanently dead.**
-
-Event rates (45 s): timers armed 97/s, **callback fires 33/s** (H1
-"timer never fires" FALSIFIED), rdpCapRect 8.8/s, captures 8.5/s —
-73.5 % of callbacks refused at the capacity gate. Then with
-`rect_id`/`rect_id_ack` read at callback entry (raw-offset uprobe;
-outstanding == rid − rack at m=1):
-
-| outstanding at callback | count | outcome |
-|---|---|---|
-| 0 | **0 — never** | |
-| 1 | 340 (25.3 %) | **all 340 captured** (== rdpCapRect count) |
-| 2 | 1004 (74.7 %) | all refused |
-
-The two-slot machinery is RUNNING and the budget is CORRECT — but one
-of the two outstanding rects is a **ghost**: the ack value permanently
-trails xorgxrdp's rect_id by one beyond the true in-flight (rack =
-rid−1 at every capture, rid−2 during encodes, never rid). Cumulative
-acks make a single lost ack permanent: xrdp acks with its own count of
-frames it encoded-and-sent, so any paint msg consumed WITHOUT producing
-a sent frame (encoder warmup rv=PENDING, error path, login-churn
-coalesce) desyncs the counters forever. Also explains why fif=4 changed
-nothing (the −1 is in the ack VALUE, not the window).
-
-**Open: genesis** — which early event eats the +1. Decisive: fresh
-session, count paint msgs vs enc_done frames from t=0.
-
-**Fix (the real #64c work): every consumed rect MUST be acked,
-including rects that produce no output frame.** Ack the incoming
-rect_id on the PENDING/error/no-output paths — or carry rect_id through
-enc_done and ack THAT instead of xrdp's own counter, which also removes
-the two-counter identity assumption entirely. CI ratchet: a
-drive_pipeline arm where some encodes are lossy, asserting the budget
-still drains (today's model would deadlock at depth cap, which is
-exactly the live behaviour minus one). Mechanism check on the T4 after
-the fix: outstanding=0 callbacks appear, negative arm gaps at m=1,
-sustained depth 2.
-
-## #65 — textflood violates the saturating-producer contract (**CLOSED 2026-07-31 — premise falsified by its own step 0**; the producer measures 27.66 fps ≥ the 16.4 floor)
-
-**CLOSED: step 0 falsified the premise this item was filed on.** The
-producer's own telemetry (now default-on) measures 27.66 fps in
-session — the pipeline consumes every ~4th frame. What this item DID
-deliver: the `--stamps` instrumentation (kept, it is FR-BENCH-1's
-required telemetry), ring_recon.c, and the cross-correlation method
-that found the real serializer (#64c). The redesigns below (scroll +
-strip, pre-rendered ring) are NOT needed and are not built — recorded
-here so they are not resurrected without a new failing measurement.
-Original filing kept below for the record; note its "8.19 fps
-producer" premise conflated the pipeline's send rate with the
-producer's frame rate, an inference no telemetry could check until
-step 0 existed — which is the whole argument for FR-BENCH-1's
-verify-per-run rule.
-
-**The core bug moved to the producer.** PRD **FR-BENCH-1** (added with
-this item) states the design intent textflood was built to and now
-fails: CPU text rendering, representative subpixel-AA colored pixels,
-and — the load-bearing clause — **strictly faster than the pipeline
-under test**, so the measured interval is pipeline-limited and a
-successor frame is physically in the fifo at pop time. Measured
-2026-07-31 (T4, m=1, 3840×2160): textflood at **8.19 fps ≈ the
-pipeline's own period**; fifo empty at all 205 completions. Every
-number gated on this producer is producer-confounded until fixed —
-which is why this blocks everything downstream, per the owner
-directive.
-
-Root cause in the producer: the serialized
-`draw_frame → XShmPutImage → XSync` loop, one thread, zero internal
-pipelining. The XSync comment ("without it the client races ahead of
-the server") is FR-BENCH-1 inverted — the producer MUST race ahead, up
-to the 2-slot capture bound.
-
-**Step 1 recon DONE 2026-07-31 (`ring_recon.c`, run ON the T4,
-offline) — and it corrected this item's own first draft.** The draft
-claimed "~100 ms cairo render, ≤10 fps regardless of buffering"; that
-was an unmeasured inference and it is FALSIFIED: the verbatim shipped
-render loop computes **24.1 ms/frame = 41.4 fps** on the T4 at 4K
-(2.5× over the 16.4 fps floor). Scroll+strip renders at 7.1 ms
-(141 fps, 8.6×); a ring memcpy at 6.8 ms (147 fps); two concurrent
-frame copies sustain 8.8 GB/s — neither compute nor bandwidth is the
-wall. **Open anomaly (quality gate check 1): the producer computes
-41 fps offline but delivered 8.19 fps deployed — a 5× gap no offline
-bench explains.** Leading hypothesis: each `XSync` pays the X thread's
-per-frame work (blit copy, damage accounting, the ~20 ms capture pack
-when the timer lands inside the sync) and the loop never renders
-during the wait. Step 0 decides it.
-
-- **Step 0 — instrument first.** `--selftest N` (offline fps, now
-  effectively answered by ring_recon) plus in-session per-frame
-  timestamps split into render / blit / XSync-wait. No redesign lands
-  before the 5× gap is attributed. Cheap: ~15 lines in textflood.
-- **Step 2 — decouple, keep live rendering (design B).** memmove
-  scroll + strip render (live per-frame CPU text rendering kept —
-  the owner's stated intent), double-buffered so the next frame
-  renders during the previous frame's sync, at most 2 outstanding
-  blits. At a 25 fps target this costs ~18 % of one core
-  (footprint clause). Full-frame damage is preserved: every pixel
-  moves every frame.
-- **Step 2-fallback — pre-rendered frame ring** (steady state = one
-  6.8 ms memcpy, R=16 ≈ 0.5 GB) ONLY if in-session measurement shows
-  design B still producer-limited — per the strict honesty rule the
-  fallback is not wired in silently; switching to it is a recorded
-  decision.
-- **Step 3 — harness enforcement.** `e_gate_run.sh` VERDICT prints the
-  producer's selftest rate and the in-run saturation observable
-  (negative overlap-gap fraction from `e52_period_decompose.py`) and
-  stamps the run **VOID (producer-limited)** when either check fails —
-  the same loud-invalid pattern as the geometry guard.
-- **Step 4 — re-run what the confound taints**: the m=1 4K overlap run
-  (re-adjudicates #64b's 0/205 with a compliant producer) and the m=2
-  A/B (re-issues #62's 1.41×, which may UNDERSTATE the batch if both
-  arms were producer-paced).
-
-Acceptance: selftest ≥ 2× the oracle pipeline rate at 3840×2160 on the
-T4; a gate run whose VERDICT shows both saturation checks green; #62's
-and #64b's numbers re-issued or explicitly re-confirmed under the
-compliant producer.
-
-## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**; **2026-07-31 verdict annotated: producer-confounded, re-run under #65** — the 1.41× may understate the batch if both arms were paced by the same 8 fps producer, per FR-BENCH-1)
+## #62 — textflood: a payload whose X-side cost is a memcpy (DONE 2026-07-31 — deployed, A/B run, **1.41x RED, attributed**; **2026-07-31 verdict annotated: producer-confounded, re-run under #67** — the 1.41× may understate the batch if both arms were paced by the same 8 fps producer, per FR-BENCH-1)
 
 Closes the instrument half of #61. #59 established that the xterm payload
 makes E5-2 measure the X server rather than our pipeline; `PR-demo/textflood/`
