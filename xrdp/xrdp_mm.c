@@ -32,6 +32,7 @@
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
+#include "xup_client_info.h"
 #include "xrdp_avc444_caps.h"
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_sockets.h"
@@ -1446,6 +1447,26 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             self->avc444_intra_refresh_frames = cfg.intra_refresh_frames;
             self->avc444_ltr_rekey_surface_reset =
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
+            /* BACKLOG #70: only the batch path publishes an absorb
+             * marker, so the knob is meaningless without aux_ltr_chain
+             * and is refused rather than silently ignored. */
+            self->avc444_eager_slot_ack =
+                self->wm->gfx_config->avc444_ffmpeg_eager_slot_ack &&
+                self->avc444_aux_ltr_chain;
+            if (self->wm->gfx_config->avc444_ffmpeg_eager_slot_ack &&
+                    !self->avc444_aux_ltr_chain)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml eager_slot_ack is set but "
+                    "aux_ltr_chain is off: there is no absorb marker on "
+                    "this path, so the shipped egress-paced ack stays");
+            }
+            if (self->avc444_eager_slot_ack)
+            {
+                LOG(LOG_LEVEL_INFO, "gfx.toml eager_slot_ack is ON "
+                    "(BACKLOG #70): the capture slot is released when the "
+                    "encoder children have absorbed the frame and the "
+                    "previous frame has left for the transport");
+            }
             if (self->avc444_aux_ltr_chain)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "
@@ -1593,6 +1614,48 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
 }
 
 /*****************************************************************************/
+/* BACKLOG #70: which frame id the producer may be told about NOW.
+ *
+ * The module ack is the ONLY flow-control token the producer has -- the
+ * capture that fills a slot is admitted by it -- so riding it on the
+ * frame's last transport write serialises all four pipeline stages
+ * (capture, encode, LTR rewrite, egress) behind one another: the one
+ * event that admits the next capture is emitted last.
+ *
+ * With eager_slot_ack the ack for frame N is due when BOTH hold:
+ *
+ *   absorb(N)     the encoder children have drained N's vmsplice'd
+ *                 input, so the borrowed capture pages are free;
+ *                 reported by the encoder thread as frame_id_consumed.
+ *   egress(N-1)   the PREVIOUS frame's last PDU has been handed to the
+ *                 transport; that is frame_id_server, which advances on
+ *                 the terminal enc_done.
+ *
+ * so the value is min(frame_id_consumed, frame_id_server + 1). Condition
+ * (b) is what keeps this BACKPRESSURE rather than a queue: an
+ * absorb-only ack would admit captures at damage rate against a slower
+ * tail and grow an unbounded backlog (the bufferbloat shape the PRD
+ * forbids). The xup ack stays the only token, so frames past capture are
+ * still bounded by the producer's two-slot budget.
+ *
+ * This ack is SLOT_ONLY: it frees the capture slot and says nothing
+ * about the frame, whose tail can still fail and owe the producer its
+ * pixels back. The frame's ordinary region-disposing ack still goes out
+ * at egress, exactly as it does today. */
+static int
+xrdp_mm_frame_slot_ack_target(struct xrdp_encoder *encoder)
+{
+    int eager;
+
+    eager = encoder->frame_id_consumed;
+    if (eager > encoder->frame_id_server + 1)
+    {
+        eager = encoder->frame_id_server + 1;
+    }
+    return eager;
+}
+
+/*****************************************************************************/
 static int
 xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
 {
@@ -1612,24 +1675,95 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
     else
     {
         int fif = encoder->frames_in_flight;
+        /* the client's own ack window stays the OUTER gate in both
+         * modes: a client that stops acking still stops the producer,
+         * because the frames it has not credited are frames the ack
+         * value may not reach */
+        struct xrdp_mod *m = self->mod;
         if (xrdp_gfx_ack_window_open(encoder->frame_id_client,
                                      encoder->frame_id_server, fif))
         {
-            if (encoder->frame_id_server > encoder->frame_id_server_sent)
+            /* the ORDINARY ack, unchanged: it disposes of every region
+             * up to the last frame that reached the transport. It is
+             * emitted FIRST so a slot ack for the frame behind it never
+             * runs ahead of the region retirement it depends on. */
+            if (encoder->frame_id_server > encoder->frame_id_region_sent)
             {
                 LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_update_module_ack: "
                           "frame_id_server %d", encoder->frame_id_server);
-                encoder->frame_id_server_sent = encoder->frame_id_server;
-                struct xrdp_mod *m = self->mod;
+                encoder->frame_id_region_sent = encoder->frame_id_server;
+                if (encoder->frame_id_server > encoder->frame_id_server_sent)
+                {
+                    encoder->frame_id_server_sent = encoder->frame_id_server;
+                }
                 if (m != NULL)
                 {
-                    m->mod_frame_ack(m, 0,
-                                     encoder->frame_id_server);
+                    if (xrdp_ack_trace_on())
+                    {
+                        LOG(LOG_LEVEL_INFO, "ACK_TRACE ack id=%d kind=region "
+                            "egress=%d absorbed=%d us=%lld",
+                            encoder->frame_id_server,
+                            encoder->frame_id_server,
+                            encoder->frame_id_consumed, xrdp_mono_us());
+                    }
+                    m->mod_frame_ack(m, 0, encoder->frame_id_server);
+                }
+            }
+            if (encoder->eager_slot_ack)
+            {
+                int target = xrdp_mm_frame_slot_ack_target(encoder);
+                if (target > encoder->frame_id_server_sent)
+                {
+                    encoder->frame_id_server_sent = target;
+                    if (m != NULL)
+                    {
+                        if (xrdp_ack_trace_on())
+                        {
+                            LOG(LOG_LEVEL_INFO, "ACK_TRACE ack id=%d "
+                                "kind=slot egress=%d absorbed=%d us=%lld",
+                                target, encoder->frame_id_server,
+                                encoder->frame_id_consumed, xrdp_mono_us());
+                        }
+                        m->mod_frame_ack(m, XUP_ACK_FLAGS_SLOT_ONLY, target);
+                    }
                 }
             }
         }
     }
     return 0;
+}
+
+/*****************************************************************************/
+/* BACKLOG #70: the encoder thread reports that frame_id's input has been
+ * absorbed by the children.
+ *
+ * The frontier is CONTIGUOUS on purpose. The module ack is cumulative --
+ * acking N retires every id up to N on the producer -- so advancing over
+ * a gap would release the slot of an id that has NOT been absorbed and
+ * let Xorg overwrite pages a child is still reading. An id that is not
+ * the next one is therefore dropped here; the terminal enc_done of that
+ * frame re-syncs the frontier one full pipeline later (slower, never
+ * wrong), which is also what covers a consumed report that could not be
+ * allocated. */
+static void
+xrdp_mm_note_frame_consumed(struct xrdp_mm *self, int frame_id)
+{
+    struct xrdp_encoder *encoder;
+
+    encoder = self->encoder;
+    if (encoder == NULL || !encoder->eager_slot_ack)
+    {
+        return;
+    }
+    if (frame_id != encoder->frame_id_consumed + 1)
+    {
+        LOG(LOG_LEVEL_DEBUG, "xrdp_mm_note_frame_consumed: id %d is not "
+            "the frontier's successor (%d); waiting for the in-order one",
+            frame_id, encoder->frame_id_consumed);
+        return;
+    }
+    encoder->frame_id_consumed = frame_id;
+    xrdp_mm_update_module_frame_ack(self);
 }
 
 /*****************************************************************************/
@@ -4022,6 +4156,7 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
     int is_gfx;
     int got_frame_id;
     int client_ack;
+    int displayed;
 
     LOG(LOG_LEVEL_TRACE, "xrdp_mm_process_enc_done:");
 
@@ -4035,7 +4170,20 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
         {
             break;
         }
+        if (ENC_IS_BIT_SET(enc_done->flags, ENC_DONE_FLAGS_CONSUMED_BIT))
+        {
+            /* BACKLOG #70: not a frame -- the encoder children have
+             * absorbed this frame's input. It sends nothing and it does
+             * not release the XRDP_ENC_DATA (the emit pass still owns
+             * it); it only advances the absorb frontier and lets the
+             * ack go out early if the previous frame has egressed. */
+            xrdp_mm_note_frame_consumed(self, enc_done->frame_id);
+            g_free(enc_done);
+            continue;
+        }
         is_gfx = ENC_IS_BIT_SET(enc_done->flags, ENC_DONE_FLAGS_GFX_BIT);
+        displayed = !ENC_IS_BIT_SET(enc_done->flags,
+                                    ENC_DONE_FLAGS_NOT_DISPLAYED_BIT);
         if (is_gfx)
         {
             got_frame_id = ENC_IS_BIT_SET(enc_done->flags,
@@ -4099,7 +4247,57 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
             LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_process_enc_done: last set");
             if (got_frame_id)
             {
-                if (client_ack)
+                /* PRD FR-ACK-1: the value acked to the producer is the
+                 * ECHOED id this enc_done carries -- the rect_id copied
+                 * out of the paint msg -- never a count of frames this
+                 * side has sent. Terminal state (b) (consumed, no output
+                 * frame) is acked IMMEDIATELY and ungated: no frame of
+                 * that id reached the client, so no client credit is
+                 * owed for it, and withholding it behind the egfx ack
+                 * window would pin the producer's capture slot until
+                 * some later frame's cumulative ack happened to cover
+                 * it -- and at cap there is no later frame. */
+                /* BACKLOG #70: reaching a msg's terminal enc_done proves
+                 * every earlier msg reached its own (the encoder emits
+                 * them in fifo order and this loop reads them in that
+                 * order), so it is the guaranteed filler of an absorb
+                 * frontier that a dropped or out-of-order consumed
+                 * report left behind. Harmless when the knob is off:
+                 * frame_id_consumed is read nowhere else. */
+                if (enc_done->frame_id > self->encoder->frame_id_consumed)
+                {
+                    self->encoder->frame_id_consumed = enc_done->frame_id;
+                }
+                if (xrdp_ack_trace_on())
+                {
+                    /* the frame's LAST byte is now with the transport */
+                    LOG(LOG_LEVEL_INFO, "ACK_TRACE egress id=%d shown=%d "
+                        "us=%lld", enc_done->frame_id, displayed,
+                        xrdp_mono_us());
+                }
+                if (!displayed)
+                {
+                    if (self->mod != NULL)
+                    {
+                        self->mod->mod_frame_ack(self->mod,
+                                                 xup_ack_flags_make(0),
+                                                 enc_done->frame_id);
+                        if (enc_done->frame_id >
+                                self->encoder->frame_id_server_sent)
+                        {
+                            self->encoder->frame_id_server_sent =
+                                enc_done->frame_id;
+                        }
+                        /* this one DID dispose of the region */
+                        if (enc_done->frame_id >
+                                self->encoder->frame_id_region_sent)
+                        {
+                            self->encoder->frame_id_region_sent =
+                                enc_done->frame_id;
+                        }
+                    }
+                }
+                else if (client_ack)
                 {
                     self->encoder->frame_id_server = enc_done->frame_id;
                     xrdp_mm_update_module_frame_ack(self);
@@ -4812,6 +5010,14 @@ server_egfx_cmd(struct xrdp_mod *mod,
     }
     g_memcpy(enc->u.gfx.cmd, cmd, cmd_bytes);
     enc->u.gfx.cmd_bytes = cmd_bytes;
+    if (xrdp_ack_trace_on())
+    {
+        /* the producer's frame has arrived at xrdp: the head of the leg
+         * chain the #70 A/B is read on */
+        LOG(LOG_LEVEL_INFO, "ACK_TRACE msgin id=%d bytes=%d us=%lld",
+            gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes), data_bytes,
+            xrdp_mono_us());
+    }
     enc->u.gfx.data = data;
     enc->u.gfx.data_bytes = data_bytes;
     enc->shmem_ptr = data;

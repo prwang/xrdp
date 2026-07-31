@@ -8,6 +8,7 @@
 #include "xrdp_client_info.h"
 #include "xup_client_info.h"
 #include "xrdp_encoder.h"
+#include <stdio.h>
 #include "test_xrdp.h"
 
 /* Exercises xrdp_mm_avc444_probe_dims(): the external ffmpeg AVC backend is
@@ -824,7 +825,7 @@ START_TEST(test_cap_budget_two_gates_agree)
             for (i = 0; i < 8; ++i)
             {
                 int predicted = xup_cap_budget_has_capacity(&b, mon, 0,
-                                                            cap);
+                                cap);
                 int refused;
 
                 ++rect_id;
@@ -875,6 +876,946 @@ START_TEST(test_overlap_m2_global_window_pins_each_monitor_to_one)
 END_TEST
 
 /******************************************************************************/
+/* PRD FR-ACK-1 / BACKLOG #64: the ack protocol itself.
+ *
+ * drive_pipeline() above models a LOSSLESS consumer -- every paint msg
+ * it receives becomes an encoded frame on the wire. The AVC444 backend
+ * is not lossless in that sense: the warmup PENDING return, an encoder
+ * error and the ship-the-pair-or-nothing drop all CONSUME a msg and
+ * produce no output frame. The protocol question is what the producer
+ * hears about those, and it is a different question from "does the
+ * shipped pair of predicates admit overlap", so it gets its own model
+ * rather than an edit to that one.
+ *
+ * The two protocols under comparison:
+ *
+ *   ACK_INHERITED  the ack value is the CONSUMER'S OWN COUNT of frames
+ *                  it has sent, and a consumed-without-output msg
+ *                  produces no ack at all. The producer compares that
+ *                  count against its rect_id, so after L such events
+ *                  the two differ by L for the rest of the session --
+ *                  the drift is monotonically nondecreasing, and once
+ *                  it reaches the per-monitor cap the producer can
+ *                  never admit another capture.
+ *
+ *   ACK_ON_CONSUME FR-ACK-1: EVERY consumed msg is acked exactly once,
+ *                  when it reaches a terminal state, with the id
+ *                  COPIED from that msg -- displayed=1 when the last
+ *                  EGFX byte went out, displayed=0 otherwise. No
+ *                  quantity this side maintains enters the ack value,
+ *                  so no drift term can exist.
+ *
+ * What is asserted below is taken from the FR's own invariants and
+ * prose, not from running this model: Invariant I (every sent r is
+ * eventually covered, so the pipeline keeps making progress),
+ * Invariant II (the bound is unchanged at cap), Invariant III (a
+ * displayed=0 frame's region comes back exactly once), and the FR's
+ * statement that a single unexpressed event pins the inherited
+ * protocol at depth cap-1 and cap of them wedge it outright.
+ */
+#define ACK_INHERITED  0
+#define ACK_ON_CONSUME 1
+#define ACK_MAX_PENDING 64
+
+struct ack_run
+{
+    int captures;       /* paint msgs the producer sent */
+    int tail_captures;  /* of those, ones sent in the final quarter */
+    int tail_depth;     /* deepest per-monitor RING count, final quarter */
+    /* deepest per-monitor count of frames CAPTURED AND NOT YET
+     * TERMINATED, final quarter. This, not tail_depth, is the quantity
+     * "capture || encode" is a claim about, and the two differ exactly
+     * where this FR bites: under the inherited protocol a ring entry
+     * can belong to a frame that is long since on the wire but whose
+     * drifting ack never retires it, so the ring reads 2 while at most
+     * one capture is ever concurrent with an encode. A metric that
+     * cannot tell those apart cannot test the claim. */
+    int tail_inflight;
+    int acks;           /* xup acks the consumer emitted */
+    int max_drift;      /* max (terminating id - acked value) seen */
+    int losses;         /* msgs consumed with no output frame */
+    int returned;       /* of those, ones whose region was identified */
+    int lost_unacked;   /* of those, ones that produced no ack at all */
+};
+
+/* One tick of the joint loop, with a consumer that can consume without
+ * producing. loss_every > 0 loses every loss_every'th rect_id; with
+ * loss_once set, only that one rect_id is lost and the rest of the run
+ * is clean. */
+static void
+drive_consumer(int monitors, int cap, int fif, int enc_ticks,
+               int client_ticks, int ticks, int loss_every, int loss_once,
+               int protocol, struct ack_run *out)
+{
+    struct xup_cap_budget b;
+    struct xup_cap_sent sent;
+    int frame_id_server = 0;    /* last frame id the consumer put on the wire */
+    int frame_id_client = 0;    /* last frame id the client acknowledged */
+    int rect_id = 0;            /* the producer's cumulative capture id */
+    int rect_id_ack = 0;        /* how far the xup ack has released it */
+    int consumer_sends = 0;     /* the inherited protocol's ack value */
+    int owed = 0;               /* xup ack deferred by a closed window */
+    int enc_id[ACK_MAX_PENDING];
+    int enc_mon[ACK_MAX_PENDING];
+    int enc_due[ACK_MAX_PENDING];
+    int enc_lost[ACK_MAX_PENDING];
+    int enc_n = 0;
+    int cli_id[ACK_MAX_PENDING];
+    int cli_due[ACK_MAX_PENDING];
+    int cli_n = 0;
+    int tail_from = ticks - ticks / 4;
+    int i;
+    int k;
+    int mon;
+
+    xup_cap_budget_reset(&b);
+    xup_cap_sent_reset(&sent);
+    g_memset(out, 0, sizeof(*out));
+
+    for (i = 0; i < ticks; ++i)
+    {
+        /* CAPTURE. Both halves must admit it, exactly as in the
+         * lossless model: the producer's per-monitor slot budget and
+         * the consumer's egfx ack window. */
+        for (mon = 0; mon < monitors; ++mon)
+        {
+            int depth;
+
+            if (!xrdp_gfx_ack_window_open(frame_id_client,
+                                          frame_id_server, fif))
+            {
+                break;
+            }
+            if (!xup_cap_budget_has_capacity(&b, mon, rect_id_ack, cap))
+            {
+                continue;
+            }
+            ++rect_id;
+            if (xup_cap_budget_record_send(&b, mon, rect_id,
+                                           rect_id_ack, cap) != 0)
+            {
+                continue;
+            }
+            /* the region this capture took out of the dirty region is
+             * held against the frame's own id until its ack says what
+             * became of it */
+            xup_cap_sent_take(&sent, mon, rect_id);
+            if (enc_n < ACK_MAX_PENDING)
+            {
+                enc_id[enc_n] = rect_id;
+                enc_mon[enc_n] = mon;
+                enc_due[enc_n] = i + enc_ticks;
+                enc_lost[enc_n] = loss_every > 0 &&
+                                  (loss_once ? rect_id == loss_every
+                                   : rect_id % loss_every == 0);
+                ++enc_n;
+            }
+            ++out->captures;
+            depth = xup_cap_budget_retire(&b, mon, rect_id_ack);
+            if (i >= tail_from)
+            {
+                int inflight = 0;
+
+                for (k = 0; k < enc_n; ++k)
+                {
+                    if (enc_mon[k] == mon)
+                    {
+                        ++inflight;
+                    }
+                }
+                ++out->tail_captures;
+                if (depth > out->tail_depth)
+                {
+                    out->tail_depth = depth;
+                }
+                if (inflight > out->tail_inflight)
+                {
+                    out->tail_inflight = inflight;
+                }
+            }
+        }
+
+        /* TERMINAL STATES, in dequeue order: the single consumer worker
+         * reaches them one at a time, which is why acks are emitted in
+         * nondecreasing id and a cumulative apply is sufficient. */
+        while (enc_n > 0 && enc_due[0] <= i)
+        {
+            int id = enc_id[0];
+            int lost = enc_lost[0];
+            int ack_val = -1;
+            int displayed = 1;
+
+            for (k = 1; k < enc_n; ++k)
+            {
+                enc_id[k - 1] = enc_id[k];
+                enc_mon[k - 1] = enc_mon[k];
+                enc_due[k - 1] = enc_due[k];
+                enc_lost[k - 1] = enc_lost[k];
+            }
+            --enc_n;
+
+            if (lost)
+            {
+                ++out->losses;
+                displayed = 0;
+                if (protocol == ACK_ON_CONSUME)
+                {
+                    /* rule 2(b): acked immediately with the echoed id
+                     * and ungated -- no frame of that id reached the
+                     * client, so no client credit is owed for it */
+                    ack_val = id;
+                }
+                else
+                {
+                    /* the inherited protocol cannot express this state */
+                    ++out->lost_unacked;
+                }
+            }
+            else
+            {
+                ++consumer_sends;
+                frame_id_server = id;
+                ack_val = (protocol == ACK_ON_CONSUME) ? id
+                          : consumer_sends;
+                if (cli_n < ACK_MAX_PENDING)
+                {
+                    cli_id[cli_n] = id;
+                    cli_due[cli_n] = i + client_ticks;
+                    ++cli_n;
+                }
+                if (!xrdp_gfx_ack_window_open(frame_id_client,
+                                              frame_id_server, fif))
+                {
+                    /* held until the client frees credit, exactly as
+                     * xrdp_mm_update_module_frame_ack holds it */
+                    owed = ack_val;
+                    ack_val = -1;
+                }
+            }
+
+            if (ack_val >= 0)
+            {
+                int amon = 0;
+                int aslot = 0;
+
+                ++out->acks;
+                if (id - ack_val > out->max_drift)
+                {
+                    out->max_drift = id - ack_val;
+                }
+                if (!displayed &&
+                        xup_cap_sent_find(&sent, ack_val, &amon, &aslot))
+                {
+                    /* Invariant III: those pixels are on no wire, so
+                     * the region goes back to the dirty region */
+                    ++out->returned;
+                    xup_cap_sent_clear(&sent, amon, aslot);
+                }
+                if (ack_val > rect_id_ack)
+                {
+                    rect_id_ack = ack_val;
+                }
+                xup_cap_sent_retire(&sent, rect_id_ack);
+            }
+        }
+
+        /* CLIENT ACKS: they free egfx credit and flush a held xup ack */
+        while (cli_n > 0 && cli_due[0] <= i)
+        {
+            frame_id_client = cli_id[0];
+            for (k = 1; k < cli_n; ++k)
+            {
+                cli_id[k - 1] = cli_id[k];
+                cli_due[k - 1] = cli_due[k];
+            }
+            --cli_n;
+            if (owed > 0 &&
+                    xrdp_gfx_ack_window_open(frame_id_client,
+                                             frame_id_server, fif))
+            {
+                ++out->acks;
+                if (owed > rect_id_ack)
+                {
+                    rect_id_ack = owed;
+                }
+                xup_cap_sent_retire(&sent, rect_id_ack);
+                owed = 0;
+            }
+        }
+    }
+}
+
+START_TEST(test_overlap_lossy_encode_wedges_without_consume_ack)
+{
+    struct ack_run r;
+
+    /* FR-ACK-1, "Contrast, old protocol": the ack value is the
+     * consumer's own send count, so r - ack is the number of
+     * consumed-without-output events and never decreases. ONE such
+     * event therefore costs one of the producer's two slots for the
+     * rest of the session -- the pipeline is pinned at depth cap - 1,
+     * which at the shipped cap of 2 is a SERIAL pipeline. */
+    drive_consumer(1, 2, 2, 2, 1, 64, 8, 1, ACK_INHERITED, &r);
+    ck_assert_int_eq(r.losses, 1);
+    ck_assert_int_eq(r.lost_unacked, 1);
+    ck_assert_int_eq(r.tail_inflight, 2 - 1);
+    /* the ring still reads full: the slot is held by a frame that was
+     * encoded and sent, and no drifting cumulative ack will ever
+     * retire it. That is the ghost, and it is why the producer-side
+     * budget counter alone showed nothing wrong on the live box. */
+    ck_assert_int_eq(r.tail_depth, 2);
+
+    /* and cap such events wedge it outright: the drift reaches the cap,
+     * has_capacity is false forever, and the producer never captures
+     * again. This is the measured "outstanding=0 in 0 of 1344 samples"
+     * reproduced in logic. */
+    drive_consumer(1, 2, 2, 2, 1, 64, 2, 0, ACK_INHERITED, &r);
+    ck_assert_int_ge(r.losses, 2);
+    ck_assert_int_eq(r.tail_captures, 0);
+    ck_assert_int_eq(r.tail_inflight, 0);
+}
+END_TEST
+
+START_TEST(test_overlap_consume_ack_restores_depth)
+{
+    struct ack_run r;
+    int loss_every;
+
+    /* Invariants I + II: every sent id is eventually covered, so
+     * outstanding strictly decreases after every consumption and
+     * capture admission recurs -- under ANY loss mask the producer
+     * still reaches, and keeps reaching, the full cap of 2. The bound
+     * itself is unchanged: it never exceeds the cap. */
+    for (loss_every = 2; loss_every <= 7; ++loss_every)
+    {
+        drive_consumer(1, 2, 2, 2, 1, 64, loss_every, 0,
+                       ACK_ON_CONSUME, &r);
+        ck_assert_int_gt(r.losses, 0);
+        ck_assert_int_eq(r.lost_unacked, 0);
+        ck_assert_int_eq(r.tail_inflight, 2);
+        /* Invariant II is untouched: the bound is still the cap */
+        ck_assert_int_eq(r.tail_depth, 2);
+        ck_assert_int_gt(r.tail_captures, 0);
+    }
+    /* the single-event case that pins the inherited protocol forever */
+    drive_consumer(1, 2, 2, 2, 1, 64, 8, 1, ACK_ON_CONSUME, &r);
+    ck_assert_int_eq(r.losses, 1);
+    ck_assert_int_eq(r.tail_inflight, 2);
+}
+END_TEST
+
+START_TEST(test_ack_value_is_echoed_identity)
+{
+    struct ack_run r;
+    int loss_every;
+
+    /* Rule 1: the acked value is copied from the received msg, so for
+     * every ack the difference between the terminating id and the value
+     * acked is ZERO -- there is no term that could accumulate. */
+    for (loss_every = 2; loss_every <= 9; ++loss_every)
+    {
+        drive_consumer(1, 2, 2, 2, 1, 64, loss_every, 0,
+                       ACK_ON_CONSUME, &r);
+        ck_assert_int_eq(r.max_drift, 0);
+        drive_consumer(2, 2, 4, 2, 1, 64, loss_every, 0,
+                       ACK_ON_CONSUME, &r);
+        ck_assert_int_eq(r.max_drift, 0);
+    }
+    /* a clean run cannot tell the two protocols apart -- which is why
+     * the inherited one survived this long */
+    drive_consumer(1, 2, 2, 2, 1, 64, 0, 0, ACK_INHERITED, &r);
+    ck_assert_int_eq(r.losses, 0);
+    ck_assert_int_eq(r.max_drift, 0);
+    /* one unexpressed event and the counter-based value is already
+     * behind, permanently */
+    drive_consumer(1, 2, 2, 2, 1, 64, 8, 1, ACK_INHERITED, &r);
+    ck_assert_int_ge(r.max_drift, 1);
+}
+END_TEST
+
+START_TEST(test_dropped_frame_region_returns_to_dirty)
+{
+    struct xup_cap_sent sent;
+    struct ack_run r;
+    int mon = -1;
+    int slot = -1;
+
+    /* Invariant III at the unit level: the producer must be able to
+     * name the region a displayed=0 ack refers to, from the id alone. */
+    xup_cap_sent_reset(&sent);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 7, &mon, &slot), 0);
+    ck_assert_int_eq(xup_cap_sent_take(&sent, 0, 7), 0);
+    ck_assert_int_eq(xup_cap_sent_take(&sent, 0, 8), 1);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 7, &mon, &slot), 1);
+    ck_assert_int_eq(mon, 0);
+    ck_assert_int_eq(slot, 0);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 8, &mon, &slot), 1);
+    ck_assert_int_eq(slot, 1);
+    /* a region is returned ONCE: after it is taken back, the same ack
+     * arriving again (duplicate, or a cumulative ack covering it) must
+     * find nothing to return */
+    xup_cap_sent_clear(&sent, 0, 0);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 7, &mon, &slot), 0);
+    /* the cumulative ack retires whatever it covers and nothing above */
+    ck_assert_int_eq(xup_cap_sent_take(&sent, 1, 9), 0);
+    ck_assert_int_eq(xup_cap_sent_retire(&sent, 8), 1);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 8, &mon, &slot), 0);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 9, &mon, &slot), 1);
+    /* an id that was never sent is not addressable at all */
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 4242, &mon, &slot), 0);
+    /* zero is the empty marker, never a frame */
+    xup_cap_sent_reset(&sent);
+    ck_assert_int_eq(xup_cap_sent_find(&sent, 0, &mon, &slot), 0);
+
+    /* and over a whole run: EVERY frame consumed without output has its
+     * region identified and returned, exactly once each -- no pixel is
+     * silently dropped, and no region comes back twice */
+    drive_consumer(1, 2, 2, 2, 1, 64, 3, 0, ACK_ON_CONSUME, &r);
+    ck_assert_int_gt(r.losses, 0);
+    ck_assert_int_eq(r.returned, r.losses);
+    drive_consumer(2, 2, 4, 2, 1, 64, 2, 0, ACK_ON_CONSUME, &r);
+    ck_assert_int_gt(r.losses, 0);
+    ck_assert_int_eq(r.returned, r.losses);
+}
+END_TEST
+
+START_TEST(test_xup_ack_displayed_bit_serialization)
+{
+    struct stream *s;
+    int flags;
+    int frame_id;
+
+    /* The bit rides the flags word the paint-rect-ex ack already
+     * carries, and displayed=1 encodes to the value xrdp sends today --
+     * that is the whole compatibility claim: happy-path bytes unchanged,
+     * old peers ignore what they do not know. */
+    ck_assert_int_eq(xup_ack_flags_make(1), 0);
+    ck_assert_int_eq(xup_ack_flags_make(0), XUP_ACK_FLAGS_NOT_DISPLAYED);
+    ck_assert_int_eq(xup_ack_flags_displayed(xup_ack_flags_make(1)), 1);
+    ck_assert_int_eq(xup_ack_flags_displayed(xup_ack_flags_make(0)), 0);
+    /* an old peer's zero flags must read as displayed, or every frame
+     * from an unchanged xrdp would be re-dirtied forever */
+    ck_assert_int_eq(xup_ack_flags_displayed(0), 1);
+
+    /* the two fields the consumer writes and the producer reads, in
+     * that order, over the message body */
+    make_stream(s);
+    init_stream(s, 64);
+    out_uint32_le(s, xup_ack_flags_make(0));
+    out_uint32_le(s, 123456);
+    s_mark_end(s);
+    ck_assert_int_eq((int)(s->end - s->data), 8);
+    s->p = s->data;
+    in_uint32_le(s, flags);
+    in_uint32_le(s, frame_id);
+    ck_assert_int_eq(xup_ack_flags_displayed(flags), 0);
+    ck_assert_int_eq(frame_id, 123456);
+    free_stream(s);
+
+    make_stream(s);
+    init_stream(s, 64);
+    out_uint32_le(s, xup_ack_flags_make(1));
+    out_uint32_le(s, INT_MAX);
+    s_mark_end(s);
+    s->p = s->data;
+    in_uint32_le(s, flags);
+    in_uint32_le(s, frame_id);
+    ck_assert_int_eq(xup_ack_flags_displayed(flags), 1);
+    ck_assert_int_eq(frame_id, INT_MAX);
+    free_stream(s);
+}
+END_TEST
+
+/******************************************************************************/
+/* BACKLOG #70: the eager slot-release ack.
+ *
+ * The two frontier rules first, then a four-resource pipeline model.
+ *
+ * What #70 changes is WHEN the producer's capture slot is released. The
+ * shipped ack rides the frame's last transport write, so capture,
+ * encode, rewrite and egress each wait for all the others. The eager
+ * ack fires for frame N when
+ *
+ *   (a) the encoder children have absorbed N's input, and
+ *   (b) frame N-1's last PDU has been handed to the transport,
+ *
+ * and it is SLOT_ONLY: it frees the slot and says nothing about the
+ * frame, whose region must stay held because its tail can still fail.
+ *
+ * The numbers asserted below are derived from that rule and from the
+ * resource layout of the model, never read off a run: a serial worker
+ * that spends absorb+rewrite per frame cannot beat one frame per
+ * absorb+rewrite however the acks are paced; a protocol that admits the
+ * next capture only after the whole chain cannot hold more than one
+ * frame between capture and termination; one that admits it after
+ * absorb holds exactly two; and one that drops condition (b) admits
+ * captures at the worker's rate against a slower egress, so its backlog
+ * is a function of how long the run is -- which is the bufferbloat the
+ * PRD forbids, and the reason (b) exists.
+ */
+START_TEST(test_ack_frontier_slot_only_holds_the_region_frontier)
+{
+    struct xup_ack_frontier f;
+
+    xup_ack_frontier_reset(&f);
+    ck_assert_int_eq(f.slot, 0);
+    ck_assert_int_eq(f.shown, 0);
+
+    /* a slot-only ack says the consumer has finished READING frame 5.
+     * Nothing is known about frame 5's fate, so no region may be
+     * forgotten -- the whole point of the flag. */
+    xup_ack_frontier_apply(&f, XUP_ACK_FLAGS_SLOT_ONLY, 5);
+    ck_assert_int_eq(f.slot, 5);
+    ck_assert_int_eq(f.shown, 0);
+
+    /* the ordinary ack for the same frame disposes of it */
+    xup_ack_frontier_apply(&f, 0, 5);
+    ck_assert_int_eq(f.slot, 5);
+    ck_assert_int_eq(f.shown, 5);
+
+    /* displayed=0 is a disposal too: it is the ack that hands the
+     * region back, so it must move the shown frontier */
+    xup_ack_frontier_apply(&f, XUP_ACK_FLAGS_NOT_DISPLAYED, 6);
+    ck_assert_int_eq(f.slot, 6);
+    ck_assert_int_eq(f.shown, 6);
+}
+END_TEST
+
+START_TEST(test_ack_frontier_is_cumulative_and_monotonic)
+{
+    struct xup_ack_frontier f;
+
+    xup_ack_frontier_reset(&f);
+    xup_ack_frontier_apply(&f, 0, 9);
+    /* a duplicated or reordered ack must not resurrect a retired slot
+     * or a forgotten region (rule 4) */
+    xup_ack_frontier_apply(&f, 0, 3);
+    ck_assert_int_eq(f.slot, 9);
+    ck_assert_int_eq(f.shown, 9);
+    xup_ack_frontier_apply(&f, XUP_ACK_FLAGS_SLOT_ONLY, 2);
+    ck_assert_int_eq(f.slot, 9);
+    ck_assert_int_eq(f.shown, 9);
+    /* shown never exceeds slot: nothing is disposed of before the
+     * consumer has finished reading it */
+    xup_ack_frontier_apply(&f, XUP_ACK_FLAGS_SLOT_ONLY, 12);
+    ck_assert_int_eq(f.slot, 12);
+    ck_assert_int_eq(f.shown, 9);
+    ck_assert_int_le(f.shown, f.slot);
+    xup_ack_frontier_apply(&f, 0, 12);
+    ck_assert_int_le(f.shown, f.slot);
+    /* a NULL frontier is a no-op, not a crash */
+    xup_ack_frontier_apply(NULL, 0, 1);
+    xup_ack_frontier_reset(NULL);
+}
+END_TEST
+
+#define EAGER_OFF   0   /* shipped: the ack rides the last write */
+#define EAGER_ON    1   /* #70: ack at max(absorb N, egress N-1) */
+#define EAGER_NO_BP 2   /* adversarial: absorb only, condition (b) dropped */
+#define EAGER_MAXQ  256
+
+struct eager_run
+{
+    int captures;        /* frames the producer put on the wire */
+    int terminated;      /* frames that reached a terminal state */
+    int tail_inflight;   /* max captured-and-not-terminated, tail quarter */
+    int max_egress_q;    /* deepest queue waiting for the transport */
+    int slot_acks;
+    int slot_clobber;    /* captures into a slot whose region is held */
+    int region_lost;     /* failed frames whose region was forgotten */
+    int returned;        /* failed frames whose region came back */
+    int losses;
+    int bad_absorb;      /* slot acks naming an unabsorbed frame */
+    int bad_backpressure;/* slot acks emitted before egress(id-1) */
+    int frontier_broken; /* shown > slot, ever */
+};
+
+/* One m=1 pipeline over four resources, one frame deep each:
+ *
+ *   producer  cap_ticks       the X capture and pack
+ *   worker    absorb_ticks    the children read the vmsplice'd input
+ *             rewrite_ticks   then the LTR rewrite and EGFX assembly
+ *   main      egress_ticks    the transport writes
+ *
+ * The producer is admitted by the xup ack alone (the real budget helpers
+ * are the ones consulted), and the client's egfx window is the outer
+ * gate. Only the ack emission rule differs between protocols. */
+static void
+drive_eager(int protocol, int ticks, int cap_ticks, int absorb_ticks,
+            int rewrite_ticks, int egress_ticks, int fif, int cap,
+            int client_ticks, int loss_every, struct eager_run *out)
+{
+    struct xup_cap_budget b;
+    struct xup_cap_sent sent;
+    struct xup_ack_frontier front;
+    int work_q[EAGER_MAXQ];
+    int work_n = 0;
+    int egress_q[EAGER_MAXQ];
+    int egress_n = 0;
+    int rect_id = 0;
+    int absorbed = 0;           /* highest id whose input is drained */
+    int frame_id_server = 0;    /* highest id fully handed to transport */
+    int frame_id_client = 0;
+    int acked = 0;              /* highest value any ack carried */
+    int region_sent = 0;        /* highest value an ordinary ack carried */
+    int cap_busy = 0;
+    int cap_at = 0;
+    int worker_busy = 0;
+    int worker_id = 0;
+    int worker_absorb_at = 0;
+    int worker_done_at = 0;
+    int main_busy = 0;
+    int main_id = 0;
+    int main_done_at = 0;
+    int cli_id[EAGER_MAXQ];
+    int cli_due[EAGER_MAXQ];
+    int cli_n = 0;
+    int tail_from = ticks - ticks / 4;
+    int inflight = 0;
+    int i;
+    int k;
+
+    xup_cap_budget_reset(&b);
+    xup_cap_sent_reset(&sent);
+    xup_ack_frontier_reset(&front);
+    g_memset(out, 0, sizeof(*out));
+
+    for (i = 0; i < ticks; ++i)
+    {
+        int emit = 0;
+
+        /* --- completions, oldest stage first --- */
+        if (main_busy && main_done_at == i)
+        {
+            int lost = loss_every > 0 && (main_id % loss_every) == 0;
+
+            main_busy = 0;
+            --inflight;
+            ++out->terminated;
+            if (lost)
+            {
+                int amon = 0;
+                int aslot = 0;
+
+                ++out->losses;
+                /* the tail failed AFTER the slot was already released:
+                 * the region must still be findable, or those pixels
+                 * are gone with no event anywhere */
+                if (xup_cap_sent_find(&sent, main_id, &amon, &aslot))
+                {
+                    ++out->returned;
+                    xup_cap_sent_clear(&sent, amon, aslot);
+                }
+                else
+                {
+                    ++out->region_lost;
+                }
+                if (main_id > acked)
+                {
+                    acked = main_id;
+                }
+                if (main_id > region_sent)
+                {
+                    region_sent = main_id;
+                }
+                xup_ack_frontier_apply(&front, XUP_ACK_FLAGS_NOT_DISPLAYED,
+                                       main_id);
+                xup_cap_sent_retire(&sent, front.shown);
+            }
+            else
+            {
+                frame_id_server = main_id;
+                if (cli_n < EAGER_MAXQ)
+                {
+                    cli_id[cli_n] = main_id;
+                    cli_due[cli_n] = i + client_ticks;
+                    ++cli_n;
+                }
+            }
+            emit = 1;
+        }
+        if (worker_busy && worker_done_at == i)
+        {
+            worker_busy = 0;
+            if (egress_n < EAGER_MAXQ)
+            {
+                egress_q[egress_n++] = worker_id;
+            }
+            if (egress_n > out->max_egress_q)
+            {
+                out->max_egress_q = egress_n;
+            }
+        }
+        else if (worker_busy && worker_absorb_at == i)
+        {
+            absorbed = worker_id;
+            emit = 1;
+        }
+        if (cap_busy && cap_at == i)
+        {
+            cap_busy = 0;
+            ++rect_id;
+            xup_cap_budget_record_send(&b, 0, rect_id, front.slot, cap);
+            /* every captured frame must get an entry to hold its region
+             * in. A full map means more undisposed frames than the map
+             * can name, and the next failure would have no pixels to
+             * give back -- the corner the +1 entry exists for. */
+            if (xup_cap_sent_take(&sent, 0, rect_id) < 0)
+            {
+                ++out->slot_clobber;
+            }
+            if (work_n < EAGER_MAXQ)
+            {
+                work_q[work_n++] = rect_id;
+            }
+            ++out->captures;
+            ++inflight;
+            if (i >= tail_from && inflight > out->tail_inflight)
+            {
+                out->tail_inflight = inflight;
+            }
+        }
+
+        /* --- client acks free egfx credit --- */
+        while (cli_n > 0 && cli_due[0] <= i)
+        {
+            frame_id_client = cli_id[0];
+            for (k = 1; k < cli_n; ++k)
+            {
+                cli_id[k - 1] = cli_id[k];
+                cli_due[k - 1] = cli_due[k];
+            }
+            --cli_n;
+            emit = 1;
+        }
+
+        /* --- ack emission --- */
+        if (emit && xrdp_gfx_ack_window_open(frame_id_client,
+                                             frame_id_server, fif))
+        {
+            if (frame_id_server > region_sent)
+            {
+                region_sent = frame_id_server;
+                if (region_sent > acked)
+                {
+                    acked = region_sent;
+                }
+                xup_ack_frontier_apply(&front, 0, region_sent);
+                xup_cap_sent_retire(&sent, front.shown);
+            }
+            if (protocol != EAGER_OFF)
+            {
+                int target = absorbed;
+
+                if (protocol == EAGER_ON && target > frame_id_server + 1)
+                {
+                    target = frame_id_server + 1;
+                }
+                if (target > acked)
+                {
+                    if (target > absorbed)
+                    {
+                        ++out->bad_absorb;
+                    }
+                    if (target > frame_id_server + 1)
+                    {
+                        ++out->bad_backpressure;
+                    }
+                    acked = target;
+                    ++out->slot_acks;
+                    xup_ack_frontier_apply(&front, XUP_ACK_FLAGS_SLOT_ONLY,
+                                           target);
+                }
+            }
+        }
+        if (front.shown > front.slot)
+        {
+            ++out->frontier_broken;
+        }
+
+        /* --- starts, downstream first so a freed stage is refilled --- */
+        if (!main_busy && egress_n > 0)
+        {
+            main_id = egress_q[0];
+            for (k = 1; k < egress_n; ++k)
+            {
+                egress_q[k - 1] = egress_q[k];
+            }
+            --egress_n;
+            main_busy = 1;
+            main_done_at = i + egress_ticks;
+        }
+        if (!worker_busy && work_n > 0)
+        {
+            worker_id = work_q[0];
+            for (k = 1; k < work_n; ++k)
+            {
+                work_q[k - 1] = work_q[k];
+            }
+            --work_n;
+            worker_busy = 1;
+            worker_absorb_at = i + absorb_ticks;
+            worker_done_at = i + absorb_ticks + rewrite_ticks;
+        }
+        if (!cap_busy &&
+                xrdp_gfx_ack_window_open(frame_id_client, frame_id_server,
+                                         fif) &&
+                xup_cap_budget_has_capacity(&b, 0, front.slot, cap))
+        {
+            cap_busy = 1;
+            cap_at = i + cap_ticks;
+        }
+    }
+}
+
+/* The parameters the two throughput tests share. The worker is the
+ * heaviest resource, exactly as measured on the T4 (absorb+rewrite
+ * 24.1+44.9 ms against 30.4 ms of egress), so the eager protocol's
+ * ceiling is the worker and the shipped protocol's is the whole chain. */
+#define EG_TICKS   400
+#define EG_CAP_T   1
+#define EG_ABS_T   2
+#define EG_REW_T   4
+#define EG_EGR_T   3
+#define EG_CHAIN   (EG_CAP_T + EG_ABS_T + EG_REW_T + EG_EGR_T)
+#define EG_WORKER  (EG_ABS_T + EG_REW_T)
+
+START_TEST(test_eager_ack_buys_nothing_when_the_budget_already_admits_two)
+{
+    struct eager_run off;
+    struct eager_run on;
+
+    drive_eager(EAGER_OFF, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 2, 1, 0, &off);
+    drive_eager(EAGER_ON, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 2, 1, 0, &on);
+
+    /* The shipped ack already admits a SECOND capture: the producer's
+     * budget is two slots and the ack retires the first at egress, so a
+     * frame is captured while its predecessor is still in the tail.
+     * That is the state this model is in, and it is NOT the state the
+     * T4 was measured in -- see the next test. */
+    ck_assert_int_eq(off.tail_inflight, 2);
+    ck_assert_int_eq(off.slot_acks, 0);
+
+    /* the eager ack adds exactly one more frame between capture and
+     * termination, bounded there by condition (b) */
+    ck_assert_int_eq(on.tail_inflight, 3);
+    ck_assert_int_gt(on.slot_acks, 0);
+
+    /* ...and buys no throughput, because with two captures already in
+     * hand the serial worker is the floor and no ack can move it. A
+     * deeper pipeline against the same bottleneck is not a faster one.
+     * This assertion exists to keep #70 from being sold as a speedup in
+     * a regime where it is not one. */
+    ck_assert_int_le(off.captures, EG_TICKS / EG_WORKER + 2);
+    ck_assert_int_le(on.captures, EG_TICKS / EG_WORKER + 2);
+    ck_assert_int_le(on.captures - off.captures, 2);
+
+    ck_assert_int_eq(on.bad_absorb, 0);
+    ck_assert_int_eq(on.bad_backpressure, 0);
+    ck_assert_int_eq(on.frontier_broken, 0);
+    ck_assert_int_eq(off.frontier_broken, 0);
+}
+END_TEST
+
+START_TEST(test_eager_ack_restores_the_floor_at_effective_depth_one)
+{
+    struct eager_run off;
+    struct eager_run on;
+
+    /* cap=1: the producer may hold ONE outstanding frame. This is the
+     * regime the deployed T4 was measured in -- period 113.6 ms against
+     * a 69 ms worker (absorb 24.1 + rewrite/assembly 44.9), i.e. the
+     * whole chain rather than its busiest resource (BACKLOG #70,
+     * captures i55_t4_cond*). Whether the deployment is here because of
+     * the budget or because a slot is dead is #70 step 0's question;
+     * what this test pins is what the ack rule is worth once it is. */
+    drive_eager(EAGER_OFF, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 1, 1, 0, &off);
+    drive_eager(EAGER_ON, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 1, 1, 0, &on);
+
+    /* one frame at a time: capture, encode, rewrite and egress each
+     * wait for all the others, so the period is their SUM */
+    ck_assert_int_eq(off.tail_inflight, 1);
+    ck_assert_int_le(off.captures, EG_TICKS / EG_CHAIN + 2);
+
+    /* the eager ack admits the next capture at absorb, so the period
+     * collapses to the busiest single resource -- the worker */
+    ck_assert_int_eq(on.tail_inflight, 2);
+    ck_assert_int_ge(on.captures, EG_TICKS / EG_WORKER - 1);
+
+    /* the gain is the chain-to-worker ratio, 10 ticks against 6 here;
+     * anything at or below 1.5x means the ack did not move the pacer */
+    ck_assert_int_gt(on.captures * 2, off.captures * 3);
+
+    /* and one capture slot still holds one region: nothing overflows */
+    ck_assert_int_eq(on.slot_clobber, 0);
+    ck_assert_int_eq(on.bad_backpressure, 0);
+    ck_assert_int_eq(on.frontier_broken, 0);
+}
+END_TEST
+
+START_TEST(test_eager_ack_never_drops_a_region_a_failing_tail_owes_back)
+{
+    struct eager_run on;
+    struct eager_run off;
+
+    /* every third frame fails in its TAIL -- after its slot ack has
+     * already gone out, which is the corner SLOT_ONLY exists for. Its
+     * region must still be there to hand back. */
+    drive_eager(EAGER_ON, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 2, 1, 3, &on);
+    drive_eager(EAGER_OFF, EG_TICKS, EG_CAP_T, EG_ABS_T, EG_REW_T,
+                EG_EGR_T, 2, 2, 1, 3, &off);
+
+    ck_assert_int_gt(on.losses, 0);
+    ck_assert_int_eq(on.region_lost, 0);
+    ck_assert_int_eq(on.returned, on.losses);
+    /* every captured frame found an entry to hold its region in: this
+     * is what the +1 in XUP_CAP_SENT_SLOTS is for, and sizing the map
+     * at the slot count instead FAILS here (measured while writing it:
+     * 45 overflows, 21 regions lost) */
+    ck_assert_int_eq(on.slot_clobber, 0);
+    /* and the shipped protocol is untouched by any of it */
+    ck_assert_int_gt(off.losses, 0);
+    ck_assert_int_eq(off.region_lost, 0);
+    ck_assert_int_eq(off.returned, off.losses);
+    ck_assert_int_eq(off.slot_clobber, 0);
+}
+END_TEST
+
+START_TEST(test_absorb_only_ack_bufferbloats_and_the_metric_shows_it)
+{
+    struct eager_run on_short;
+    struct eager_run on_long;
+    struct eager_run nobp_short;
+    struct eager_run nobp_long;
+
+    /* egress SLOWER than the worker: absorb 1 + rewrite 1 against 6 of
+     * transport. Dropping condition (b) admits captures at the worker's
+     * rate against a queue that drains at a third of it. */
+    drive_eager(EAGER_NO_BP, 200, 1, 1, 1, 6, 2, 2, 1, 0, &nobp_short);
+    drive_eager(EAGER_NO_BP, 400, 1, 1, 1, 6, 2, 2, 1, 0, &nobp_long);
+    drive_eager(EAGER_ON, 200, 1, 1, 1, 6, 2, 2, 1, 0, &on_short);
+    drive_eager(EAGER_ON, 400, 1, 1, 1, 6, 2, 2, 1, 0, &on_long);
+
+    /* a backlog that is a function of run length is the bufferbloat the
+     * PRD forbids; it is what condition (b) removes */
+    ck_assert_int_gt(nobp_long.max_egress_q, nobp_short.max_egress_q);
+    ck_assert_int_gt(nobp_long.bad_backpressure, 0);
+
+    /* with (b) the queue is bounded by the token, not by the run */
+    ck_assert_int_eq(on_long.max_egress_q, on_short.max_egress_q);
+    ck_assert_int_le(on_long.max_egress_q, 2);
+    ck_assert_int_eq(on_long.bad_backpressure, 0);
+    /* and the slow transport, not the ack, is what paces it */
+    ck_assert_int_le(on_long.captures, 400 / 6 + 2);
+}
+END_TEST
+
+/******************************************************************************/
 Suite *
 make_suite_avc444_multimon(void)
 {
@@ -911,6 +1852,20 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc, test_overlap_model_instant_ack_cannot_overlap);
     tcase_add_test(tc, test_overlap_model_widening_window_never_reduces_depth);
     tcase_add_test(tc, test_cap_budget_two_gates_agree);
+    /* PRD FR-ACK-1 / BACKLOG #64 */
+    tcase_add_test(tc, test_overlap_lossy_encode_wedges_without_consume_ack);
+    tcase_add_test(tc, test_overlap_consume_ack_restores_depth);
+    tcase_add_test(tc, test_ack_value_is_echoed_identity);
+    tcase_add_test(tc, test_dropped_frame_region_returns_to_dirty);
+    tcase_add_test(tc, test_xup_ack_displayed_bit_serialization);
+    tcase_add_test(tc, test_ack_frontier_slot_only_holds_the_region_frontier);
+    tcase_add_test(tc, test_ack_frontier_is_cumulative_and_monotonic);
+    tcase_add_test(tc,
+                   test_eager_ack_buys_nothing_when_the_budget_already_admits_two);
+    tcase_add_test(tc, test_eager_ack_restores_the_floor_at_effective_depth_one);
+    tcase_add_test(tc,
+                   test_eager_ack_never_drops_a_region_a_failing_tail_owes_back);
+    tcase_add_test(tc, test_absorb_only_ack_bufferbloats_and_the_metric_shows_it);
     suite_add_tcase(s, tc);
     return s;
 }

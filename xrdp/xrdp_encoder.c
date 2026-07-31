@@ -22,6 +22,9 @@
 #include <config_ac.h>
 #endif
 
+#include <limits.h>
+#include <time.h>
+
 #include "xrdp_encoder.h"
 #include "xup_client_info.h"
 #include "xrdp_encoder_ffmpeg.h"
@@ -252,6 +255,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_fault_aux_delay = mm->avc444_fault_aux_delay;
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
         self->avc444_aux_ltr_chain = mm->avc444_aux_ltr_chain;
+        self->eager_slot_ack = mm->avc444_eager_slot_ack;
         self->avc444_ltr_rekey_frame_num = mm->avc444_ltr_rekey_frame_num;
         self->avc444_intra_refresh_frames =
             mm->avc444_intra_refresh_frames;
@@ -816,6 +820,30 @@ gfx_enc_trace_on(void)
 }
 
 /*****************************************************************************/
+/* BACKLOG #70 -- see xrdp_encoder.h */
+long long
+xrdp_mono_us(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
+}
+
+/*****************************************************************************/
+int
+xrdp_ack_trace_on(void)
+{
+    static int cached = -1;
+    if (cached < 0)
+    {
+        const char *e = g_getenv("XRDP_ACK_TRACE");
+        cached = (e != NULL && e[0] == '1') ? 1 : 0;
+    }
+    return cached;
+}
+
+/*****************************************************************************/
 static void
 gfx_trace_rects(const char *tag, int surface_id, int num_rects,
                 struct xrdp_egfx_rect *rects)
@@ -985,6 +1013,34 @@ gfx_egfx_batch_peek_mon(const char *cmd, int cmd_bytes)
         return -1;
     }
     return (int)((flags >> 28) & 0xF);
+}
+
+/*****************************************************************************/
+/* BACKLOG #70 -- see xrdp_encoder.h */
+int
+gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes)
+{
+    const unsigned char *p;
+
+    if (cmd == NULL || cmd_bytes < GFX_BATCH_STARTFRAME_BYTES)
+    {
+        return -1;
+    }
+    p = (const unsigned char *)cmd;
+    if (gfx_batch_u16(p) != XR_RDPGFX_CMDID_STARTFRAME ||
+            gfx_batch_u32(p + 4) != GFX_BATCH_STARTFRAME_BYTES)
+    {
+        return -1;
+    }
+    /* STARTFRAME body: cmd_id 2 + flags 2 + cmd_bytes 4, then frame_id.
+     * The producer counts rect_id up from 1 in an int; a value that
+     * cannot be one is refused rather than wrapped into a negative id
+     * that would poison the ack frontier. */
+    if (gfx_batch_u32(p + 8) > (unsigned int)INT_MAX)
+    {
+        return -1;
+    }
+    return (int)gfx_batch_u32(p + 8);
 }
 
 /*****************************************************************************/
@@ -1215,6 +1271,89 @@ gfx_send_done(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
     fifo_add_item(self->fifo_processed, enc_done);
     tc_mutex_unlock(self->mutex);
     /* signal completion for main thread */
+    g_set_wait_obj(self->xrdp_encoder_event_processed);
+    return 0;
+}
+
+/*****************************************************************************/
+/* PRD FR-ACK-1 rule 2: the TERMINAL ack of one received paint msg.
+ *
+ * Carries the ECHOED frame id of that msg -- never a counter this side
+ * maintains -- and the terminal state it reached:
+ *
+ *   displayed=1  every PDU of the frame was built and queued;
+ *   displayed=0  the frame was consumed but produced no output frame
+ *                (AVC444 warmup PENDING, encoder error, dropped pair).
+ *
+ * It carries no bytes (comp_bytes 0), so the client-facing stream is
+ * unchanged, and it is the msg's LAST enc_done, which is what releases
+ * the XRDP_ENC_DATA. Emitting it on EVERY path is what makes the ack
+ * total: a msg that produced no ack used to pin a producer capture slot
+ * until some later frame's cumulative ack happened to cover it, and at
+ * cap there is no later frame. */
+static int
+gfx_send_terminal_ack(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                      int frame_id, int displayed)
+{
+    XRDP_ENC_DATA_DONE *enc_done;
+
+    enc_done = g_new0(XRDP_ENC_DATA_DONE, 1);
+    if (enc_done == NULL)
+    {
+        return 1;
+    }
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_GFX_BIT);
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_FRAME_ID_BIT);
+    if (!displayed)
+    {
+        ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_NOT_DISPLAYED_BIT);
+    }
+    enc_done->enc = enc;
+    enc_done->last = 1;
+    enc_done->frame_id = frame_id;
+    tc_mutex_lock(self->mutex);
+    fifo_add_item(self->fifo_processed, enc_done);
+    tc_mutex_unlock(self->mutex);
+    g_set_wait_obj(self->xrdp_encoder_event_processed);
+    return 0;
+}
+
+/*****************************************************************************/
+/* BACKLOG #70: report that the encoder children have ABSORBED this
+ * frame's input, so the producer's capture slot can be released without
+ * waiting for the rest of the pipeline (LTR rewrite, EGFX assembly,
+ * transport egress).
+ *
+ * This is NOT a frame: comp_bytes 0 (nothing reaches the client) and
+ * last 0 (the XRDP_ENC_DATA still belongs to the emit pass that follows).
+ * It carries the ECHOED frame id, and it is emitted ONLY after a
+ * successful collect -- the child cannot have produced the pair without
+ * having read the input the pair was made from, which is exactly the
+ * proof the borrowed capture pages (FR-PROC-6: vmsplice, never GIFT)
+ * are no longer referenced. Emitting it any earlier would let Xorg
+ * overwrite pages a child is still reading. */
+static int
+gfx_send_consumed(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                  int frame_id)
+{
+    XRDP_ENC_DATA_DONE *enc_done;
+
+    enc_done = g_new0(XRDP_ENC_DATA_DONE, 1);
+    if (enc_done == NULL)
+    {
+        /* the frame is still acked by its terminal enc_done, one full
+         * pipeline later: slower, never wrong */
+        return 1;
+    }
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_GFX_BIT);
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_FRAME_ID_BIT);
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_CONSUMED_BIT);
+    enc_done->enc = enc;
+    enc_done->last = 0;
+    enc_done->frame_id = frame_id;
+    tc_mutex_lock(self->mutex);
+    fifo_add_item(self->fifo_processed, enc_done);
+    tc_mutex_unlock(self->mutex);
     g_set_wait_obj(self->xrdp_encoder_event_processed);
     return 0;
 }
@@ -1969,10 +2108,20 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
     {
         /* centre luma of the CURRENT capture: proves which colour this
-         * submission carries vs which sequence the popped pair returns */
+         * submission carries vs which sequence the popped pair returns.
+         * BACKLOG #70: with the eager ack this frame's capture slot may
+         * already have been released and be under the NEXT capture's
+         * pen, so the read is skipped rather than reported as this
+         * frame's colour -- a diagnostic must not print a value it
+         * cannot stand behind. */
         int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
         int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
                      + t_cw / 2;
+        int center_y = -1;
+        if (!(self->eager_slot_ack && self->avc444_batch_have[mon_index] > 0))
+        {
+            center_y = (int)main_view[cy_off];
+        }
         LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
             "%lld rv=%s inflight=%d centerY=%d",
             (unsigned long long)seq,
@@ -1980,7 +2129,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             ? (long long)pair.desktop_sequence : -1LL,
             enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
             xrdp_ffmpeg_avc444_inflight(ff),
-            (int)main_view[cy_off]);
+            center_y);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -2150,6 +2299,55 @@ gfx_batch_collect_one(struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
+/* BACKLOG #70: release the capture slot of every item in this set whose
+ * pair was collected, i.e. whose input the child has provably absorbed.
+ * A monitor whose collect FAILED is deliberately skipped: its child was
+ * torn down mid-stream and nothing here proves how much of the input it
+ * read, so that frame keeps the shipped egress-paced ack (its terminal
+ * enc_done, displayed=0). Off by default (gfx.toml eager_slot_ack). */
+static void
+gfx_batch_release_slots(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
+                        const int *set_mon, int set_n)
+{
+    int index;
+    int frame_id;
+
+    if (!self->eager_slot_ack && !xrdp_ack_trace_on())
+    {
+        return;
+    }
+    for (index = 0; index < set_n; index++)
+    {
+        if (set_mon[index] < 0 || self->avc444_batch_have[set_mon[index]] != 1)
+        {
+            continue;
+        }
+        frame_id = gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
+                                                set[index]->u.gfx.cmd_bytes);
+        if (frame_id < 0)
+        {
+            continue;
+        }
+        if (xrdp_ack_trace_on())
+        {
+            /* stamped in BOTH modes: the absorb instant is the axis the
+             * A/B is read on, so the control arm has to publish it too */
+            LOG(LOG_LEVEL_INFO, "ACK_TRACE absorb id=%d mon=%d us=%lld",
+                frame_id, set_mon[index], xrdp_mono_us());
+        }
+        if (!self->eager_slot_ack)
+        {
+            continue;
+        }
+        if (gfx_send_consumed(self, set[index], frame_id) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "gfx_batch_release_slots: consumed report "
+                "for frame id %d could not be queued", frame_id);
+        }
+    }
+}
+
+/*****************************************************************************/
 /* #45 step 7 -- run ONE grouped set: SUBMIT every batchable item's pair,
  * drive the whole set's children through ONE pump_pairs (E4: 2 children
  * per damaged monitor, so 4 for two monitors), COLLECT each pair, and only
@@ -2225,6 +2423,13 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
             continue;
         }
         self->avc444_batch_seq[mon] = seq;
+        if (xrdp_ack_trace_on())
+        {
+            LOG(LOG_LEVEL_INFO, "ACK_TRACE submit id=%d mon=%d us=%lld",
+                gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
+                                             set[index]->u.gfx.cmd_bytes),
+                mon, xrdp_mono_us());
+        }
         handles[n_handles] = ff;
         handle_mon[n_handles] = mon;
         n_handles++;
@@ -2285,6 +2490,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
              * released with this cycle's shmem */
             gfx_batch_collect_one(self, handles[index], mon);
         }
+        gfx_batch_release_slots(self, set, set_mon, set_n);
         return;
     }
     /* COLLECT pass */
@@ -2292,6 +2498,8 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     {
         gfx_batch_collect_one(self, handles[index], handle_mon[index]);
     }
+    /* #70: the collects above are the absorb proof for this set */
+    gfx_batch_release_slots(self, set, set_mon, set_n);
 }
 
 /*****************************************************************************/
@@ -2818,7 +3026,8 @@ gfx_deletesurface(struct xrdp_encoder *self,
 /*****************************************************************************/
 static struct stream *
 gfx_startframe(struct xrdp_encoder *self,
-               struct xrdp_egfx_bulk *bulk, struct stream *in_s)
+               struct xrdp_egfx_bulk *bulk, struct stream *in_s,
+               int *aframe_id)
 {
     int frame_id;
     int time_stamp;
@@ -2829,6 +3038,10 @@ gfx_startframe(struct xrdp_encoder *self,
     }
     in_uint32_le(in_s, frame_id);
     in_uint32_le(in_s, time_stamp);
+    /* FR-ACK-1: the id is published to the caller HERE, not only at the
+     * ENDFRAME, so a frame that fails before its ENDFRAME can still be
+     * acked with its own echoed id (rule 2, totality) */
+    *aframe_id = frame_id;
     return xrdp_egfx_frame_start(bulk, frame_id, time_stamp);
 }
 
@@ -2910,6 +3123,32 @@ gfx_mapsurfacetooutput(struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
+/* FR-ACK-1 rule 2, the single exhaustive exit of one received egfx paint
+ * msg: if the msg carried a frame id, exactly one terminal ack is
+ * emitted for THAT id, on every path out of process_enc_egfx -- the
+ * normal end of the command stream, a malformed cmd_bytes, or a failed
+ * enc_done allocation. There is no third terminal state short of
+ * teardown, which is what Invariant I's exhaustiveness rests on.
+ * A msg with no frame id (surface lifecycle only) owes no ack and its
+ * last PDU keeps releasing the XRDP_ENC_DATA as before. */
+static int
+gfx_close_egfx_msg(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
+                   int frame_id, int owe_ack, int displayed)
+{
+    if (!owe_ack)
+    {
+        return 0;
+    }
+    if (gfx_send_terminal_ack(self, enc, frame_id, displayed) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "gfx_close_egfx_msg: terminal ack for frame "
+            "id %d could not be queued", frame_id);
+        return 1;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
 /* called from encoder thread */
 static int
 process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
@@ -2924,7 +3163,18 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
     int error;
     char *holdp;
     char *holdend;
+    /* FR-ACK-1: the echoed id of the frame this msg carries, and the
+     * terminal state it reaches. owe_ack says a terminal ack is owed --
+     * once it is set, the terminal enc_done is the msg's LAST one on
+     * every exit path, including the error returns. */
+    int term_frame_id;
+    int owe_ack;
+    int displayed;
+    int handled;
 
+    term_frame_id = 0;
+    owe_ack = 0;
+    displayed = 1;
     bulk = self->mm->egfx->bulk;
     g_memset(&in_s, 0, sizeof(in_s));
     in_s.data = enc->u.gfx.cmd;
@@ -2936,12 +3186,14 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         s = NULL;
         frame_id = 0;
         got_frame_id = 0;
+        handled = 1;
         holdp = in_s.p;
         in_uint16_le(&in_s, cmd_id);
         in_uint8s(&in_s, 2); /* flags */
         in_uint32_le(&in_s, cmd_bytes);
         if ((cmd_bytes < 8) || (cmd_bytes > 32 * 1024))
         {
+            gfx_close_egfx_msg(self, enc, term_frame_id, owe_ack, 0);
             return 1;
         }
         holdend = in_s.end;
@@ -2968,7 +3220,8 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
                 s = gfx_deletesurface(self, bulk, &in_s);
                 break;
             case XR_RDPGFX_CMDID_STARTFRAME:            /* 0x000B */
-                s = gfx_startframe(self, bulk, &in_s);
+                s = gfx_startframe(self, bulk, &in_s, &frame_id);
+                got_frame_id = 1;
                 break;
             case XR_RDPGFX_CMDID_ENDFRAME:              /* 0x000C */
                 s = gfx_endframe(self, bulk, &in_s, &frame_id);
@@ -2981,6 +3234,7 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
                 s = gfx_mapsurfacetooutput(self, bulk, &in_s);
                 break;
             default:
+                handled = 0;
                 break;
         }
         /* setup for next cmd */
@@ -2988,20 +3242,28 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         in_s.end = holdend;
         if (got_frame_id)
         {
-            /* remember the last GFX frame id so an idle tail-flush can reuse it
-             * for its own STARTFRAME/ENDFRAME without perturbing frame acks */
+            /* FR-ACK-1 rule 1: the id this msg is acked with is COPIED
+             * from the msg (the producer's rect_id, carried in both the
+             * STARTFRAME and the ENDFRAME), never derived from a counter
+             * kept on this side. The terminal ack is emitted once, after
+             * the whole msg, by gfx_close_egfx_msg below. */
+            term_frame_id = frame_id;
+            owe_ack = 1;
         }
         if (s != NULL)
         {
-            /* send message to main thread */
+            /* send message to main thread. The frame id never rides a
+             * PDU any more: it belongs to the terminal ack, which is
+             * also the msg's last enc_done once one is owed. */
             error = gfx_send_done(self, enc, (int) (s->end - s->data),
-                                  0, s->data, got_frame_id, frame_id,
-                                  !s_check_rem(&in_s, 8));
+                                  0, s->data, 0, 0,
+                                  !owe_ack && !s_check_rem(&in_s, 8));
             if (error != 0)
             {
                 LOG(LOG_LEVEL_ERROR, "process_enc_egfx: gfx_send_done failed "
                     "error %d", error);
                 free_stream(s);
+                gfx_close_egfx_msg(self, enc, term_frame_id, owe_ack, 0);
                 return 1;
             }
             g_free(s); /* don't call free_stream() here so s->data is valid */
@@ -3009,9 +3271,18 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         else
         {
             LOG_DEVEL(LOG_LEVEL_INFO, "process_enc_egfx: nil");
+            if (handled)
+            {
+                /* FR-ACK-1 rule 2(b): a command of this frame was
+                 * consumed and produced no PDU -- the AVC444 warmup
+                 * PENDING return, an encoder error, or a dropped pair.
+                 * The frame is still acked, with displayed=0, so the
+                 * producer frees the slot and takes the region back. */
+                displayed = 0;
+            }
         }
     }
-    return 0;
+    return gfx_close_egfx_msg(self, enc, term_frame_id, owe_ack, displayed);
 }
 
 /*****************************************************************************/

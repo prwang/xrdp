@@ -1409,6 +1409,72 @@ m=1, outstanding=0 callback entries appear; (3) T4 last, 30 s gate
 run against the 55–57 ms prediction, decomposed with the #55 i55
 instrument (`i55_h1h2_uprobe.sh` + `i55_analyze.py`).
 
+### Rung 1 (CI) RESULT — implemented, 174/174 green, and it moved the item
+
+Shipped behind `gfx.toml [avc444_ffmpeg] eager_slot_ack` (default 0,
+so the shipped pacing is unchanged byte for byte). xup contract
+20260731. The T4 is decommissioned, so rung 3 is now the local fleet.
+
+**The ack was SPLIT, not moved.** An early ack that also disposed of
+the frame's region would lose pixels: a tail that fails after the slot
+is released still owes the producer its capture region back. So there
+are two acks per frame — `XUP_ACK_FLAGS_SLOT_ONLY` at
+`max(absorb N, egress N−1)`, which frees the slot and says nothing
+about the frame, and the ordinary region-disposing ack at egress,
+unchanged and at its shipped emission point. The producer keeps two
+frontiers (`rect_id_ack` / `rect_id_ack_shown`) advanced by one shared
+rule, `xup_ack_frontier_apply()` in `common/xup_client_info.h`, which
+is the copy xorgxrdp calls and the copy CI tests.
+
+**CI FINDING 1 — the pre-registered 55–57 ms prediction is CONDITIONAL,
+and step 0 is now the load-bearing question.** A four-resource model
+(capture ‖ worker[absorb+rewrite] ‖ transport, the T4's shape: worker
+heaviest) says that with a HEALTHY two-slot budget the SHIPPED ack
+already reaches the worker floor — 67 vs 68 captures per 400 ticks,
+i.e. eager acking buys nothing at m=1. It pays only when the effective
+capture depth is ONE, and there it restores the floor exactly:
+40 → 67 captures, **1.68×**, against a chain/worker ratio of 10/6.
+The deployed T4 measured 113.6 ms against a 69 ms worker (24.1 absorb
++ 44.9 rewrite/assembly) = **1.65×** — the depth-1 arm, not the
+depth-2 arm. So the T4's regime is explained by an effective depth of
+one, and #70's value is exactly the value of getting off it. Whether
+that is the ack VALUE off-by-one (step 0's dead slot) or something
+else is now the question that decides whether #70 is the fix or a
+second fix for the same 1.65×. Both assertions are pinned
+(`test_eager_ack_buys_nothing_when_the_budget_already_admits_two`,
+`test_eager_ack_restores_the_floor_at_effective_depth_one`) so the
+claim cannot be quietly upgraded.
+
+**CI FINDING 2 — the design as filed LOSES REGIONS; caught before
+deployment.** The producer's held-region map had one entry per capture
+slot, which was exact while slot-release and disposal were the same
+event. The eager ack separates them, so a monitor holds one more
+undisposed frame than it holds slots, and a capture overwrote a region
+entry whose frame could still fail: 45 overflows and 21 lost regions
+in a 400-tick run with a failing tail every third frame — a stale
+rectangle on screen with no event anywhere. Fixed by sizing the map at
+`XUP_CAP_SENT_SLOTS = XUP_CAP_AVC444_SLOT_COUNT + 1` and allocating
+entries by identity (`xup_cap_sent_take`) rather than by capture slot.
+The +1 is exactly what condition (b) bounds the lag at — the
+adversarial absorb-only arm overflows even three entries (15 times),
+which is the same fact seen from the other side.
+
+**Also pinned:** the absorb-only arm (condition (b) dropped)
+bufferbloats visibly — its egress backlog is a function of run length
+(200 ticks → 400 ticks grows it) while the (a)&&(b) arm stays at 2 for
+any run length. That is the PRD-forbidden shape, and it is why (b) is
+not optional.
+
+Instrument for rungs 2–3: `XRDP_ACK_TRACE=1` (separate from
+`XRDP_GFX_TRACE`, so a timing run does not pay for per-rect tracing)
+emits `ACK_TRACE {msgin,submit,absorb,egress,ack} id=… us=…` from xrdp
+and `ACK_TRACE cap id=… begin_us=… packed_us=… sent_us=… ack=… shown=…`
+from xorgxrdp, all stamped in CLOCK_MONOTONIC µs — one system-wide
+clock, so a capture leg and the previous frame's tail can be
+INTERSECTED and the concurrency stated in milliseconds. The `ack=`
+field on the capture line is also the step-0 instrument: `id − ack` at
+capture admission says directly whether a slot is dead.
+
 ## #71 (was #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
 
 At m≥2 two further issues sit ON TOP of the m=1 serializer (#70):

@@ -565,6 +565,73 @@ START_TEST(test_batch_group_degenerate_input)
 }
 END_TEST
 
+/* BACKLOG #70 -- gfx_egfx_batch_peek_frame_id.
+ *
+ * The eager slot-release ack names a frame by the id the PRODUCER put in
+ * the blob, so the id read here has to be the one xorgxrdp wrote and
+ * nothing else. The expected values below come from the wire layout
+ * (MS-RDPEGFX RDPGFX_START_FRAME_PDU: cmdId 2 + flags 2 + pduLength 4,
+ * then frameId) and from what tb_build() -- an independent transcription
+ * of rdpClientCon.c's emitter -- put there; never from running the
+ * parser. Reading the wrong id would ack the wrong frame, which frees a
+ * capture slot whose pages an encoder child is still reading. */
+START_TEST(test_batch_peek_frame_id_reads_the_startframe_id)
+{
+    unsigned char blob[512];
+    int total;
+
+    total = tb_build(blob, 0, XR_RDPGFX_CODECID_AVC444, 1, 1);
+    ck_assert_int_eq(77, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    /* the producer counts up from 1 without bound within a session */
+    tb_u32(blob + 8, 1);
+    ck_assert_int_eq(1, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u32(blob + 8, 65535);
+    ck_assert_int_eq(65535,
+                     gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u32(blob + 8, 0x7FFFFFFF);
+    ck_assert_int_eq(0x7FFFFFFF,
+                     gfx_egfx_batch_peek_frame_id((char *)blob, total));
+}
+END_TEST
+
+START_TEST(test_batch_peek_frame_id_rejects_what_it_cannot_read)
+{
+    unsigned char blob[512];
+    int total;
+    int n;
+
+    total = tb_build(blob, 0, XR_RDPGFX_CODECID_AVC444, 1, 1);
+    /* not a STARTFRAME */
+    tb_u16(blob, XR_RDPGFX_CMDID_ENDFRAME);
+    ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u16(blob, XR_RDPGFX_CMDID_STARTFRAME);
+    /* a STARTFRAME that does not declare its own length */
+    tb_u32(blob + 4, TB_STARTFRAME_BYTES + 1);
+    ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u32(blob + 4, TB_STARTFRAME_BYTES);
+    /* an id that cannot be a producer rect_id: it would land negative */
+    tb_u32(blob + 8, 0x80000000u);
+    ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u32(blob + 8, 0xFFFFFFFFu);
+    ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id((char *)blob, total));
+    tb_u32(blob + 8, 77);
+    /* every truncation short of a whole STARTFRAME, through a buffer of
+     * exactly that size so an over-read is a real heap over-read */
+    for (n = 0; n < TB_STARTFRAME_BYTES; ++n)
+    {
+        char *tight = (char *)malloc(n > 0 ? n : 1);
+        ck_assert_ptr_ne(tight, NULL);
+        if (n > 0)
+        {
+            memcpy(tight, blob, n);
+        }
+        ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id(tight, n));
+        free(tight);
+    }
+    ck_assert_int_eq(-1, gfx_egfx_batch_peek_frame_id(NULL, total));
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_egfx_base_functions(void)
@@ -600,6 +667,9 @@ make_suite_egfx_base_functions(void)
                    test_batch_group_non_batchable_second_ends_the_batch);
     tcase_add_test(tc_batch, test_batch_group_sixteen_monitors);
     tcase_add_test(tc_batch, test_batch_group_degenerate_input);
+    tcase_add_test(tc_batch, test_batch_peek_frame_id_reads_the_startframe_id);
+    tcase_add_test(tc_batch,
+                   test_batch_peek_frame_id_rejects_what_it_cannot_read);
     suite_add_tcase(s, tc_batch);
 
     return s;

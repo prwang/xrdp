@@ -450,6 +450,7 @@ struct xrdp_mm
     int avc444_intra_refresh_frames; /* scheduled paired refresh interval */
     /*                                  (PRD FR-H264-6, #45)             */
     int avc444_ltr_rekey_surface_reset; /* emit surface churn (#48)      */
+    int avc444_eager_slot_ack; /* ack on absorb, not on egress (#70)     */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.

@@ -180,6 +180,17 @@ struct xrdp_tconfig_gfx
      * visualize a main/aux pairing slip (2026-07-27 arm-K). Default 0;
      * the runner logs a WARNING whenever it is active. */
     int avc444_ffmpeg_fault_aux_delay;
+    /* BACKLOG #70: release the producer's capture slot as soon as the
+     * frame's input has been ABSORBED by the encoder children, instead
+     * of after its last byte reaches the transport. The module ack is
+     * the only token that admits the next capture, so riding it on the
+     * last transport write serialises capture, encode, LTR rewrite and
+     * egress behind one another. Default 0 = the shipped behaviour,
+     * byte for byte. Effective only on the AVC444 ffmpeg batch path
+     * (aux_ltr_chain), which is where the absorb marker exists, and
+     * requires the paired xorgxrdp (xup contract 20260731+): an older
+     * producer frees the slot with no region-return safety behind it.*/
+    int avc444_ffmpeg_eager_slot_ack;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

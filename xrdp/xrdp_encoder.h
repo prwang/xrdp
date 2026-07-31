@@ -163,6 +163,17 @@ struct xrdp_encoder
     int frame_id_client; /* last frame id received from client */
     int frame_id_server; /* last frame id received from Xorg */
     int frame_id_server_sent;
+    /* BACKLOG #70: the CONTIGUOUS frontier of frame ids whose input the
+     * encoder children have absorbed (their vmsplice'd pages are free).
+     * Never advanced past a gap: the module ack is cumulative, so
+     * acking N would also release an unconsumed N-1 whose borrowed
+     * capture pages a child may still be reading. */
+    int frame_id_consumed;
+    /* highest id acked with the region-disposing (ordinary) ack. Equal
+     * to frame_id_server_sent unless an eager slot-only ack has run
+     * ahead of it. */
+    int frame_id_region_sent;
+    int eager_slot_ack;  /* gfx.toml eager_slot_ack, batch path only */
     int frames_in_flight;
     int gfx;
     int gfx_ack_off;
@@ -208,6 +219,18 @@ typedef struct xrdp_enc_data XRDP_ENC_DATA;
 
 #define ENC_DONE_FLAGS_GFX_BIT      0
 #define ENC_DONE_FLAGS_FRAME_ID_BIT 1
+/* PRD FR-ACK-1 terminal state (b): this frame was CONSUMED but produced
+ * no output frame (AVC444 warmup PENDING, encoder error, dropped pair).
+ * Carries the echoed frame id with comp_bytes 0 so the producer's slot
+ * is released and its region returns to the dirty region. Set only
+ * together with ENC_DONE_FLAGS_FRAME_ID_BIT. */
+#define ENC_DONE_FLAGS_NOT_DISPLAYED_BIT 2
+/* BACKLOG #70: this enc_done is not a frame at all -- it reports that
+ * the encoder children have ABSORBED the input of the frame whose
+ * echoed id it carries. comp_bytes 0, last 0: it sends nothing and it
+ * does not release the XRDP_ENC_DATA. Set only together with
+ * ENC_DONE_FLAGS_FRAME_ID_BIT. */
+#define ENC_DONE_FLAGS_CONSUMED_BIT 3
 
 /* used when scheduling tasks from xrdp_encoder.c */
 struct xrdp_enc_data_done
@@ -285,6 +308,28 @@ gfx_egfx_batch_peek_mon(const char *cmd, int cmd_bytes);
 int
 gfx_egfx_batch_group(XRDP_ENC_DATA **in, int n_in,
                      XRDP_ENC_DATA **set, int *set_mon, int *set_n);
+
+/* BACKLOG #70 measurement (env XRDP_ACK_TRACE=1, off by default and
+ * separate from XRDP_GFX_TRACE so a timing run does not also pay for the
+ * per-rect damage tracing): one line per pipeline stage boundary,
+ * stamped in CLOCK_MONOTONIC microseconds and keyed by the frame's
+ * ECHOED id. That clock is system-wide, so the xorgxrdp capture legs and
+ * these encode/egress legs live on ONE timeline and can be intersected
+ * to answer "how many ms of capture ran concurrently with the tail of
+ * the previous frame" -- the unit the concurrency claim is made in. */
+long long
+xrdp_mono_us(void);
+int
+xrdp_ack_trace_on(void);
+
+/* BACKLOG #70 -- the ECHOED frame id (the producer's rect_id) carried in
+ * a batchable blob's STARTFRAME, or -1 if the blob does not open with a
+ * whole STARTFRAME. It is only ever read from a blob
+ * gfx_egfx_batch_peek_mon() has already accepted, which is the one shape
+ * whose STARTFRAME sits at offset 0; the bounds are re-checked here
+ * anyway because the blob arrives verbatim off the xup socket. */
+int
+gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes);
 
 struct xrdp_egfx_rect;
 struct stream;
