@@ -1804,17 +1804,46 @@ paths call `rdpScheduleDeferredUpdate` (`rdpClientCon.c:3925`,
 411 frames across two runs, fifo empty at every completion, `budget
 exceeded` = 0 (the gate is never even asked).
 
-**Decisive probe:** extend `PR-demo/t4_profile/xorg_capture_uprobe.sh`
-to `rdpDeferredUpdateCallback`, `rdpScheduleDeferredUpdate`, and
-`rdpCapRect`; count, during encode windows: callback entries, and which
-exit each takes (top capacity gate / per-monitor break / empty dirty
-intersect / captured). One 40 s run separates: timer never fires while
-a frame is outstanding (schedule suppressed) vs fires-and-refuses
-(a gate not visible at INFO) vs captures-but-never-sends.
+**PROBE RUN 2026-07-31 (`xorg_ackpace_uprobe.sh`, two runs, captures
+`e52_t4_ackpace_probe_20260731` + `e52_t4_ackpace_vars_20260731`) — the
+serializer is named: THE ACK UNDERCOUNTS BY ONE and a capture slot is
+permanently dead.**
 
-Acceptance: the serializer named by count; a one-line mechanism
-statement in the PRD concurrency table; then the fix, whose mechanism
-check is negative arm gaps appearing at m=1 (sustained depth 2).
+Event rates (45 s): timers armed 97/s, **callback fires 33/s** (H1
+"timer never fires" FALSIFIED), rdpCapRect 8.8/s, captures 8.5/s —
+73.5 % of callbacks refused at the capacity gate. Then with
+`rect_id`/`rect_id_ack` read at callback entry (raw-offset uprobe;
+outstanding == rid − rack at m=1):
+
+| outstanding at callback | count | outcome |
+|---|---|---|
+| 0 | **0 — never** | |
+| 1 | 340 (25.3 %) | **all 340 captured** (== rdpCapRect count) |
+| 2 | 1004 (74.7 %) | all refused |
+
+The two-slot machinery is RUNNING and the budget is CORRECT — but one
+of the two outstanding rects is a **ghost**: the ack value permanently
+trails xorgxrdp's rect_id by one beyond the true in-flight (rack =
+rid−1 at every capture, rid−2 during encodes, never rid). Cumulative
+acks make a single lost ack permanent: xrdp acks with its own count of
+frames it encoded-and-sent, so any paint msg consumed WITHOUT producing
+a sent frame (encoder warmup rv=PENDING, error path, login-churn
+coalesce) desyncs the counters forever. Also explains why fif=4 changed
+nothing (the −1 is in the ack VALUE, not the window).
+
+**Open: genesis** — which early event eats the +1. Decisive: fresh
+session, count paint msgs vs enc_done frames from t=0.
+
+**Fix (the real #64c work): every consumed rect MUST be acked,
+including rects that produce no output frame.** Ack the incoming
+rect_id on the PENDING/error/no-output paths — or carry rect_id through
+enc_done and ack THAT instead of xrdp's own counter, which also removes
+the two-counter identity assumption entirely. CI ratchet: a
+drive_pipeline arm where some encodes are lossy, asserting the budget
+still drains (today's model would deadlock at depth cap, which is
+exactly the live behaviour minus one). Mechanism check on the T4 after
+the fix: outstanding=0 callbacks appear, negative arm gaps at m=1,
+sustained depth 2.
 
 ## #65 — textflood violates the saturating-producer contract (**CLOSED 2026-07-31 — premise falsified by its own step 0**; the producer measures 27.66 fps ≥ the 16.4 floor)
 
