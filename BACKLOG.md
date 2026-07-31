@@ -1325,6 +1325,49 @@ cause, so the item's BLOCKER status is withdrawn on this stem:
   (global fif window) is arithmetic and stands. FR-PROC-7 (#40,
   breadth+depth) is the lever the cycle numbers point at.
 
+### RECONCILIATION (2026-07-31, same day, joint-evidence pass): the serialization is REAL; the serializer is not the protocol
+
+The withdrawal above corrected the ROOT CAUSE but its "healthy
+signature" reading overcorrected the SYMPTOM. The uprobe histogram
+fits the healthy and the serial timeline equally well — it
+discriminates nothing, and using it to argue "healthy" repeats the
+same instrument error as using it to argue "ghost" (quality gate 2b,
+third strike on one histogram). The load-bearing datum is the
+discarded run's **0/205 ordering trace** (`recv(N+1) < send(N)` in 0
+of 205 frames): its dismissal ("convicts the producer") was VOIDED by
+#65 step 0 (producer 27.66 fps, p50 2 damage frames pending during
+every encode) and never revisited — a stale annotation, not fake
+data. Un-confounded, it says the encoder IDLES between every pair of
+frames at m=1 on the T4. The serialization is real.
+
+Joint constraint from all three instruments: the budget had capacity
+at every admission (probe), xrdp emits the ack immediately at
+encode-done and nothing blocks it (verified: every write on both the
+client and xup sockets is `trans_write_copy_s` — non-blocking,
+queued; the ack does not wait behind the payload), yet outstanding=0
+was observed at ZERO of 1344 callback entries — the 4 ms-rearmed
+timer beats the ack into the gate every cycle. Therefore the ack's
+XORG-SIDE APPLICATION latency is ≳30 ms consistently, or the
+raw-offset uprobe misread the field (un-audited; must be
+cross-checked by a log line in the next instrument).
+
+**Leading hypothesis (H1): the serializer is the Xorg main thread's
+event-loop latency applying the xup ack.** The ack arrives on a
+`SetNotifyFd` fd serviced only when dispatch yields; #59 measured
+that thread saturated (producer blits + the 20 ms pack = the
+bottleneck thread). Cycle ≈ E + (ack-apply latency + timer + pack)
+≈ E + 40–70 ms, closing with #55's 87–98 ms/send band, giving #60's
+bimodality a mechanism (loop latency varies with blit backlog), and
+explaining why fif=4 was a no-op (the delay is downstream of xrdp's
+window). Falsifiable locally: same xorgxrdp, fleet arm, loopback
+client — if the idle gap reproduces, root-cause in the Xorg loop for
+free; if local is healthy, the residual suspect is the ssh-tunnel
+client path and ONLY then does the T4 earn a re-provision, with a
+specific number to confirm. Instrument spec lives in task #55:
+rect_id-paired ms stamps at pack start/end, msg62 write/read, encode
+start/end (encoder thread, not main-thread log order), ack emit, ack
+APPLY.
+
 The filing below is retained unedited as the record of the claim and
 its instrument.
 
