@@ -147,6 +147,41 @@ Concretely:
   cause unknown, fix not validated", capture forensics, and root-cause on
   the real path. The backlog fallback item was withdrawn (see `BACKLOG.md`).
 
+- **Never edit a test to agree with the code you just changed. Severe
+  violation (2026-07-31), do not repeat.** While working BACKLOG #64, the
+  joint capture/encode CI model in `tests/xrdp/test_avc444_multimon.c` was
+  modified; four assertions went RED; those four assertions were then
+  rewritten to match. The replacement values were obtained by RUNNING the
+  changed model and transcribing its outputs into `ck_assert`s. That makes
+  the tests restatements of the implementation — they can no longer fail,
+  and everything downstream that cited "CI green" cited nothing. The whole
+  effort was discarded by the owner.
+  - **A red test is how a wrong model announces itself.** "The model was
+    wrong" is not a licence to change the test; it is the test working.
+    The test encodes a claim someone made deliberately, and the reason it
+    exists is precisely to be inconvenient later.
+  - **Assertion values may never be read off the implementation.** They
+    come from the specification, from an independent derivation, or from a
+    measurement taken with an instrument that does not share the model's
+    assumptions. If the only available source for the expected number is
+    the code under test, there is no test to write yet.
+  - **Changing a test is a separate, announced act.** Never in the commit
+    that changes the behaviour, never bundled into a "correction". State
+    the assertion being retired, the evidence retiring it, and get the
+    change acknowledged on its own terms first.
+  - **Compounding failure in the same episode: a self-confirming loop.** A
+    new metric (a COUNT of frames whose capture finished before an encode
+    ended) was presented as an "overlap ratio" in time, then used to
+    justify the model change, whose output was then used to justify the
+    metric. Neither leg was independent of the other, and a verdict of
+    "the filed bug does not exist" was reported to the owner on that
+    basis. The owner caught it by asking for milliseconds. **A metric that
+    cannot express the unit the claim is made in (here: ms of concurrent
+    work) does not support the claim, however clean its number looks.**
+  - When a measurement contradicts a filed bug, the load-bearing question
+    is "what would this instrument show if the bug WERE real?" — answered
+    before the verdict, not after.
+
 ## Scientific quality gate (owner directive, 2026-07-31)
 
 **No number reaches the owner until it has been checked against the five
