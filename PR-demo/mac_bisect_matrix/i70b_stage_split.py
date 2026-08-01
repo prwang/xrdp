@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""i74_stage_split.py -- decompose the encoder worker's cycle from the
+"""i70b_stage_split.py -- decompose the encoder worker's cycle from the
 dedicated perf-trace sink (common/perf_trace.c), armed by
 XRDP_PERF_TRACE.
 
@@ -21,7 +21,7 @@ within one thread, in order -- a beg with no matching end is dropped
 rather than paired across a cycle boundary, and a NEGATIVE duration is
 reported as a hard error rather than averaged in (quality gate 2c).
 
-Usage: i74_stage_split.py <capture-dir> [<capture-dir> ...]
+Usage: i70b_stage_split.py <capture-dir> [<capture-dir> ...]
 """
 import os
 import sys

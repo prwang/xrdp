@@ -1,4 +1,4 @@
-# ARM W (host port 40022) — BACKLOG #74. The encoder block is
+# ARM W (host port 40022) — BACKLOG #70B. The encoder block is
 # byte-identical to gfx/arm-v.toml: this arm is arm-v's configuration
 # running on an xrdp deb that carries the perf-trace sink and the
 # worker-stage brackets. If this file ever diverges from arm-v.toml the

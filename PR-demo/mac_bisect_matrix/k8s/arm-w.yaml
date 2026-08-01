@@ -1,4 +1,4 @@
-# Arm W: BACKLOG #74 — arm-v's configuration, instrumented.
+# Arm W: BACKLOG #70B — arm-v's configuration, instrumented.
 #
 # The encoder config is byte-identical to gfx/arm-v.toml (eager_slot_ack
 # on), so this arm reproduces arm-v's pipeline; the ONLY difference is
@@ -47,7 +47,7 @@ spec:
             - name: SESSION_KIND
               value: "codeflood"
             - name: ARM_LABEL
-              value: "W: #74 perf-trace - arm-v instrumented (port 40022)"
+              value: "W: #70B perf-trace - arm-v instrumented (port 40022)"
             - name: XRDP_GFX_TRACE
               value: "1"
             - name: XRDP_ACK_TRACE

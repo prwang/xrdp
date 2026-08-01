@@ -1,4 +1,4 @@
-# BACKLOG #74 — the worker cycle, decomposed
+# BACKLOG #70B — the worker cycle, decomposed
 
 arm-w = arm-v's encoder configuration on an xrdp deb carrying
 `common/perf_trace.{c,h}` and the worker-stage brackets
@@ -6,7 +6,7 @@ arm-w = arm-v's encoder configuration on an xrdp deb carrying
 arm-u/arm-v). m=1, **2560x1440 = 3.69 Mpx**, `SESSION_KIND=codeflood`,
 oracle client, 45 s, AMD VAAPI (`h264_vaapi`, CQP 20).
 
-Analyzers: `../../i74_stage_split.py <dir>` (the sink) and
+Analyzers: `../../i70b_stage_split.py <dir>` (the sink) and
 `../../i70_ack_overlap.py <dir>` (the ACK_TRACE cross-check).
 
 ## The instrument did not move the thing it measures
@@ -14,7 +14,7 @@ Analyzers: `../../i74_stage_split.py <dir>` (the sink) and
 arm-w reproduces arm-v on every metric arm-v was read on, which is the
 mechanism check (gate 2) for the sink itself:
 
-| | arm-v (#70) | arm-w (#74) |
+| | arm-v (#70) | arm-w (#70B) |
 |---|---|---|
 | period | 33.0 ms | 32.5 ms |
 | encode(N+1) ‖ tail(N) | 8.5 ms | 8.6 ms |
@@ -78,11 +78,18 @@ single stage at 10.78 ms, and `emit` at 5.96 ms is the largest piece of
 the chain that is neither waiting for the children nor sending.
 
 Moving `emit` off the encoder worker would cut the chain to ~22.5 ms
-(a ~1.4x ceiling) **without adding a frame of latency**: during
+(a projected 1.22x-1.44x period, 22.6-26.6 ms; the range is the 4.04 ms
+inter-cycle gap, which this change does not determine) **without adding
+a frame of latency**: during
 `pump(N+1)` the previous frame is already alive on the main thread being
 egressed, so an assembler thread does not raise the number of resident
-frames. See BACKLOG #74 for the ordering hazard that governs how.
+frames. See BACKLOG #70B for the ordering hazard that governs how.
 
-Still open and unchanged: whether the main thread's 12.6 ms is the
-server's send cost or the oracle client's inability to drain
-288 Mbit/s. That decides whether a 1.4x worker-side win is realisable.
+The main thread's 12.6 ms is NOT a term in the table above — the two
+threads run concurrently and the table already closes to 0.00 ms without
+it. Nor is it orthogonal: it is the NEXT ceiling. At <=39 % occupancy it
+is not binding today and does not bind after the emit split either
+(~47-56 %); it binds near a 12.6 ms period (~79 fps), once `pump` is
+also attacked. Whether those 12.6 ms are the server's send cost or the
+oracle client failing to drain 288 Mbit/s decides the FIX at that point,
+not when it arrives — and it does NOT gate the emit split.

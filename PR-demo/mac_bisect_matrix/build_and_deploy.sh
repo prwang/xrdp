@@ -78,7 +78,7 @@ declare -A ARM_XORG_DEB=(
     # 20260731, so this xorgxrdp pairs ONLY with this xrdp.
     [arm-u]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [arm-v]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # arm-w (BACKLOG #74): arm-v's config on an instrumented xrdp. The
+    # arm-w (BACKLOG #70B): arm-v's config on an instrumented xrdp. The
     # xorgxrdp side is the SAME deb as arm-u/arm-v -- the xup contract
     # did not move, so the attribution is about arm-v's pipeline.
     [arm-w]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -117,7 +117,7 @@ declare -A TAG_DEB=(
     # arm-u/arm-v (BACKLOG #70): the eager slot-release ack, off by
     # default in the binary and turned on per arm by gfx.toml
     [348a16dde3f3.xx10fa3aa]="xrdp-dev_0.10.80+git20260731212249.348a16dde3f3_amd64.deb"
-    # arm-w (BACKLOG #74): the same encoder, plus common/perf_trace and
+    # arm-w (BACKLOG #70B): the same encoder, plus common/perf_trace and
     # the worker-stage brackets
     [e6e1f6f5641e.xx10fa3aa]="xrdp-dev_0.10.80+git20260801010944.e6e1f6f5641e_amd64.deb"
 )

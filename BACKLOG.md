@@ -1319,7 +1319,7 @@ T4 redo + resolution · `b245c1a1` client-rig statelessness (the two
 harness bugs the redo surfaced). PRD: FR-ACK-1-as-filed moved to
 Non-goals (NG-9).
 
-## #70 — Eager slot-release ack: ack(N) fires at max(absorb N, egress N−1) (DONE 2026-07-31 — shipped behind a default-off knob, CI 174/174, local A/B **1.11× and encode‖tail 4.8 → 8.5 ms**; step 0 answered NO; the remaining serializer is the worker thread → #40/#41)
+## #70 — Eager slot-release ack: ack(N) fires at max(absorb N, egress N−1) (DONE 2026-07-31 — shipped behind a default-off knob, CI 174/174, local A/B **1.11× and encode‖tail 4.8 → 8.5 ms**; step 0 answered NO; the remaining serializer is the worker thread → **#70B**, which PRD FR-ACK-2 now makes a REQUIREMENT of shipping this ack, not a follow-up)
 
 The m=1 pipeline has four stages — capture, ffmpeg, LTR rewrite, net
 egress — and the shipped ack releases the next capture only after the
@@ -1742,7 +1742,7 @@ workload heavy enough to expose what is not batched. This motivates **#63**.
    preempt/breadth/depth policies need a payload that loads the aux view,
    which subpixel-AA text does maximally (aux is 44.8 % of the bytes here).
 
-## #74 — a dedicated perf-trace sink, and what it says the worker's 7.9 ms is (IN PROGRESS 2026-08-01)
+## #70B — #70 completed: the emit split, and the sink that measured it (IN PROGRESS 2026-08-01)
 
 **Why.** #70's follow-up established, from archived traces alone, that the
 encoder worker burns **7.9 ms of CPU per frame** between `absorb(N)` and
@@ -1840,7 +1840,7 @@ launched with `MM_MONITORS=1`, but `e_gate_run.sh`'s knob is
 `E_MONITORS` — the session came up 2-monitor at 12.9 Mpx. Caught before
 any number was computed, by the record counts not lining up (1230 emit
 against 654 pump) and `client-monitors.txt` reading "Monitors: 2". That
-capture is kept as `captures/VOID_i74_armW_m2_wrong_geometry_20260801/`
+capture is kept as `captures/VOID_i70b_armW_m2_wrong_geometry_20260801/`
 and none of its numbers are quoted: a 12.9 Mpx 2-monitor run is not
 comparable to the 3.69 Mpx m=1 series (gate 5).
 
@@ -1848,7 +1848,10 @@ comparable to the 3.69 Mpx m=1 series (gate 5).
 
 The worker's serial chain is **28.5 ms of a 32.5 ms cycle (88 %
 occupancy)**. Moving `emit` to its own thread cuts it to ~22.5 ms, a
-**~1.4x ceiling**, and — the part that matters for FR-PROC-6 — adds NO
+**1.22x–1.44x** projected period (22.6–26.6 ms from 32.56 ms; the range
+is the 4.04 ms inter-cycle gap, which this change does not determine —
+quote the range, not its optimistic end), and — the part that matters
+for FR-PROC-6 — adds NO
 frame of latency: during `pump(N+1)` the previous frame is already alive
 on the main thread being egressed, so an assembler thread does not raise
 the resident-frame count.
@@ -1862,6 +1865,23 @@ buffered. Joining before collect is sufficient AND still wins
 everything: `emit(N)` (5.96 ms) hides completely inside
 `subm(N+1) + pump(N+1)` (14.5 ms). A bounded depth-1 handoff expresses
 the join and needs no ack change at all.
+
+### Why a ready capture does not stop the children starving (FR-ACK-2)
+
+`submit` and `pump` — the only code that feeds the two FFmpeg children —
+both run on the encoder worker thread. Input readiness is therefore
+necessary but NOT sufficient: any worker-thread time not spent feeding
+them is time they idle *with a frame already queued*. #70 made the frame
+ready early (`absorb(N) → msgin(N+1)` p50 −1.9 ms; 61 % already in the
+fifo) and the wait simply moved in front of the worker
+(`msgin → submit` p50 2.4 → 10.3 ms).
+
+Per 32.56 ms cycle: the children have work for the 10.78 ms `pump` and
+NOTHING for the other 21.77 ms (2.60 + 3.22 + 2.25 + 5.96 + 4.04 + 3.70)
+— **idle 67 % of wall time** behind stages that are not encoding.
+`emit` is the largest of those and touches no child, no capture page and
+no borrowed shmem (FR-PROC-6), which is what makes it separable. This is
+now **PRD FR-ACK-2**: the eager ack may not ship without the split.
 
 ### The main thread's 12.6 ms — where it sits in the accounting
 
@@ -1884,8 +1904,9 @@ counted against it, not excluded. The main thread therefore has **at
 least 61 % slack**, and binds only when the period falls to ~12.6 ms
 (~79 fps).
 
-Projected: move `emit` off the worker → chain ~22.5 ms → period ~22.5 ms
-(~44 fps), main occupancy rises to ~56 %, still not binding. Only after
+Projected: move `emit` off the worker → chain ~22.5 ms → period
+22.6–26.6 ms (37.6–44.3 fps), main occupancy rises to ~47–56 %, still
+not binding. Only after
 `pump`'s 10.78 ms is also attacked (FR-PROC-7, #40) does the chain
 approach 12.6 ms and the transport become the constraint.
 

@@ -1033,7 +1033,7 @@ same producer and the batch's true gain understated; the m=1 "0/205
 overlap" T4 run convicts the producer, not the pipeline; and the PRD's
 `capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
 holding, which its 1600×912 evidence satisfied and 4K does not.
-Tracked under the linear chain **BACKLOG #70 → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
+Tracked under the linear chain **BACKLOG #70 → #70B → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
 
 ### FR-ACK-1: WITHDRAWN 2026-07-31 — see NG-9 and BACKLOG #70
 
@@ -1043,9 +1043,99 @@ never drifted. Its machinery — echoed identity, ack totality, the
 displayed flag, region return on non-display — survives verbatim in
 **BACKLOG #70** (eager slot-release ack) with the corrected rationale
 (concurrency, not correctness) and an earlier emission point
-(max(absorb N, egress N−1)). Full former text of this FR, with the
+(max(absorb N, egress N−1)). The eager ack is only half the change:
+see **FR-ACK-2**, which makes the assembly split of BACKLOG #70B a
+requirement rather than a follow-up, with the measurements showing why
+the ack alone only relocates the wait. Full former text of this FR, with the
 invariant proofs, is preserved at commit `0db74f6e`; history pointers
 in NG-9.
+
+### FR-ACK-2: the eager slot-release ack is incomplete without the emit split (2026-08-01, measured)
+
+**The eager slot-release ack (BACKLOG #70) MUST NOT be shipped without
+the assembly (`emit`) split of BACKLOG #70B.** On its own it converts a
+producer-side wait into a worker-side queue and stops there.
+
+Measured, m=1 at 2560×1440 under a saturated payload (arm-u/arm-v/arm-w,
+1290–1730 frames each):
+
+| | shipped ack | eager ack |
+|---|---|---|
+| `absorb(N) → msgin(N+1)` (p50) | 18.0 ms | **−1.9 ms** |
+| `msgin(N+1) → submit(N+1)` (p50) | 2.4 ms | **10.3 ms** |
+
+The eager ack does exactly what it claims — the next frame is *already
+in the fifo* before the current one is absorbed on 61 % of frames — and
+the wait simply moves in front of the encoder worker. Period improves
+1.11×, and no further.
+
+#### Why a ready capture does not stop the children starving
+
+The two FFmpeg children are fed by `submit` and driven by `pump`, and
+**both run on the encoder worker thread**. Input readiness is therefore
+necessary but not sufficient: any worker-thread time not spent feeding
+the children is time they are idle *with work available*. Per 32.56 ms
+cycle, measured:
+
+```
+pump           10.78 ms   children have work
+pump_end -> coll_beg 2.60
+coll                 3.22   NUT pop + LTR rewrite
+coll_end -> emit_beg 2.25
+emit                 5.96   <-- assembly: pure CPU, touches no child
+emit_end -> drain    4.04
+drain + subm         3.70
+               -------
+               21.77 ms   children have NOTHING, and a frame is queued
+```
+
+**The children are idle 67 % of wall time** while the stage they are
+waiting behind is not encoding at all. `emit` is the largest such stage
+and is provably independent of them — it reads the *already collected*
+bitstream and touches no child, no capture page, and (FR-PROC-6) no
+borrowed shmem. That is what makes it separable.
+
+#### The join point is a correctness requirement, not a tuning choice
+
+With `emit` on its own thread, the worker MUST join the previous frame's
+assembly **before `collect(N+1)`**, and MUST NOT join it before
+`submit(N+1)`:
+
+- **Before `collect(N+1)` — required for correctness.**
+  `xrdp_ffmpeg_avc444_collect_pair` returns a pair whose `main_data` /
+  `aux_data` point into that handle's own `main_buf` / `aux_buf`, which
+  the *next* collect on the handle overwrites in place. Joining any
+  later — for instance before the next ack, the intuitive choice — lets
+  `collect(N+1)` overwrite buffers the assembler is still reading. The
+  failure mode is silent wrong pixels, not a crash. The only alternative
+  is to double-buffer those two buffers per handle.
+- **Not before `submit(N+1)` — required for the gain to exist.**
+  Joining at the top of the loop leaves the children idle for the whole
+  of `emit`, which is the starvation this FR exists to remove: the work
+  would have moved to another thread and bought nothing.
+- **Between them it is free.** `emit` (5.96 ms) fits entirely inside
+  `submit(N+1) + pump(N+1)` (14.5 ms), so the join is not expected to
+  block the worker at all at this geometry. A bounded depth-1 handoff
+  expresses the join, keeps PDU order trivially (one assembler thread),
+  and requires no change to either ack.
+
+#### Frame budget
+
+The split does **not** cost a frame of latency and does not alter
+FR-BP-2's bound. During `pump(N+1)` the previous frame is *already*
+alive on the main thread being egressed; an assembler thread does not
+raise the number of resident frames, it relocates work already in
+flight. The resident set stays {capture N+2, children N+1, assembly N},
+which is what the two-slot capture budget and the `slots + 1` held-region
+map (`XUP_CAP_SENT_SLOTS`) already size for.
+
+#### Acceptance
+
+Projected period 22.6–26.6 ms from 32.56 ms — **1.22×–1.44×**; the range
+is the 4.04 ms inter-cycle gap, which this change does not determine.
+Quote the range, not its optimistic end. The transport is not the
+constraint at either figure: the main thread is at ≤39 % occupancy and
+binds only near a 12.6 ms period (~79 fps).
 
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 

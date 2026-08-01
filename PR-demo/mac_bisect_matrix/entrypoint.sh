@@ -44,7 +44,7 @@ fi
 ls -la /dev/dri/ >&2 || true
 
 mkdir -p /var/run/xrdp /var/run/xrdp/sockdir
-# BACKLOG #74: the perf sink writes <XRDP_PERF_TRACE>.<pid>; it fopen()s
+# BACKLOG #70B: the perf sink writes <XRDP_PERF_TRACE>.<pid>; it fopen()s
 # once and gives up silently if the directory is missing, so create it
 # here rather than discover an empty measurement afterwards. Deliberately
 # NOT /var/log/xrdp: the whole point of the sink is that stage timings do
