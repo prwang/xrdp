@@ -34,6 +34,7 @@
 #include "fifo.h"
 #include "xrdp_egfx.h"
 #include "string_calls.h"
+#include "perf_trace.h"
 
 #ifdef XRDP_RFXCODEC
 #include "rfxcodec_encode.h"
@@ -2390,6 +2391,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * the same order and the same single global counter as before this
      * step, so GFX_TRACE lines, XRDP_AVC444_DUMP file names and the wire
      * audit still correlate across monitors. */
+    PERF_TRACE("subm_beg", set_n, 0);
     for (index = 0; index < set_n; index++)
     {
         if (set_mon[index] < 0)
@@ -2434,13 +2436,16 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         handle_mon[n_handles] = mon;
         n_handles++;
     }
+    PERF_TRACE("subm_end", n_handles, 0);
     if (n_handles < 1)
     {
         return; /* nothing armed; every item takes the unchanged path */
     }
     /* ONE pump over the whole set (D2/D10) */
+    PERF_TRACE("pump_beg", n_handles, 0);
     st = xrdp_ffmpeg_avc444_pump_pairs(handles, n_handles, &bad_handle,
                                        &kids_armed);
+    PERF_TRACE("pump_end", n_handles, kids_armed);
     self->avc444_batch_cycles++;
     self->avc444_batch_items += n_handles;
     if (kids_armed > self->avc444_batch_max_kids)
@@ -2493,10 +2498,14 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         gfx_batch_release_slots(self, set, set_mon, set_n);
         return;
     }
-    /* COLLECT pass */
+    /* COLLECT pass -- this is where the NUT pop and the LTR rewrite of
+     * BOTH views happen, so the bracket below is the rewrite's real
+     * in-situ cost (the offline bench measured 1.75 ms/pair) */
     for (index = 0; index < n_handles; index++)
     {
+        PERF_TRACE("coll_beg", handle_mon[index], 0);
         gfx_batch_collect_one(self, handles[index], handle_mon[index]);
+        PERF_TRACE("coll_end", handle_mon[index], 0);
     }
     /* #70: the collects above are the absorb proof for this set */
     gfx_batch_release_slots(self, set, set_mon, set_n);
@@ -3331,6 +3340,7 @@ proc_enc_msg(void *arg)
     int index;
     int batching;
     int drain_full;
+    int pf_id;
 
     LOG_DEVEL(LOG_LEVEL_INFO, "proc_enc_msg: thread is running");
 
@@ -3408,6 +3418,7 @@ proc_enc_msg(void *arg)
          * everything it drained and would have blocked with work still
          * on the fifo until unrelated damage re-set the event.) */
         drain_full = 0;
+        PERF_TRACE("drain_beg", n_items, 0);
         tc_mutex_lock(mutex);
         while (n_items < GFX_BATCH_MAX_ITEMS)
         {
@@ -3421,6 +3432,7 @@ proc_enc_msg(void *arg)
         }
         drain_full = (n_items >= GFX_BATCH_MAX_ITEMS);
         tc_mutex_unlock(mutex);
+        PERF_TRACE("drain_end", n_items, drain_full);
         if (n_items == 0)
         {
             continue;
@@ -3451,7 +3463,16 @@ proc_enc_msg(void *arg)
          * order, with this monitor's pair already collected */
         for (index = 0; index < set_n; index++)
         {
+            /* the id is read only when the sink is armed: peeking costs
+             * a bounds check and a few bytes, but a disarmed build must
+             * pay exactly one branch */
+            pf_id = perf_trace_on()
+                    ? gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
+                            set[index]->u.gfx.cmd_bytes)
+                    : 0;
+            PERF_TRACE("emit_beg", pf_id, set_mon[index]);
             self->process_enc(self, set[index]);
+            PERF_TRACE("emit_end", pf_id, set_mon[index]);
         }
         for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
                 index++)

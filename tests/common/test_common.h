@@ -21,6 +21,7 @@ Suite *make_suite_test_guid(void);
 Suite *make_suite_test_scancode(void);
 Suite *make_suite_test_timers(void);
 Suite *make_suite_test_log(void);
+Suite *make_suite_test_perf_trace(void);
 
 TCase *make_tcase_test_os_calls_signals(void);
 

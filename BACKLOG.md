@@ -1741,3 +1741,61 @@ workload heavy enough to expose what is not batched. This motivates **#63**.
 7. Then use textflood as the instrument for FR-PROC-7 (#40/#41): its
    preempt/breadth/depth policies need a payload that loads the aux view,
    which subpixel-AA text does maximally (aux is 44.8 % of the bytes here).
+
+## #74 — a dedicated perf-trace sink, and what it says the worker's 7.9 ms is (IN PROGRESS 2026-08-01)
+
+**Why.** #70's follow-up established, from archived traces alone, that the
+encoder worker burns **7.9 ms of CPU per frame** between `absorb(N)` and
+`submit(N+1)` (mean; p50 7.6, floor 5.3, and identical on both arms —
+8.1 control vs 7.9 eager — so it is real work, not queueing). It could
+not say WHICH stage. The offline bench put the LTR rewrite at 1.75 ms per
+pair, and the rewrite is on the far side of the `absorb` stamp anyway, so
+the 7.9 ms is unexplained.
+
+**Why a new sink rather than LOG().** Measured on the dev box: one
+`common/log.c` line costs ~350–450 ns (timestamp format ~68 ns,
+vsnprintf ~68 ns, and a mutex'd UNBUFFERED `write()` syscall ~211 ns) and
+lands in `/var/log/xrdp` + journald mixed with operator-facing messages.
+Owner directive (2026-08-01): performance tracing gets its own sink.
+
+**Why not eBPF/bpftrace.** Investigated and rejected for this box, with
+evidence:
+- `gfx_wiretosurface1_avc444` and `gfx_batch_run_set` are **inlined** —
+  absent from the symbol table — so a uprobe cannot name them. Probing
+  by address offset is exactly the instrument that produced the retracted
+  step-0 claim (`e41bcb59`); not repeating it.
+- USDT markers (`systemtap-sdt-dev`) DO solve the inlining problem: a
+  `STAP_PROBE2` compiles to a bare `nopl` plus a `.note.stapsdt` ELF
+  note — verified by objdump/readelf. But the consumer cannot run here:
+  `bpf()` is blocked by the sandbox's seccomp filter (`Seccomp: 2`,
+  "Operation not permitted" loading a trivial program) despite
+  `CapEff: 000001ffffffffff`, and `perf` hits `perf_event_paranoid` +
+  tracefs permissions from the other side.
+- Verdict: markers are free and can be added later if a host permits
+  BPF, but the measurement cannot DEPEND on a consumer that will not run
+  where the work is done.
+
+**What was built.** `common/perf_trace.{c,h}`: its own file, its own
+schema, stdio's buffering rather than a hand-rolled ring buffer —
+measured **101.6 ns/event including the clock read**, ~4× cheaper than
+LOG() and ~15× more than a raw ring-buffer record (24.8 ns), which is
+the price of not writing one. Armed by `XRDP_PERF_TRACE` (a path prefix;
+each process appends its pid). Disarmed — the shipped default — is one
+branch on a cached flag. Record: `<monotonic_ns> <tid> <tag> <a> <b>`;
+CLOCK_MONOTONIC so records from different processes share one timeline,
+and the identity goes in `<a>` because frames are joined by echoed id,
+never by a time window (#64 / gate 2c).
+
+Brackets added to the worker: `subm_*`, `pump_*`, `coll_*` (the NUT pop
++ LTR rewrite), `emit_*`, `drain_*` — enough to decompose the whole
+`absorb → submit` window rather than split it in two.
+
+**Acceptance.** The 7.9 ms is attributed to named stages, and the answer
+to "is emit under 1 ms or is it 8 ms" is stated with a distribution, not
+an inference from differencing.
+
+**Rung 1 (CI).** `make check` green: common 170 (165 + 5 new schema
+tests), xrdp 174, libipm 35, libxrdp 13, memtest 1. The schema
+assertions are written from the documented contract in `perf_trace.h`,
+NOT read off a run — an analyzer parses these records by position, so
+field order and separator are the thing under test.

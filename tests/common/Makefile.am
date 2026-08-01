@@ -28,6 +28,7 @@ test_common_SOURCES = \
     test_guid.c \
     test_scancode.c \
     test_timers.c \
+    test_perf_trace.c \
     test_log.c
 
 test_common_CFLAGS = \
