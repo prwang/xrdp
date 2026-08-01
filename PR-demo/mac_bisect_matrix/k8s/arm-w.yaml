@@ -1,0 +1,107 @@
+# Arm W: BACKLOG #74 — arm-v's configuration, instrumented.
+#
+# The encoder config is byte-identical to gfx/arm-v.toml (eager_slot_ack
+# on), so this arm reproduces arm-v's pipeline; the ONLY difference is
+# the xrdp deb, which carries common/perf_trace.{c,h} and the
+# worker-stage brackets (subm_*, pump_*, coll_*, emit_*, drain_*).
+#
+# It exists to attribute the 7.9 ms of worker CPU per frame that #70's
+# analysis pinned between absorb(N) and submit(N+1) but could not break
+# down. XRDP_PERF_TRACE arms the dedicated sink; records land in
+# /var/log/xrdp-perf/enc.<pid> — NOT in /var/log/xrdp and not journald.
+#
+# The sink costs ~100 ns/event and this arm emits ~10 events/frame, so
+# the instrument is ~1 us per 33 ms frame (0.003%). It cannot plausibly
+# perturb the stage it measures, which is the whole reason it is not
+# LOG() (~350-450 ns/line, and a write() syscall under a global mutex).
+#
+# RDP endpoint on the host: 127.0.0.1:40022.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-arm-w
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: arm-w
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: arm-w
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: arm-w
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:e6e1f6f5641e.xx10fa3aa
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "codeflood"
+            - name: ARM_LABEL
+              value: "W: #74 perf-trace - arm-v instrumented (port 40022)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40022
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-arm-w
