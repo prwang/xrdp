@@ -59,29 +59,31 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
-## #61c — What actually paces the frame period at m=1 (TODO — opened by #70B's red)
+## #61c — The producer is the ceiling, and it is the payload's own drawing (ANSWERED 2026-08-01; the lever is #61b)
 
-**Hypothesis.** The session Xorg is the constraint, not anything in
-xrdp: sampled through a run it sits at **93-95 % of one core** while the
-encoder worker has 28 % slack, `codeflood` has no metronome (it is
-explicitly consumer-limited), and the result is 30.0 pairs/s with a p50
-send gap of exactly 30 ms.
+**Answered the day it was opened.** The session Xorg runs at **98.9 % of
+one core with NO client connected at all** — the payload alone saturates
+it. Connecting the client and running the whole capture path moves it to
+**96.4 %**, i.e. *down* 2.5 points: the capture does not add load, it
+displaces payload drawing inside the same single thread.
 
-**Justification.** #70B proved the negative — the encoder worker does
-not bind — by removing 6.8 ms from its serial chain and watching the
-period not move. The positive is unproven. Same shape as #59/#60 (the
-T4's Xorg bottleneck) on different hardware, which is why #61b's search
-for a payload whose X-side cost is not the X server's own drawing is now
-on the critical path rather than beside it.
+Share of that thread, from `tools/avc444_pack_bench.c` on this CPU
+(1.3–1.5 ms/frame at 3.686 Mpx × 30.05 fps): **capture ~4 %, everything
+else ~92 %** — xterm glyph compositing, scroll blits, Present emulation,
+fills. Reproduces the T4's 99.9 % (#59) on different hardware.
 
-**Decisive test.** Give the producer headroom (or lower the damage rate)
-and see whether the period follows. If it does, every remaining
-xrdp-side throughput item at m=1 is measuring the wrong process, and
-the benchmark payload has to change before any of them can be read.
+**Consequence, and it governs the queue below.** No worker-side change
+is measurable under this payload; the producer answers every question
+first. #70 (1.11×) and #70B (0.96×) were both spent against a stage with
+slack. **Do not start another xrdp-side throughput item until the
+benchmark payload is producer-unbound.**
 
-**Do NOT start another xrdp-side throughput change until this is
-answered.** #70 (1.11x) and #70B (0.96x) both spent their effort on a
-stage with slack.
+`perf` sampling is unavailable on this box (`perf_event_paranoid = 4`,
+host-owned, `sysctl -w` silently fails; `perf record` yields 0 bytes) —
+hence `/proc/<pid>/stat` deltas plus an offline bench. Same class of
+blocker as the seccomp `bpf()` denial in #70B.
+
+**Record:** `PR-demo/mac_bisect_matrix/captures/i61c_xorg_profile_20260801/README.md`.
 
 ## #71 (was #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
 
@@ -349,16 +351,34 @@ content, not the pipeline.
 
 ## #61b — A benchmark payload whose cost is not the X server's own drawing (TODO)
 
-**Open half of #61.** GLAMOR is CLOSED-WONTFIX on NVIDIA (it renders
-black; the campaign built on it is void). The question it was meant to
-answer is still open: **E5-2 measures a payload that spends two thirds
-of the Xorg thread on its own software rendering (44.9 % xterm glyphs +
-18.8 % Present emulation) against 13.8 % for the entire capture**, so
-the ratio is dominated by work xrdp does not own.
+**Open half of #61, and now the head of the queue** — #61c showed the
+producer answers every throughput question before xrdp gets to.
 
-`textflood` (#62) was the first attempt and came back 1.41× RED but
-producer-confounded. A payload is needed whose X-side cost is a memcpy
-and whose frame cadence is not itself the clock.
+GLAMOR is CLOSED-WONTFIX on NVIDIA (it renders black; the campaign built
+on it is void). The question it was meant to answer is still open:
+**E5-2 measures a payload that spends two thirds of the Xorg thread on
+its own software rendering (44.9 % xterm glyphs + 18.8 % Present
+emulation) against 13.8 % for the entire capture** on the T4, and ~92 %
+against ~4 % on the dev box (#61c) — the ratio is dominated by work xrdp
+does not own.
+
+**The payload already exists and is not wired in.** `textflood`
+(#62, `PR-demo/textflood/`) rasterizes the same corpus with cairo in its
+own process and hands X one finished image over MIT-SHM: **7.7× less
+X-thread cost**, measured. `PR-demo/mac_bisect_matrix/banner.sh` has
+**no `textflood` kind at all` — it was only ever deployed to the
+decommissioned T4, so every fleet arm including x001/x002 runs xterm
+`codeflood`.
+
+**Work:** add a `textflood` kind to `banner.sh`, build the binary into
+the fleet image, stand up an arm pair, and re-run the #70/#70B ratios
+against a producer that is not the clock.
+
+**Gate before any ratio is quoted from it:** #62's own T4 result came
+back 1.41× RED and was later annotated *producer-confounded*. Swapping
+the payload is necessary, not sufficient — FR-BENCH-1's check (the
+payload's measured frame rate clearly exceeds the pipeline's) must PASS
+on the new arm first.
 
 **Record:** `docs/experiments/61-glamor-on-nvidia.md`,
 `docs/experiments/62-textflood-payload.md`.
