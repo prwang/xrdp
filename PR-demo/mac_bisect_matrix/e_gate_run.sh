@@ -31,7 +31,25 @@
 #                             session is client-bound by 3.29x, so this
 #                             number cannot move until the client side
 #                             is addressed (out of #45 scope).
-#   E2 wire properties        the oracle dump is run through
+#   E2 wire properties        MOVED OUT, 2026-08-01 (owner directive).
+#                             These are a property of the deployed ARM --
+#                             this image's ffmpeg, this host's VAAPI
+#                             driver, this arm's encoder_args -- not of a
+#                             measurement run, and the rewriter logic
+#                             behind them is already pinned byte-exactly
+#                             by CI (tests/xrdp/test_avc444_ltr.c, 26
+#                             golden-vector assertions). They now run
+#                             ONCE per deploy, on 3 s of payload, in
+#                             arm_certify.sh, and NOWHERE ELSE. Measured
+#                             cost of the old arrangement, 2026-08-01:
+#                             10 min 07 s of dump-walking against 64 s of
+#                             measurement, on a 7.75 GB dump, re-proving
+#                             properties that had not changed. This
+#                             script now writes no dump at all (E_DUMP=1
+#                             overrides, for bitstream investigations
+#                             only) and refuses to run against an arm
+#                             with no current certificate.
+#   E2 (historical)           the oracle dump was run through
 #                             tools/avc444_ltr_wire_audit.py --assert
 #                             --intra-refresh N (no mid-stream IDR, cuts
 #                             only on scheduled ordinals, paired across
@@ -188,6 +206,34 @@ then
     fail "$SRV_NAME still carries the R1 recon xorgxrdp — wrong build for a gate run"
 fi
 
+# --- the arm's bytes must have been certified (owner directive, 2026-08-01)
+# E2's wire audit and black-frame decode moved out of this script and into
+# arm_certify.sh, which runs 3 s of payload once per deploy. That only
+# stays honest if a measurement REFUSES to run against an arm nobody
+# certified -- otherwise the checks quietly stop happening at all, which
+# is strictly worse than the 10 min they used to cost.
+#
+# The certificate is keyed to image + gfx.toml. A redeploy that changes
+# either invalidates it, exactly like the ARM_TAG / manifest pin guard:
+# a stale certificate covering a different pair is the same class of lie
+# as a manifest pinning another arm's binary.
+CERTFILE=$D/certs/$ARM.cert
+if [ "$TARGET" = pod ]; then
+    [ -f "$CERTFILE" ] || fail "$ARM has no certificate at $CERTFILE — its \
+bytes have never been checked. Run: $D/arm_certify.sh $ARM"
+    WANT_IMAGE=$(kubectl -n "$NS" get pod "$POD" \
+                 -o jsonpath='{.spec.containers[0].image}')
+    WANT_GFX=$(sha256sum "$D/gfx/$ARM.toml" | cut -c1-16)
+    GOT_KEY=$(sed -n 's/^key: *//p' "$CERTFILE")
+    if [ "$GOT_KEY" != "$WANT_IMAGE|$WANT_GFX" ]; then
+        fail "$ARM's certificate is STALE — it certifies
+  $GOT_KEY
+but the running pod is
+  $WANT_IMAGE|$WANT_GFX
+Re-certify: $D/arm_certify.sh $ARM"
+    fi
+fi
+
 # --- client-side X server at the E3 target geometry ----------------------
 # STATELESS, always (owner directive 2026-07-31): never adopt a dummy X
 # server another run left behind. An adopted server carries the previous
@@ -304,12 +350,29 @@ else
                             "/size:$E_SIZE" \
                             "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
 fi
-DUMPDIR=$OUT/oracle
 if [ "$MODE" = oracle ]; then
     [ -x "$ORACLE_BIN" ] || fail "oracle client missing at $ORACLE_BIN"
+    echo "client: ORACLE (save-only, acks before decode) — server ceiling"
+    # FREERDP_ORACLE_DUMP IS NOT OPTIONAL IN ORACLE MODE. It does not
+    # merely "also save the bytes" -- it is what makes this client an
+    # ORACLE: save-only, acking BEFORE decode and present. Without it the
+    # client decodes and presents, becomes the bottleneck, and the server
+    # stalls waiting for acks, so the send-to-send interval stops being
+    # the server ceiling and becomes a measurement of xfreerdp.
+    #
+    # MEASURED 2026-08-01, same pod, back to back, 20 s each, nothing but
+    # this variable different:
+    #     dump ON   654 sends  mean  25.7 ms  p50 25  p90  29  p99  32
+    #     dump OFF   73 sends  mean 230.0 ms  p50 28  p90 668  p99 764
+    # An attempt to drop the dump "because the E2 walks were expensive"
+    # therefore SWAPPED THE INSTRUMENT (honesty rule: never swap the
+    # component under test). The 10 min tax was never the writing -- it
+    # was WALKING the dump twice, and that is what moved to
+    # arm_certify.sh. The write itself goes to tmpfs and is what keeps
+    # the client fast.
+    DUMPDIR=$OUT/oracle
     mkdir -p "$DUMPDIR"
     rm -f /tmp/oracle_avc_s*.bin
-    echo "client: ORACLE (save-only, acks before decode) — server ceiling"
     setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib \
         FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" \
         "$ORACLE_BIN" /args-from:env:RDPARGS </dev/null \
@@ -327,7 +390,14 @@ fi
 CLIENT_PGID=$!
 unset PW RDPARGS
 echo "connected; recording for ${SECS}s ..."
+# The run window, for cutting the perf ring down to THIS run. The ring
+# file is the xrdp process's whole life -- a pod that has served three
+# runs has all three in it -- so it needs the same windowing xrdp.log
+# already gets from MARK_P. Without it a 60 s run on a 45-minute-old pod
+# reported "2629 sends over 2713.5 s" (2026-08-01).
+RUN_T0=$(date +%s)
 sleep "$SECS"
+RUN_T1=$(date +%s)
 kill -9 -- -"$CLIENT_PGID" 2>/dev/null
 sleep 1
 if pgrep -g "$CLIENT_PGID" >/dev/null 2>&1; then
@@ -340,6 +410,17 @@ if [ "$MODE" = oracle ]; then
     mv /tmp/oracle_avc_s*.bin "$DUMPDIR"/ 2>/dev/null
     du -cb "$DUMPDIR"/*.bin 2>/dev/null | tail -1 \
         > "$OUT/oracle_dump_bytes.txt"
+    # The dump had to be WRITTEN (it is what makes the client an oracle)
+    # but nothing here reads it any more: the wire audit and black-frame
+    # decode moved to arm_certify.sh. At 3840x2400 it is 7.75 GB per
+    # 60 s, so it is deleted unless someone actually wants the bytes.
+    # E_KEEP_DUMP=1 keeps them, for a bitstream investigation.
+    if [ "${E_KEEP_DUMP:-0}" != 1 ]; then
+        rm -f "$DUMPDIR"/*.bin
+        rmdir "$DUMPDIR" 2>/dev/null
+        echo "oracle dump discarded after the run (E_KEEP_DUMP=1 to keep);" \
+             "size was $(awk '{print $1}' "$OUT/oracle_dump_bytes.txt") bytes"
+    fi
 fi
 
 # --- collect both server-side logs, windowed ------------------------------
@@ -374,13 +455,40 @@ if [ -n "$PERF_FILES" ]; then
     for f in $PERF_FILES; do
         srv_cat "$f" > "$OUT/perf/$(basename "$f")" 2>/dev/null
     done
-    python3 "$D/perf_trace_lines.py" "$OUT"/perf/enc.* \
+    # --since/--until: cut the ring down to THIS run. A margin of 5 s on
+    # each side absorbs clock skew between the pod's CLOCK_REALTIME and
+    # the host's without letting a neighbouring run's records in.
+    python3 "$D/perf_trace_lines.py" \
+        --since $((RUN_T0 - 5)) --until $((RUN_T1 + 5)) "$OUT"/perf/enc.* \
         > "$OUT/perf_trace_lines.txt" 2>"$OUT/perf_trace_lines.log"
-    tail -1 "$OUT/perf_trace_lines.log"
+    cat "$OUT/perf_trace_lines.log"
     # the ACK_TRACE analyses read xrdp.log; the E5 parser reads
     # gfx_trace.txt. Both get the rendered records.
     grep -a "ACK_TRACE" "$OUT/perf_trace_lines.txt" >> "$OUT/xrdp.log"
     grep -a "GFX_TRACE" "$OUT/perf_trace_lines.txt" > "$OUT/gfx_trace.txt"
+    # SPAN GUARD. The rendered trace must cover roughly the run and not
+    # much more. This is what catches a window that failed to apply --
+    # the failure mode is silent and severe: on 2026-08-01 an unwindowed
+    # ring made a 60 s run report "2629 sends over 2713.5 s", mean
+    # 1032.5 ms against a p50 of 25.0 ms, because two idle gaps between
+    # runs of the same pod were inside the "run". A mean over a span the
+    # session did not occupy is not a rate.
+    SPAN=$(awk -F'[][]' '/GFX_TRACE/ {print $2}' "$OUT/gfx_trace.txt" \
+        | sed 's/+0000//' \
+        | awk 'NR==1{a=$0} {b=$0} END{if(NR>1) print a" "b}' \
+        | while read -r s e; do
+              python3 -c "
+import sys,datetime as dt
+f='%Y-%m-%dT%H:%M:%S.%f'
+print(int((dt.datetime.strptime('$e',f)-dt.datetime.strptime('$s',f)).total_seconds()))"
+          done)
+    if [ -n "$SPAN" ] && [ "$SPAN" -gt $((SECS * 2 + 30)) ]; then
+        fail "the rendered trace spans ${SPAN}s for a ${SECS}s run — the \
+ring window did not apply and every rate below would be an average over \
+time the session did not occupy. This is a harness fault; do not read the \
+numbers."
+    fi
+    echo "trace span: ${SPAN:-?}s for a ${SECS}s run"
 else
     echo "WARNING: no perf ring file under $PERF_DIR on $SRV_NAME —" \
          "is XRDP_PERF_TRACE set for this arm? Since #61h the per-frame" \
@@ -610,23 +718,24 @@ PY
     echo
 } | tee "$OUT/VERDICT.txt"
 
-if [ "$MODE" = oracle ]; then
-    DUMP=$(ls -S "$DUMPDIR"/*.bin 2>/dev/null | head -1)
-    if [ -n "$DUMP" ]; then
-        {
-            echo "=== E2 — wire audit (--assert) on $(basename "$DUMP") ==="
-            python3 "$D/../../tools/avc444_ltr_wire_audit.py" --assert \
-                --intra-refresh "$REFRESH" "$DUMP" "$ARM gate run" \
-                2>&1 | tail -25
-            echo "wire audit exit: $?"
-            echo
-            echo "=== E2 — black-frame check ==="
-            python3 "$D/oracle_black_frame_check.py" "$DUMP" 2>&1 | tail -15
-        } | tee -a "$OUT/VERDICT.txt"
+# E2's two dump walks do NOT run here (owner directive, 2026-08-01).
+# They are a property of the deployed ARM -- this image's ffmpeg, this
+# host's VAAPI driver, this arm's encoder_args -- not of the run, so they
+# are proven once by arm_certify.sh on 3 s of payload at deploy time. On
+# 2026-08-01 running them here cost 10 min 07 s against 64 s of
+# measurement, re-proving unchanged properties on a 7.75 GB dump.
+# What is reproduced below is the certificate, so every measurement still
+# STATES what was certified and against which image.
+{
+    echo "=== arm certification (arm_certify.sh, at deploy time) ==="
+    if [ -f "$CERTFILE" ]; then
+        sed -n '1,6p' "$CERTFILE"
+        grep -E "ASSERT VERDICT|VERDICT: PASS|black frames" "$CERTFILE" \
+            | sed 's/^/  /'
+        echo "  full certificate: $CERTFILE"
     else
-        echo "RED: the oracle client wrote no dump — E2 cannot be judged" \
-            | tee -a "$OUT/VERDICT.txt"
+        echo "  NONE -- see the abort above; this line should be unreachable"
     fi
-fi
+} | tee -a "$OUT/VERDICT.txt"
 echo
 echo "evidence: $OUT"

@@ -452,6 +452,55 @@ and not the one that would answer a bigger question you were not asked.
   every one of those and uses one. A probe that isolates a single
   variable belongs in `PR-demo/` as its own script, or is a one-liner
   in the pod.
+- **Bitstream conformance is certified for 3 s after a container
+  deploy, and NOWHERE ELSE (owner directive, 2026-08-01).** The wire
+  audit and the black-frame decode are a property of the DEPLOYED ARM —
+  this image's ffmpeg, this host's VAAPI driver, this arm's
+  `encoder_args` — not of the xrdp build and not of a measurement run.
+  The rewriter logic underneath them is already pinned byte-exactly by
+  CI (`tests/xrdp/test_avc444_ltr.c`, 26 golden-vector assertions), so
+  what an arm adds is only that the real encoder stack emits conforming
+  bytes. That is proven once, by `arm_certify.sh`, from
+  `build_and_deploy.sh`, on 3 s of payload.
+  - **A measurement run still WRITES the dump and simply never walks
+    it.** `FREERDP_ORACLE_DUMP` is not a "save the bytes" flag — it is
+    what makes the oracle client save-only and ack BEFORE decode. Turning
+    it off turns the timing instrument into an ordinary rendering client
+    and the run measures xfreerdp instead of the server. Measured
+    2026-08-01, same pod, back to back, 20 s each, nothing else
+    different: **dump ON 654 sends at mean 25.7 ms; dump OFF 73 sends at
+    mean 230.0 ms**. The 10× tax was never the writing (tmpfs) — it was
+    walking the dump twice. `e_gate_run.sh` writes it, reads nothing from
+    it, and deletes it after the run (`E_KEEP_DUMP=1` to keep).
+  - *This one was learned the hard way in the same turn the rule was
+    written:* "the walks are expensive" was turned into "so drop the
+    dump", which silently swapped the component under test — the exact
+    thing the strict-honesty rule forbids. Removing a cost is only safe
+    once you know what else that cost was buying.
+  - **The gate reprints the arm's certificate** so every result states
+    what was certified, and it REFUSES to run against an arm with no
+    certificate, or one whose certificate does not match the running
+    image + `gfx.toml`. Moving a check must never be a quiet way of
+    deleting it.
+  - *Why:* both walks were built as standalone forensics (2026-07-28,
+    2026-07-29) and folded into the gate the same week, when an oracle
+    dump was 83 MB and walking it twice was free. It stopped being free.
+    On 2026-08-01 a 60 s run at 3840×2400 dumped **7.75 GB** and the two
+    walks took **10 min 07 s against 64 s of measurement** — a 10× tax
+    on a question about the frame period, re-proving properties that had
+    not changed. Not a scar like the other guards: a correct decision
+    that silently stopped being correct as the workload grew ~93× under
+    it.
+  - **Do not lengthen the 3 s window to raise coverage.** A 3 s window
+    holds ~100 frames and the intra refresh is every 240, so A2/A3/A4
+    (cuts on scheduled ordinals, paired, none skipped) assert
+    vacuously — `arm_certify.sh` prints that limit rather than claiming
+    7/7. The cut schedule is CI's job and CI already does it. Chasing
+    those three asserts with a longer capture is how the 10× tax comes
+    back.
+  - `E_DUMP=1` still writes and keeps the dump, for when the bitstream
+    itself is what is being investigated. Expect an order of magnitude
+    more wall time, and say so before starting.
 - **Rule of thumb for duration.** A *rate* needs a long run. A *binary
   property*, a *presence check*, a *this-or-that attribution*, or "did
   the knob apply at all" is answered by seconds of trace, one log line,

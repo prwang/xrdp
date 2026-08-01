@@ -47,6 +47,12 @@ every consecutive pair of events, so it closes by construction:
 Cross-check: the server's own send-to-send interval is 25.5 ms mean
 (2227 sends / 56.7 s = 25.46 ms). Two instruments, one number.
 
+**Independently reproduced later the same day**, on the same arm after
+the harness was reworked (`i61e_x013_verify_20260801`): **2228 sends,
+mean 25.5 ms, p50 25.0, p90 28, p99 31** — against the original 2227 /
+25.5 / 25.0. Two runs, 45 minutes apart, on a pod that had served three
+sessions in between. The period is stable.
+
 Shape checked before quoting the centres — both stages are unimodal.
 `pump` p10 15.674 / p50 16.610 / p90 17.640 (p90÷p10 = 1.13); `collect`
 p10 7.174 / p50 8.276 / p90 11.386 (1.59).

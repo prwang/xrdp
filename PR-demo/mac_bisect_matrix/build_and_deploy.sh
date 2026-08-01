@@ -285,6 +285,25 @@ for arm in $ARMS; do
         --timeout=300s
 done
 kubectl -n bisect-matrix get pods -o wide
+
+# --- certify each arm's BYTES, once, here (owner directive, 2026-08-01) ---
+# The wire audit and black-frame decode are a property of the deployed
+# pair -- this image's ffmpeg, this host's VAAPI driver, this arm's
+# encoder_args -- not of a measurement run. They used to run inside every
+# e_gate_run.sh, where on 2026-08-01 they cost 10 min 07 s against 64 s of
+# measurement on a 7.75 GB dump. THIS is their one place: 3 s of payload,
+# once, at deploy. e_gate_run.sh now refuses to measure an arm that has no
+# current certificate, so moving them here does not quietly delete them.
+CERT_FAIL=0
+for arm in $ARMS; do
+    "$D/arm_certify.sh" "$arm" || CERT_FAIL=1
+done
+if [ "$CERT_FAIL" != 0 ]; then
+    echo >&2
+    echo "ABORT: at least one arm failed certification — it encodes" >&2
+    echo "non-conforming or undecodable bytes. Do not measure it." >&2
+    exit 1
+fi
 echo
 echo "matrix up: arm-a 127.0.0.1:40000  arm-b :40001  arm-c :40002" \
      "arm-d :40003  arm-e :40004"
