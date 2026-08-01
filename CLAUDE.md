@@ -197,6 +197,49 @@ Concretely:
     is "what would this instrument show if the bug WERE real?" — answered
     before the verdict, not after.
 
+- **An unreadable result is not a reported result. Severe violation
+  (2026-08-01), do not repeat.** BACKLOG #61e's period attribution was
+  handed to the owner as a table of the tracer's own bracket names —
+  `pump_beg -> pump_end 16.690`, `coll_beg -> coll_end 8.486`, `subm`,
+  `book`, `rel` — with no statement of what code any bracket encloses.
+  The owner's reply was "I can't read your report ... you can't cheat by
+  obscuring and hiding things", and that is the correct name for it.
+  Every number in that table was right. It was still a bad report,
+  because a reader who cannot decode it cannot audit it, and the whole
+  point of this regime is that the owner's time is the LAST line of
+  defence, not the place errors get caught.
+  - **Report in the domain's words, not the instrument's.** A stage name
+    is an index into the code, never an explanation. `pump` is "wait for
+    the ffmpeg children to finish encoding"; `book` is "counters plus a
+    LOG line that costs 2.5 ms because log.c writes unbuffered under a
+    global mutex". If a term cannot be written in one plain clause
+    saying what the machine is doing and why it takes time, it is not
+    understood well enough to report.
+  - **State the load-bearing answer in plain words, first.** The
+    question was "who waits for whom". The evidence was in the report —
+    a stalled wait ends 0.01–0.03 ms after the main thread's enqueue —
+    and the sentence "the encoder worker waits for the xrdp main thread"
+    was never written. Burying a conclusion the reader must reconstruct
+    is functionally the same as not having it, and it is worse than
+    silence because it looks like an answer.
+  - **Never let a headline number stand for a distribution that is not
+    unimodal.** "2.249 ms/cycle of wait" was one number for two
+    unrelated mechanisms: 466 cycles of ~1.87 ms phase offset (25 % of
+    the total) and 78 cycles of ~33 ms where capture genuinely fell
+    behind (75 %). The mean pointed at the small effect and hid the
+    large one. Check the shape before quoting the centre.
+  - **Density is where errors hide, including your own.** In the same
+    unreadable report a broken metric survived unchallenged: slot
+    release was paired with "the next enqueue in time", which in the
+    65 % of cycles where the frame arrives early silently picks up the
+    frame AFTER next. Pair by identity, never by time window (the 2c
+    gate) — and note that a report the reader can follow is itself a
+    check on the reporter. Obscurity protected a mistake.
+  - **Lead with what fails.** The report opened with the transparent
+    tracer and the closed 0.007 ms accounting, and reached the falsified
+    PRD row further down. Order the report by what the owner must act
+    on, not by what went well.
+
 ## Scientific quality gate (owner directive, 2026-07-31)
 
 **No number reaches the owner until it has been checked against the five
