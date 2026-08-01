@@ -464,6 +464,47 @@ fallback shape the honesty rule exists to catch.
 not the vulnerability: the 1.9 ms margin and the 16 ms main-thread
 service latency stay ours.
 
+## #74 — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
+
+Lever 2 was queued as "implement FR-PROC-7's submit/collect
+construction + the three policies" on the implicit shape of ONE worker
+thread. The #61e/#61f decomposition reopened the shape question, and
+the owner has argued (2026-08-01) for a different one. **Do not start
+implementation until this is decided.** The candidates:
+
+- **A. Depth reorder, one thread** (the shape #40 assumed):
+  `subm(N+1) → coll(N)+book+rel(N) → pump(N+1)`. Period
+  `subm + max(encode, tail)` ≈ 21 ms at m=1 — but only while
+  `tail ≤ encode` (13.7 vs 16.7 ms today, 3 ms margin), and the fixed
+  service order idles the children whenever encode finishes early.
+  The owner's objection: capture-ready and encode-done are independent
+  events; a hardwired order is a bet that worker CPU stays faster than
+  ffmpeg, and it stops paying exactly where serialization hurts most
+  (tail ~27 ms at m=2 > encode ~17 ms under the set-pump).
+- **B. Submit/collect stage threads** (owner proposal): a submit side
+  owning stdin fds + schedule cadence, a collect side owning stdout
+  fds + the NUT demux/LTR rewrite, bounded one-frame SPSC queue
+  between them; event-driven on whichever upstream fires first.
+  Period `max(subm, tail, encode)` — generalizes to m≥2 (~27 ms vs
+  A's ~36 ms). Each child's stream is touched by exactly one thread,
+  so per-child ordering is structural; shared state shrinks to handle
+  lifecycle + error stop-the-line.
+- **C. Resumable-coll state machine on one thread** — rejected in
+  discussion: hand-rolled coroutines in C to slice an 8.5 ms
+  demux+rewrite is strictly heavier than a thread, and the codebase
+  precedent (emit thread, FR-TRACE-1 ring) already buys threads with
+  narrow queues for exactly this problem.
+
+Constraints that survive whichever shape wins: **#61f Step 1 first**
+(a 21–27 ms pipeline behind a ~32 ms delivery loop converts the whole
+gain into `wait`); the bounded queue is the contract (the bufferbloat
+prohibition applies as it did to the global pool); PRD's "exactly one
+worker thread / a measurement a set-pump cannot reach" paragraph
+(concurrency section) stands until superseded by a dated amendment —
+option B requires that amendment, and the m≥2 tail arithmetic above is
+the candidate measurement, currently *projected*, not measured (#71
+owns the m≥2 numbers).
+
 ---
 
 # Closed — records in `docs/experiments/`
