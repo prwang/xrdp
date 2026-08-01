@@ -40,9 +40,11 @@ START_TEST(test_perf_trace_format_schema)
     int rv;
 
     rv = perf_trace_format(buf, (int)sizeof(buf), 1569856240672000LL,
-                           140737488355328LL, "emit_beg", 42, 1);
+                           140737488355328LL, "emit_beg", 42, 1, 0, 0, 0, 0);
     ck_assert_int_eq(rv, (int)strlen(buf));
-    ck_assert_str_eq(buf, "1569856240672000 140737488355328 emit_beg 42 1\n");
+    ck_assert_str_eq(buf,
+                     "1569856240672000 140737488355328 emit_beg 42 1 "
+                     "0 0 0 0\n");
 }
 END_TEST
 
@@ -53,8 +55,9 @@ START_TEST(test_perf_trace_format_negative_ids)
 {
     char buf[128];
 
-    perf_trace_format(buf, (int)sizeof(buf), 1, 2, "coll_end", -1, -1);
-    ck_assert_str_eq(buf, "1 2 coll_end -1 -1\n");
+    perf_trace_format(buf, (int)sizeof(buf), 1, 2, "coll_end", -1, -1,
+                      -1, -1, -1, -1);
+    ck_assert_str_eq(buf, "1 2 coll_end -1 -1 -1 -1 -1 -1\n");
 }
 END_TEST
 
@@ -68,7 +71,7 @@ START_TEST(test_perf_trace_format_truncates)
 
     memset(buf, 'x', sizeof(buf));
     rv = perf_trace_format(buf, (int)sizeof(buf), 111111, 222222,
-                           "pump_beg", 7, 8);
+                           "pump_beg", 7, 8, 0, 0, 0, 0);
     ck_assert_int_gt(rv, (int)sizeof(buf));
     ck_assert_int_eq((int)strlen(buf), (int)sizeof(buf) - 1);
 }
@@ -78,9 +81,12 @@ START_TEST(test_perf_trace_format_rejects_bad_args)
 {
     char buf[64];
 
-    ck_assert_int_eq(perf_trace_format(NULL, 64, 1, 2, "t", 0, 0), -1);
-    ck_assert_int_eq(perf_trace_format(buf, 0, 1, 2, "t", 0, 0), -1);
-    ck_assert_int_eq(perf_trace_format(buf, 64, 1, 2, NULL, 0, 0), -1);
+    ck_assert_int_eq(perf_trace_format(NULL, 64, 1, 2, "t", 0, 0,
+                                       0, 0, 0, 0), -1);
+    ck_assert_int_eq(perf_trace_format(buf, 0, 1, 2, "t", 0, 0,
+                                       0, 0, 0, 0), -1);
+    ck_assert_int_eq(perf_trace_format(buf, 64, 1, 2, NULL, 0, 0,
+                                       0, 0, 0, 0), -1);
 }
 END_TEST
 
@@ -127,7 +133,7 @@ START_TEST(test_perf_trace_ring_fifo_order)
     for (index = 0; index < 5; index++)
     {
         ck_assert_int_eq(perf_trace_ring_push(r, 100 + index, 7, "subm_beg",
-                                              index, 0), 1);
+                                              index, 0, 0, 0, 0, 0), 1);
     }
     for (index = 0; index < 5; index++)
     {
@@ -155,18 +161,18 @@ START_TEST(test_perf_trace_ring_capacity_is_slots_minus_one)
     for (index = 0; index < PERF_TRACE_RING_SLOTS - 1; index++)
     {
         ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "pump_beg", index,
-                                              0), 1);
+                                              0, 0, 0, 0, 0), 1);
     }
     /* the N-th push has nowhere to go */
-    ck_assert_int_eq(perf_trace_ring_push(r, 999999, 1, "pump_beg", 999, 0),
+    ck_assert_int_eq(perf_trace_ring_push(r, 999999, 1, "pump_beg", 999, 0, 0, 0, 0, 0),
                      0);
     ck_assert_uint_eq(r->dropped, 1);
     /* and it stored nothing: the head of the queue is still record 0 */
     ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 1);
     ck_assert_int_eq(rec.a, 0);
     /* one pop freed exactly one slot */
-    ck_assert_int_eq(perf_trace_ring_push(r, 12345, 1, "pump_end", 42, 0), 1);
-    ck_assert_int_eq(perf_trace_ring_push(r, 12346, 1, "pump_end", 43, 0), 0);
+    ck_assert_int_eq(perf_trace_ring_push(r, 12345, 1, "pump_end", 42, 0, 0, 0, 0, 0), 1);
+    ck_assert_int_eq(perf_trace_ring_push(r, 12346, 1, "pump_end", 43, 0, 0, 0, 0, 0), 0);
     ck_assert_uint_eq(r->dropped, 2);
     free(r);
 }
@@ -184,11 +190,11 @@ START_TEST(test_perf_trace_ring_counts_every_drop)
     ck_assert_ptr_ne(r, NULL);
     for (index = 0; index < PERF_TRACE_RING_SLOTS - 1; index++)
     {
-        perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0);
+        perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0, 0, 0, 0, 0);
     }
     for (index = 0; index < 100; index++)
     {
-        ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0),
+        ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0, 0, 0, 0, 0),
                          0);
     }
     ck_assert_uint_eq(r->dropped, 100);
@@ -209,7 +215,7 @@ START_TEST(test_perf_trace_ring_wraps_without_dropping)
     for (index = 0; index < PERF_TRACE_RING_SLOTS * 3; index++)
     {
         ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "emit_beg", index,
-                                              0), 1);
+                                              0, 0, 0, 0, 0), 1);
         ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 1);
         ck_assert_int_eq(rec.a, index);
     }
@@ -227,11 +233,41 @@ START_TEST(test_perf_trace_ring_rejects_null)
     struct perf_trace_rec rec;
     struct perf_trace_ring *r;
 
-    ck_assert_int_eq(perf_trace_ring_push(NULL, 1, 1, "x", 0, 0), 0);
+    ck_assert_int_eq(perf_trace_ring_push(NULL, 1, 1, "x", 0, 0, 0, 0, 0, 0), 0);
     ck_assert_int_eq(perf_trace_ring_pop(NULL, &rec), 0);
     r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
     ck_assert_ptr_ne(r, NULL);
     ck_assert_int_eq(perf_trace_ring_pop(r, NULL), 0);
+    free(r);
+}
+END_TEST
+
+
+/* The payload is SIX fields (BACKLOG #61h). Every one of them must
+ * survive the ring and reach the formatted record: the per-frame
+ * records that moved off log.c carry up to six -- a GFX send is
+ * (bytes, last, frame_id, id_server, id_client, fif) -- and a field
+ * silently dropped in the middle of that tuple would mis-key an
+ * analysis rather than fail it. */
+START_TEST(test_perf_trace_six_payload_fields_round_trip)
+{
+    struct perf_trace_ring *r = calloc(1, sizeof(*r));
+    struct perf_trace_rec got;
+    char buf[128];
+
+    ck_assert_ptr_ne(r, NULL);
+    ck_assert_int_eq(perf_trace_ring_push(r, 42, 7, "send",
+                                          1930000, 0, 288, 288, 286, 2), 1);
+    ck_assert_int_eq(perf_trace_ring_pop(r, &got), 1);
+    ck_assert_int_eq(got.a, 1930000);
+    ck_assert_int_eq(got.b, 0);
+    ck_assert_int_eq(got.c, 288);
+    ck_assert_int_eq(got.d, 288);
+    ck_assert_int_eq(got.e, 286);
+    ck_assert_int_eq(got.f, 2);
+    perf_trace_format(buf, (int)sizeof(buf), got.ns, got.tid, got.tag,
+                      got.a, got.b, got.c, got.d, got.e, got.f);
+    ck_assert_str_eq(buf, "42 7 send 1930000 0 288 288 286 2\n");
     free(r);
 }
 END_TEST
@@ -256,6 +292,7 @@ make_suite_test_perf_trace(void)
     tcase_add_test(tc, test_perf_trace_ring_counts_every_drop);
     tcase_add_test(tc, test_perf_trace_ring_wraps_without_dropping);
     tcase_add_test(tc, test_perf_trace_ring_rejects_null);
+    tcase_add_test(tc, test_perf_trace_six_payload_fields_round_trip);
 
     return s;
 }

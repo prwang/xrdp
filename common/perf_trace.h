@@ -61,7 +61,17 @@
  *
  * Record format, one line per event, all fields space separated:
  *
- *   <monotonic_ns> <tid> <tag> <a> <b>
+ *   <monotonic_ns> <tid> <tag> <a> <b> <c> <d> <e> <f>
+ *
+ * SIX payload fields, not two (BACKLOG #61h, 2026-08-01). Two was
+ * enough while the ring carried only stage brackets, but the per-frame
+ * records it now has to carry -- which used to be LOG() lines on the
+ * hot path -- have up to six: a GFX send is
+ * (bytes, last, frame_id, id_server, id_client, fif) and a damage
+ * record is (surface, num_rects, x0, y0, x1, y1). Splitting one record
+ * across two events would have to be re-joined by the reader, and
+ * joining by anything other than an echoed identity is the exact
+ * mistake the 2c quality gate exists to stop.
  *
  * CLOCK_MONOTONIC is system-wide, so records from different processes
  * share one timeline and can be intersected. Frames must still be
@@ -93,6 +103,10 @@ struct perf_trace_rec
     const char *tag;  /* NOT owned -- must be a literal, see above */
     int a;
     int b;
+    int c;
+    int d;
+    int e;
+    int f;
 };
 
 /* Single producer, single consumer. head is written ONLY by the
@@ -125,6 +139,13 @@ void
 perf_trace_ev(const char *tag, int a, int b);
 
 /**
+ * As perf_trace_ev(), for a record with more than two payload fields.
+ * perf_trace_ev(tag, a, b) is exactly perf_trace_ev6(tag, a, b, 0,0,0,0).
+ */
+void
+perf_trace_ev6(const char *tag, int a, int b, int c, int d, int e, int f);
+
+/**
  * The ring's push and pop, exposed ONLY so the SPSC behaviour can be
  * unit tested without a filesystem or a second thread.
  *
@@ -135,7 +156,8 @@ perf_trace_ev(const char *tag, int a, int b);
  */
 int
 perf_trace_ring_push(struct perf_trace_ring *r, long long ns, long long tid,
-                     const char *tag, int a, int b);
+                     const char *tag, int a, int b, int c, int d, int e,
+                     int f);
 int
 perf_trace_ring_pop(struct perf_trace_ring *r, struct perf_trace_rec *out);
 
@@ -152,7 +174,7 @@ perf_trace_close(void);
  */
 int
 perf_trace_format(char *buf, int len, long long ns, long long tid,
-                  const char *tag, int a, int b);
+                  const char *tag, int a, int b, int c, int d, int e, int f);
 
 #define PERF_TRACE(tag, a, b)             \
     do                                    \
@@ -162,6 +184,16 @@ perf_trace_format(char *buf, int len, long long ns, long long tid,
             perf_trace_ev((tag), (a), (b)); \
         }                                 \
     }                                     \
+    while (0)
+
+#define PERF_TRACE6(tag, a, b, c, d, e, f)                     \
+    do                                                         \
+    {                                                          \
+        if (perf_trace_on())                                   \
+        {                                                      \
+            perf_trace_ev6((tag), (a), (b), (c), (d), (e), (f)); \
+        }                                                      \
+    }                                                          \
     while (0)
 
 #endif

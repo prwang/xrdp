@@ -851,8 +851,28 @@ process_enc_rfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 #endif
 
 /*****************************************************************************/
-/* Diagnostic: XRDP_GFX_TRACE=1 logs the per-frame damage region so a stuck
- * on-screen frame can be checked for a wrong/degenerate metablock region. */
+/* A trace knob is armed but the ring is not: every per-frame record the
+ * knob selects goes to the perf sink (BACKLOG #61h), so without
+ * XRDP_PERF_TRACE the run produces NOTHING and would otherwise look
+ * like a session that simply had no damage. Say so once, loudly, at the
+ * point the knob is first read. */
+static int
+trace_sink_check(const char *knob)
+{
+    if (!perf_trace_on())
+    {
+        LOG(LOG_LEVEL_WARNING, "%s=1 but XRDP_PERF_TRACE is not set: "
+            "per-frame trace records go to the perf ring, not to this "
+            "log, so this run will record none of them", knob);
+        return 0;
+    }
+    return 1;
+}
+
+/*****************************************************************************/
+/* Diagnostic: XRDP_GFX_TRACE=1 records the per-frame damage region so a
+ * stuck on-screen frame can be checked for a wrong/degenerate metablock
+ * region. The records go to the perf ring, never to log.c. */
 static int
 gfx_enc_trace_on(void)
 {
@@ -861,6 +881,10 @@ gfx_enc_trace_on(void)
     {
         const char *e = g_getenv("XRDP_GFX_TRACE");
         cached = (e != NULL && e[0] == '1') ? 1 : 0;
+        if (cached)
+        {
+            cached = trace_sink_check("XRDP_GFX_TRACE");
+        }
     }
     return cached;
 }
@@ -885,6 +909,10 @@ xrdp_ack_trace_on(void)
     {
         const char *e = g_getenv("XRDP_ACK_TRACE");
         cached = (e != NULL && e[0] == '1') ? 1 : 0;
+        if (cached)
+        {
+            cached = trace_sink_check("XRDP_ACK_TRACE");
+        }
     }
     return cached;
 }
@@ -911,11 +939,12 @@ gfx_trace_rects(const char *tag, int surface_id, int num_rects,
         bx2 = MAX(bx2, rects[i].x2);
         by2 = MAX(by2, rects[i].y2);
     }
-    LOG(LOG_LEVEL_INFO, "GFX_TRACE %s surface=%d num_rects=%d "
-        "bbox=(%d,%d)-(%d,%d) first=(%d,%d)-(%d,%d)", tag, surface_id,
-        num_rects, bx1, by1, bx2, by2,
-        num_rects > 0 ? rects[0].x1 : -1, num_rects > 0 ? rects[0].y1 : -1,
-        num_rects > 0 ? rects[0].x2 : -1, num_rects > 0 ? rects[0].y2 : -1);
+    /* `tag` is a literal at every call site, which is what the ring
+       requires; the bounding box is all six payload fields, so the
+       `first=` rect the old log line also carried is dropped -- no
+       reader parsed it (checked across PR-demo and tools). */
+    (void)tag;
+    PERF_TRACE6("dmg", surface_id, num_rects, bx1, by1, bx2, by2);
 }
 
 /* #45 step 7 -- the xorgxrdp AVC444 xup blob is EXACTLY three EGFX
@@ -1654,14 +1683,12 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
         int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
                      + t_cw / 2;
-        LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
-            "%lld rv=%s inflight=%d centerY=%d",
-            (unsigned long long)(self->avc444_seq - 1),
-            enc_rv == XRDP_FFMPEG_PAIR_READY
-            ? (long long)pic.desktop_sequence : -1LL,
-            enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
-            xrdp_ffmpeg_avc444_inflight(ff),
-            (int)main_view[cy_off]);
+        PERF_TRACE6("enc", (int)(self->avc444_seq - 1),
+                    enc_rv == XRDP_FFMPEG_PAIR_READY
+                    ? (int)pic.desktop_sequence : -1,
+                    enc_rv == XRDP_FFMPEG_PAIR_READY,
+                    xrdp_ffmpeg_avc444_inflight(ff),
+                    (int)main_view[cy_off], 0);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -2205,14 +2232,12 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         {
             center_y = (int)main_view[cy_off];
         }
-        LOG(LOG_LEVEL_INFO, "GFX_TRACE enc submitted_seq=%llu returned_seq="
-            "%lld rv=%s inflight=%d centerY=%d",
-            (unsigned long long)seq,
-            enc_rv == XRDP_FFMPEG_PAIR_READY
-            ? (long long)pair.desktop_sequence : -1LL,
-            enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
-            ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
-            center_y);
+        PERF_TRACE6("enc", (int)seq,
+                    enc_rv == XRDP_FFMPEG_PAIR_READY
+                    ? (int)pair.desktop_sequence : -1,
+                    enc_rv == XRDP_FFMPEG_PAIR_READY,
+                    ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
+                    center_y, 0);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -2448,8 +2473,7 @@ gfx_batch_release_slots(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         {
             /* stamped in BOTH modes: the absorb instant is the axis the
              * A/B is read on, so the control arm has to publish it too */
-            LOG(LOG_LEVEL_INFO, "ACK_TRACE absorb id=%d mon=%d us=%lld",
-                frame_id, set_mon[index], xrdp_mono_us());
+            PERF_TRACE6("absorb", frame_id, set_mon[index], 0, 0, 0, 0);
         }
         if (!self->eager_slot_ack)
         {
@@ -2631,10 +2655,11 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         sub_state[mon] = 1;
         if (xrdp_ack_trace_on())
         {
-            LOG(LOG_LEVEL_INFO, "ACK_TRACE submit id=%d mon=%d us=%lld",
-                gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
-                                             set[index]->u.gfx.cmd_bytes),
-                mon, xrdp_mono_us());
+            PERF_TRACE6("submit",
+                        gfx_egfx_batch_peek_frame_id(
+                            set[index]->u.gfx.cmd,
+                            set[index]->u.gfx.cmd_bytes),
+                        mon, 0, 0, 0, 0);
         }
         handles[n_handles] = ff;
         handle_mon[n_handles] = mon;
@@ -2699,10 +2724,9 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         kids_armed, self->avc444_batch_max_kids, st);
     if (gfx_enc_trace_on())
     {
-        LOG(LOG_LEVEL_INFO, "GFX_TRACE batch cycle=%llu set_n=%d "
-            "monitors_armed=%d kids_armed=%d max_kids=%d rv=%d",
-            (unsigned long long)self->avc444_batch_cycles, set_n, n_handles,
-            kids_armed, self->avc444_batch_max_kids, st);
+        PERF_TRACE6("batch", (int)self->avc444_batch_cycles, set_n,
+                    n_handles, kids_armed, self->avc444_batch_max_kids,
+                    st);
     }
     PERF_TRACE("book_end", n_handles, 0);
     if (st != XRDP_FFMPEG_PAIR_READY)

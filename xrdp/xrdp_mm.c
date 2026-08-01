@@ -1714,11 +1714,9 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
                 {
                     if (xrdp_ack_trace_on())
                     {
-                        LOG(LOG_LEVEL_INFO, "ACK_TRACE ack id=%d kind=region "
-                            "egress=%d absorbed=%d us=%lld",
-                            encoder->frame_id_server,
-                            encoder->frame_id_server,
-                            encoder->frame_id_consumed, xrdp_mono_us());
+                        PERF_TRACE6("ackregion", encoder->frame_id_server,
+                                    encoder->frame_id_server,
+                                    encoder->frame_id_consumed, 0, 0, 0);
                     }
                     m->mod_frame_ack(m, 0, encoder->frame_id_server);
                 }
@@ -1733,10 +1731,10 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
                     {
                         if (xrdp_ack_trace_on())
                         {
-                            LOG(LOG_LEVEL_INFO, "ACK_TRACE ack id=%d "
-                                "kind=slot egress=%d absorbed=%d us=%lld",
-                                target, encoder->frame_id_server,
-                                encoder->frame_id_consumed, xrdp_mono_us());
+                            PERF_TRACE6("ackslot", target,
+                                        encoder->frame_id_server,
+                                        encoder->frame_id_consumed,
+                                        0, 0, 0);
                         }
                         m->mod_frame_ack(m, XUP_ACK_FLAGS_SLOT_ONLY, target);
                     }
@@ -1794,6 +1792,15 @@ gfx_trace_on(void)
     {
         const char *e = g_getenv("XRDP_GFX_TRACE");
         cached = (e != NULL && e[0] == '1') ? 1 : 0;
+        if (cached && !perf_trace_on())
+        {
+            /* see trace_sink_check() in xrdp_encoder.c -- the records
+               this knob selects live in the ring now (BACKLOG #61h) */
+            LOG(LOG_LEVEL_WARNING, "XRDP_GFX_TRACE=1 but XRDP_PERF_TRACE "
+                "is not set: per-frame trace records go to the perf ring, "
+                "not to this log, so this run will record none of them");
+            cached = 0;
+        }
     }
     return cached;
 }
@@ -1841,9 +1848,8 @@ xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
               frame_id, encoder->frame_id_client, encoder->frame_id_server);
     if (gfx_trace_on())
     {
-        LOG(LOG_LEVEL_INFO, "GFX_TRACE ack frame_id=%d queue_depth=%u "
-            "decoded=%d id_server=%d ack_off=%d", frame_id, queue_depth,
-            frames_decoded, encoder->frame_id_server, encoder->gfx_ack_off);
+        PERF_TRACE6("cliack", frame_id, (int)queue_depth, frames_decoded,
+                    encoder->frame_id_server, encoder->gfx_ack_off, 0);
     }
     if (frame_id < 0 || frame_id > encoder->frame_id_server)
     {
@@ -4221,12 +4227,11 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                                     enc_done->comp_bytes);
                 if (gfx_trace_on())
                 {
-                    LOG(LOG_LEVEL_INFO, "GFX_TRACE send bytes=%d last=%d "
-                        "frame_id=%d id_server=%d id_client=%d fif=%d",
-                        enc_done->comp_bytes, enc_done->last,
-                        enc_done->frame_id, self->encoder->frame_id_server,
-                        self->encoder->frame_id_client,
-                        self->encoder->frames_in_flight);
+                    PERF_TRACE6("send", enc_done->comp_bytes,
+                                enc_done->last, enc_done->frame_id,
+                                self->encoder->frame_id_server,
+                                self->encoder->frame_id_client,
+                                self->encoder->frames_in_flight);
                 }
             }
             else
@@ -4285,9 +4290,8 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                 if (xrdp_ack_trace_on())
                 {
                     /* the frame's LAST byte is now with the transport */
-                    LOG(LOG_LEVEL_INFO, "ACK_TRACE egress id=%d shown=%d "
-                        "us=%lld", enc_done->frame_id, displayed,
-                        xrdp_mono_us());
+                    PERF_TRACE6("egress", enc_done->frame_id, displayed,
+                                0, 0, 0, 0);
                 }
                 if (!displayed)
                 {
@@ -5030,9 +5034,9 @@ server_egfx_cmd(struct xrdp_mod *mod,
     {
         /* the producer's frame has arrived at xrdp: the head of the leg
          * chain the #70 A/B is read on */
-        LOG(LOG_LEVEL_INFO, "ACK_TRACE msgin id=%d bytes=%d us=%lld",
-            gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes), data_bytes,
-            xrdp_mono_us());
+        PERF_TRACE6("msgin",
+                    gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
+                    data_bytes, 0, 0, 0, 0);
     }
     enc->u.gfx.data = data;
     enc->u.gfx.data_bytes = data_bytes;

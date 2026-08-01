@@ -360,7 +360,33 @@ else
     srv_cat "$XLOG" | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
 fi
 srv_cat /var/log/xrdp.log | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
-grep -a "GFX_TRACE" "$OUT/xrdp.log" > "$OUT/gfx_trace.txt" 2>/dev/null
+# --- the per-frame trace, from the ring the sink writes ------------------
+# BACKLOG #61h: GFX_TRACE / ACK_TRACE records are no longer log.c lines --
+# they were ~12 unbuffered writes per frame on the xrdp main thread, on the
+# path #61f exists to make faster, and the "send window" every #61f number
+# was quoted against was the interval between two of them. They go to
+# common/perf_trace's ring now. Pull the ring file and render it back into
+# the line shapes every analysis here already reads.
+PERF_DIR=/var/log/xrdp-perf
+mkdir -p "$OUT/perf"
+PERF_FILES=$(srv "ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" | tr -d '\r')
+if [ -n "$PERF_FILES" ]; then
+    for f in $PERF_FILES; do
+        srv_cat "$f" > "$OUT/perf/$(basename "$f")" 2>/dev/null
+    done
+    python3 "$D/perf_trace_lines.py" "$OUT"/perf/enc.* \
+        > "$OUT/perf_trace_lines.txt" 2>"$OUT/perf_trace_lines.log"
+    tail -1 "$OUT/perf_trace_lines.log"
+    # the ACK_TRACE analyses read xrdp.log; the E5 parser reads
+    # gfx_trace.txt. Both get the rendered records.
+    grep -a "ACK_TRACE" "$OUT/perf_trace_lines.txt" >> "$OUT/xrdp.log"
+    grep -a "GFX_TRACE" "$OUT/perf_trace_lines.txt" > "$OUT/gfx_trace.txt"
+else
+    echo "WARNING: no perf ring file under $PERF_DIR on $SRV_NAME —" \
+         "is XRDP_PERF_TRACE set for this arm? Since #61h the per-frame" \
+         "trace lives ONLY there, so E5/E4 will read an empty trace" >&2
+    : > "$OUT/gfx_trace.txt"
+fi
 
 # --- the report ----------------------------------------------------------
 {

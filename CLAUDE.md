@@ -63,10 +63,36 @@ All durable rules and "memory" for this project live here, in-tree and committed
    builds), `g_*` OS-call wrappers in `common/os_calls.{c,h}`, `list_*`, and
    libipm serialization (`libipm_msg_out_simple_send` / `libipm_msg_in_parse`
    format strings). Match surrounding naming and idiom.
-5. **Tests required.** Add/extend unit tests for new pure logic (e.g. a new
+5. **Per-frame telemetry goes to `common/perf_trace`, never to `log.c`
+   (owner directive, 2026-08-01).** `LOG()` formats a timestamp, takes a
+   global mutex and does an UNBUFFERED `write()` per line. Anything that
+   fires once per frame — or once per monitor per frame, or per encode
+   cycle — must use `PERF_TRACE` / `PERF_TRACE6`, whose source path is a
+   vDSO clock read and a store into the calling thread's own ring, with a
+   separate sink thread doing the I/O.
+   - This is not a style preference. It has cost this project twice: an
+     `fprintf` on one shared `FILE*` moved the frame period from 40.4 ms
+     to 135.3 ms (#61e), and ~12 `LOG()` lines per frame on the xrdp main
+     thread sat on the very path #61f exists to make faster, bracketing
+     the "17 ms send window" that a whole day's work was then built on
+     (#61h).
+   - **An instrument on the measured path is part of the measurement.**
+     Before quoting an interval, ask what the interval's own endpoints
+     cost. If the answer is "a `write()` under a global mutex", there is
+     no number yet.
+   - `LOG()` stays correct for what a human reads: session lifecycle,
+     configuration, errors, anything at human rates. The test is rate,
+     not importance.
+   - **Do not build a new tracer, sampler or ring for a measurement.**
+     `common/perf_trace` is the one sink; extend it (the payload widened
+     from two ints to six for exactly this reason) rather than adding a
+     parallel mechanism. A one-off sampler next to it costs real CPU —
+     the #61g `/proc` sampler burned 36 % of a core and moved the rate it
+     was measuring — and it is a second thing to get wrong.
+6. **Tests required.** Add/extend unit tests for new pure logic (e.g. a new
    encode/decode or geometry calculation) and for new message serialization.
    Keep tests deterministic.
-6. **Style.** Follow `coding_style.md`: 4-space indent, no tabs, Allman braces,
+7. **Style.** Follow `coding_style.md`: 4-space indent, no tabs, Allman braces,
    ≤80 cols, lowercase_with_underscores (UPPERCASE preprocessor constants),
    `/* */` comments only (never `//`), newline before the function name in
    definitions, one declaration per line. Run astyle. Aim for C/C++ compatibility.

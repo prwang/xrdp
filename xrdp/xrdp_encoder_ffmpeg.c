@@ -1294,7 +1294,7 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
         int kids_armed;
 
         st = xrdp_ffmpeg_avc444_submit_pair(self, main_nv12, aux_nv12,
-                                           nv12_size, desktop_sequence);
+                                            nv12_size, desktop_sequence);
         if (st != XRDP_FFMPEG_PAIR_READY)
         {
             return st;

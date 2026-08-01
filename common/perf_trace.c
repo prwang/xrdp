@@ -90,7 +90,8 @@ perf_trace_now_ns(void)
  * the record was stored, 0 if the ring was full. */
 int
 perf_trace_ring_push(struct perf_trace_ring *r, long long ns, long long tid,
-                     const char *tag, int a, int b)
+                     const char *tag, int a, int b, int c, int d, int e,
+                     int f)
 {
     unsigned int head;
     unsigned int next;
@@ -113,6 +114,10 @@ perf_trace_ring_push(struct perf_trace_ring *r, long long ns, long long tid,
     r->slots[head].tag = tag;
     r->slots[head].a = a;
     r->slots[head].b = b;
+    r->slots[head].c = c;
+    r->slots[head].d = d;
+    r->slots[head].e = e;
+    r->slots[head].f = f;
     /* The slot must be visible to the sink BEFORE the index that
      * publishes it, or the sink can read a half-written record. */
     __sync_synchronize();
@@ -148,14 +153,14 @@ perf_trace_ring_pop(struct perf_trace_ring *r, struct perf_trace_rec *out)
 /*****************************************************************************/
 int
 perf_trace_format(char *buf, int len, long long ns, long long tid,
-                  const char *tag, int a, int b)
+                  const char *tag, int a, int b, int c, int d, int e, int f)
 {
     if (buf == NULL || len < 1 || tag == NULL)
     {
         return -1;
     }
-    return snprintf(buf, (size_t)len, "%lld %lld %s %d %d\n", ns, tid,
-                    tag, a, b);
+    return snprintf(buf, (size_t)len, "%lld %lld %s %d %d %d %d %d %d\n",
+                    ns, tid, tag, a, b, c, d, e, f);
 }
 
 /*****************************************************************************/
@@ -164,6 +169,7 @@ static void
 perf_trace_drain(void)
 {
     struct perf_trace_rec rec;
+    char line[256];
     int index;
     unsigned int dropped;
 
@@ -173,15 +179,26 @@ perf_trace_drain(void)
 
         while (perf_trace_ring_pop(r, &rec))
         {
-            fprintf(g_perf_file, "%lld %lld %s %d %d\n", rec.ns, rec.tid,
-                    rec.tag, rec.a, rec.b);
+            /* through perf_trace_format(), so the schema has ONE
+               definition and the unit test that pins it pins what the
+               sink actually writes */
+            if (perf_trace_format(line, (int)sizeof(line), rec.ns, rec.tid,
+                                  rec.tag, rec.a, rec.b, rec.c, rec.d,
+                                  rec.e, rec.f) > 0)
+            {
+                fputs(line, g_perf_file);
+            }
         }
         /* A truncated trace must announce itself. */
         dropped = r->dropped;
         if (dropped != r->drop_seen)
         {
-            fprintf(g_perf_file, "%lld %d perfdrop %u %d\n",
-                    perf_trace_now_ns(), index, dropped, index);
+            if (perf_trace_format(line, (int)sizeof(line),
+                                  perf_trace_now_ns(), index, "perfdrop",
+                                  (int)dropped, index, 0, 0, 0, 0) > 0)
+            {
+                fputs(line, g_perf_file);
+            }
             r->drop_seen = dropped;
         }
     }
@@ -205,8 +222,15 @@ perf_trace_sink_thread(void *arg)
     perf_trace_drain();
     if (g_perf_no_ring != 0)
     {
-        fprintf(g_perf_file, "%lld 0 perfnoring %u 0\n",
-                perf_trace_now_ns(), g_perf_no_ring);
+        {
+            char line[256];
+            if (perf_trace_format(line, (int)sizeof(line),
+                                  perf_trace_now_ns(), 0, "perfnoring",
+                                  (int)g_perf_no_ring, 0, 0, 0, 0, 0) > 0)
+            {
+                fputs(line, g_perf_file);
+            }
+        }
     }
     fflush(g_perf_file);
     return NULL;
@@ -257,6 +281,24 @@ perf_trace_open(void)
         return;
     }
     g_perf_ring_count = PERF_TRACE_MAX_RINGS;
+    /* The clock base, once, as the first line. Records carry
+     * CLOCK_MONOTONIC because that is what can be intersected across
+     * processes; a reader that has to place them beside a wall-clock
+     * artefact (an xrdp.log line, a screenshot) needs the pair, and
+     * fitting one from the other is exactly the kind of guess this
+     * project has been bitten by. Comment-prefixed so a record parser
+     * skips it. */
+    {
+        struct timespec mono;
+        struct timespec real;
+        if (clock_gettime(CLOCK_MONOTONIC, &mono) == 0 &&
+                clock_gettime(CLOCK_REALTIME, &real) == 0)
+        {
+            fprintf(g_perf_file, "# perfbase mono_ns %lld real_ns %lld\n",
+                    (long long)mono.tv_sec * 1000000000LL + mono.tv_nsec,
+                    (long long)real.tv_sec * 1000000000LL + real.tv_nsec);
+        }
+    }
     if (pthread_create(&g_perf_sink, NULL, perf_trace_sink_thread,
                        NULL) != 0)
     {
@@ -313,7 +355,7 @@ perf_trace_my_ring(void)
 
 /*****************************************************************************/
 void
-perf_trace_ev(const char *tag, int a, int b)
+perf_trace_ev6(const char *tag, int a, int b, int c, int d, int e, int f)
 {
     struct perf_trace_ring *r;
 
@@ -329,7 +371,14 @@ perf_trace_ev(const char *tag, int a, int b)
     /* No syscall, no I/O, no allocation, no shared lock -- a clock read
      * through the vDSO and a store into this thread's own ring. */
     perf_trace_ring_push(r, perf_trace_now_ns(), (long long)pthread_self(),
-                         tag, a, b);
+                         tag, a, b, c, d, e, f);
+}
+
+/*****************************************************************************/
+void
+perf_trace_ev(const char *tag, int a, int b)
+{
+    perf_trace_ev6(tag, a, b, 0, 0, 0, 0);
 }
 
 /*****************************************************************************/
