@@ -266,6 +266,63 @@ START_TEST(test_trans_cork__nests)
 END_TEST
 
 /******************************************************************************/
+/* a trans_send that records what it was offered and accepts all of it */
+static int g_offer_count;
+static int g_offer_max;
+static int g_offer_total;
+
+static int
+recording_send(struct trans *self, const char *data, int len)
+{
+    (void) self;
+    (void) data;
+    g_offer_count++;
+    g_offer_total += len;
+    if (len > g_offer_max)
+    {
+        g_offer_max = len;
+    }
+    return len;
+}
+
+/******************************************************************************/
+START_TEST(test_trans_cork__send_is_chunked)
+{
+    int peer;
+    struct trans *t = make_pair(&peer);
+    /* four whole chunks and a bit, so the cap has to bind more than once
+       and the remainder has to come out too */
+    const int payload = TRANS_MAX_SEND_CHUNK * 4 + 1234;
+    int blocks = payload / BLOCK_BYTES;
+    char sink[64];
+    int i;
+
+    ck_assert_ptr_ne(t, NULL);
+    t->trans_send = recording_send;
+    g_offer_count = 0;
+    g_offer_max = 0;
+    g_offer_total = 0;
+
+    ck_assert_int_eq(trans_cork(t), 0);
+    for (i = 0; i < blocks; ++i)
+    {
+        ck_assert_int_eq(write_block(t, i), 0);
+    }
+    ck_assert_int_eq(trans_uncork(t), 0);
+    /* the uncork flushes ONE chunk and hands the caller back its loop --
+       it does not stand there until the whole frame has gone */
+    ck_assert_int_eq(g_offer_count, 1);
+    ck_assert_int_eq(g_offer_max, TRANS_MAX_SEND_CHUNK);
+
+    drain(t, peer, sink, sizeof(sink));
+    /* every offer is within the cap, and together they are the payload */
+    ck_assert_int_le(g_offer_max, TRANS_MAX_SEND_CHUNK);
+    ck_assert_int_eq(g_offer_total, blocks * BLOCK_BYTES);
+    close_pair(t, peer);
+}
+END_TEST
+
+/******************************************************************************/
 Suite *
 make_suite_test_trans_cork(void)
 {
@@ -279,6 +336,7 @@ make_suite_test_trans_cork(void)
     tcase_add_test(tc, test_trans_cork__bytes_and_order_survive);
     tcase_add_test(tc, test_trans_cork__uncorked_is_unchanged);
     tcase_add_test(tc, test_trans_cork__nests);
+    tcase_add_test(tc, test_trans_cork__send_is_chunked);
     suite_add_tcase(s, tc);
 
     return s;

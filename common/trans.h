@@ -37,6 +37,19 @@
 #define TRANS_STATUS_DOWN 0
 #define TRANS_STATUS_UP 1
 
+/**
+ * Most bytes handed to one trans_send() call when draining the queue.
+ *
+ * ssl_tls_write() does not do partial writes -- it loops internally on
+ * SSL_ERROR_WANT_WRITE until the whole length has gone -- so the size
+ * offered to it is the length of time the caller is parked. A whole
+ * corked GFX frame in one call measured WORSE than the thousands of
+ * small writes it replaced (BACKLOG #61f, x008 vs x006, 51.2 vs
+ * 41.8 ms per frame). One chunk per call keeps the system-call saving
+ * and returns the caller to its wait-object loop in between.
+ */
+#define TRANS_MAX_SEND_CHUNK (64 * 1024)
+
 struct trans; /* forward declaration */
 struct xrdp_tls;
 
