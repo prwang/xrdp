@@ -77,6 +77,21 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Before coding, ensure the task exists in `BACKLOG.md` with clear scope and
   acceptance criteria; update its status (`TODO` / `IN PROGRESS` / `BLOCKED` /
   `DONE`) as you go.
+- **`BACKLOG.md` is the OPEN work list, not a lab notebook (owner directive,
+  2026-08-01).** An entry is a hypothesis, its justification, and a pointer.
+  When an item closes, its conditions/tables/anomalies/retractions move to
+  `docs/experiments/<item>-<slug>.md` and the backlog keeps one line saying
+  what the work decided. If you are about to paste a results table into
+  `BACKLOG.md`, it belongs in `docs/experiments/` instead. Per-run evidence
+  stays with its capture under
+  `PR-demo/mac_bisect_matrix/captures/<run>/README.md`; anything still true
+  after the item closes belongs in `PRD.md`. This rule exists because the
+  file has had to be rewritten twice for the same reason — 3268 lines on
+  2026-07-28, 1923 on 2026-08-01.
+- **Records in `docs/experiments/` are kept verbatim, wrong claims included.**
+  Do not tidy a past result to agree with what is now believed; supersede it
+  with a dated note saying what changed it. The retractions are the most
+  useful part of the record.
 - Commit `BACKLOG.md` / `CLAUDE.md` updates alongside the related code so the
   rationale and scope stay reviewable in git history.
 - Make small, reviewable commits, each scoped to one backlog item. Do not commit
