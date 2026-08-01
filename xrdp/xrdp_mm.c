@@ -32,6 +32,7 @@
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
+#include "perf_trace.h"
 #include "xup_client_info.h"
 #include "xrdp_avc444_caps.h"
 #include "xrdp_encoder_ffmpeg.h"
@@ -4988,7 +4989,9 @@ server_egfx_cmd(struct xrdp_mod *mod,
     XRDP_ENC_DATA *enc;
     struct xrdp_wm *wm;
     struct xrdp_mm *mm;
+    int enq_depth;
 
+    enq_depth = 0;
     wm = (struct xrdp_wm *)(mod->wm);
     mm = wm->mm;
     if (mm->encoder == NULL)
@@ -5039,6 +5042,7 @@ server_egfx_cmd(struct xrdp_mod *mod,
     tc_mutex_lock(mm->encoder->mutex);
     fifo_add_item(mm->encoder->fifo_to_proc, enc);
     mm->encoder->fifo_to_proc_depth++;
+    enq_depth = mm->encoder->fifo_to_proc_depth;
     /* FR-CAPTURE-8: the two-slot producer gate bounds the queue to the
        outstanding-rect budget; more means a leaked ack or a broken
        gate on the xorgxrdp side (loud, mandated local assertion).
@@ -5070,6 +5074,17 @@ server_egfx_cmd(struct xrdp_mod *mod,
         }
     }
     tc_mutex_unlock(mm->encoder->mutex);
+    /* #61e -- the moment this frame became available to the encoder,
+     * keyed by the producer's echoed frame id. The encoder writes a
+     * matching "take" when it lifts the same id off the fifo; enq ->
+     * take is fifo RESIDENCY, and a residency that is consistently
+     * POSITIVE is the direct evidence that the encoder could not have
+     * started on this frame any sooner -- the data was already in hand
+     * and the worker was busy with the previous one. Stamped OUTSIDE
+     * the encoder mutex: the worker's drain takes the same lock, and an
+     * instrument must not add contention to the thing it measures. */
+    PERF_TRACE("enq", gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
+               enq_depth);
     /* signal xrdp_encoder thread */
     g_set_wait_obj(mm->encoder->xrdp_encoder_event_to_proc);
     return 0;

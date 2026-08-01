@@ -381,6 +381,53 @@ resolution-dependent: `pump` and `coll` scale with pixel count and
 17 % at 3840x2400. The ratio at the smaller geometry should be *larger*,
 and that is a prediction this item can falsify.
 
+## #61e — Close x004's period to ≤0.5 ms unknown, and settle capture‖encode at m=1 (IN PROGRESS)
+
+**The claim under test is PRD's, not a ratio.** The `capture ‖ encode =
+YES for m = 1, shipped` row asserts the frame period *equals* the encode
+duration and the capture is *fully hidden*. It was measured at 1600×912
+in a different era. At 3840×2400 on x004 the worker's serial chain is
+**29.07 ms** against a **35.95 ms** period: **6.88 ms/frame belongs to
+no stage**, and PRD's claim is exactly the claim that none of it is the
+encoder waiting for a frame.
+
+**Step 1 (DONE, no new code).** Attributing every consecutive pair of
+worker events, not just the bracketed stages, closes x004 to
+**−0.063 ms** and names the two holes: `join_end -> coll_beg`
+**2.38 ms** and `coll_end -> drain_beg` **4.49 ms**. So the 6.88 ms is
+real elapsed time on the worker thread, not a pairing artefact — but it
+is named by *tag*, not by *code*, which is not an attribution.
+
+**Step 2 (this item).** Five new brackets under the existing
+`XRDP_PERF_TRACE` sink, shipped disarmed:
+
+| bracket | names |
+|---|---|
+| `book_beg/end` | the counters + `LOG(LOG_LEVEL_DEBUG)` + `GFX_TRACE` block — the whole of hole A |
+| `rel_beg/end` | `gfx_batch_release_slots()`, the #70 CONSUMED ack |
+| `wait_beg/end` | **`g_obj_wait` — the encoder holding nothing to encode** |
+| `enq` (main thread) | a frame becoming available, keyed by its echoed id |
+| `take` (worker) | the same id lifted off the fifo |
+
+**What decides it.** `wait` is the per-frame millisecond count by which
+capture is NOT hidden behind encode; PRD's claim is that it is zero.
+`enq -> take` residency is the same statement in its positive form — a
+residency that is consistently positive says the data was already in
+hand and the worker was busy, i.e. ffmpeg could not have seen frame N+1
+any sooner. The two are complementary and must agree: every cycle is
+either worker-bound (residency > 0) or capture-bound (wait > 0), never
+both, never neither.
+
+**Gate 4 is mandatory before reading anything.** The instrumented build
+is not the build that measured 1.12×. New arms **x005/x006** (not a
+rebuild of x003/x004, whose images stay as measured) must reproduce
+40.25 / 35.95 ms, or the attribution is of a different system.
+
+**Falsifiable.** If `wait` is ~0 on both arms, PRD's row survives at
+3840×2400 and the 6.88 ms is all worker overhead we own. If `wait` is
+several ms, the row is wrong at this geometry and the capture pipeline —
+not the encoder — is the next lever.
+
 ---
 
 # Closed — records in `docs/experiments/`

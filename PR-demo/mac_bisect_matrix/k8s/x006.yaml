@@ -1,0 +1,105 @@
+# Arm x006: BACKLOG #61b/#70B — the emit-split A/B re-run under a payload
+# that does NOT saturate the producer.
+#
+# #61c measured the reason this pair exists: under codeflood the session
+# Xorg is at 98.9 % of one core with NO client attached, so the producer
+# sets the frame period and no worker-side change is measurable. The
+# x001/x002 pair measured 0.96x against that ceiling. textflood renders
+# the same corpus with cairo in its own process and hands X one finished
+# image per frame (7.7x less X-thread cost, #62).
+#
+# BEFORE quoting any ratio from this pair, FR-BENCH-1 must PASS: the
+# payload's own frame rate (/tmp/e52_textflood_stamps.tsv in the session)
+# must clearly exceed the pipeline's send rate. #62's T4 result was later
+# annotated producer-confounded for want of exactly that check.
+#
+# RDP endpoint on the host: 127.0.0.1:40028.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x006
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x006
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x006
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x006
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:4bbf11814323.xx10fa3aa-tf
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "textflood"
+            - name: ARM_LABEL
+              value: "x006: #61b textflood + emit split=true (port 40028)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40028
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x006

@@ -2671,6 +2671,14 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * overtake the assembler's terminal ack for the previous one. */
     gfx_emit_join(self);
     gfx_batch_publish(self, sub_seq, sub_state, sub_reset);
+    /* #61e -- the cycle decomposition ran out of names here: the span
+     * from pump_end (or join_end) to the first coll_beg was 2.4-2.8
+     * ms/frame and belonged to no stage. It is this block: counters,
+     * one LOG(LOG_LEVEL_DEBUG) and, when armed, one GFX_TRACE line.
+     * log.c writes unbuffered under a global mutex, so it is a
+     * plausible owner of milliseconds and must be measured, not
+     * assumed. */
+    PERF_TRACE("book_beg", n_handles, 0);
     self->avc444_batch_cycles++;
     self->avc444_batch_items += n_handles;
     if (kids_armed > self->avc444_batch_max_kids)
@@ -2696,6 +2704,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
             (unsigned long long)self->avc444_batch_cycles, set_n, n_handles,
             kids_armed, self->avc444_batch_max_kids, st);
     }
+    PERF_TRACE("book_end", n_handles, 0);
     if (st != XRDP_FFMPEG_PAIR_READY)
     {
         LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: pump of %d children failed; "
@@ -2733,7 +2742,9 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         PERF_TRACE("coll_end", handle_mon[index], 0);
     }
     /* #70: the collects above are the absorb proof for this set */
+    PERF_TRACE("rel_beg", set_n, 0);
     gfx_batch_release_slots(self, set, set_mon, set_n);
+    PERF_TRACE("rel_end", set_n, 0);
 }
 
 /*****************************************************************************/
@@ -3685,6 +3696,7 @@ proc_enc_msg(void *arg)
     int index;
     int batching;
     int drain_full;
+    int n_carried;
 
     LOG_DEVEL(LOG_LEVEL_INFO, "proc_enc_msg: thread is running");
 
@@ -3721,12 +3733,23 @@ proc_enc_msg(void *arg)
             robjs[robjs_count++] = lterm_obj;
             robjs[robjs_count++] = event_to_proc;
 
+            /* #61e -- THE capture-vs-encode bracket. Time spent here is
+             * time the encoder had nothing to encode: the worker has
+             * finished frame N and frame N+1 does not exist yet. It is
+             * therefore the exact per-frame amount by which capture is
+             * NOT hidden behind encode, in milliseconds, and PRD's
+             * "capture || encode = YES for m = 1" claim is the claim
+             * that this bracket is empty. Bracketing the wait is the
+             * only way to distinguish "the producer is late" from "the
+             * worker is slow" -- both look like a long cycle. */
+            PERF_TRACE("wait_beg", n_items, drain_full);
             if (g_obj_wait(robjs, robjs_count, wobjs, wobjs_count,
                            timeout) != 0)
             {
                 /* error, should not get here */
                 g_sleep(100);
             }
+            PERF_TRACE("wait_end", 0, 0);
         }
         /* THE STARVATION RULE: a cycle that ends holding carried items
          * must NOT block, or the monitor those items belong to would sit
@@ -3762,6 +3785,7 @@ proc_enc_msg(void *arg)
          * everything it drained and would have blocked with work still
          * on the fifo until unrelated damage re-set the event.) */
         drain_full = 0;
+        n_carried = n_items;
         PERF_TRACE("drain_beg", n_items, 0);
         tc_mutex_lock(mutex);
         while (n_items < GFX_BATCH_MAX_ITEMS)
@@ -3777,6 +3801,26 @@ proc_enc_msg(void *arg)
         drain_full = (n_items >= GFX_BATCH_MAX_ITEMS);
         tc_mutex_unlock(mutex);
         PERF_TRACE("drain_end", n_items, drain_full);
+        /* #61e -- one record per item this drain actually TOOK off the
+         * fifo, carrying the producer's echoed frame id. Paired with the
+         * "enq" record the main thread writes when it puts that same id
+         * on the fifo, the difference is the item's fifo RESIDENCY: how
+         * long the data sat in xrdp, already available, before the
+         * encoder asked for it. Joined by echoed identity, never by a
+         * time window (perf_trace.h; BACKLOG #64; quality gate 2c).
+         * Items carried over from the previous iteration are skipped --
+         * they were already stamped when they were taken. */
+        if (perf_trace_on() && batching)
+        {
+            for (index = n_carried; index < n_items; index++)
+            {
+                PERF_TRACE("take",
+                           gfx_egfx_batch_peek_frame_id(
+                               items[index]->u.gfx.cmd,
+                               items[index]->u.gfx.cmd_bytes),
+                           self->fifo_to_proc_depth);
+            }
+        }
         if (n_items == 0)
         {
             continue;
