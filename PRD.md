@@ -1052,6 +1052,21 @@ in NG-9.
 
 ### FR-ACK-2: the eager slot-release ack is incomplete without the emit split (2026-08-01, measured)
 
+> **SUPERSEDED IN PART, 2026-08-01 (same day), by measurement.** The
+> split was built and measured, and its *acceptance criterion below is
+> not met*: period 33.3 -> 34.7 ms, **0.96x**, against the 1.22x-1.44x
+> predicted here. The mechanism applied (assembly on its own tid, join
+> present) and the worker's serial chain fell 24.0 -> 17.2 ms exactly as
+> designed — the period simply did not follow, because **this FR's
+> load-bearing assumption is wrong: the encoder worker does not pace the
+> frame period.** It was 72 % occupied before the split, so it had 28 %
+> slack and was never the constraint. The requirement below therefore
+> stands as *written* only for its correctness content (the join point,
+> the thread shape, the shared-state rules — all of which held); its
+> throughput claim is withdrawn. Evidence:
+> `PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md`.
+> Text below kept verbatim, wrong projection included.
+
 **The eager slot-release ack (BACKLOG #70) MUST NOT be shipped without
 the assembly (`emit`) split of BACKLOG #70B.** On its own it converts a
 producer-side wait into a worker-side queue and stops there.

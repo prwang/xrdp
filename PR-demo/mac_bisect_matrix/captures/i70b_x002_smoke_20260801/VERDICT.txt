@@ -1,0 +1,73 @@
+=== #45 gate run: x002, oracle client, 20s ===
+image:    localhost/xrdp-bisect:4bbf11814323.xx10fa3aa
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260801021842.4bbf11814323
+monitors: OK: 1 monitor (1024x768 at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = codeflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 597 over 16.9 s
+send-to-send gap: mean 28.4 ms  p50 31 ms  p90 35 ms  p99 57 ms
+session geometry (max damage extent): 1024x768 = 0.79 Mpx over 597 damage records
+         GEOMETRY WARNING: the session served under 2 Mpx. If a 4K run was intended, the client fell back to its default size (/size is mandatory without /multimon) and this is NOT a 4K measurement.
+35.31 sends/s = 35.31 pairs/s per monitor (1 monitor)
+surface 0 own period: n=597 mean 28.4 ms  p50 31.0 ms
+damage coverage: surface 0: 597
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 597   kids_armed: 2:597 (100%)
+
+E5 GATE: baseline 51.1 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 28.4 ms  ->  1.80x
+         between 1.5x and 2.0x: SHORT OF THE PREDICTION -- record it as such, do not re-tune until it looks better
+
+=== E4 — poll-set size the worker actually armed ===
+    597 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== E2 — wire audit (--assert) on oracle_avc_s0.bin ===
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT0      : 595/596
+      avg P size=126138B   avg I/IDR size=156249B   inter share of pictures=99.5%
+aux  pictures=596    P(inter)=593    I(intra)=3     IDR=0
+      P slices retargeted to OWN slot LT1 : 593/593
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT1      : 596/596
+      avg P size=111333B   avg I/IDR size=143785B   inter share of pictures=99.5%
+
+merged decode-order frame_num chain: 1192 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
+  A2 intra only on a scheduled index       PASS  unscheduled intra: main [] aux []
+  A3 cuts are paired across views          PASS  main intra ordinals [0, 240, 480] ... aux [0, 240, 480]
+  A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
+  A5 own-slot refs and self-marks          PASS  all pictures conform
+  A6 one contiguous frame_num chain        PASS  0 gap(s)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 239 aux 239 (bound 240)
+
+ASSERT VERDICT: PASS -- 7 checks, all clean
+wire audit exit: 0
+
+=== E2 — black-frame check ===
+oracle_avc_s0.bin
+  pictures in capture     : 1192
+  frames decoded          : 1192
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS

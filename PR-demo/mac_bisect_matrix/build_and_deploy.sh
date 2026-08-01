@@ -40,6 +40,12 @@ DIST=${DIST:-/work/dist}
 # clock the measurement. They are deployed together or not at all --
 # a flood measurement of one arm alone has no baseline:
 #   build_and_deploy.sh arm-s arm-t
+# x001 / x002 are the BACKLOG #70B A/B: the same two debs on both,
+# differing only in gfx.toml's emit_thread. Deployed together or not at
+# all -- a split measurement with no same-binary control has no
+# baseline (arm-w is an older build, so it is not one):
+#   build_and_deploy.sh x001 x002
+# Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
@@ -82,6 +88,12 @@ declare -A ARM_XORG_DEB=(
     # xorgxrdp side is the SAME deb as arm-u/arm-v -- the xup contract
     # did not move, so the attribution is about arm-v's pipeline.
     [arm-w]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x001/x002 (BACKLOG #70B): the emit-split A/B. SAME xrdp deb and
+    # SAME xorgxrdp deb on both -- the arms differ by one gfx.toml line
+    # (emit_thread). The xrdp change is encoder-internal and does not
+    # move the xup contract, so this is still arm-u/v/w's xorgxrdp.
+    [x001]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x002]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -95,6 +107,8 @@ declare -A ARM_TAG=(
     [arm-u]=348a16dde3f3.xx10fa3aa
     [arm-v]=348a16dde3f3.xx10fa3aa
     [arm-w]=e6e1f6f5641e.xx10fa3aa
+    [x001]=4bbf11814323.xx10fa3aa
+    [x002]=4bbf11814323.xx10fa3aa
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -120,6 +134,11 @@ declare -A TAG_DEB=(
     # arm-w (BACKLOG #70B): the same encoder, plus common/perf_trace and
     # the worker-stage brackets
     [e6e1f6f5641e.xx10fa3aa]="xrdp-dev_0.10.80+git20260801010944.e6e1f6f5641e_amd64.deb"
+    # x001/x002 (BACKLOG #70B): the assembler thread, plus the
+    # prerequisites that make its join point sound (emit no longer
+    # touches the ffmpeg handle array; arm state published after the
+    # join). Default off in the binary; armed per arm by gfx.toml.
+    [4bbf11814323.xx10fa3aa]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

@@ -184,3 +184,114 @@ What the server-vs-client distinction actually changes is the FIX once
 12.6 ms does bind — fewer bytes (bitrate/codec) or a faster transport if
 it is server cost, versus a client-side problem xrdp cannot fix — and
 not WHEN it binds, which is set by the 12.6 ms either way.
+
+
+---
+
+# 2026-08-01 (later the same day) — the split was built and measured: RED
+
+**Built and measured the same day it was specified. The split works and
+buys nothing: 33.3 -> 34.7 ms, 0.96x, against a predicted 1.22x-1.44x.**
+
+The mechanism applied — assembly on its own tid, `join_*` present, the
+worker's serial chain 24.0 -> 17.2 ms exactly as designed — and the
+period did not follow. The worker was 72 % occupied BEFORE the split, so
+it had 28 % slack and never paced the frame period. That is the
+assumption FR-ACK-2 rested on, and it is wrong. Correctness held on both
+arms: wire audit 7/7, zero black frames, zero rewrite failures.
+
+The code is shipped, default off (`gfx.toml emit_thread`), because the
+prerequisite refactor it forced is worth keeping on its own terms: emit
+no longer touches `avc444_ffmpeg_handle[]` (a real use-after-free on the
+re-key/resize paths), and the arm state it reads is published at one
+place after the join. x002 (the same deb, split off) reproduces arm-w
+stage for stage within 0.25 ms, so none of that cost anything.
+
+Cost when enabled: `emit` runs 34 % slower on its own thread (6.39 ->
+8.59 ms) — likeliest cache locality across cores, recorded not
+explained. That is what makes it 0.96x rather than neutral.
+
+**Record:** `PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md`
+(three arms, the gate-2 tid cross-tab, the stage tables, and a VOID
+first sweep kept with its numbers), `docs/experiments/70B-perf-trace-sink.md`
+(the sink), commits `4bbf1181`/`81ab8de6`.
+
+Full measurement, arms, gate-2 thread cross-tab, stage tables and the
+void first sweep:
+`../../PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md`.
+
+## The BACKLOG entry this closed, kept verbatim
+
+Its projection was wrong and its correctness reasoning was right. Kept
+as written rather than tidied — the assumption it names ("the worker
+is 88 % occupied") is exactly what the measurement falsified, and that
+is the useful part of the record.
+
+**Hypothesis.** Moving `emit` (build the EGFX PDUs) from the encoder
+worker to its own thread raises throughput 1.22×–1.44× at no latency
+cost, because the worker is 88 % occupied while the two FFmpeg children
+idle 67 % of wall time waiting to be fed.
+
+**Justification.** The worker cycle is now measured stage by stage and
+closes to 0.00 ms: `pump` 10.78, `emit` 5.96, `subm` 3.70, `coll` 3.22,
++4.85 inter-stage, +4.04 gap = 32.56 ms against a 32.56 ms period.
+`submit` and `pump` are the only code that feeds the children and both
+run on the worker, so a ready capture does not prevent starvation —
+#70's eager ack made frames ready early (61 % already queued at absorb)
+and the wait simply moved in front of the worker (`msgin → submit` p50
+2.4 → 10.3 ms). `emit` is the largest worker stage that touches no
+child, no capture page and no borrowed shmem (FR-PROC-6).
+
+**Design constraint (correctness, not tuning).** Join the previous
+frame's assembly **after `submit(N+1)` and before `collect(N+1)`**.
+Later — e.g. before the next ack — lets `collect(N+1)` overwrite the
+handle's `main_buf`/`aux_buf` while the assembler still reads them.
+Earlier — at the top of the loop — leaves the children idle for the
+whole of `emit` and buys nothing. Between the two it is free: 5.96 ms
+fits inside `submit+pump`'s 14.5 ms. One permanent assembler thread, a
+depth-1 slot, two `tc_sem`s; the join is one `tc_sem_dec` whose
+position is the specification. Full shape, teardown and shared-state
+audit in PRD FR-ACK-2 ("The assembler is ONE permanent thread").
+
+**Two blockers, found 2026-08-01 by auditing what `emit` touches. The
+join point above is NOT sound against today's code; both must land as
+their own change, before the thread exists.**
+
+1. **`emit` mutates `avc444_ffmpeg_handle[m]`** — the geometry-change
+   teardown in `gfx_avc444_handle_for`, the encode-error path, and the
+   post-ship `rekey_pending` teardown — while `submit(N+1)` reads and
+   creates through the same array for the same monitor. Joining after
+   `submit` races `xrdp_ffmpeg_avc444_delete` against
+   `submit_pair` on the freed handle: rare (a resize, or one frame in
+   ~65 000) and a use-after-free. Fix: the worker evaluates
+   `rekey_pending` right after `gfx_batch_collect_one`, where it already
+   holds the handle, and applies the teardown at the top of the next
+   cycle before `submit`. Defers the re-key one frame; margin is 504
+   frames (`REKEY` = 2^16−512, hard stop 2^16−8). Same fix covers
+   `avc444_surface_reset_pending[m]`.
+2. **The aliasing is a realloc, not just an overwrite.** `collect_pair`
+   calls `grow(&self->main_buf, ...)` before each rewrite, so
+   `collect(N+1)` can *free* what `pair.main_data` points at. Recorded
+   because it changes the fallback: "double-buffer the two buffers"
+   does not fix it — an owned copy in the handoff would.
+
+Also required: `avc444_debug_dump` reads capture shmem the eager ack may
+have released (the GFX_TRACE `centerY` read is already skipped for this
+reason; the dump is not). The split widens that window from µs to ms.
+Drop its NV12 arguments or run it in the worker before the join.
+
+**Not gated on the transport.** The main thread is at ≤39 % occupancy
+and binds only near a 12.6 ms period (~79 fps); it is the next ceiling,
+not the current one, and is not a term in the worker accounting above.
+
+**Acceptance.** Period 22.6–26.6 ms measured on arm-w's geometry (quote
+the range, not its optimistic end); no black frames; wire audit 7/7;
+resident set unchanged at {capture N+2, children N+1, assembly N}.
+
+**Record:** `docs/experiments/70B-perf-trace-sink.md` (why the sink, why
+not eBPF, the full stage table), capture
+`PR-demo/mac_bisect_matrix/captures/i70b_armW_perftrace_m1_20260801/`,
+analyzer `PR-demo/mac_bisect_matrix/i70b_stage_split.py`, commits
+`9036721d`/`c7564e8b`/`5053d2b5`. Sink shipped in
+`common/perf_trace.{c,h}` (disarmed by default); the split itself is NOT
+built.
