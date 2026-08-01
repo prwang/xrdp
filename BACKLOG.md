@@ -512,11 +512,27 @@ existing analyses read. CLAUDE.md rule 5 now requires the ring for
 anything at frame rate.
 
 Verified on a 60 s run of the fixed build: **zero** `GFX_TRACE` lines in
-the pod's `xrdp.log`, records present in the ring. **No overhead figure
-is claimed** — see the record for why the obvious before/after would be
-an unsound comparison.
+the pod's `xrdp.log`, records present in the ring.
 
-**Record:** `docs/experiments/61h-the-logger-was-in-the-measurement.md`.
+**The replacement is now measured, not just argued (2026-08-01).** The
+armed ring costs a producer thread **~7 µs per frame** (p99 50 µs, worst
+frame observed 91 µs) for the twelve records the hot path writes — 0.02 %
+of a frame period, worst frame 0.37 % — plus 0.5–0.6 % of one core in
+total across both threads. Disarmed, which is what ships, a
+`PERF_TRACE6` costs ~30–45 ns. **Timing taken with the ring armed can be
+quoted as if the ring were not there.** Instrument:
+`tools/perf_trace_bench.c`, two arms, 20 s each, linking the shipped
+`common/perf_trace.c`.
+
+Open and small: 29 % of frames carry a minor page fault (first touch of
+the 393 KB ring and the sink's 1 MB stdio buffer), which is inside the
+worst case above. A `memset` of both at `perf_trace_open()` would move
+it off the producer thread. Not applied — it is shipped-code change and
+a third arm.
+
+**Records:** `docs/experiments/61h-the-logger-was-in-the-measurement.md`
+(the defect and what it voided), `docs/experiments/61h-what-the-ring-costs.md`
+(what the replacement costs).
 
 **Consequence, and it is large: every timing number measured with the
 trace armed is void.** Twenty-five capture directories and three

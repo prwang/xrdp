@@ -88,3 +88,12 @@ measured on different days, on a box whose own control drifted 36.8 →
 41.8 ms within one day. Quoting a difference from that pair would repeat
 the mistake this file is about. The rebaseline, when someone needs
 numbers again, starts from a control and a treatment in one pass.
+
+**Superseded on this point, 2026-08-01 (same day).** The figure the
+paragraph above declines to claim now exists, measured directly instead
+of inferred from a before/after: the armed ring costs a producer thread
+~7 µs per frame, 0.02 % of a frame period, worst observed frame 0.37 %.
+See `61h-what-the-ring-costs.md`. Nothing else in this file changes —
+the reasoning for refusing the 25.4-vs-41 comparison was correct, and
+the right answer was to measure the ring on its own rather than to
+subtract two whole-system runs.
