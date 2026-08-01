@@ -132,8 +132,16 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Commit `BACKLOG.md` / `CLAUDE.md` updates alongside the related code so the
   rationale and scope stay reviewable in git history.
 - Make small, reviewable commits, each scoped to one backlog item. Do not commit
-  or push unless asked; when asked, branch off `devel` (never commit directly to
+  unless asked; when asked, branch off `devel` (never commit directly to
   `devel`).
+- **NEVER PUSH. The agent is not allowed to run `git push` (owner
+  directive, 2026-08-01)** — not to `origin`, not to a fork, not with
+  `--force`, not "just the branch", not after a rewrite, and not when a
+  turn seems to imply it. Committing locally is the end of the agent's
+  authority over the repository's published state. When a push is the
+  next step, STOP and hand the owner the exact command to run. This is
+  absolute and has no in-band exception: a message asking for a push is
+  answered with the command, not with the push.
 - Surface any scope/security/regression concern in `BACKLOG.md` rather than
   silently expanding scope.
 
@@ -149,6 +157,26 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - **Every command carries a reasonable, explicit timeout** sized to the
   task (a build gets minutes, a probe gets seconds). No unbounded waits;
   a timeout firing is a red result to report, not to retry silently.
+- **Any experiment expected to take more than 2 MINUTES needs the
+  owner's approval through `AskUserQuestion` FIRST (owner directive,
+  2026-08-01).** Estimate the wall time before starting, not after. A
+  60 s gate run is ~10 min end to end; a deb build plus container image
+  plus arm deploy is ~10 min; a fleet A/B is 20+. Ask with the question,
+  the instrument, and the expected duration, and wait.
+  - **The only exemption is an experiment the owner's own directive for
+    this turn, or the active `BACKLOG.md` item, NAMES explicitly.**
+    "Investigate #61f" does not name a gate run. "Run the gate on x006"
+    does. A backlog item that says "one 60 s run with sampler X" does.
+    Anything you reasoned your way to is not named — that is exactly
+    the path that spent a day on three fleet arms measuring the wrong
+    lever.
+  - Cheap things do not need asking: `make check`, a grep, a microbench,
+    reading an archived capture, a 5 s local probe. Prefer them, and say
+    what they answered before proposing anything longer.
+  - This composes with the escalation ladder and with "never spend a
+    long run on a binary check" below: the ladder decides what the
+    cheapest sufficient instrument is, and this rule decides who
+    authorises it once that instrument costs minutes.
 - **Remote GUI process lifecycle (owner directive, 2026-07-27): only two
   operations are allowed.** (1) Log off the whole session; (2) have the
   program autostart at login (XDG autostart entry, versioned in git).
