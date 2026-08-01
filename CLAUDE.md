@@ -118,6 +118,17 @@ All durable rules and "memory" for this project live here, in-tree and committed
   Do not tidy a past result to agree with what is now believed; supersede it
   with a dated note saying what changed it. The retractions are the most
   useful part of the record.
+- **One exception, and only one: a result whose INSTRUMENT was on the
+  measured path is deleted, not superseded (owner directive,
+  2026-08-01).** A wrong conclusion drawn from sound data is worth
+  keeping — it teaches. A number produced by an experiment that was
+  measuring itself teaches nothing and will be re-quoted by the next
+  reader who skims. Delete the record and the captures; git history
+  keeps them. Say in the replacement record what was voided and why,
+  and reopen in `BACKLOG.md` every item that had closed on them —
+  reopening the conclusions is the part that is easy to skip and is the
+  whole point. Precedent: #61h voided 25 captures and 3 records and
+  reopened #61b/#61c/#61e/#70B.
 - Commit `BACKLOG.md` / `CLAUDE.md` updates alongside the related code so the
   rationale and scope stay reviewable in git history.
 - Make small, reviewable commits, each scoped to one backlog item. Do not commit

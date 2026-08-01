@@ -588,9 +588,12 @@ PY
     echo
 
     echo "=== E4 — poll-set size the worker actually armed ==="
-    if grep -aq "kids_armed\|set_size\|batched" "$OUT/xrdp.log"; then
+    # gfx_trace.txt, not xrdp.log: since #61h the per-frame records come
+    # from the perf ring, and only the ACK_TRACE ones are appended back
+    # into xrdp.log for the delivery-chain analyses
+    if grep -aq "kids_armed\|set_size\|batched" "$OUT/gfx_trace.txt"; then
         grep -ao "kids_armed=[0-9]*\|set_size=[0-9]*\|batched=[0-9]*" \
-            "$OUT/xrdp.log" | sort | uniq -c | sort -rn | head -5
+            "$OUT/gfx_trace.txt" | sort | uniq -c | sort -rn | head -5
     else
         echo "no set-size records in this window (step 7 logs them; with"
         echo "one monitor damaged per cycle the set is 2 children, not 4)"

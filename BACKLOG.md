@@ -59,7 +59,7 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
-## #61c — The producer is the ceiling, and it is the payload's own drawing (ANSWERED 2026-08-01; the lever is #61b)
+## #61c — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
 
 **Answered the day it was opened.** The session Xorg runs at **98.9 % of
 one core with NO client connected at all** — the payload alone saturates
@@ -83,7 +83,7 @@ host-owned, `sysctl -w` silently fails; `perf record` yields 0 bytes) —
 hence `/proc/<pid>/stat` deltas plus an offline bench. Same class of
 blocker as the seccomp `bpf()` denial in #70B.
 
-**Record:** `PR-demo/mac_bisect_matrix/captures/i61c_xorg_profile_20260801/README.md`.
+**Record:** `captures/i61c_xorg_profile_20260801 (DELETED by #61h, git history only)`.
 
 ## #71 (was #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
 
@@ -349,20 +349,26 @@ content, not the pipeline.
 
 ---
 
-## #61b — textflood wired into the fleet (DONE 2026-08-01)
+## #61b — textflood wired into the fleet (plumbing DONE; its NUMBERS reopened by #61h)
 
 `SESSION_KIND=textflood` now exists in `banner.sh` and the binary is
 built into the fleet image (builder stage in `Containerfile`). Arms
 **x003/x004** are the #70B A/B under it at 3840x2400.
 
-Session Xorg **96.4 % -> 25.3 %** of one core; FR-BENCH-1 **PASSES**
-(producer 65.07 fps vs pipeline 24.94 = 2.61x margin) — the check #62
-lacked. GLAMOR stays CLOSED-WONTFIX.
+**The measured figures below are VOID (#61h): they were taken with the
+per-frame trace on log.c, i.e. with ~12 unbuffered writes per frame
+inside the period being measured.** They are kept here only so nobody
+re-quotes them from memory — Session Xorg 96.4 % -> 25.3 % of one core,
+FR-BENCH-1 passing at producer 65.07 fps vs pipeline 24.94 (2.61x). Both
+the producer's rate and the pipeline's have to be measured again on a
+ring-traced build before FR-BENCH-1 can be called passed.
+GLAMOR stays CLOSED-WONTFIX.
 
 **Every throughput number from here uses textflood.** A ratio measured
 under codeflood is a measurement of the X server (#61c).
 
-**Record:** `PR-demo/mac_bisect_matrix/captures/i61b_x004_ab_20260801/README.md`.
+**Record:** the capture was deleted by #61h's garbage collection; it is
+in git history only.
 
 ## #61d — Re-measure the codeflood-era ratios under textflood (TODO)
 
@@ -383,22 +389,24 @@ and that is a prediction this item can falsify.
 
 ## #61f — Cut the delivery loop's latency: the encoder is ack-clocked through a busy main thread (TODO)
 
-**Root-caused 2026-08-01 from the archived x005/x006 captures alone**
-(evidence: `docs/experiments/61e-period-attribution-and-the-tracer.md`
-addendum; instrument: `PR-demo/mac_bisect_matrix/i61f_delivery_chain.py`).
-The encoder worker's idle time (2.249 ms/cycle, 6.1 %, x006) is one
-loop at two amplitudes: **capture is not damage-clocked — it fires
-8.0 ms (IQR 2.8) after the eager slot ack of frame N−2, and the
-captured rect then waits 16.2 ms (p50) for the xrdp main thread to
-read it**, because that same thread spreads each frame's ~3.7 MB
-client-socket write over 17 ms at the client's drain pace. Steady
-state, that loop lands the frame 1.9 ms after the worker goes idle
-(the 25 % population); when the client stops draining for 50–150 ms,
-the transit spikes (p90 56 ms) and the stall echoes at two-frame
-spacing through the slotack(N−2) budget re-open (the 75 % tail).
-FR-CAPTURE-8's two slots buy no lookahead at m=1: the frontier reads
-`ack = N−2, shown = N−3` at 1524/1533 captures — permanently at cap,
-re-opened once per encoded frame.
+**The shape of the loop is established; every DURATION in it is void
+(#61h).** What survives is ordering, which a slow logger cannot
+distort: capture is not damage-clocked — it fires some time after the
+eager slot ack of frame N−2, the captured rect then waits for the xrdp
+main thread to read it, and that same thread is also writing the
+previous frame to the client. FR-CAPTURE-8's two slots buy no lookahead
+at m=1: the frontier reads `ack = N−2, shown = N−3` at 1524/1533
+captures — permanently at cap, re-opened once per encoded frame. When
+the client stops draining, the stall echoes at two-frame spacing
+through the slotack(N−2) budget re-open.
+
+The numbers that used to be here — 8.0 ms trigger, 16.2 ms transit,
+17 ms send window, 1.9 ms margin, 2.249 ms/cycle idle — were all
+measured with ~12 unbuffered log.c writes per frame inside them, and
+the send window in particular was the interval BETWEEN two of those
+writes. They have to be taken again on a ring-traced build before any
+of them means anything. Instrument:
+`PR-demo/mac_bisect_matrix/i61f_delivery_chain.py`.
 
 **Step 1 — cut the main thread's 16 ms xup service latency.** The
 frame exists 16 ms before the thread that must enqueue it reads the
@@ -415,17 +423,17 @@ The first attempt batched the ~2400 drdynvc PDUs of a frame into one
 buffered write. That is a network-egress optimisation: it does not
 appear anywhere in the dependency above, it carries wire-adjacent risk
 the item never scoped, and it measured worse at every shape tried
-(51.2 and 127.3 ms/frame against a 41–42 ms control). Reverted whole in
-`b588a954`; record in
-`docs/experiments/61f-the-cork-was-the-wrong-lever.md`. The finding is
-"wrong lever", not "slow lever" — a faster version of it would have
-been worse, because it would have shipped.
+(its own A/B numbers are void under #61h, and the record was deleted
+with them). Reverted whole in `b588a954`. The finding is "wrong lever",
+not "slow lever" — a faster version of it would have been worse,
+because it would have shipped, and no rate number could have told us
+that.
 
-**Blocked on #61h.** The 17 ms send window this item is measured against
-is bracketed by `GFX_TRACE`/`ACK_TRACE` lines, which are unbuffered
-log.c writes on the same thread. Move those to `common/perf_trace`
-first, or Step 1's acceptance test is partly a measurement of the
-logger.
+**#61h is DONE, so this is unblocked — but it must START by
+re-measuring.** The service latency this item exists to cut has never
+been measured with an instrument that was off the path. Take
+`msgin − cap_sent` on a ring-traced build first; the target for Step 1
+follows from that number, not from the void 16 ms.
 
 **Step 2 — capture depth, per monitor only** (PRD forbids a global
 pool). A third slot adds one frame of real lookahead and absorbs
@@ -448,8 +456,9 @@ The worker is no longer the only ceiling.
 
 **Step 1 is ANSWERED, and it rules the planned fix out.** One 60 s gate
 run on x006 with per-thread `/proc/<tid>/schedstat` sampling
-(2026-08-01, record in
-`docs/experiments/61f-the-cork-was-the-wrong-lever.md`): run-delay
+(2026-08-01; the capture and its record were garbage-collected by #61h
+and are in git history only — the finding is a RATIO of the client's own
+counters, which the server's logger does not touch): run-delay
 summed over every client thread is 0.326 s in 57.0 s — **0.5 % of the
 client's CPU time**, and no higher inside the ack holes (6.0 ms/s) than
 outside (5.4 ms/s). The client runs at ~0.65 cores throughout, on a
@@ -485,30 +494,68 @@ morning and 41.2–41.8 ms the same evening — same arm, same image, same
 payload, cause unestablished (host load 1.0 → 1.9). Quote a treatment
 only against a control from its own pass.
 
-## #61h — The main thread still writes unbuffered log lines on the per-frame hot path (TODO)
+## #61h — Per-frame trace off log.c and into the perf ring (DONE 2026-08-01)
 
-`ACK_TRACE msgin/submit/egress/ack` and `GFX_TRACE send/ack/dmg` are
-`LOG(LOG_LEVEL_INFO, …)` — log.c's unbuffered write under a global
-mutex — and there are ~12 of them per frame on the xrdp main thread,
-the same thread whose 16 ms service latency #61f exists to cut.
-`common/perf_trace` (FR-TRACE-1) was built in #61e for exactly this and
-is used only by the encoder worker.
+Every `GFX_TRACE` / `ACK_TRACE` record was a `LOG(LOG_LEVEL_INFO, …)` —
+global mutex, unbuffered `write()`, ~12 per frame, nine of them on the
+xrdp main thread. The instrument sat on the path it measured, and the
+"17 ms send window" the whole first #61f attempt was designed against is
+the interval between two of those log lines.
 
-Two consequences, and the second is why this blocks #61f Step 1:
+Fixed in `66a60311`: records go to `common/perf_trace` (payload widened
+2 → 6 ints so a GFX send fits in one event), the sink formats through
+one schema function, the file opens with a `# perfbase` line carrying
+both clocks, and a trace knob armed without `XRDP_PERF_TRACE` warns once
+and disarms instead of silently recording nothing.
+`perf_trace_lines.py` renders the ring back into the line shapes the
+existing analyses read. CLAUDE.md rule 5 now requires the ring for
+anything at frame rate.
 
-- the instrument is on the path it measures, so it is part of the cost;
-- the "17 ms egress send window" is the interval BETWEEN two of those
-  log lines, so an unquantified part of it is the logger rather than
-  the write, and any before/after on that window is unsound until this
-  is fixed.
+Verified on a 60 s run of the fixed build: **zero** `GFX_TRACE` lines in
+the pod's `xrdp.log`, records present in the ring. **No overhead figure
+is claimed** — see the record for why the obvious before/after would be
+an unsound comparison.
 
-**Scope.** Move the main thread's per-frame records onto the existing
-ring (source and sink already separated, #61e `2781220a`); leave the
-low-rate lines (session lifecycle, errors) on log.c. No new tracer, no
-new file format. Acceptance: with tracing armed, the main thread emits
-zero log.c writes per frame, and the x006 arm's mean ms/frame with
-tracing armed vs disarmed differs by less than the same-build run
-noise.
+**Record:** `docs/experiments/61h-the-logger-was-in-the-measurement.md`.
+
+**Consequence, and it is large: every timing number measured with the
+trace armed is void.** Twenty-five capture directories and three
+experiment records were deleted from the tree (they remain in git
+history). The items that had closed on them are reopened below.
+
+## #61e — REOPENED 2026-08-01: close the period, and settle `capture ‖ encode` at m=1
+
+Previously marked DONE with a period closing to 0.007 ms unattributed, a
+worker idling 2.249 ms/cycle (35 % of cycles stalled), and PRD's
+`capture ‖ encode` row declared falsified with the emit split on.
+
+**All of that is void (#61h).** Those runs carried ~12 unbuffered log.c
+writes per frame, nine on the xrdp main thread, inside the period being
+attributed — and the stage brackets were being differenced against a
+period the logger inflated. The tracer-transparency argument that
+covered this is void for the same reason: its controls (armed vs
+disarmed ring, new vs old build) had the log.c lines in BOTH arms, so it
+could not see them.
+
+**What is still standing** is one ordering fact, which a slow instrument
+cannot distort: capture is ack-clocked, not damage-clocked — the
+xorgxrdp frontier reads `ack = N−2, shown = N−3` at essentially every
+capture, so FR-CAPTURE-8's two slots buy no lookahead at m=1.
+
+**To redo, on a ring-traced build:** the period attribution and the
+`capture ‖ encode` verdict, control and treatment in ONE pass. Do not
+compare anything to a pre-#61h number.
+
+## #70B — REOPENED 2026-08-01: does the emit split buy anything?
+
+Previously marked DONE at 1.12x under textflood (and 0.96x under
+codeflood, already void as producer-bound). **The 1.12x is void (#61h)**
+— measured on x001–x004, all with the per-frame trace on log.c.
+
+The code ships and stays default-off; its prerequisite refactor fixed a
+real use-after-free and that is unaffected. What has to be measured
+again is whether splitting the emit off the worker moves the rate at
+all, and by how much. PRD FR-ACK-2 still names it as #70's completion.
 
 ## #74 — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
 
@@ -560,7 +607,6 @@ retractions are in the linked file; the code is in git.
 
 | item | outcome | record |
 |---|---|---|
-| **#61e** close the period to ≤0.5 ms unknown; settle `capture ‖ encode` at m=1 | DONE. Period closes to **0.007 ms**. PRD's row is **wrong with the emit split on** — the worker stalls 35 % of cycles on a capture path that is one frame deep (→ #61f). The v1 tracer was itself a 3.3× regression; fixed by FR-TRACE-1, its cost bounded below the ~1 ms same-build run noise by an untraced twin (36.8 vs 37.1 ms) and same-day old-build controls (40.4/41.3 vs 41.0/41.1). | [`61e-period-attribution-and-the-tracer.md`](docs/experiments/61e-period-attribution-and-the-tracer.md) |
 | **#45** intra refresh, one-thread `pump_set`, per-monitor capture budget | DONE. E5 resolved by #52 at 2.13×. | [`45-intra-refresh-and-pump-set.md`](docs/experiments/45-intra-refresh-and-pump-set.md) |
 | **#52** E5-2 saturated-payload frame interval | DONE. 2.13× GREEN; retired the 51.1 ms cadence baseline as a reading of a 10 Hz metronome. | [`52-e5-2-saturated-payload.md`](docs/experiments/52-e5-2-saturated-payload.md) |
 | **#55** E5-2 on the T4 | DONE. 1.5×–2.3× AMBER, attributed to a saturated Xorg. T4 now decommissioned. | [`55-e5-2-on-the-t4.md`](docs/experiments/55-e5-2-on-the-t4.md) |
@@ -569,4 +615,3 @@ retractions are in the linked file; the code is in git.
 | **#62** textflood payload | DONE. 1.41× RED, then annotated producer-confounded. | [`62-textflood-payload.md`](docs/experiments/62-textflood-payload.md) |
 | **#64** rect_id ack "ghost" | CLOSED. Root cause REFUTED — the ack is an echo and never drifted. Machinery survived into #70. | [`64-rect-id-ack-ghost.md`](docs/experiments/64-rect-id-ack-ghost.md) |
 | **#70** eager slot-release ack | DONE, shipped default-off. 1.11×, encode‖tail 4.8 → 8.5 ms. Step 0 answered NO. Incomplete without #70B per PRD FR-ACK-2. | [`70-eager-slot-release-ack.md`](docs/experiments/70-eager-slot-release-ack.md) |
-| **#70B** emit split | Built 2026-08-01. 0.96x under codeflood (producer-bound, void as a throughput number) then **1.12x under textflood at 3840x2400**. Shipped default-off; its prerequisite refactor fixed a real use-after-free. | [`70B-perf-trace-sink.md`](docs/experiments/70B-perf-trace-sink.md), [codeflood](PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md), [textflood](PR-demo/mac_bisect_matrix/captures/i61b_x004_ab_20260801/README.md) |

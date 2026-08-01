@@ -1,5 +1,0 @@
-=== E7 — per-monitor progress during the boundary sweep ===
-surface 0    sends 586    span   64.7 s  worst gap   497.0 ms  mean  110.7 ms
-surface 1    sends 827    span   64.9 s  worst gap  4753.0 ms  mean   78.6 ms
-
-RED: surface 1 stalled 4753 ms (> 2000 ms) while the other monitor kept sending — the 251bc4d shape
