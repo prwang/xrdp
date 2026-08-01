@@ -1863,6 +1863,40 @@ everything: `emit(N)` (5.96 ms) hides completely inside
 `subm(N+1) + pump(N+1)` (14.5 ms). A bounded depth-1 handoff expresses
 the join and needs no ack change at all.
 
-Prerequisite for both: settle whether the main thread's 12.6 ms is the
-server's send cost or client backpressure. A 1.4x worker-side win is
-not realisable if the transport is already the constraint.
+### The main thread's 12.6 ms — where it sits in the accounting
+
+**It is NOT a term in the worker accounting.** The stage table above
+sums to 32.56 ms against a 32.56 ms cycle with the main thread's 12.6 ms
+nowhere in it: the two run on different threads, concurrently. The
+worker's cycle is the period; the main thread's send fits inside it.
+
+**Nor is it orthogonal — it is the NEXT ceiling, not the current one.**
+Occupancy per frame, against a 32.5 ms period:
+
+| | busy | occupancy |
+|---|---|---|
+| encoder worker | 28.5 ms | **88 %** |
+| main thread (send) | ≤ 12.6 ms | ≤ 39 % |
+
+12.6 ms is an upper bound on main-thread occupancy — it is the span from
+the frame's first PDU to its last, so any interleaved event-loop work is
+counted against it, not excluded. The main thread therefore has **at
+least 61 % slack**, and binds only when the period falls to ~12.6 ms
+(~79 fps).
+
+Projected: move `emit` off the worker → chain ~22.5 ms → period ~22.5 ms
+(~44 fps), main occupancy rises to ~56 %, still not binding. Only after
+`pump`'s 10.78 ms is also attacked (FR-PROC-7, #40) does the chain
+approach 12.6 ms and the transport become the constraint.
+
+**Correction to this item as first written (2026-08-01).** It said the
+emit split was a prerequisite on settling the server-vs-client question,
+"a 1.4x worker-side win is not realisable if the transport is already
+the constraint". That was wrong, and the occupancy arithmetic above is
+why: the transport is at ≤39 %, not saturated, so a shorter worker chain
+does not merely relocate a queue. **The emit split is not gated on it.**
+
+What the server-vs-client distinction actually changes is the FIX once
+12.6 ms does bind — fewer bytes (bitrate/codec) or a faster transport if
+it is server cost, versus a client-side problem xrdp cannot fix — and
+not WHEN it binds, which is set by the 12.6 ms either way.
