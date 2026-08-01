@@ -16,5 +16,6 @@ Suite *make_suite_avc444_ltr(void);
 Suite *make_suite_avc444_nut(void);
 Suite *make_suite_avc444_ffmpeg(void);
 Suite *make_suite_avc444_multimon(void);
+Suite *make_suite_avc444_emit_split(void);
 
 #endif /* TEST_XRDP_H */

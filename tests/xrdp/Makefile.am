@@ -68,6 +68,7 @@ test_xrdp_SOURCES = \
     test_avc444_nut.c \
     test_avc444_ffmpeg.c \
     test_avc444_multimon.c \
+    test_avc444_emit_split.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \

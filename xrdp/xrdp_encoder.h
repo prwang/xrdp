@@ -51,6 +51,63 @@ xrdp_gfx_ack_window_open(int frame_id_client, int frame_id_server,
 
 struct xrdp_enc_data;
 
+/**
+ * BACKLOG #70B / PRD FR-ACK-2 -- one cycle's set, handed from the
+ * encoder worker to the assembler thread.
+ *
+ * DEPTH ONE, deliberately. A deeper queue would put more than one frame
+ * in assembly, which (a) breaks the resident-frame bound the two-slot
+ * capture budget is sized for, and (b) would let the worker's CONSUMED
+ * ack for frame N+1 overtake the assembler's terminal ack for frame N
+ * on fifo_processed. Depth 1 is what makes both free.
+ */
+struct xrdp_encoder_emit_slot
+{
+    struct xrdp_enc_data *set[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int set_mon[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int set_n;
+};
+
+/**
+ * Copy one cycle's set into the handoff slot.
+ *
+ * Pure, and separated from the dispatch so the bound can be tested: a
+ * set larger than the slot must be REFUSED, never truncated into a
+ * partial frame whose remaining items would never be acked.
+ *
+ * @param slot    destination (cleared on any refusal)
+ * @param set     items, in fifo order
+ * @param set_mon per-item monitor index, -1 for "not the batchable shape"
+ * @param set_n   number of items
+ * @return set_n on success, 0 if the arguments are unusable
+ */
+int
+gfx_emit_slot_fill(struct xrdp_encoder_emit_slot *slot,
+                   struct xrdp_enc_data **set, const int *set_mon,
+                   int set_n);
+
+/**
+ * May the emit pass encode this item synchronously, on its own?
+ *
+ * On the batch path a monitor whose pair the submit/pump/collect cycle
+ * did not arm (have == 0) is re-encoded inline by the emit pass, which
+ * means calling gfx_avc444_handle_for() and driving an ffmpeg child.
+ * With the assembly on its own thread that would be a second thread
+ * touching a child the worker owns, so it is REFUSED and the frame
+ * ships nothing (it is acked displayed=0 and the producer takes its
+ * region back). The frames this drops are frames whose submit already
+ * failed; the next frame for that monitor re-arms it.
+ *
+ * @param split_on   emit runs on the assembler thread
+ * @param batch_have per-monitor arm state: -1 failed, 0 unarmed, 1 ready
+ * @return != 0 if the caller may encode inline
+ */
+static inline int
+gfx_emit_may_encode_inline(int split_on, int batch_have)
+{
+    return !(split_on && batch_have == 0);
+}
+
 typedef void *(*xrdp_encoder_h264_create_proc)(void);
 typedef int (*xrdp_encoder_h264_delete_proc)(void *handle);
 typedef int (*xrdp_encoder_h264_encode_proc)(
@@ -141,10 +198,22 @@ struct xrdp_encoder
      * before", 1 for "pair[] holds this monitor's pair" and -1 for "this
      * monitor's pair failed in this cycle, ship nothing". Written and
      * read by the encoder thread only, and cleared at both ends of a
-     * cycle so nothing can survive into the next one. */
+     * cycle so nothing can survive into the next one.
+     *
+     * BACKLOG #70B: with the emit split these are read by the ASSEMBLER
+     * while the worker runs the next cycle, so the worker writes them
+     * only AFTER the join (gfx_emit_join). The submit pass therefore
+     * records its results in locals and publishes them post-join --
+     * that ordering is load-bearing, not incidental. */
     int avc444_batch_have[16];
     unsigned long long avc444_batch_seq[16];
     struct xrdp_avc444_encoded_pair avc444_batch_pair[16];
+    /* #70B: the coded geometry the emit pass used to read straight off
+     * the child (xrdp_ffmpeg_avc444_coded_width/height). Snapshotted by
+     * the worker at collect so the assembler never dereferences a
+     * handle -- see avc444_teardown_req below for why that matters. */
+    int avc444_batch_cw[16];
+    int avc444_batch_ch[16];
     /* E4 counters: E4 must be assertable from a deployed log, never
      * inferred from a wall-clock improvement */
     unsigned long long avc444_batch_cycles;
@@ -154,6 +223,17 @@ struct xrdp_encoder
     void *avc444_ffmpeg_handle[16];  /* struct xrdp_ffmpeg_avc444 * */
     int avc444_actual_w[16];         /* per-surface visible dims for  */
     int avc444_actual_h[16];         /* resize detection (FR-RESIZE)  */
+    /* BACKLOG #70B: the emit pass USED to tear the child down itself
+     * (the post-ship aux_ltr_chain re-key), but submit(N+1) reads and
+     * creates through this same array and the join sits after submit --
+     * that race is a use-after-free. The worker now observes
+     * xrdp_ffmpeg_avc444_rekey_pending() right after collect, where it
+     * already holds the handle, and applies the teardown at the TOP of
+     * the next cycle, before submit. Cost: the re-key is deferred by
+     * one frame out of the 504 of margin between
+     * XRDP_H264_LTR_FRAME_NUM_REKEY (2^16-512) and the 2^16-8 hard
+     * stop. Worker-only. */
+    int avc444_teardown_req[16];
     /* tail-flush (OPT-IN last resort, gfx.toml tail_flush; default off): a deep
      * encoder pipeline (e.g. -async_depth > 1) withholds the last frame of an
      * idle-bounded burst until the next input. The root-cause fix is a shallow
@@ -174,6 +254,24 @@ struct xrdp_encoder
      * ahead of it. */
     int frame_id_region_sent;
     int eager_slot_ack;  /* gfx.toml eager_slot_ack, batch path only */
+    /* BACKLOG #70B / PRD FR-ACK-2: the EGFX assembly pass on its own
+     * permanent thread. emit_thread is the armed knob (batch path
+     * only); the rest is the depth-1 handoff. emit_outstanding is
+     * WORKER-ONLY -- it is what makes gfx_emit_join() idempotent, so
+     * every path out of a cycle can join without counting. */
+    int emit_thread;
+    int emit_outstanding;
+    int emit_quit;
+    tbus emit_req_sem;   /* worker -> assembler: a set is in the slot */
+    tbus emit_idle_sem;  /* assembler -> worker: the slot is free     */
+    tbus emit_gone_sem;  /* assembler -> worker: the thread has left  */
+    struct xrdp_encoder_emit_slot emit_slot;
+    /* frames the split refused to assemble because their monitor was
+     * not armed this cycle (see gfx_emit_may_encode_inline). Counted
+     * and logged once, because "this never happens" must be assertable
+     * from a deployed log rather than assumed. */
+    unsigned long long emit_unarmed_drops;
+    int emit_unarmed_logged;
     int frames_in_flight;
     int gfx;
     int gfx_ack_off;
@@ -187,6 +285,29 @@ struct xrdp_encoder
     xrdp_encoder_h264_delete_proc xrdp_encoder_h264_delete;
     xrdp_encoder_h264_encode_proc xrdp_encoder_h264_encode;
 };
+
+/**
+ * Publish one cycle's per-monitor arm state to the emit pass.
+ *
+ * Called ONLY after gfx_emit_join(): everything it writes is read by
+ * the assembler thread, and the submit pass that produced its inputs
+ * ran BEFORE the join, which is why those results are carried in the
+ * caller's locals rather than written where they were computed.
+ *
+ * Not static so the tri-state can be pinned: sub_state distinguishes
+ * "armed" from "never touched" because seq 0 is a real sequence number
+ * -- the first submit of a session -- and a truthiness test on the seq
+ * would silently un-arm that frame.
+ *
+ * @param self
+ * @param sub_seq   per-monitor sequence handed out by the submit pass
+ * @param sub_state per-monitor: 1 armed, 0 untouched, -1 submit failed
+ * @param sub_reset per-monitor: the child was torn down this cycle
+ */
+void
+gfx_batch_publish(struct xrdp_encoder *self,
+                  const unsigned long long *sub_seq, const int *sub_state,
+                  const int *sub_reset);
 
 /* cmd_id = 0 */
 struct xrdp_enc_surface_command

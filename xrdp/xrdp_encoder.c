@@ -110,6 +110,10 @@ process_enc_h264(struct xrdp_encoder *self, XRDP_ENC_DATA *enc);
 #endif
 static int
 process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc);
+/* BACKLOG #70B: the EGFX assembly thread, created alongside
+ * proc_enc_msg and joined by it at teardown */
+static THREAD_RV THREAD_CC
+proc_emit_msg(void *arg);
 
 /*****************************************************************************/
 /* Item destructor for self->fifo_to_proc */
@@ -473,8 +477,34 @@ xrdp_encoder_create(struct xrdp_mm *mm)
 
     set_h264_encoder_methods(self);
 
+    /* BACKLOG #70B: the assembler. Armed only for the batch path, which
+     * is the only one whose emit pass reads a pre-collected pair; every
+     * other path still assembles inline on the worker. */
+    self->emit_thread = mm->avc444_emit_thread &&
+                        self->avc444_ffmpeg && self->avc444_aux_ltr_chain;
+    if (self->emit_thread)
+    {
+        self->emit_req_sem = tc_sem_create(0);
+        self->emit_idle_sem = tc_sem_create(0);
+        self->emit_gone_sem = tc_sem_create(0);
+        if (self->emit_req_sem == 0 || self->emit_idle_sem == 0 ||
+                self->emit_gone_sem == 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_encoder_create: emit_thread could "
+                "not create its semaphores; assembling inline");
+            self->emit_thread = 0;
+        }
+    }
+
     /* create thread to process messages */
     tc_thread_create(proc_enc_msg, self);
+    if (self->emit_thread)
+    {
+        LOG(LOG_LEVEL_INFO, "xrdp_encoder_create: gfx.toml emit_thread is "
+            "ON (BACKLOG #70B): EGFX assembly runs on its own thread, "
+            "joined after submit and before collect");
+        tc_thread_create(proc_emit_msg, self);
+    }
 
     return self;
 }
@@ -542,6 +572,21 @@ xrdp_encoder_delete(struct xrdp_encoder *self)
                                       self->avc444_ffmpeg_handle[index]);
             self->avc444_ffmpeg_handle[index] = NULL;
         }
+    }
+
+    /* #70B: the worker joined the assembler before setting term_done,
+     * so by here the thread is gone and its semaphores are unreferenced */
+    if (self->emit_req_sem != 0)
+    {
+        tc_sem_delete(self->emit_req_sem);
+    }
+    if (self->emit_idle_sem != 0)
+    {
+        tc_sem_delete(self->emit_idle_sem);
+    }
+    if (self->emit_gone_sem != 0)
+    {
+        tc_sem_delete(self->emit_gone_sem);
     }
 
     /* destroy wait objects used for signalling */
@@ -1933,6 +1978,11 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     int need;
     int shmem_offset;
     unsigned long long seq;
+    /* #70B: the coded geometry, read from the child only on the inline
+     * path. On the batch path it is the worker's snapshot, because the
+     * assembler must not dereference a handle. */
+    int coded_w;
+    int coded_h;
 
     if (!s_check_rem(in_s, 11))
     {
@@ -2073,14 +2123,47 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         return NULL;
     }
 
-    /* lazily (re)create the per-surface ffmpeg child (see
-     * gfx_avc444_handle_for); already done for this cycle when the
-     * batching submit pass armed this monitor */
-    ff = gfx_avc444_handle_for(self, mon_index, twidth, theight);
-    if (ff == NULL)
+    /* #70B: with the assembly on its own thread, an UNARMED monitor may
+     * not be encoded inline here -- that would mean a second thread
+     * creating and driving an ffmpeg child the worker owns. Ship
+     * nothing; the frame is still acked (displayed=0) and its region
+     * returns to the producer, exactly as a failed pair does. */
+    if (!gfx_emit_may_encode_inline(self->emit_thread,
+                                    self->avc444_batch_have[mon_index]))
     {
+        self->emit_unarmed_drops++;
+        if (!self->emit_unarmed_logged)
+        {
+            self->emit_unarmed_logged = 1;
+            LOG(LOG_LEVEL_WARNING, "gfx_wiretosurface1_avc444: monitor %d "
+                "was not armed by the submit pass and the emit split "
+                "forbids encoding it inline; shipping nothing for this "
+                "frame (first occurrence)", mon_index);
+        }
         g_free(d_rects);
         return NULL;
+    }
+
+    if (self->avc444_batch_have[mon_index] > 0)
+    {
+        /* the child is the worker's; everything this pass needs from it
+         * was snapshotted at collect */
+        ff = NULL;
+        coded_w = self->avc444_batch_cw[mon_index];
+        coded_h = self->avc444_batch_ch[mon_index];
+    }
+    else
+    {
+        /* lazily (re)create the per-surface ffmpeg child (see
+         * gfx_avc444_handle_for). Only reachable with the split off. */
+        ff = gfx_avc444_handle_for(self, mon_index, twidth, theight);
+        if (ff == NULL)
+        {
+            g_free(d_rects);
+            return NULL;
+        }
+        coded_w = xrdp_ffmpeg_avc444_coded_width(ff);
+        coded_h = xrdp_ffmpeg_avc444_coded_height(ff);
     }
 
     /* the capture shmem already holds the packed wire views
@@ -2115,9 +2198,8 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
          * pen, so the read is skipped rather than reported as this
          * frame's colour -- a diagnostic must not print a value it
          * cannot stand behind. */
-        int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
-        int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
-                     + t_cw / 2;
+        int t_cw = coded_w;
+        int cy_off = (coded_h / 2) * t_cw + t_cw / 2;
         int center_y = -1;
         if (!(self->eager_slot_ack && self->avc444_batch_have[mon_index] > 0))
         {
@@ -2129,13 +2211,18 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             enc_rv == XRDP_FFMPEG_PAIR_READY
             ? (long long)pair.desktop_sequence : -1LL,
             enc_rv == XRDP_FFMPEG_PAIR_READY ? "READY" : "PENDING",
-            xrdp_ffmpeg_avc444_inflight(ff),
+            ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
             center_y);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
-        xrdp_ffmpeg_avc444_delete(ff);
-        self->avc444_ffmpeg_handle[mon_index] = NULL;
+        /* only reachable from the inline encode above, which is the
+         * only branch that owns a handle here */
+        if (ff != NULL)
+        {
+            xrdp_ffmpeg_avc444_delete(ff);
+            self->avc444_ffmpeg_handle[mon_index] = NULL;
+        }
         g_free(d_rects);
         return NULL;
     }
@@ -2145,10 +2232,20 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         return NULL;
     }
 
+    /* #70B: the NV12 views point into capture shmem that the eager ack
+     * may already have released, and the split widens that window from
+     * microseconds to milliseconds. A dump that silently records the
+     * NEXT frame's pixels under this frame's sequence number is worse
+     * than no dump, so on the batch path the bitstream is dumped and
+     * the pixel views are not. (The GFX_TRACE centerY read above is
+     * skipped for the same reason.) */
     avc444_debug_dump(pair.desktop_sequence, twidth, theight,
-                      xrdp_ffmpeg_avc444_coded_width(ff),
-                      xrdp_ffmpeg_avc444_coded_height(ff),
-                      d_rects, num_rects_d, &pair, main_view, aux_view,
+                      coded_w, coded_h,
+                      d_rects, num_rects_d, &pair,
+                      self->avc444_batch_have[mon_index] > 0
+                      ? NULL : main_view,
+                      self->avc444_batch_have[mon_index] > 0
+                      ? NULL : aux_view,
                       nv12_bytes);
 
     need = 4 + pair.main_len + pair.aux_len + num_rects_d * 24 + 512;
@@ -2257,13 +2354,19 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             return NULL;
         }
     }
-    if (xrdp_ffmpeg_avc444_rekey_pending(ff))
+    if (ff != NULL && xrdp_ffmpeg_avc444_rekey_pending(ff))
     {
         /* aux_ltr_chain: the shared frame_num counter is near its
          * wrap. The current pair HAS shipped (its damage is on the
          * wire above); tearing the encoder down now makes the next
          * damaged frame recreate it -> fresh IDR, counter reset --
-         * no frame is ever dropped for the re-key. */
+         * no frame is ever dropped for the re-key.
+         *
+         * #70B: reachable only on the INLINE path now. On the batch
+         * path the worker observes rekey_pending at collect and applies
+         * the teardown at the top of the next cycle, because this
+         * function may be running on the assembler thread and
+         * submit(N+1) reads the same handle array. */
         LOG(LOG_LEVEL_INFO, "gfx_wiretosurface1_avc444: aux_ltr_chain "
             "re-key: recreating the encoder pair after this frame");
         xrdp_ffmpeg_avc444_delete(ff);
@@ -2289,6 +2392,18 @@ gfx_batch_collect_one(struct xrdp_encoder *self,
             == XRDP_FFMPEG_PAIR_READY)
     {
         self->avc444_batch_have[mon] = 1;
+        /* #70B: everything the emit pass would otherwise have read off
+         * this child, taken HERE where the worker holds the handle. */
+        self->avc444_batch_cw[mon] = xrdp_ffmpeg_avc444_coded_width(ff);
+        self->avc444_batch_ch[mon] = xrdp_ffmpeg_avc444_coded_height(ff);
+        if (xrdp_ffmpeg_avc444_rekey_pending(ff))
+        {
+            /* the pair just collected still ships this cycle; the child
+             * is torn down at the top of the NEXT cycle, before submit,
+             * so no thread can be inside it. Defers the re-key by one
+             * frame out of 504 of margin. */
+            self->avc444_teardown_req[mon] = 1;
+        }
         return;
     }
     LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: monitor %d pair seq %llu could "
@@ -2362,6 +2477,65 @@ gfx_batch_release_slots(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
  * pairwise distinct -- which is what makes the emit pass's per-item
  * teardowns (an ERROR path, or the post-ship aux_ltr_chain re-key) unable
  * to touch a sibling monitor's already-collected pair. */
+/*****************************************************************************/
+/* BACKLOG #70B / PRD FR-ACK-2 -- wait for the assembler to finish the
+ * PREVIOUS cycle's set.
+ *
+ * IDEMPOTENT, and that is the point: every exit from a cycle owes this
+ * join, and there are several, so making it counted would mean auditing
+ * them all. emit_outstanding is written only by the worker (dispatch
+ * sets it, this clears it), so no lock is needed to read it.
+ *
+ * With the split off this is a no-op -- the emit pass ran inline on this
+ * thread and there is nothing outstanding. */
+static void
+gfx_emit_join(struct xrdp_encoder *self)
+{
+    if (!self->emit_outstanding)
+    {
+        return;
+    }
+    PERF_TRACE("join_beg", self->emit_slot.set_n, 0);
+    tc_sem_dec(self->emit_idle_sem);
+    self->emit_outstanding = 0;
+    PERF_TRACE("join_end", 0, 0);
+}
+
+/*****************************************************************************/
+/* #70B (e) -- publish this cycle's per-monitor state to the emit pass.
+ *
+ * Runs ONLY after gfx_emit_join(). Everything here is read by the
+ * assembler thread, and the submit pass that produced it ran before the
+ * join, so it is accumulated in the caller's locals and applied here.
+ * Getting this wrong is not a crash but a silent one-cycle-late arm
+ * state, so the ordering is asserted by the caller's structure rather
+ * than by a comment alone. */
+void
+gfx_batch_publish(struct xrdp_encoder *self,
+                  const unsigned long long *sub_seq, const int *sub_state,
+                  const int *sub_reset)
+{
+    int index;
+
+    for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; index++)
+    {
+        /* the emit pass must never see arm state from an earlier cycle */
+        self->avc444_batch_have[index] = (sub_state[index] < 0) ? -1 : 0;
+        if (sub_state[index] > 0)
+        {
+            self->avc444_batch_seq[index] = sub_seq[index];
+        }
+        if (sub_reset[index])
+        {
+            /* the child was torn down for the re-key at the top of this
+             * cycle; the next frame for this monitor rebuilds the
+             * client's decoder (BACKLOG #48) */
+            self->avc444_surface_reset_pending[index] = 1;
+        }
+    }
+}
+
+/*****************************************************************************/
 static void
 gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                   const int *set_mon, int set_n)
@@ -2371,6 +2545,14 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     struct gfx_avc444_submit_info info;
     struct xrdp_ffmpeg_avc444 *ff;
     unsigned long long seq;
+    /* #70B: state the EMIT pass reads is not written until after the
+     * join in (d). The teardown pass and the submit pass therefore
+     * accumulate here and are published in (e). */
+    unsigned long long sub_seq[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    /* tri-state, so that seq 0 -- the first submit of a session -- is
+     * not mistaken for "this monitor was never armed" */
+    int sub_state[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    int sub_reset[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
     int n_handles;
     int bad_handle;
     int kids_armed;
@@ -2378,10 +2560,31 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     int mon;
     int st;
 
-    /* the emit pass must never see state from an earlier cycle */
+    g_memset(sub_seq, 0, sizeof(sub_seq));
+    g_memset(sub_state, 0, sizeof(sub_state));
+    g_memset(sub_reset, 0, sizeof(sub_reset));
+    /* #70B (a): apply the child teardowns the PREVIOUS cycle's collect
+     * asked for. This point -- before submit, after the previous emit
+     * has been joined at the end of that cycle -- is the only one where
+     * no thread can be inside the child. */
     for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; index++)
     {
-        self->avc444_batch_have[index] = 0;
+        if (!self->avc444_teardown_req[index])
+        {
+            continue;
+        }
+        self->avc444_teardown_req[index] = 0;
+        if (self->avc444_ffmpeg_handle[index] != NULL)
+        {
+            LOG(LOG_LEVEL_INFO, "gfx_batch_run_set: aux_ltr_chain re-key: "
+                "recreating monitor %d's encoder pair", index);
+            xrdp_ffmpeg_avc444_delete((struct xrdp_ffmpeg_avc444 *)
+                                      self->avc444_ffmpeg_handle[index]);
+            self->avc444_ffmpeg_handle[index] = NULL;
+        }
+        /* deferred to (e): the emit pass reads this, and the assembler
+         * may still be inside the previous frame here */
+        sub_reset[index] = 1;
     }
     n_handles = 0;
     kids_armed = 0;
@@ -2421,10 +2624,11 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                 (unsigned long long)seq);
             xrdp_ffmpeg_avc444_delete(ff);
             self->avc444_ffmpeg_handle[mon] = NULL;
-            self->avc444_batch_have[mon] = -1;
+            sub_state[mon] = -1;
             continue;
         }
-        self->avc444_batch_seq[mon] = seq;
+        sub_seq[mon] = seq;
+        sub_state[mon] = 1;
         if (xrdp_ack_trace_on())
         {
             LOG(LOG_LEVEL_INFO, "ACK_TRACE submit id=%d mon=%d us=%lld",
@@ -2439,13 +2643,34 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     PERF_TRACE("subm_end", n_handles, 0);
     if (n_handles < 1)
     {
-        return; /* nothing armed; every item takes the unchanged path */
+        /* nothing armed; every item takes the unchanged path. The join
+         * is still owed -- the emit pass runs on the way out of this
+         * cycle either way. */
+        gfx_emit_join(self);
+        gfx_batch_publish(self, sub_seq, sub_state, sub_reset);
+        return;
     }
     /* ONE pump over the whole set (D2/D10) */
     PERF_TRACE("pump_beg", n_handles, 0);
     st = xrdp_ffmpeg_avc444_pump_pairs(handles, n_handles, &bad_handle,
                                        &kids_armed);
     PERF_TRACE("pump_end", n_handles, kids_armed);
+    /* #70B (d) -- THE JOIN. PRD FR-ACK-2: after submit(N+1) and pump(N+1),
+     * before collect(N+1). Its POSITION is the specification:
+     *
+     *   later  -- collect_pair grow()s and rewrites the handle's
+     *             main_buf/aux_buf in place, which the assembler is
+     *             still reading through pair.main_data; grow() reallocs,
+     *             so this is a use-after-free, not merely torn bytes.
+     *   earlier - the children sit idle for the whole of emit, which is
+     *             the starvation the split exists to remove.
+     *
+     * It is also what keeps the enc_done order safe now that
+     * fifo_processed has two producers: gfx_batch_release_slots below
+     * emits the #70 CONSUMED ack for THIS frame, and it must not
+     * overtake the assembler's terminal ack for the previous one. */
+    gfx_emit_join(self);
+    gfx_batch_publish(self, sub_seq, sub_state, sub_reset);
     self->avc444_batch_cycles++;
     self->avc444_batch_items += n_handles;
     if (kids_armed > self->avc444_batch_max_kids)
@@ -3307,6 +3532,126 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
  * once. Bounded and one-shot per idle burst, so idle never becomes a fixed-fps
  * duplicate stream. */
 
+/*****************************************************************************/
+/* BACKLOG #70B -- see xrdp_encoder.h. Refuses rather than truncates: a
+ * partially copied set would leave items with no owner and no ack. */
+int
+gfx_emit_slot_fill(struct xrdp_encoder_emit_slot *slot,
+                   struct xrdp_enc_data **set, const int *set_mon,
+                   int set_n)
+{
+    int index;
+
+    if (slot == NULL)
+    {
+        return 0;
+    }
+    slot->set_n = 0;
+    if (set == NULL || set_mon == NULL || set_n < 1 ||
+            set_n > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+    {
+        return 0;
+    }
+    for (index = 0; index < set_n; index++)
+    {
+        if (set[index] == NULL)
+        {
+            slot->set_n = 0;
+            return 0;
+        }
+        slot->set[index] = set[index];
+        slot->set_mon[index] = set_mon[index];
+    }
+    slot->set_n = set_n;
+    return set_n;
+}
+
+/*****************************************************************************/
+/* #70B -- hand one cycle's set to the assembler. The caller must have
+ * joined the previous set first (gfx_emit_join), which is what makes
+ * the depth-1 slot safe to overwrite here. Returns 0 if the set could
+ * not be handed over, in which case the caller emits it inline. */
+static int
+gfx_emit_dispatch(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
+                  const int *set_mon, int set_n)
+{
+    if (gfx_emit_slot_fill(&self->emit_slot, set, set_mon, set_n) != set_n)
+    {
+        LOG(LOG_LEVEL_ERROR, "gfx_emit_dispatch: set of %d could not be "
+            "handed to the assembler; emitting it inline", set_n);
+        return 0;
+    }
+    self->emit_outstanding = 1;
+    tc_sem_inc(self->emit_req_sem);
+    return 1;
+}
+
+/*****************************************************************************/
+/* #70B -- run the emit pass over one set. Called on the assembler
+ * thread when the split is on, and inline on the worker when it is off,
+ * so the two configurations execute exactly the same code. */
+static void
+gfx_emit_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
+                 const int *set_mon, int set_n)
+{
+    int index;
+    int pf_id;
+
+    for (index = 0; index < set_n; index++)
+    {
+        /* the id is read only when the sink is armed: peeking costs
+         * a bounds check and a few bytes, but a disarmed build must
+         * pay exactly one branch */
+        pf_id = perf_trace_on()
+                ? gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
+                                               set[index]->u.gfx.cmd_bytes)
+                : 0;
+        PERF_TRACE("emit_beg", pf_id, set_mon[index]);
+        self->process_enc(self, set[index]);
+        PERF_TRACE("emit_end", pf_id, set_mon[index]);
+    }
+}
+
+/**
+ * EGFX assembly thread (BACKLOG #70B / PRD FR-ACK-2)
+ *
+ * ONE permanent thread, created with the encoder and joined by the
+ * worker at teardown. Never one thread per frame: PDU order on
+ * fifo_processed and the terminal-ack-is-last rule (FR-ACK-1 rule 2)
+ * are only defined with a single assembler, and the resident-frame
+ * bound the capture budget is sized for only holds at depth 1.
+ *
+ * It touches no ffmpeg child, no capture page and no borrowed shmem --
+ * see gfx_wiretosurface1_avc444, where the batch path reads the
+ * worker's snapshot instead of the handle.
+ *****************************************************************************/
+static THREAD_RV THREAD_CC
+proc_emit_msg(void *arg)
+{
+    struct xrdp_encoder *self;
+
+    self = (struct xrdp_encoder *) arg;
+    if (self == 0)
+    {
+        return 0;
+    }
+    LOG_DEVEL(LOG_LEVEL_INFO, "proc_emit_msg: assembler thread is running");
+    for (;;)
+    {
+        tc_sem_dec(self->emit_req_sem);
+        if (self->emit_quit)
+        {
+            break;
+        }
+        gfx_emit_run_set(self, self->emit_slot.set, self->emit_slot.set_mon,
+                         self->emit_slot.set_n);
+        tc_sem_inc(self->emit_idle_sem);
+    }
+    LOG_DEVEL(LOG_LEVEL_DEBUG, "proc_emit_msg: assembler thread exit");
+    tc_sem_inc(self->emit_gone_sem);
+    return 0;
+}
+
 /**
  * Encoder thread main loop
  *****************************************************************************/
@@ -3340,7 +3685,6 @@ proc_enc_msg(void *arg)
     int index;
     int batching;
     int drain_full;
-    int pf_id;
 
     LOG_DEVEL(LOG_LEVEL_INFO, "proc_enc_msg: thread is running");
 
@@ -3460,24 +3804,26 @@ proc_enc_msg(void *arg)
         }
         gfx_batch_run_set(self, set, set_mon, set_n);
         /* EMIT pass: the existing per-item processing, unchanged, in fifo
-         * order, with this monitor's pair already collected */
-        for (index = 0; index < set_n; index++)
+         * order, with this monitor's pair already collected. #70B: with
+         * the split armed it runs on the assembler thread instead, and
+         * this cycle ends here -- the next cycle joins it after its own
+         * submit and pump. Note what is NOT done afterwards any more:
+         * avc444_batch_have[] is no longer cleared here, because the
+         * assembler is still reading it. gfx_batch_publish() clears it
+         * at the top of the next cycle, after the join. */
+        if (self->emit_thread &&
+                gfx_emit_dispatch(self, set, set_mon, set_n))
         {
-            /* the id is read only when the sink is armed: peeking costs
-             * a bounds check and a few bytes, but a disarmed build must
-             * pay exactly one branch */
-            pf_id = perf_trace_on()
-                    ? gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
-                            set[index]->u.gfx.cmd_bytes)
-                    : 0;
-            PERF_TRACE("emit_beg", pf_id, set_mon[index]);
-            self->process_enc(self, set[index]);
-            PERF_TRACE("emit_end", pf_id, set_mon[index]);
+            /* handed over; do not touch set[] again */
         }
-        for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
-                index++)
+        else
         {
-            self->avc444_batch_have[index] = 0;
+            gfx_emit_run_set(self, set, set_mon, set_n);
+            for (index = 0; index < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+                    index++)
+            {
+                self->avc444_batch_have[index] = 0;
+            }
         }
         /* keep the leftovers, IN ORDER, for the next iteration */
         n_items -= consumed;
@@ -3487,6 +3833,18 @@ proc_enc_msg(void *arg)
         }
 
     } /* end while (cont) */
+    /* #70B: the worker OWNS the assembler and joins it here. Only then
+     * is term_done set, so xrdp_encoder_delete's contract is unchanged
+     * -- one wait object, one 5 s timeout, one g_free(self). That
+     * matters because the delete does not join: it frees self on
+     * timeout regardless, and a second thread must not outlive it. */
+    if (self->emit_thread)
+    {
+        gfx_emit_join(self);
+        self->emit_quit = 1;
+        tc_sem_inc(self->emit_req_sem);
+        tc_sem_dec(self->emit_gone_sem);
+    }
     /* carried items are indistinguishable from items still on the fifo at
      * teardown, so they are disposed of the same way (fifo_delete runs
      * this destructor over whatever is still queued) */
