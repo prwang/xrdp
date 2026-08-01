@@ -402,11 +402,30 @@ re-opened once per encoded frame.
 
 **Step 1 — cut the main thread's 16 ms xup service latency.** The
 frame exists 16 ms before the thread that must enqueue it reads the
-message. Candidate shapes: service the xup fd between frame-part
-writes; or move the enqueue (or the egress writes) off the main
-thread. This attacks BOTH populations. Acceptance: `msgin − cap_sent`
-p50 drops to low single digits on a gate run; `wait` > 1 ms cycles
-fall accordingly.
+message. THE DEPENDENCY, stated so it cannot be mistaken again:
+`xup fd readable -> main thread reads the rect -> fifo_add -> encoder
+worker sees it`. A shape qualifies only if it shortens THAT. Candidate
+shapes: service the xup fd from inside the egress write loop; or move
+the enqueue (or the egress writes) off the main thread. This attacks
+BOTH populations. Acceptance: `msgin − cap_sent` p50 drops to low
+single digits on a gate run; `wait` > 1 ms cycles fall accordingly.
+
+**Making the egress itself cheaper is NOT this item (owner, 2026-08-01).**
+The first attempt batched the ~2400 drdynvc PDUs of a frame into one
+buffered write. That is a network-egress optimisation: it does not
+appear anywhere in the dependency above, it carries wire-adjacent risk
+the item never scoped, and it measured worse at every shape tried
+(51.2 and 127.3 ms/frame against a 41–42 ms control). Reverted whole in
+`b588a954`; record in
+`docs/experiments/61f-the-cork-was-the-wrong-lever.md`. The finding is
+"wrong lever", not "slow lever" — a faster version of it would have
+been worse, because it would have shipped.
+
+**Blocked on #61h.** The 17 ms send window this item is measured against
+is bracketed by `GFX_TRACE`/`ACK_TRACE` lines, which are unbuffered
+log.c writes on the same thread. Move those to `common/perf_trace`
+first, or Step 1's acceptance test is partly a measurement of the
+logger.
 
 **Step 2 — capture depth, per monitor only** (PRD forbids a global
 pool). A third slot adds one frame of real lookahead and absorbs
@@ -425,34 +444,31 @@ margin is ours.
 serial time now converts into more of this wait rather than into rate.
 The worker is no longer the only ceiling.
 
-## #61g — The oracle client's 50–150 ms pauses tax every rate number; attribute, then fix the harness (TODO)
+## #61g — The oracle client's 50–150 ms pauses: NOT scheduling; what they are is still open (TODO)
 
-**Hypothesis.** The tail #61f traced to the client (~78 stalls/run,
-≈ 2.6 s of 56.7 s) is instrument noise, not server behaviour: removing
-it would move x006's E5 from 36.8 ms → ≈ 35.1 ms (51.1/35.1 ≈ 1.46x
-against the RED 1.39x — an estimate assuming the tail vanishes and
-nothing else moves). The dump is ruled out (`/tmp` is tmpfs); the
-remaining suspects are host CPU contention (the client shares the box
-with the whole pod fleet, the session Xorg, textflood and two ffmpeg
-children, unpinned and unprioritised) and something periodic inside
-the client itself.
+**Step 1 is ANSWERED, and it rules the planned fix out.** One 60 s gate
+run on x006 with per-thread `/proc/<tid>/schedstat` sampling
+(2026-08-01, record in
+`docs/experiments/61f-the-cork-was-the-wrong-lever.md`): run-delay
+summed over every client thread is 0.326 s in 57.0 s — **0.5 % of the
+client's CPU time**, and no higher inside the ack holes (6.0 ms/s) than
+outside (5.4 ms/s). The client runs at ~0.65 cores throughout, on a
+32-core box at load ~1. **Host CPU contention is not what pauses it**,
+so the pin/nice fix that was queued as Step 2 is withdrawn — it would
+have targeted a mechanism that is not operating.
 
-**Step 1 — attribute before touching anything.** One 60 s gate run
-with a 100 Hz sampler of the oracle client's
-`/proc/<pid>/schedstat` (run-delay) alongside the existing traces. If
-run-delay spikes coincide with the client's ack holes, it is
-scheduling; if not, it is internal to the client. Sampler is versioned
-in `PR-demo/`, not ad hoc.
+The dump was already ruled out (`/tmp` is tmpfs). What the client is
+actually doing during a pause is unattributed, and the honest position
+is that it stays unattributed until someone has a cheap way to ask.
 
-**Step 2 — the fix matching the attribution, versioned in
-`e_gate_run.sh`.** For scheduling: pin the oracle client + its Xvfb to
-cores the pods' cpuset excludes (and/or modest negative nice). This
-changes no client binary and no protocol behaviour — but it IS a
-harness change (client-rig rule): announce it, re-baseline
-x005/x006/x007 in one pass under the new harness, and never mix pre-
-and post-change numbers (gate 5). Keep the #61f stall census
-(`i61f_delivery_chain.py` sections 1+4) in every VERDICT so residual
-hiccups stay visible instead of silent.
+**Do not build another sampler for it.** The one used here was a custom
+wheel next to `common/perf_trace`; it cost 36 % of a core and moved the
+rate it was measuring (37.6 vs 36.8 ms on the same arm), and its whole
+yield was the single number above. It is reverted. Next candidate
+instruments, cheapest first: the client's own `--log-level` timing on
+the DVC receive path; `perf record` on the client pid for 5 s; a
+one-line `/proc/<pid>/stat` delta before/after. None of them is a new
+tool in `PR-demo/`.
 
 **Explicitly out of scope without owner sign-off:** enlarging the
 loopback socket buffers to hide client pauses from the server. That
@@ -463,6 +479,36 @@ fallback shape the honesty rule exists to catch.
 **Not a substitute for #61f.** A perfect client removes the forcing,
 not the vulnerability: the 1.9 ms margin and the 16 ms main-thread
 service latency stay ours.
+
+**Caution for anyone re-measuring here.** x006 measured 36.8 ms in the
+morning and 41.2–41.8 ms the same evening — same arm, same image, same
+payload, cause unestablished (host load 1.0 → 1.9). Quote a treatment
+only against a control from its own pass.
+
+## #61h — The main thread still writes unbuffered log lines on the per-frame hot path (TODO)
+
+`ACK_TRACE msgin/submit/egress/ack` and `GFX_TRACE send/ack/dmg` are
+`LOG(LOG_LEVEL_INFO, …)` — log.c's unbuffered write under a global
+mutex — and there are ~12 of them per frame on the xrdp main thread,
+the same thread whose 16 ms service latency #61f exists to cut.
+`common/perf_trace` (FR-TRACE-1) was built in #61e for exactly this and
+is used only by the encoder worker.
+
+Two consequences, and the second is why this blocks #61f Step 1:
+
+- the instrument is on the path it measures, so it is part of the cost;
+- the "17 ms egress send window" is the interval BETWEEN two of those
+  log lines, so an unquantified part of it is the logger rather than
+  the write, and any before/after on that window is unsound until this
+  is fixed.
+
+**Scope.** Move the main thread's per-frame records onto the existing
+ring (source and sink already separated, #61e `2781220a`); leave the
+low-rate lines (session lifecycle, errors) on log.c. No new tracer, no
+new file format. Acceptance: with tracing armed, the main thread emits
+zero log.c writes per frame, and the x006 arm's mean ms/frame with
+tracing armed vs disarmed differs by less than the same-build run
+noise.
 
 ## #74 — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
 
