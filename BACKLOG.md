@@ -429,11 +429,25 @@ not "slow lever" — a faster version of it would have been worse,
 because it would have shipped, and no rate number could have told us
 that.
 
-**#61h is DONE, so this is unblocked — but it must START by
-re-measuring.** The service latency this item exists to cut has never
-been measured with an instrument that was off the path. Take
-`msgin − cap_sent` on a ring-traced build first; the target for Step 1
-follows from that number, not from the void 16 ms.
+**MEASURED 2026-08-01 on the ring-traced build, and the answer retires
+Step 1's whole premise.** The delay this item exists to cut is
+enqueue → submit, and it is **15.316 ms** (p50 15.035, p90 18.199) —
+60 % of a 25.474 ms period. Of that, the worker was idle for
+**0.0019 ms**: a recoverable share of **0.01 %**. The frame sits on the
+fifo for 15 ms because the worker is still encoding the previous one.
+That is serial work in progress, not scheduling slack, so **no earlier
+wake-up, no re-ordering and no cheaper handoff recovers it** — the
+entire class of fix Step 1 was reaching for is ruled out, and the cork
+is confirmed unrelated rather than merely slow.
+
+What is left is arithmetic, and it belongs to #74: `pump` (16.654 ms,
+waiting for the two ffmpeg children) and `collect` (8.802 ms, popping
+NALs and rewriting both views' LTR refs) are serial with each other
+within a frame and across frames. Overlapping them is Lever 2, and the
+prize is now sized: up to 8.8 ms of 25.5 ms.
+
+**Record:** `docs/experiments/61e-the-period-is-encode-and-rewrite.md`;
+capture `captures/i61e_x013_eager_m1_4k_20260801`.
 
 **Step 2 — capture depth, per monitor only** (PRD forbids a global
 pool). A third slot adds one frame of real lookahead and absorbs
@@ -539,7 +553,32 @@ trace armed is void.** Twenty-five capture directories and three
 experiment records were deleted from the tree (they remain in git
 history). The items that had closed on them are reopened below.
 
-## #61e — REOPENED 2026-08-01: close the period, and settle `capture ‖ encode` at m=1
+## #61e — DONE 2026-08-01 (redone on the ring): the period is encode + LTR rewrite, and `capture ‖ encode` HOLDS at m=1
+
+**Answered on arm x013**, one monitor at 3840×2400, textflood, eager ack
++ emit split, 2227 sends, 0 trace drops. The frame period is **25.474 ms
+and 100 % of it is the encoder worker running serially**: 16.654 ms
+waiting for the two ffmpeg children to encode the frame (65.4 %),
+8.802 ms popping the encoded NALs and rewriting both views' LTR
+references (34.6 %), 0.018 ms for everything else (0.1 %). Per-cycle
+closure residual max |0.000000| ms; the 25.46 ms send-to-send interval
+agrees independently.
+
+`capture ‖ encode` at m=1 **HOLDS**: worker `wait` 0.0019 ms mean, 0 of
+2226 cycles over 1 ms, 100 % of frames already enqueued, fifo depth 0 at
+all takes — with gate 2b run first to prove the bracket could have shown
+a stall. Read the condition, though: capture is hidden *because encode
+is slow*, so a materially faster encoder reopens the question.
+
+**No ratio is claimed** — one arm, no control. The gate's
+`2.01x` line is against the stale `SESSION_KIND=code` default baseline
+and is void as a comparison.
+
+**Record:** `docs/experiments/61e-the-period-is-encode-and-rewrite.md`.
+Open follow-up recorded there: `collect` at 8.8 ms/frame is 5× an
+offline bench figure of 1.75 ms/pair that states no resolution.
+
+## #61e — the reopening this replaced (2026-08-01)
 
 Previously marked DONE with a period closing to 0.007 ms unattributed, a
 worker idling 2.249 ms/cycle (35 % of cycles stalled), and PRD's

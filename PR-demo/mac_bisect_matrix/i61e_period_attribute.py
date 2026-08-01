@@ -46,15 +46,36 @@ import statistics as st
 
 
 def load(path):
+    """Read a perf_trace file.
+
+    The record is <ns> <tid> <tag> <a> <b> <c> <d> <e> <f> -- NINE
+    fields since BACKLOG #61h widened the payload from two ints to six
+    so a GFX send fits in one event. This reader accepted only the old
+    five-field form and silently `continue`d past every record of the
+    new one: against the x013 trace it loaded 0 events and reported
+    "0 drops, 0 records / not enough cycles", which reads like an empty
+    run rather than like a parser that cannot read the file. Both widths
+    are accepted, and a file that yields nothing is now an error rather
+    than an empty table.
+    """
     evs = []
+    seen = 0
     for line in open(path, errors="replace"):
+        if line.startswith("#"):
+            continue          # the `# perfbase` clock-base line
         f = line.split()
-        if len(f) != 5:
+        if len(f) not in (5, 9):
             continue
+        seen += 1
         try:
             evs.append((int(f[0]), f[1], f[2], int(f[3]), int(f[4])))
         except ValueError:
             pass
+    if seen == 0:
+        sys.exit("%s: no records this reader could parse. A perf_trace "
+                 "record is 5 fields (pre-#61h) or 9 (current); this file "
+                 "has neither, so it is a format mismatch and NOT an "
+                 "empty run." % path)
     return evs
 
 

@@ -55,6 +55,12 @@ DIST=${DIST:-/work/dist}
 # same gfx.toml body, trace ARMED vs DISARMED. Deployed together, or
 # the traced number has nothing to be compared against:
 #   build_and_deploy.sh x006 x007
+# x013 is a SOLO arm and deliberately has no twin: it re-measures the
+# eager-ack frame-interval DECOMPOSITION (a within-run accounting, not a
+# ratio) on the ring-traced build, after #61h voided every timing taken
+# with the trace on log.c. A control arm would buy nothing an attribution
+# that closes against its own period does not already have:
+#   build_and_deploy.sh x013
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -117,6 +123,9 @@ declare -A ARM_XORG_DEB=(
     # x007 (#61e CONTROL): the UNTRACED twin of x006 -- same xrdp deb,
     # same xorgxrdp deb, same gfx.toml body; XRDP_PERF_TRACE unset.
     [x007]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x013 (#61e redo): the SAME xorgxrdp as x005/x006/x007, so the
+    # producer side is identical to the arms whose numbers this replaces
+    [x013]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -146,6 +155,11 @@ declare -A ARM_TAG=(
     # in that its manifest omits XRDP_PERF_TRACE. It is the only control
     # that can show whether observing the pipeline changes it.
     [x007]=2781220ae747.xx10fa3aa-tf
+    # x013: the ring-traced build (#61h). Shipped source is identical to
+    # the 66a60311 image already on this box, but that tag names a commit
+    # the history rewrite removed, so it is rebuilt from a hash that still
+    # exists rather than deployed from a package nothing can trace.
+    [x013]=82babb9fe4ba.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -183,6 +197,9 @@ declare -A TAG_DEB=(
     # there to confirm rather than assume.
     [05847031a303.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801141607.05847031a303_amd64.deb"
     [2781220ae747.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801150407.2781220ae747_amd64.deb"
+    # x013 (#61e redo): per-frame records on common/perf_trace's ring
+    # instead of log.c -- the #61h fix, plus the six-field payload
+    [82babb9fe4ba.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801213501.82babb9fe4ba_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
