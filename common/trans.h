@@ -106,6 +106,9 @@ struct trans
     char *listen_filename;
     tis_term is_term; /* used to test for exit */
     struct stream *wait_s;
+    struct stream *wait_s_tail; /* last node of wait_s, or 0 if empty */
+    struct stream *cork_s;      /* accumulator, only while corked */
+    int cork_level;             /* nesting depth of trans_cork() */
     int no_stream_init_on_data_in;
     int extra_flags; /* user defined */
     void *extra_data; /* user defined */
@@ -147,6 +150,33 @@ int
 trans_write_copy(struct trans *self);
 int
 trans_write_copy_s(struct trans *self, struct stream *out_s);
+/**
+ * Batch the writes made until the matching trans_uncork()
+ *
+ * @param self Transport
+ * @return 0 for success
+ *
+ * While a transport is corked, trans_write_copy_s() only appends to an
+ * accumulator: it makes no socket call at all. trans_uncork() hands the
+ * whole accumulation to the send queue as ONE buffer and attempts a
+ * single non-blocking flush; whatever the kernel does not take drains
+ * from the main loop's writable-object pass as usual.
+ *
+ * This exists because a GFX frame leaves xrdp as ~2400 separate
+ * 1500-byte drdynvc PDUs (see xrdp_egfx_send_data), and doing a
+ * select()+send() pair per PDU kept the xrdp main thread inside the
+ * write for 17 ms per frame, during which it did not service the
+ * X server's capture messages (BACKLOG #61f). Corking does not change
+ * a single byte on the wire or the order they go out in -- only how
+ * many system calls carry them and whether the caller stays inside the
+ * write while the client drains.
+ *
+ * Calls nest: the flush happens on the outermost trans_uncork().
+ */
+int
+trans_cork(struct trans *self);
+int
+trans_uncork(struct trans *self);
 /**
  * Connect the transport to the specified destination
  *
