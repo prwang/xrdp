@@ -62,17 +62,6 @@ xrdp_egfx_send_data(struct xrdp_egfx *egfx, const char *data, int bytes)
     }
     else
     {
-        /* BACKLOG #61f: a 4K AVC444 frame leaves here as ~2400 separate
-           1500-byte drdynvc PDUs, and each one used to cost the main
-           thread a select() and a send(). Measured on the x006 arm
-           (2026-08-01) that kept the thread inside this loop for 17 ms
-           per frame -- 49 % of the wall clock -- and the X server's next
-           captured rect, which arrives mid-loop 1515 times out of 1532,
-           waited 16.4 ms (p50) to be read. Corking batches the PDUs into
-           one buffer and one flush attempt: identical bytes, identical
-           order, but the thread returns to its wait-object loop instead
-           of staying here while the client drains. */
-        trans_cork(egfx->session->trans);
         error = libxrdp_drdynvc_data_first(egfx->session, egfx->channel_id,
                                            data, 1500, bytes);
         data += 1500;
@@ -88,10 +77,6 @@ xrdp_egfx_send_data(struct xrdp_egfx *egfx, const char *data, int bytes)
                                          data, to_send);
             data += to_send;
             bytes -= to_send;
-        }
-        if (trans_uncork(egfx->session->trans) != 0 && error == 0)
-        {
-            error = 1;
         }
     }
     return error;

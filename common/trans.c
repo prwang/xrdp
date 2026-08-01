@@ -137,12 +137,6 @@ trans_delete(struct trans *self)
     free_stream(self->in_s);
     free_stream(self->out_s);
 
-    if (self->cork_s != 0)
-    {
-        free_stream(self->cork_s);
-        self->cork_s = 0;
-    }
-
     if (self->sck >= 0)
     {
         g_tcp_close(self->sck);
@@ -262,18 +256,6 @@ trans_send_waiting(struct trans *self, int block)
             if (g_tcp_can_send(self->sck, timeout))
             {
                 bytes = (int) (temp_s->end - temp_s->p);
-                if (bytes > TRANS_MAX_SEND_CHUNK)
-                {
-                    /* Offer at most one chunk to any single send.
-                       ssl_tls_write() does NOT do partial writes: it
-                       loops on SSL_ERROR_WANT_WRITE until the whole
-                       length is gone, so handing it a 3.5 MB frame
-                       parks this thread until the peer has drained all
-                       of it (measured, x008 vs x006: 51.2 vs 41.8 ms
-                       per frame -- worse than the 2400 small writes it
-                       replaced). */
-                    bytes = TRANS_MAX_SEND_CHUNK;
-                }
                 sent = self->trans_send(self, temp_s->p, bytes);
                 if (sent > 0)
                 {
@@ -285,10 +267,6 @@ trans_send_waiting(struct trans *self, int block)
                     if (temp_s->p >= temp_s->end)
                     {
                         self->wait_s = temp_s->next;
-                        if (self->wait_s == 0)
-                        {
-                            self->wait_s_tail = 0;
-                        }
                         free_stream(temp_s);
                     }
                 }
@@ -302,8 +280,6 @@ trans_send_waiting(struct trans *self, int block)
                     {
                         return 1;
                     }
-                    /* the peer is not taking any more right now */
-                    cont = block;
                 }
             }
             else if (block)
@@ -318,18 +294,12 @@ trans_send_waiting(struct trans *self, int block)
                     }
                 }
             }
-            else
-            {
-                /* not blocking and the socket is full: stop here and let
-                   the caller's wait-object loop bring us back when the
-                   peer has made room */
-                cont = 0;
-            }
         }
         else
         {
             break;
         }
+        cont = block;
     }
     return 0;
 }
@@ -625,161 +595,18 @@ trans_force_write(struct trans *self)
 }
 
 /*****************************************************************************/
-/* queue `size` bytes at the tail of the send list. The tail pointer is
-   what keeps this O(1): a GFX frame corked and then uncorked is one
-   node, but the uncorked path still appends thousands of small nodes per
-   frame under back-pressure, and walking the list from the head each
-   time made that quadratic. */
-static int
-trans_queue_wait_s(struct trans *self, const char *out_data, int size)
-{
-    struct stream *wait_s;
-
-    make_stream(wait_s);
-    init_stream(wait_s, size);
-    if (self->si != 0)
-    {
-        if ((self->si->cur_source != XRDP_SOURCE_NONE) &&
-                (self->si->cur_source != self->my_source))
-        {
-            self->si->source[self->si->cur_source] += size;
-            wait_s->source = self->si->source + self->si->cur_source;
-        }
-    }
-    out_uint8a(wait_s, out_data, size);
-    s_mark_end(wait_s);
-    wait_s->p = wait_s->data;
-    if (self->wait_s == 0)
-    {
-        self->wait_s = wait_s;
-    }
-    else
-    {
-        self->wait_s_tail->next = wait_s;
-    }
-    self->wait_s_tail = wait_s;
-    return 0;
-}
-
-/*****************************************************************************/
-/* append to the cork accumulator, growing it geometrically */
-static int
-trans_cork_append(struct trans *self, const char *data, int size)
-{
-    struct stream *s;
-    int used;
-    int want;
-    char *bigger;
-
-    if (self->cork_s == 0)
-    {
-        make_stream(self->cork_s);
-        init_stream(self->cork_s, size < 65536 ? 65536 : size);
-        if (self->cork_s->data == 0)
-        {
-            return 1;
-        }
-    }
-    s = self->cork_s;
-    used = (int) (s->end - s->data);
-    if (used + size > s->size)
-    {
-        want = s->size;
-        while (want < used + size)
-        {
-            want *= 2;
-        }
-        bigger = (char *) g_malloc(want, 0);
-        if (bigger == 0)
-        {
-            return 1;
-        }
-        g_memcpy(bigger, s->data, used);
-        g_free(s->data);
-        s->data = bigger;
-        s->size = want;
-        s->end = s->data + used;
-    }
-    g_memcpy(s->end, data, size);
-    s->end += size;
-    return 0;
-}
-
-/*****************************************************************************/
-int
-trans_cork(struct trans *self)
-{
-    if (self == 0)
-    {
-        return 1;
-    }
-    self->cork_level++;
-    return 0;
-}
-
-/*****************************************************************************/
-int
-trans_uncork(struct trans *self)
-{
-    int size;
-    int rv = 0;
-
-    if (self == 0)
-    {
-        return 1;
-    }
-    if (self->cork_level > 0)
-    {
-        self->cork_level--;
-    }
-    if (self->cork_level > 0)
-    {
-        return 0;
-    }
-    if (self->cork_s == 0)
-    {
-        return 0;
-    }
-    size = (int) (self->cork_s->end - self->cork_s->data);
-    if (size > 0 && self->status == TRANS_STATUS_UP)
-    {
-        /* one buffer, appended in order behind anything already
-           waiting, then ONE non-blocking flush attempt. The remainder
-           leaves through the main loop's writable-object pass, so the
-           caller is not held here while the peer drains. */
-        rv = trans_queue_wait_s(self, self->cork_s->data, size);
-        if (rv == 0)
-        {
-            if (trans_send_waiting(self, 0) != 0)
-            {
-                self->status = TRANS_STATUS_DOWN;
-                rv = 1;
-            }
-        }
-    }
-    /* keep the buffer for the next frame; only the fill level resets */
-    self->cork_s->end = self->cork_s->data;
-    self->cork_s->p = self->cork_s->data;
-    return rv;
-}
-
-/*****************************************************************************/
 int
 trans_write_copy_s(struct trans *self, struct stream *out_s)
 {
     int size;
     int sent;
+    struct stream *wait_s;
+    struct stream *temp_s;
     char *out_data;
 
     if (self->status != TRANS_STATUS_UP)
     {
         return 1;
-    }
-    if (self->cork_level > 0)
-    {
-        /* corked: no socket call, no queue node -- just accumulate */
-        return trans_cork_append(self, out_s->data,
-                                 (int) (out_s->end - out_s->data));
     }
     /* try to send any left over */
     if (trans_send_waiting(self, 0) != 0)
@@ -819,7 +646,34 @@ trans_write_copy_s(struct trans *self, struct stream *out_s)
         return 0;
     }
     /* did not send right away, have to copy */
-    return trans_queue_wait_s(self, out_data, size);
+    make_stream(wait_s);
+    init_stream(wait_s, size);
+    if (self->si != 0)
+    {
+        if ((self->si->cur_source != XRDP_SOURCE_NONE) &&
+                (self->si->cur_source != self->my_source))
+        {
+            self->si->source[self->si->cur_source] += size;
+            wait_s->source = self->si->source + self->si->cur_source;
+        }
+    }
+    out_uint8a(wait_s, out_data, size);
+    s_mark_end(wait_s);
+    wait_s->p = wait_s->data;
+    if (self->wait_s == 0)
+    {
+        self->wait_s = wait_s;
+    }
+    else
+    {
+        temp_s = self->wait_s;
+        while (temp_s->next != 0)
+        {
+            temp_s = temp_s->next;
+        }
+        temp_s->next = wait_s;
+    }
+    return 0;
 }
 
 /*****************************************************************************/

@@ -326,41 +326,8 @@ fi
 # nothing (it left a client alive for 2.2 h on 2026-07-29).
 CLIENT_PGID=$!
 unset PW RDPARGS
-
-# --- optional: per-thread scheduling sample (BACKLOG #61g Step 1) ---------
-# E_SCHED=1 samples /proc/<tid>/schedstat at 100 Hz for the client and for
-# every process in the pod's cgroup, on the SAME CLOCK_MONOTONIC as xrdp's
-# ACK_TRACE `us=`, so a client pause can be split into "waited for a CPU",
-# "was running", and "was asleep" without a tracer. Off by default: it is
-# an instrument, and an instrument that is always on is a variable.
-SCHED_PID=
-if [ "${E_SCHED:-0}" = 1 ]; then
-    sleep 3          # let the login finish so the session Xorg exists
-    SCHED_SECS=$((SECS - 3))
-    [ "$SCHED_SECS" -ge 5 ] || SCHED_SECS=5
-    SCHED_TARGETS="client=$ORACLE_BIN"
-    if [ "$TARGET" = pod ]; then
-        CID=$(kubectl -n "$NS" get pod "$POD" \
-              -o jsonpath='{.status.containerStatuses[0].containerID}' \
-              | sed 's#.*/##')
-        [ -n "$CID" ] || fail "cannot resolve container id for $POD"
-        SCHED_TARGETS="$SCHED_TARGETS pod=@cgroup:$CID"
-    fi
-    # shellcheck disable=SC2086
-    python3 "$D/i61g_sched_sampler.py" --secs "$SCHED_SECS" --hz 100 \
-        --out "$OUT/sched.csv" $SCHED_TARGETS \
-        2> "$OUT/sched.log" &
-    SCHED_PID=$!
-    echo "sched sampler: pid $SCHED_PID -> $OUT/sched.csv"
-fi
 echo "connected; recording for ${SECS}s ..."
-# the sampler's 3 s settle came out of the same window, so the client is
-# up for exactly SECS either way and the E5 number stays comparable
-if [ -n "$SCHED_PID" ]; then sleep "$((SECS - 3))"; else sleep "$SECS"; fi
-if [ -n "$SCHED_PID" ]; then
-    wait "$SCHED_PID" 2>/dev/null
-    tail -1 "$OUT/sched.log" 2>/dev/null
-fi
+sleep "$SECS"
 kill -9 -- -"$CLIENT_PGID" 2>/dev/null
 sleep 1
 if pgrep -g "$CLIENT_PGID" >/dev/null 2>&1; then

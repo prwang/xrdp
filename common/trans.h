@@ -37,24 +37,6 @@
 #define TRANS_STATUS_DOWN 0
 #define TRANS_STATUS_UP 1
 
-/**
- * Most bytes handed to one trans_send() call when draining the queue.
- *
- * ssl_tls_write() does not do partial writes -- it loops internally on
- * SSL_ERROR_WANT_WRITE until the whole length has gone -- so the size
- * offered to it is the length of time the caller is parked. A whole
- * corked GFX frame in one call measured WORSE than the thousands of
- * small writes it replaced (BACKLOG #61f, x008 vs x006, 51.2 vs
- * 41.8 ms per frame).
- *
- * The cap bounds ONE send, not one call: a non-blocking drain keeps
- * offering chunks until the peer refuses. Stopping after one chunk per
- * call was measured too (x009, 127.3 ms per frame) -- the queue then
- * advanced only once per main-loop pass, ~1.6 ms of unrelated work per
- * 64 KB.
- */
-#define TRANS_MAX_SEND_CHUNK (64 * 1024)
-
 struct trans; /* forward declaration */
 struct xrdp_tls;
 
@@ -124,9 +106,6 @@ struct trans
     char *listen_filename;
     tis_term is_term; /* used to test for exit */
     struct stream *wait_s;
-    struct stream *wait_s_tail; /* last node of wait_s, or 0 if empty */
-    struct stream *cork_s;      /* accumulator, only while corked */
-    int cork_level;             /* nesting depth of trans_cork() */
     int no_stream_init_on_data_in;
     int extra_flags; /* user defined */
     void *extra_data; /* user defined */
@@ -168,33 +147,6 @@ int
 trans_write_copy(struct trans *self);
 int
 trans_write_copy_s(struct trans *self, struct stream *out_s);
-/**
- * Batch the writes made until the matching trans_uncork()
- *
- * @param self Transport
- * @return 0 for success
- *
- * While a transport is corked, trans_write_copy_s() only appends to an
- * accumulator: it makes no socket call at all. trans_uncork() hands the
- * whole accumulation to the send queue as ONE buffer and drains it
- * without blocking until the peer refuses more; whatever is left goes
- * out from the main loop's writable-object pass as usual.
- *
- * This exists because a GFX frame leaves xrdp as ~2400 separate
- * 1500-byte drdynvc PDUs (see xrdp_egfx_send_data), and doing a
- * select()+send() pair per PDU kept the xrdp main thread inside the
- * write for 17 ms per frame, during which it did not service the
- * X server's capture messages (BACKLOG #61f). Corking does not change
- * a single byte on the wire or the order they go out in -- only how
- * many system calls carry them and whether the caller stays inside the
- * write while the client drains.
- *
- * Calls nest: the flush happens on the outermost trans_uncork().
- */
-int
-trans_cork(struct trans *self);
-int
-trans_uncork(struct trans *self);
 /**
  * Connect the transport to the specified destination
  *
