@@ -2074,6 +2074,7 @@ xrdp_ffmpeg_avc444_delete(struct xrdp_ffmpeg_avc444 *self)
     }
     xrdp_ffmpeg_avc444_delete(self->leaf);
     self->leaf = NULL;
+    xrdp_h264_ltr_state_free(&self->ltr);
     if (self->in_fd >= 0)
     {
         close(self->in_fd);

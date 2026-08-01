@@ -39,9 +39,24 @@ find_start_code(const unsigned char *data, int len, int pos,
 {
     int i;
 
-    for (i = pos; i + 3 <= len; i++)
+    /* #75: memchr for the leading zero rather than a byte-at-a-time
+     * triple compare. This runs over the whole coded picture once per
+     * NAL boundary, so at 4K it is a pass over ~1.7 MB per view; the
+     * bytes it skips are entropy-coded and almost never zero. Same
+     * result as the naive loop -- first i >= pos with 00 00 01 and
+     * i + 3 <= len. */
+    i = pos;
+    while (i + 3 <= len)
     {
-        if (data[i] == 0 && data[i + 1] == 0 && data[i + 2] == 1)
+        const unsigned char *hit;
+
+        hit = (const unsigned char *)memchr(data + i, 0, len - 2 - i);
+        if (hit == NULL)
+        {
+            return 0;
+        }
+        i = (int)(hit - data);
+        if (data[i + 1] == 0 && data[i + 2] == 1)
         {
             /* a preceding zero makes it a 4-byte start code, but either way
              * the NAL header follows the 01 byte */
@@ -49,6 +64,7 @@ find_start_code(const unsigned char *data, int len, int pos,
             *nal_start = i + 3;
             return 1;
         }
+        i++;
     }
     return 0;
 }
@@ -160,6 +176,16 @@ xrdp_h264_aux_ok(const unsigned char *data, int len)
  */
 
 #define SPS_RBSP_MAX 1024
+
+/*
+ * #75: escaped bytes of a VCL NAL unescaped up front to reach the end of
+ * the slice header. A slice header is tens of bytes -- first_mb,
+ * slice_type, pps_id, frame_num, the child's marking ops, qp delta and
+ * the deblocking fields -- so this is roughly an order of magnitude of
+ * slack. It is a performance bound, not a correctness one: a header that
+ * does not fit re-runs over the whole NAL.
+ */
+#define XRDP_H264_LTR_HDR_SCAN 512
 
 struct sps_bits
 {
@@ -2041,6 +2067,64 @@ parse_child_marking(struct sps_bits *b)
 }
 
 /*****************************************************************************/
+/* Emulation-prevention state after emitting the first `len` RBSP bytes:  */
+/* the number of consecutive trailing 0x00 since the last escape byte was */
+/* inserted, which is exactly what decides whether the NEXT byte needs    */
+/* one. Mirrors the escape loop in slice_ltr_rewrite; keep them together. */
+static int
+escape_state(const unsigned char *rbsp, int len)
+{
+    int zeros;
+    int i;
+
+    zeros = 0;
+    for (i = 0; i < len; i++)
+    {
+        if (zeros == 2 && rbsp[i] <= 3)
+        {
+            zeros = 0;
+        }
+        zeros = (rbsp[i] == 0) ? zeros + 1 : 0;
+    }
+    return zeros;
+}
+
+/*****************************************************************************/
+/* Offset in the ESCAPED NAL at which the emission of RBSP byte `want`     */
+/* begins -- the byte itself, or the inserted 0x03 in front of it. Walks   */
+/* only as far as `want`, which for the CABAC payload boundary is tens of  */
+/* bytes. Returns -1 if the NAL ends first.                                */
+static int
+esc_offset_of_rbsp(const unsigned char *nal, int nal_len, int want)
+{
+    int zeros;
+    int r;
+    int i;
+
+    zeros = 0;
+    r = 0;
+    for (i = 1; i < nal_len; i++)
+    {
+        if (zeros == 2 && nal[i] == 3)
+        {
+            if (r == want)
+            {
+                return i;        /* the escape belongs to rbsp[want] */
+            }
+            zeros = 0;
+            continue;
+        }
+        if (r == want)
+        {
+            return i;
+        }
+        zeros = (nal[i] == 0) ? zeros + 1 : 0;
+        r++;
+    }
+    return (r == want) ? nal_len : -1;
+}
+
+/*****************************************************************************/
 /* rewrite one VCL slice NAL into its LTR-chain form. view: 0 main,      */
 /* 1 aux. to_intra_i: emit this intra picture as the self-contained      */
 /* non-IDR I that self-marks the view's own long-term slot -- always     */
@@ -2050,11 +2134,16 @@ parse_child_marking(struct sps_bits *b)
 /* Accepts three input shapes: IDR-carrying-I, non-IDR I (h264_nvenc at  */
 /* a forced key frame without -forced-idr) and P.                        */
 /* returns the new NAL length or -1 on failure.                          */
+/*                                                                       */
+/* scan_len is how much of the NAL is unescaped up front. The slice      */
+/* header is tens of bytes and the CABAC payload behind it is copied     */
+/* verbatim, so the caller asks for a bounded prefix first (#75) and     */
+/* only re-runs over the whole NAL if that was not enough.               */
 static int
-slice_ltr_rewrite(const unsigned char *nal, int nal_len,
-                  unsigned char *out, int out_cap,
-                  const struct xrdp_h264_param_cache *c,
-                  int view, int to_intra_i, int fn)
+slice_ltr_rewrite_sz(const unsigned char *nal, int nal_len, int scan_len,
+                     unsigned char *out, int out_cap,
+                     const struct xrdp_h264_param_cache *c,
+                     int view, int to_intra_i, int fn)
 {
     unsigned char *rbsp;
     unsigned char *newr;
@@ -2080,24 +2169,42 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     int olen;
     int nbytes;
     int cap_bits;
+    int zbytes;
+    int prefix_mode;
+    int esc_pay_off;
+    int zero_state;
+    unsigned char hdr_rbsp[XRDP_H264_LTR_HDR_SCAN];
+    unsigned char hdr_newr[XRDP_H264_LTR_HDR_SCAN + 64];
 
     is_idr = (nal[0] & 0x1f) == 5;
     if (nal_len < 4)
     {
         return -1;
     }
-    rbsp = (unsigned char *)malloc(nal_len);
-    newr = (unsigned char *)malloc(nal_len + 16);
-    if (rbsp == NULL || newr == NULL)
+    prefix_mode = scan_len < nal_len;
+    if (prefix_mode)
     {
-        free(rbsp);
-        free(newr);
-        return -1;
+        /* the header path: both buffers are stack-sized and no
+         * allocation happens at all */
+        rbsp = hdr_rbsp;
+        newr = hdr_newr;
+        cap_bits = (int)sizeof(hdr_newr) * 8;
     }
-    cap_bits = (nal_len + 16) * 8;
+    else
+    {
+        rbsp = (unsigned char *)malloc(nal_len);
+        newr = (unsigned char *)malloc(nal_len + 16);
+        if (rbsp == NULL || newr == NULL)
+        {
+            free(rbsp);
+            free(newr);
+            return -1;
+        }
+        cap_bits = (nal_len + 16) * 8;
+    }
     rlen = 0;
     zeros = 0;
-    for (i = 1; i < nal_len; i++)
+    for (i = 1; i < scan_len; i++)
     {
         if (zeros == 2 && nal[i] == 3)
         {
@@ -2208,7 +2315,19 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     {
         goto unsupported;
     }
-    memset(newr, 0, nal_len + 16);
+    /* #75: put_bit ORs, so only the bytes the new header will occupy
+     * have to start at zero. The old form zeroed the whole picture
+     * buffer -- 1.7 MB per view at 4K -- and every byte past the header
+     * is overwritten by the payload copy below anyway. The bound is the
+     * original header rounded up, plus the widest insertion this
+     * function makes (list modification + mmco, under 24 bits) and a
+     * byte of alignment slack. */
+    zbytes = pay_byte + 8;
+    if (zbytes > (prefix_mode ? (int)sizeof(hdr_newr) : nal_len + 16))
+    {
+        goto unsupported;
+    }
+    memset(newr, 0, zbytes);
     opos = 0;
     oerr = 0;
     put_ue(newr, &opos, cap_bits, first_mb, &oerr);
@@ -2252,12 +2371,19 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
         put_bit(newr, &opos, cap_bits, 1, &oerr);
     }
     nbytes = opos / 8;
-    if (oerr || nbytes + (rlen - pay_byte) > nal_len + 16)
+    if (oerr || nbytes > zbytes)
     {
         goto unsupported;
     }
-    memcpy(newr + nbytes, rbsp + pay_byte, rlen - pay_byte);
-    nbytes += rlen - pay_byte;
+    if (!prefix_mode)
+    {
+        if (nbytes + (rlen - pay_byte) > nal_len + 16)
+        {
+            goto unsupported;
+        }
+        memcpy(newr + nbytes, rbsp + pay_byte, rlen - pay_byte);
+        nbytes += rlen - pay_byte;
+    }
     /* NAL header: nri = 3 always (Windows shape); type: IDR stays 5
      * on main, everything else is 1 */
     out[0] = (is_idr && !to_intra_i) ? 0x65 : 0x61;
@@ -2281,6 +2407,43 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
         zeros = (newr[i] == 0) ? zeros + 1 : 0;
         out[olen++] = newr[i];
     }
+    if (prefix_mode)
+    {
+        /* #75: the CABAC payload is byte-aligned in both the child's NAL
+         * and ours (cabac_alignment_one_bit pads to a byte in front of
+         * it) and its RBSP bytes are copied through unchanged, so the
+         * ESCAPED payload bytes are invariant -- provided the escaper
+         * enters the payload in the same state in both. `zeros` is that
+         * state for the header we just emitted; escape_state() computes
+         * it for the child's. When they agree the child's own escaped
+         * payload is byte-for-byte what we would produce, so it is
+         * copied verbatim: no unescape pass, no re-escape pass, and no
+         * picture-sized intermediate.
+         *
+         * When they disagree the payload's first bytes could escape
+         * differently, so this returns -1 and the caller re-runs over
+         * the whole NAL on the original path. The trailing
+         * cabac_zero_words escape below is not re-applied here for the
+         * same reason it is not needed: the child's NAL already carries
+         * it, and it is inside the range copied. */
+        zero_state = escape_state(rbsp, pay_byte);
+        if (zero_state != zeros)
+        {
+            goto unsupported;
+        }
+        esc_pay_off = esc_offset_of_rbsp(nal, nal_len, pay_byte);
+        if (esc_pay_off < 0 || esc_pay_off >= nal_len)
+        {
+            goto unsupported;
+        }
+        if (olen + (nal_len - esc_pay_off) > out_cap)
+        {
+            goto unsupported;
+        }
+        memcpy(out + olen, nal + esc_pay_off, nal_len - esc_pay_off);
+        olen += nal_len - esc_pay_off;
+        return olen;
+    }
     if (zeros >= 2)
     {
         /* trailing cabac_zero_words: the child's wire ended 00 00 03;
@@ -2296,9 +2459,40 @@ slice_ltr_rewrite(const unsigned char *nal, int nal_len,
     free(newr);
     return olen;
 unsupported:
-    free(rbsp);
-    free(newr);
+    if (!prefix_mode)
+    {
+        free(rbsp);
+        free(newr);
+    }
     return -1;
+}
+
+/*****************************************************************************/
+/* #75: try the bounded-prefix path first -- the slice header is tens of  */
+/* bytes, so the whole rewrite is a small stack buffer plus one memcpy of */
+/* the child's already-escaped payload. Anything that path cannot express */
+/* (a header longer than the scan, or a payload whose escaping would      */
+/* change) re-runs over the whole NAL on the original code, so no packet  */
+/* the old form accepted is refused by the new one.                       */
+static int
+slice_ltr_rewrite(const unsigned char *nal, int nal_len,
+                  unsigned char *out, int out_cap,
+                  const struct xrdp_h264_param_cache *c,
+                  int view, int to_intra_i, int fn)
+{
+    if (nal_len > XRDP_H264_LTR_HDR_SCAN)
+    {
+        int rv;
+
+        rv = slice_ltr_rewrite_sz(nal, nal_len, XRDP_H264_LTR_HDR_SCAN,
+                                  out, out_cap, c, view, to_intra_i, fn);
+        if (rv >= 0)
+        {
+            return rv;
+        }
+    }
+    return slice_ltr_rewrite_sz(nal, nal_len, nal_len, out, out_cap, c,
+                                view, to_intra_i, fn);
 }
 
 /*****************************************************************************/
@@ -2445,7 +2639,18 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
     }
     own = (view == 0) ? &st->main_cache : &st->aux_cache;
     out_cap = *len + xrdp_h264_ltr_growth_budget(data, *len);
-    out = (unsigned char *)malloc(out_cap);
+    /* #75: a picture-sized buffer is far above glibc's 128 KB
+     * M_MMAP_THRESHOLD, so malloc/free here was an mmap+munmap pair per
+     * view per frame and every page of it faulted on first touch --
+     * 4228 minor faults per pair measured at 4K. Held on the state and
+     * reused instead; xrdp_h264_ltr_state_free() releases it. */
+    if (st->scratch_cap < out_cap)
+    {
+        free(st->scratch);
+        st->scratch = (unsigned char *)malloc(out_cap);
+        st->scratch_cap = (st->scratch == NULL) ? 0 : out_cap;
+    }
+    out = st->scratch;
     if (out == NULL)
     {
         return 1;
@@ -2762,8 +2967,20 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
         }
         st->pic_index[view]++;
     }
-    free(out);
-    return rv;
+    return rv;                    /* out is st->scratch, kept for reuse */
+}
+
+/*****************************************************************************/
+void
+xrdp_h264_ltr_state_free(struct xrdp_h264_ltr_state *st)
+{
+    if (st == NULL)
+    {
+        return;
+    }
+    free(st->scratch);
+    st->scratch = NULL;
+    st->scratch_cap = 0;
 }
 
 /*****************************************************************************/

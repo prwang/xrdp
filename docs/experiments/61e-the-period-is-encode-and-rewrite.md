@@ -124,16 +124,107 @@ frame N could run while the children encode N+1.
    `eager_slot_ack = false` twin. The run says where the period goes,
    not what any switch is worth.
 
-## Open, and left open
+## FR-BENCH-1: PASSES at 1.52x — checked 2026-08-01, after this record was first written
 
-`collect` is 8.8 ms/frame of xrdp's own CPU for a single monitor. The
-comment beside that bracket in `xrdp_encoder.c` cites an offline
-rewrite bench of **1.75 ms/pair** — 5× less. The offline figure records
-no resolution, and this run is 9.22 Mpx at 3.5 MB/frame, so the gap may
-be entirely size. It is **not verified**, and it is the largest single
-piece of xrdp-side CPU in the period, so it is worth its own cheap
-check (`tools/avc444_ltr_rewrite_bench.c` at this frame size) before
-anyone designs against either number.
+**This check was owed and was missing.** `k8s/x013.yaml`'s own header
+says the payload's frame rate must clearly exceed the pipeline's send
+rate before anything is quoted from this arm, and names the file that
+proves it (`/tmp/e52_textflood_stamps.tsv` in the session). The gate
+never collected it and neither capture archived it. The worker `wait`
+bracket above is stronger evidence in one direction — it shows the
+pipeline never once waited on the producer — but it cannot show the
+MARGIN, and the margin is what decides whether the next lever is
+measurable at all.
+
+Read out of the still-running x013 pod and windowed to the verify run
+(2026-08-01 22:36:02–22:37:01 UTC, the same 59 s as the trace):
+
+| textflood's own loop | ms |
+|---|---|
+| render (cairo, in the payload's own process) | 13.80 |
+| blit (`XShmPutImage`) | 0.00 |
+| `XSync` | 2.89 |
+| **frame interval** | **16.71** (p50 16.37, p90 19.11, p99 22.71) |
+
+n = 3475 frames. Legs close on the interval to 0.02 ms, and the frame
+count closes independently: 3475 frames / 59 s = 58.9 fps against
+1000/16.71 = 59.8 fps.
+
+**59.8 fps producer against a 39.2 fps pipeline: requirement 1 holds,
+with 1.52x of margin.** The period reported above is the pipeline's,
+not the payload's.
+
+**But 1.52x is the whole remaining headroom of this payload, and #74
+Lever 2 asks for 1.53x.** Removing `collect` from the critical path
+takes the period 25.47 → 16.67 ms; the producer's own interval is
+16.71 ms. The prize lands exactly on the producer's ceiling, so a
+Lever 2 A/B measured with today's textflood would be reading the
+payload, not the change — the "producer-confounded" annotation #62
+already carries. Whatever is built for #74 needs the faster producer
+(PRD's design B, memmove scroll + strip render, 7.1 ms/frame offline
+on the T4) in place BEFORE the arm is run, not after the ratio
+disappoints.
+
+## RESOLVED 2026-08-01: the 8.8 ms is the rewriter, it is linear in bytes, and the gap to 1.75 ms/pair was entirely frame size
+
+`tools/avc444_ltr_rewrite_bench.c` (links `xrdp_h264_annexb.o`, not a
+copy), 60 pictures per view of 3840×2400 encoded with x013's own
+`encoder_args`, 20 iterations, dev box:
+
+    rewrite  per PAIR 11.750 ms   2.03 ns/byte
+    copy-in  per PAIR  0.207 ms   0.04 ns/byte
+
+**2.03 ns/byte × the run's real 3.48 MB/frame = 7.07 ms**, against a
+measured `collect` of 8.802 ms. The rewrite is ~80 % of the bracket;
+the remaining ~1.7 ms is the NAL/sequence FIFO pop and output buffer
+handling that `collect_pair` does around it. The old 1.75 ms/pair
+figure back-solves to ~860 KB/pair at this rate — 1080p-sized. **The 5×
+was frame size, as suspected. Nothing is unexplained.**
+
+**But the rate itself is the finding: 2.03 ns/byte is 50× the
+0.04 ns/byte the SAME bench measures for a plain `memcpy` of the same
+buffers.** The header edit is tens of bytes; the cost is that the whole
+coded picture is re-serialised around it. Measured split, same run
+(`getrusage` on the child):
+
+| where the 11.75 ms/pair goes | ms/pair | share |
+|---|---|---|
+| byte-at-a-time passes (start-code scan ×2, unescape, re-escape) | ~8.4 | 72 % |
+| `mmap`/`munmap` + first-touch faults from 6 large `malloc`s | 2.29 | 19 % |
+| bulk `memset` + two `memcpy`s | ~1.0 | 9 % |
+
+Page faults were **4228 per pair measured** against 4248 predicted from
+3 buffers × 2 views × 708 pages — closes to 0.5 %. `sys` was 2.75 s of
+16.43 s wall.
+
+Caveat on the payload: the bench's pictures are 2.9 MB of synthetic
+noise where the session's are 1.74 MB/view of text. The per-byte rate
+transfers because every pass visits every byte regardless of content;
+the absolute ms/pair does not.
+
+Antipatterns behind it, in the order they cost:
+
+1. **The CABAC payload is unescaped and re-escaped for nothing.** It is
+   byte-aligned in both input and output (`cabac_alignment_one_bit`
+   pads to a byte before it) and is copied verbatim, so the escaped
+   bytes are invariant — only a bounded boundary region can change.
+   Today `slice_ltr_rewrite` strips emulation-prevention from the whole
+   NAL and re-inserts it over the whole NAL, one byte at a time.
+2. **Six ~1.7 MB `malloc`/`free` per frame** (`out` in
+   `ltr_rewrite_walk`, `rbsp` and `newr` in `slice_ltr_rewrite`, twice
+   for two views). All far above glibc's 128 KB `M_MMAP_THRESHOLD`, so
+   each is an `mmap`+`munmap` pair whose every page faults on first
+   touch. Same class as #61h's ring-fault finding.
+3. **`memset(newr, 0, nal_len + 16)`** zeroes the whole picture buffer
+   when only the rewritten header is read before `memcpy` overwrites
+   the rest.
+4. **`find_start_code` is a naive byte-at-a-time triple compare** and
+   runs over the full payload once per NAL boundary, twice per packet
+   counting the `packet_intra_is_converted` pre-scan.
+
+The output is pinned byte-exactly by CI (`tests/xrdp/test_avc444_ltr.c`,
+234 assertions including `ck_assert_mem_eq` golden vectors), so any of
+these can be changed with the correctness question already answered.
 
 ## Correctness, which timing cannot affect but which ran anyway
 

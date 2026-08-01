@@ -59,6 +59,65 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
+## #75 — The LTR rewrite re-serialised a whole picture to edit 30 bytes of slice header (CODE DONE 2026-08-01, arm pending)
+
+**Why.** #61e measured `collect` at 8.802 ms of a 25.474 ms period, and
+`tools/avc444_ltr_rewrite_bench.c` attributes 7.07 ms of it to the
+rewriter: **1.90-2.03 ns/byte across runs, against 0.03-0.04 ns/byte for
+a plain `memcpy` of the same buffers in the same bench — ~60×.** The
+edit itself is the
+slice header, tens of bytes. This is the largest piece of xrdp-side CPU
+in the frame period and it is not AVC444 overhead in any inherent
+sense.
+
+**What costs it** (measured split, `getrusage` on the bench child):
+byte-at-a-time passes ~72 %, `mmap`/`munmap` + first-touch faults from
+six ~1.7 MB `malloc`s ~19 % (**4228 minor faults per pair measured**
+against 4248 predicted), bulk `memset`/`memcpy` ~9 %.
+
+**The four antipatterns**, in cost order:
+
+1. The CABAC payload is unescaped and re-escaped for nothing. It is
+   byte-aligned in both input and output (`cabac_alignment_one_bit`
+   pads to a byte before it) and copied verbatim, so its escaped bytes
+   are invariant whenever the emulation-prevention zero-state entering
+   the payload is the same in the old and new headers.
+2. Six ~1.7 MB `malloc`/`free` per frame, all above glibc's 128 KB
+   `M_MMAP_THRESHOLD`.
+3. `memset(newr, 0, nal_len + 16)` zeroes a whole picture buffer when
+   only the rewritten header is read before `memcpy` overwrites it.
+4. `find_start_code` is a byte-at-a-time triple compare over the full
+   payload, once per NAL boundary and twice per packet counting the
+   `packet_intra_is_converted` pre-scan.
+
+**Scope.** `xrdp/xrdp_h264_annexb.c` only. No wire change, no protocol
+change, no config knob: the emitted bytes must be IDENTICAL. The fast
+path is taken only when its precondition holds and falls back to
+today's code otherwise.
+
+**Acceptance.** (a) `make check` green with
+`tests/xrdp/test_avc444_ltr.c`'s golden byte vectors UNCHANGED — the
+test is what proves the output did not move, so touching it would void
+the whole exercise; (b) `avc444_ltr_rewrite_bench` ns/byte reported
+before and after on the same input; (c) one deployed arm measuring the
+end-to-end textflood send interval (owner-approved, 2026-08-01, ONE
+arm).
+
+**LANDED.** Offline: **11.027 -> 1.026 ms/pair, 1.90 -> 0.18 ns/byte,
+4228 -> 73 minor faults per pair**, against an unchanged 0.03 ns/byte
+`memcpy` control. Output proven identical two ways: CI 411/411 with the
+golden byte vectors UNTOUCHED, and an FNV-1a digest over 120 whole 4K
+pictures identical before and after (`12c16104c46343cb`). Predicted
+in-session effect: `collect` 8.8 -> ~2.4 ms, period 25.5 -> ~19.1 ms.
+Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`.
+
+**Known limit on (c), stated before the run.** The producer's own
+interval is 16.71 ms (#61e, FR-BENCH-1 section). If this lands as
+predicted the period approaches that number, so the arm measures a
+pipeline that is no longer clearly the bottleneck. Report the producer
+rate beside the send interval and do not quote a ratio the margin
+cannot support.
+
 ## #61c — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
 
 **Answered the day it was opened.** The session Xorg runs at **98.9 % of

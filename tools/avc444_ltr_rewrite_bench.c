@@ -10,12 +10,14 @@
  * over real Annex-B access units and reports ms per pair and ns per
  * byte.
  *
- * The rewrite's shape per slice NAL is: full-NAL unescape -> bit-copy
- * of the slice header with the LTR edits -> byte-verbatim memcpy of the
- * CABAC payload -> full re-escape. Two byte-at-a-time passes over the
- * whole packet plus one memcpy, so the cost is expected to be linear in
- * the bitstream, which is what the ns/byte figure is for: multiply it
- * by the bytes/frame a real session actually produces.
+ * The rewrite's shape per slice NAL is: unescape a bounded prefix to
+ * reach the end of the slice header -> bit-copy of that header with the
+ * LTR edits -> verbatim memcpy of the child's already-escaped CABAC
+ * payload (BACKLOG #75; before it, the whole packet was unescaped and
+ * re-escaped one byte at a time). The cost is still linear in the
+ * bitstream because the payload is copied, which is what the ns/byte
+ * figure is for: multiply it by the bytes/frame a real session actually
+ * produces.
  *
  * build (from repo root, after `make`):
  *   gcc -O2 -I xrdp -I common tools/avc444_ltr_rewrite_bench.c \
@@ -41,6 +43,29 @@ struct au
     unsigned char *data;
     int len;
 };
+
+/*
+ * FNV-1a over every rewritten packet, in order. The point of this bench
+ * is to make the rewrite cheaper, and a cheaper rewrite is only a
+ * rewrite if it emits the same bytes -- so the digest is printed beside
+ * the timing and an optimisation is compared against the digest of the
+ * build it replaced. CI's golden vectors (tests/xrdp/test_avc444_ltr.c)
+ * pin the same property on small hand-built inputs; this pins it on
+ * whole 4K pictures out of a real encoder, which is where a
+ * size-dependent mistake would hide.
+ */
+static unsigned long long
+fnv1a(unsigned long long h, const unsigned char *p, int n)
+{
+    int i;
+
+    for (i = 0; i < n; i++)
+    {
+        h ^= p[i];
+        h *= 1099511628211ULL;
+    }
+    return h;
+}
 
 static double
 now_ms(void)
@@ -179,6 +204,7 @@ main(int argc, char **argv)
     long long bytes = 0;
     long long done = 0;
     int failures = 0;
+    unsigned long long digest = 14695981039346656037ULL;
 
     if (argc < 3)
     {
@@ -262,6 +288,10 @@ main(int argc, char **argv)
                 failures++;
                 continue;
             }
+            if (it == 0)
+            {
+                digest = fnv1a(digest, work, len);
+            }
             done++;
 
             /* AUX */
@@ -283,12 +313,22 @@ main(int argc, char **argv)
                 failures++;
                 continue;
             }
+            if (it == 0)
+            {
+                digest = fnv1a(digest, work, len);
+            }
             done++;
         }
+        /* the rewrite holds a picture-sized scratch buffer on the state
+         * (#75); a bench that forgot to release it would grow by one
+         * per iteration */
+        xrdp_h264_ltr_state_free(&st);
     }
 
     printf("iters %d  packets rewritten %lld  failures %d\n",
            iters, done, failures);
+    printf("output digest (FNV-1a over every rewritten packet) %016llx\n",
+           digest);
     printf("rewrite  total %8.1f ms   per PAIR %6.3f ms   %5.2f ns/byte\n",
            t_rw, t_rw / (iters * (double)pairs),
            t_rw * 1.0e6 / (double)(bytes * iters));

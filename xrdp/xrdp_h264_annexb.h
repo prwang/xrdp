@@ -239,7 +239,23 @@ struct xrdp_h264_ltr_state
      * always sets it when aux_ltr_chain is on. */
     int refresh_period;
     int pic_index[2];
+    /* #75: reusable output buffer for the rewrite, grown on demand and
+     * released by xrdp_h264_ltr_state_free(). A picture-sized malloc
+     * per view per frame was an mmap+munmap pair whose every page
+     * faulted on first touch. Zero-initialised state means "not yet
+     * allocated", so an existing caller that memsets its state needs no
+     * change. */
+    unsigned char *scratch;
+    int scratch_cap;
 };
+
+/*
+ * Release the rewrite scratch buffer. Safe on a zeroed state and safe to
+ * call twice; the state stays usable afterwards (the buffer simply
+ * re-grows on the next packet).
+ */
+void
+xrdp_h264_ltr_state_free(struct xrdp_h264_ltr_state *st);
 
 /*
  * Worst-case output growth of the LTR rewrite for an Annex-B packet
