@@ -290,6 +290,40 @@ attached. State plainly that the hypothesis was falsified, revert the
 change, and record the next open hypothesis rather than reaching for the
 nearest explanation.
 
+### Never spend a long run on a binary check (owner directive, 2026-08-01)
+
+**A yes/no question gets a yes/no-sized instrument. Ten minutes to
+answer one bit is a violation, not thoroughness.** Before starting any
+measurement, state the question, then pick the CHEAPEST instrument that
+can answer *that* question — not the instrument already lying around,
+and not the one that would answer a bigger question you were not asked.
+
+- **Violation, 2026-08-01, do not repeat.** BACKLOG #61e needed one bit:
+  *"is a freshly-created pod slower at CPU/memory work than a warm
+  one — yes or no?"* The answer was chased with a full
+  `e_gate_run.sh 60` — cold session login, 60 s of capture, a multi-GB
+  oracle dump, a 7-check wire audit and a full black-frame decode —
+  roughly ten minutes per arm, and a *third* arm (x007) was built and
+  deployed to run it a third time. The same bit is available in seconds
+  from `tools/avc444_pack_bench.c` run inside each pod: no session, no
+  client, no encode, no dump. **Two of the three runs were pure waste,
+  and building x007 was waste on top of it.**
+- **The gate is a gate, not a probe.** `e_gate_run.sh` exists to certify
+  a configuration end to end — rate *plus* correctness *plus* wire
+  conformance. Reaching for it to answer "is X slower than Y" pays for
+  every one of those and uses one. A probe that isolates a single
+  variable belongs in `PR-demo/` as its own script, or is a one-liner
+  in the pod.
+- **Rule of thumb for duration.** A *rate* needs a long run. A *binary
+  property*, a *presence check*, a *this-or-that attribution*, or "did
+  the knob apply at all" is answered by seconds of trace, one log line,
+  a microbench, or a unit test — and if none of those can answer it,
+  say so explicitly and justify the long run before starting it.
+- **Corollary — do not deploy an arm to answer a bit.** A new fleet arm
+  costs an image build and a k3s import. Build one to hold a
+  *configuration* under test, never to run a single comparison that a
+  microbench inside an existing pod would settle.
+
 ## Demo & reproduction scaffolding
 
 - **`PR-demo/`** holds box-specific reproduction harnesses (and their committed
