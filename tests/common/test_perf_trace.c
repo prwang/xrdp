@@ -30,6 +30,7 @@
 #endif
 
 #include <string.h>
+#include <stdlib.h>
 #include "perf_trace.h"
 #include "test_common.h"
 
@@ -96,6 +97,145 @@ START_TEST(test_perf_trace_disarmed_by_default)
 }
 END_TEST
 
+/* --- the SPSC ring (PRD FR-TRACE-1) ---------------------------------
+ *
+ * Every expected value below comes from the SPECIFICATION of a
+ * head/tail ring that leaves one slot empty to tell full from empty:
+ *
+ *   - a ring of N slots holds N-1 records, never N;
+ *   - it is FIFO;
+ *   - the push that would make head meet tail stores NOTHING and
+ *     increments ->dropped;
+ *   - a pop frees exactly one slot, so a full ring accepts exactly one
+ *     more push per pop;
+ *   - popping an empty ring reports empty and does not invent a record.
+ *
+ * None of these numbers were obtained by running perf_trace.c. If the
+ * ring is reimplemented (a different capacity convention, a count
+ * field, a lock-free variant), these are the claims it must still
+ * satisfy -- and the one that must NOT be quietly edited to agree with
+ * it is the capacity: N-1 is a decision, not an accident. */
+
+START_TEST(test_perf_trace_ring_fifo_order)
+{
+    struct perf_trace_ring *r;
+    struct perf_trace_rec rec;
+    int index;
+
+    r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
+    ck_assert_ptr_ne(r, NULL);
+    for (index = 0; index < 5; index++)
+    {
+        ck_assert_int_eq(perf_trace_ring_push(r, 100 + index, 7, "subm_beg",
+                                              index, 0), 1);
+    }
+    for (index = 0; index < 5; index++)
+    {
+        ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 1);
+        ck_assert_int_eq((int)rec.ns, 100 + index);
+        ck_assert_int_eq(rec.a, index);
+        ck_assert_int_eq((int)rec.tid, 7);
+        ck_assert_str_eq(rec.tag, "subm_beg");
+    }
+    ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 0);
+    ck_assert_uint_eq(r->dropped, 0);
+    free(r);
+}
+END_TEST
+
+/* Capacity is SLOTS-1, and the overflowing push must not store. */
+START_TEST(test_perf_trace_ring_capacity_is_slots_minus_one)
+{
+    struct perf_trace_ring *r;
+    struct perf_trace_rec rec;
+    int index;
+
+    r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
+    ck_assert_ptr_ne(r, NULL);
+    for (index = 0; index < PERF_TRACE_RING_SLOTS - 1; index++)
+    {
+        ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "pump_beg", index,
+                                              0), 1);
+    }
+    /* the N-th push has nowhere to go */
+    ck_assert_int_eq(perf_trace_ring_push(r, 999999, 1, "pump_beg", 999, 0),
+                     0);
+    ck_assert_uint_eq(r->dropped, 1);
+    /* and it stored nothing: the head of the queue is still record 0 */
+    ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 1);
+    ck_assert_int_eq(rec.a, 0);
+    /* one pop freed exactly one slot */
+    ck_assert_int_eq(perf_trace_ring_push(r, 12345, 1, "pump_end", 42, 0), 1);
+    ck_assert_int_eq(perf_trace_ring_push(r, 12346, 1, "pump_end", 43, 0), 0);
+    ck_assert_uint_eq(r->dropped, 2);
+    free(r);
+}
+END_TEST
+
+/* Drops are COUNTED, not silent: a full ring keeps counting every
+ * rejected push, which is what lets an analysis tell a complete trace
+ * from a truncated one. */
+START_TEST(test_perf_trace_ring_counts_every_drop)
+{
+    struct perf_trace_ring *r;
+    int index;
+
+    r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
+    ck_assert_ptr_ne(r, NULL);
+    for (index = 0; index < PERF_TRACE_RING_SLOTS - 1; index++)
+    {
+        perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0);
+    }
+    for (index = 0; index < 100; index++)
+    {
+        ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "coll_beg", 0, 0),
+                         0);
+    }
+    ck_assert_uint_eq(r->dropped, 100);
+    free(r);
+}
+END_TEST
+
+/* The index wraps rather than growing: pushing and popping far more
+ * records than the ring holds must work, and must never drop. */
+START_TEST(test_perf_trace_ring_wraps_without_dropping)
+{
+    struct perf_trace_ring *r;
+    struct perf_trace_rec rec;
+    int index;
+
+    r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
+    ck_assert_ptr_ne(r, NULL);
+    for (index = 0; index < PERF_TRACE_RING_SLOTS * 3; index++)
+    {
+        ck_assert_int_eq(perf_trace_ring_push(r, index, 1, "emit_beg", index,
+                                              0), 1);
+        ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 1);
+        ck_assert_int_eq(rec.a, index);
+    }
+    ck_assert_uint_eq(r->dropped, 0);
+    ck_assert_int_eq(perf_trace_ring_pop(r, &rec), 0);
+    free(r);
+}
+END_TEST
+
+/* A NULL ring or a NULL out is refused, not dereferenced: the source
+ * path calls push with whatever perf_trace_my_ring() returned, and that
+ * is NULL when the pool is exhausted. */
+START_TEST(test_perf_trace_ring_rejects_null)
+{
+    struct perf_trace_rec rec;
+    struct perf_trace_ring *r;
+
+    ck_assert_int_eq(perf_trace_ring_push(NULL, 1, 1, "x", 0, 0), 0);
+    ck_assert_int_eq(perf_trace_ring_pop(NULL, &rec), 0);
+    r = (struct perf_trace_ring *)calloc(1, sizeof(*r));
+    ck_assert_ptr_ne(r, NULL);
+    ck_assert_int_eq(perf_trace_ring_pop(r, NULL), 0);
+    free(r);
+}
+END_TEST
+
 Suite *
 make_suite_test_perf_trace(void)
 {
@@ -111,6 +251,11 @@ make_suite_test_perf_trace(void)
     tcase_add_test(tc, test_perf_trace_format_truncates);
     tcase_add_test(tc, test_perf_trace_format_rejects_bad_args);
     tcase_add_test(tc, test_perf_trace_disarmed_by_default);
+    tcase_add_test(tc, test_perf_trace_ring_fifo_order);
+    tcase_add_test(tc, test_perf_trace_ring_capacity_is_slots_minus_one);
+    tcase_add_test(tc, test_perf_trace_ring_counts_every_drop);
+    tcase_add_test(tc, test_perf_trace_ring_wraps_without_dropping);
+    tcase_add_test(tc, test_perf_trace_ring_rejects_null);
 
     return s;
 }

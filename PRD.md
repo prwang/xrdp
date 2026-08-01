@@ -1035,6 +1035,96 @@ overlap" T4 run convicts the producer, not the pipeline; and the PRD's
 holding, which its 1600×912 evidence satisfied and 4K does not.
 Tracked under the linear chain **BACKLOG #70 → #70B → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
 
+### FR-TRACE-1: The perf tracer must not be able to perturb what it measures (owner directive, 2026-08-01)
+
+**An instrument that serializes the threads it observes produces
+fiction, and it produces it in the shape of a plausible result.** The
+perf-trace sink is not a logger and is not held to a logger's
+standards: it is a measuring device inside the hot path, and the
+following are hard requirements, not preferences.
+
+1. **The SOURCE must never block.** The call site — the `PERF_TRACE`
+   macro, invoked from the encoder worker, the EGFX assembler and the
+   main thread — must not execute any syscall, must not perform I/O,
+   must not allocate, and must not acquire any lock that a slow path
+   can hold. Reading a coarse monotonic clock through the vDSO is
+   permitted because it is not a syscall. Nothing else is.
+2. **SOURCE and SINK must live on different threads, joined by a ring
+   buffer.** The source appends a fixed-size record to the ring and
+   returns. A dedicated sink thread — and only that thread — drains the
+   ring, formats, and writes to disk. The sink is *allowed* to block,
+   serialize and be slow, because nothing measured is waiting on it.
+3. **Overflow drops, and drops are COUNTED and REPORTED.** When the
+   ring is full the source discards the record and increments a
+   counter; it must never block, never spin and never grow the ring in
+   the hot path. The drop count must be emitted into the trace so that
+   an analysis can tell a complete trace from a truncated one. A
+   silently truncated trace is worse than no trace (the "no silent
+   caps" rule).
+4. **No shared `FILE*`, ever.** More than one thread using stdio on one
+   stream is the defect this requirement exists to forbid.
+
+**Why this is a requirement and not a nicety — the measurement it
+destroyed (2026-08-01, BACKLOG #61e).** The original sink was a
+`fprintf` onto a shared `FILE*`. `fprintf` takes `flockfile`, so every
+event serialized against every other event *in whatever thread issued
+it*, and the wait landed inside whichever stage bracket happened to be
+open. While that sink was written to by ONE thread it was invisible.
+Adding a single `enq` record on the **main** thread — one event per
+frame, ~140 events/second total — put a second thread on the stream for
+the first time and the measured frame period went **40.4 ms → 135.3 ms,
+a 3.3× regression that existed only while the instrument was armed**.
+The stages that inflated were exactly the CPU-side ones (`subm`
+3.53 → 16.60, `emit` 5.89 → 30.06, and a `book` bracket containing three
+integer increments and one log write measured at **12.55 ms**), while
+the child-blocking `pump` was untouched — the signature of serialization,
+not of work. Two hypotheses were floated and killed by measurement
+before the real cause was found: log VOLUME (identical at 14.1
+lines/frame, and 3.3× *fewer* per second on the slow arm) and pod
+CPU/memory (`avc444_pack_bench` identical at 3.32 vs 3.23 ms/frame).
+**The instrument was the bug.**
+
+**Implementation decision (2026-08-01): an in-tree, per-thread SPSC ring
+in C. `spdlog` was considered and REJECTED.**
+
+spdlog was the obvious off-the-shelf answer — Debian ships it
+(`libspdlog-dev`, trixie 1:1.15.2), it is MIT, and its async mode has
+the right shape (a `circular_q` drained by a dedicated backend thread).
+It was rejected on two counts, both recorded so the decision is not
+re-litigated from scratch:
+
+- **It would put `libstdc++` into the shipped `xrdp` binary**, which
+  links no C++ runtime today — only the optional `vrplayer/` Qt tool is
+  C++. Paying a permanent runtime dependency in the RDP server for a
+  diagnostic that is disarmed in production is the wrong trade, and it
+  is a dependency the upstream `devel` PR would rightly refuse.
+- **It is not lock-free anyway.** `mpmc_blocking_q` is a `std::mutex`
+  plus condition variables around the ring, so the source still takes a
+  shared lock — a weaker guarantee than clause 1 deserves, for a
+  library whose whole appeal was not having to think about this.
+
+The in-tree design gives a **stronger** guarantee than spdlog would:
+
+- **One ring per producer thread**, claimed from a fixed pool at first
+  use, so producers never contend with each other at all — there is no
+  shared lock on the source path, not merely a short one. Each ring is
+  single-producer / single-consumer, so `head` is written only by its
+  producer and `tail` only by the sink.
+- **The pool is allocated when the sink is ARMED**, never on the source
+  path, so clause 1's "must not allocate" holds literally. A thread that
+  finds the pool exhausted drops and counts, and never blocks.
+- **`tag` is stored as a pointer, not copied** — every call site passes
+  a string literal, which is a documented precondition of the API, and
+  it keeps the source path free of any formatting work.
+- **Only the sink thread ever touches the `FILE*`**, satisfying clause 4
+  by construction rather than by convention.
+
+The ring's push/pop/overflow behaviour is pure logic and is unit-tested
+in `tests/common/` against the SPSC specification (capacity `N` yields
+`N-1` usable slots; FIFO order; the `N`th push drops and increments the
+counter) — the expected values come from the ring specification, never
+from running the implementation.
+
 ### FR-ACK-1: WITHDRAWN 2026-07-31 — see NG-9 and BACKLOG #70
 
 The filing (ack-on-consume as the fix for a rect_id "ghost") was

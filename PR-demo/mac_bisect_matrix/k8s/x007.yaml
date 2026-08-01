@@ -1,4 +1,4 @@
-# Arm x005: BACKLOG #61b/#70B — the emit-split A/B re-run under a payload
+# Arm x007: BACKLOG #61b/#70B — the emit-split A/B re-run under a payload
 # that does NOT saturate the producer.
 #
 # #61c measured the reason this pair exists: under codeflood the session
@@ -13,31 +13,31 @@
 # must clearly exceed the pipeline's send rate. #62's T4 result was later
 # annotated producer-confounded for want of exactly that check.
 #
-# RDP endpoint on the host: 127.0.0.1:40027.
+# RDP endpoint on the host: 127.0.0.1:40029.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: xrdp-x005
+  name: xrdp-x007
   namespace: bisect-matrix
   labels:
     app: xrdp-bisect
-    arm: x005
+    arm: x007
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      arm: x005
+      arm: x007
   template:
     metadata:
       labels:
         app: xrdp-bisect
-        arm: x005
+        arm: x007
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:05847031a303.xx10fa3aa-tf
+          image: localhost/xrdp-bisect:4bbf11814323.xx10fa3aa-tf
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -45,7 +45,7 @@ spec:
             - name: SESSION_KIND
               value: "textflood"
             - name: ARM_LABEL
-              value: "x005: #61e instrumented, textflood + emit split=false (port 40027)"
+              value: "x007: #61e instrumented, textflood + emit split=false (port 40029)"
             - name: XRDP_GFX_TRACE
               value: "1"
             - name: XRDP_ACK_TRACE
@@ -54,7 +54,7 @@ spec:
               value: "/var/log/xrdp-perf/enc"
           ports:
             - containerPort: 3389
-              hostPort: 40027
+              hostPort: 40029
               hostIP: 127.0.0.1
               protocol: TCP
           volumeMounts:
@@ -102,4 +102,4 @@ spec:
             defaultMode: 0o755
         - name: gfx
           configMap:
-            name: xrdp-gfx-x005
+            name: xrdp-gfx-x007

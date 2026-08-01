@@ -15,8 +15,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Dedicated performance trace sink -- see perf_trace.h for why this is
- * not the logger.
+ * Dedicated performance trace sink -- see perf_trace.h for why the
+ * source and the sink are on different threads (PRD FR-TRACE-1).
  */
 
 #if defined(HAVE_CONFIG_H)
@@ -32,14 +32,42 @@
 
 #include "perf_trace.h"
 
-/* one page short of a MiB is pointless precision; a round buffer keeps
- * the amortised write() cost per event in the single-digit ns */
+/* The SINK's own stdio buffer. Only the sink thread ever touches the
+ * FILE*, so this buffering is invisible to every measured thread. */
 #define PERF_TRACE_BUF_SIZE (1024 * 1024)
+
+/* How long the sink sleeps between drain passes. A ring holds
+ * PERF_TRACE_RING_SLOTS - 1 = 8191 records; at the rate this is used
+ * for (single digits of events per frame, tens of frames per second) a
+ * 10 ms pass drains a handful of records and the ring is never close to
+ * full. It is deliberately NOT event-driven: a condition variable would
+ * put a shared lock back on the source path, which is the entire defect
+ * this design exists to remove. */
+#define PERF_TRACE_DRAIN_MS 10
 
 static FILE *g_perf_file = NULL;
 static char *g_perf_buf = NULL;
 static int g_perf_armed = 0;
 static pthread_once_t g_perf_once = PTHREAD_ONCE_INIT;
+
+/* The ring pool. Allocated ONCE when the sink is armed -- never on the
+ * source path, so perf_trace_ev() cannot allocate. */
+static struct perf_trace_ring *g_perf_rings = NULL;
+static int g_perf_ring_count = 0;
+static pthread_t g_perf_sink;
+static int g_perf_sink_live = 0;
+static volatile int g_perf_quit = 0;
+
+/* Threads that wanted a ring and found the pool exhausted. Written by
+ * any thread, read by the sink; it is a diagnostic counter, so a lost
+ * update is acceptable where a lock on the source path is not. */
+static volatile unsigned int g_perf_no_ring = 0;
+
+/* This thread's ring, resolved once per thread. NULL means "not yet
+ * looked up"; the claim below sets it to a ring or leaves it NULL and
+ * sets g_perf_no_ring. */
+static __thread struct perf_trace_ring *g_perf_my_ring = NULL;
+static __thread int g_perf_my_ring_done = 0;
 
 /*****************************************************************************/
 static long long
@@ -47,11 +75,141 @@ perf_trace_now_ns(void)
 {
     struct timespec ts;
 
+    /* vDSO on Linux: a memory read and arithmetic, not a syscall. This
+     * is the ONE thing FR-TRACE-1 clause 1 permits on the source path. */
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
     {
         return 0;
     }
     return (long long)ts.tv_sec * 1000000000LL + (long long)ts.tv_nsec;
+}
+
+/*****************************************************************************/
+/* SPSC push. Called ONLY by the thread that owns this ring, so head is
+ * read and written by this thread alone and needs no lock. Returns 1 if
+ * the record was stored, 0 if the ring was full. */
+int
+perf_trace_ring_push(struct perf_trace_ring *r, long long ns, long long tid,
+                     const char *tag, int a, int b)
+{
+    unsigned int head;
+    unsigned int next;
+
+    if (r == NULL)
+    {
+        return 0;
+    }
+    head = r->head;
+    next = (head + 1) & PERF_TRACE_RING_MASK;
+    /* One slot is left empty so that full and empty are distinguishable
+     * without a shared count. */
+    if (next == r->tail)
+    {
+        r->dropped++;
+        return 0;
+    }
+    r->slots[head].ns = ns;
+    r->slots[head].tid = tid;
+    r->slots[head].tag = tag;
+    r->slots[head].a = a;
+    r->slots[head].b = b;
+    /* The slot must be visible to the sink BEFORE the index that
+     * publishes it, or the sink can read a half-written record. */
+    __sync_synchronize();
+    r->head = next;
+    return 1;
+}
+
+/*****************************************************************************/
+/* SPSC pop. Called ONLY by the sink thread. Returns 1 and fills *out if
+ * a record was available, 0 if the ring was empty. */
+int
+perf_trace_ring_pop(struct perf_trace_ring *r, struct perf_trace_rec *out)
+{
+    unsigned int tail;
+
+    if (r == NULL || out == NULL)
+    {
+        return 0;
+    }
+    tail = r->tail;
+    if (tail == r->head)
+    {
+        return 0;
+    }
+    /* Read the published index before the slot it publishes. */
+    __sync_synchronize();
+    *out = r->slots[tail];
+    __sync_synchronize();
+    r->tail = (tail + 1) & PERF_TRACE_RING_MASK;
+    return 1;
+}
+
+/*****************************************************************************/
+int
+perf_trace_format(char *buf, int len, long long ns, long long tid,
+                  const char *tag, int a, int b)
+{
+    if (buf == NULL || len < 1 || tag == NULL)
+    {
+        return -1;
+    }
+    return snprintf(buf, (size_t)len, "%lld %lld %s %d %d\n", ns, tid,
+                    tag, a, b);
+}
+
+/*****************************************************************************/
+/* One drain pass over every ring. Sink thread only. */
+static void
+perf_trace_drain(void)
+{
+    struct perf_trace_rec rec;
+    int index;
+    unsigned int dropped;
+
+    for (index = 0; index < g_perf_ring_count; index++)
+    {
+        struct perf_trace_ring *r = &g_perf_rings[index];
+
+        while (perf_trace_ring_pop(r, &rec))
+        {
+            fprintf(g_perf_file, "%lld %lld %s %d %d\n", rec.ns, rec.tid,
+                    rec.tag, rec.a, rec.b);
+        }
+        /* A truncated trace must announce itself. */
+        dropped = r->dropped;
+        if (dropped != r->drop_seen)
+        {
+            fprintf(g_perf_file, "%lld %d perfdrop %u %d\n",
+                    perf_trace_now_ns(), index, dropped, index);
+            r->drop_seen = dropped;
+        }
+    }
+}
+
+/*****************************************************************************/
+static void *
+perf_trace_sink_thread(void *arg)
+{
+    struct timespec ts;
+
+    (void)arg;
+    ts.tv_sec = 0;
+    ts.tv_nsec = PERF_TRACE_DRAIN_MS * 1000000L;
+    while (!g_perf_quit)
+    {
+        perf_trace_drain();
+        nanosleep(&ts, NULL);
+    }
+    /* Final pass: whatever the producers wrote before they stopped. */
+    perf_trace_drain();
+    if (g_perf_no_ring != 0)
+    {
+        fprintf(g_perf_file, "%lld 0 perfnoring %u 0\n",
+                perf_trace_now_ns(), g_perf_no_ring);
+    }
+    fflush(g_perf_file);
+    return NULL;
 }
 
 /*****************************************************************************/
@@ -85,6 +243,35 @@ perf_trace_open(void)
     {
         setvbuf(g_perf_file, g_perf_buf, _IOFBF, PERF_TRACE_BUF_SIZE);
     }
+    /* The whole pool, up front. After this point the source path never
+     * allocates -- it only claims an already-built ring. */
+    g_perf_rings = (struct perf_trace_ring *)
+                   calloc(PERF_TRACE_MAX_RINGS,
+                          sizeof(struct perf_trace_ring));
+    if (g_perf_rings == NULL)
+    {
+        fclose(g_perf_file);
+        g_perf_file = NULL;
+        free(g_perf_buf);
+        g_perf_buf = NULL;
+        return;
+    }
+    g_perf_ring_count = PERF_TRACE_MAX_RINGS;
+    if (pthread_create(&g_perf_sink, NULL, perf_trace_sink_thread,
+                       NULL) != 0)
+    {
+        /* No sink thread means no way to drain, and a source that fills
+         * its ring and drops everything is worse than a disarmed one. */
+        free(g_perf_rings);
+        g_perf_rings = NULL;
+        g_perf_ring_count = 0;
+        fclose(g_perf_file);
+        g_perf_file = NULL;
+        free(g_perf_buf);
+        g_perf_buf = NULL;
+        return;
+    }
+    g_perf_sink_live = 1;
     g_perf_armed = 1;
 }
 
@@ -97,42 +284,79 @@ perf_trace_on(void)
 }
 
 /*****************************************************************************/
-int
-perf_trace_format(char *buf, int len, long long ns, long long tid,
-                  const char *tag, int a, int b)
+/* Claim this thread's ring. Runs at most once per thread; the claim is
+ * an atomic test-and-set on an already-allocated slot, so it neither
+ * allocates nor takes a lock. */
+static struct perf_trace_ring *
+perf_trace_my_ring(void)
 {
-    if (buf == NULL || len < 1 || tag == NULL)
+    int index;
+
+    if (g_perf_my_ring_done)
     {
-        return -1;
+        return g_perf_my_ring;
     }
-    return snprintf(buf, (size_t)len, "%lld %lld %s %d %d\n", ns, tid,
-                    tag, a, b);
+    g_perf_my_ring_done = 1;
+    for (index = 0; index < g_perf_ring_count; index++)
+    {
+        if (__sync_bool_compare_and_swap(&g_perf_rings[index].claimed, 0, 1))
+        {
+            g_perf_my_ring = &g_perf_rings[index];
+            return g_perf_my_ring;
+        }
+    }
+    /* Pool exhausted: this thread drops, loudly in the trace, rather
+     * than blocking or allocating on the measured path. */
+    __sync_fetch_and_add(&g_perf_no_ring, 1);
+    return NULL;
 }
 
 /*****************************************************************************/
 void
 perf_trace_ev(const char *tag, int a, int b)
 {
+    struct perf_trace_ring *r;
+
     if (!g_perf_armed || tag == NULL)
     {
         return;
     }
-    /* stdio takes its own lock, so concurrent worker/main-thread events
-     * cannot tear a record; the tid field is what separates them */
-    fprintf(g_perf_file, "%lld %lld %s %d %d\n", perf_trace_now_ns(),
-            (long long)pthread_self(), tag, a, b);
+    r = perf_trace_my_ring();
+    if (r == NULL)
+    {
+        return;
+    }
+    /* No syscall, no I/O, no allocation, no shared lock -- a clock read
+     * through the vDSO and a store into this thread's own ring. */
+    perf_trace_ring_push(r, perf_trace_now_ns(), (long long)pthread_self(),
+                         tag, a, b);
 }
 
 /*****************************************************************************/
 void
 perf_trace_close(void)
 {
+    if (g_perf_sink_live)
+    {
+        /* Stop producing before draining, so the final pass sees a
+         * quiescent set of rings. */
+        g_perf_armed = 0;
+        g_perf_quit = 1;
+        pthread_join(g_perf_sink, NULL);
+        g_perf_sink_live = 0;
+    }
+    g_perf_armed = 0;
     if (g_perf_file != NULL)
     {
-        g_perf_armed = 0;
         fflush(g_perf_file);
         fclose(g_perf_file);
         g_perf_file = NULL;
+    }
+    if (g_perf_rings != NULL)
+    {
+        free(g_perf_rings);
+        g_perf_rings = NULL;
+        g_perf_ring_count = 0;
     }
     if (g_perf_buf != NULL)
     {

@@ -37,7 +37,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:4bbf11814323.xx10fa3aa-tf
+          image: localhost/xrdp-bisect:05847031a303.xx10fa3aa-tf
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -45,7 +45,7 @@ spec:
             - name: SESSION_KIND
               value: "textflood"
             - name: ARM_LABEL
-              value: "x006: #61b textflood + emit split=true (port 40028)"
+              value: "x006: #61e instrumented, textflood + emit split=true (port 40028)"
             - name: XRDP_GFX_TRACE
               value: "1"
             - name: XRDP_ACK_TRACE

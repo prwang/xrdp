@@ -48,6 +48,9 @@ DIST=${DIST:-/work/dist}
 # x003 / x004 are the SAME A/B under SESSION_KIND=textflood -- the #61b
 # payload whose X-side cost is a memcpy. Deployed together:
 #   build_and_deploy.sh x003 x004
+# x005 / x006 are x003 / x004 on the #61e INSTRUMENTED build (the wait
+# and residency brackets). Deployed together:
+#   build_and_deploy.sh x005 x006
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -101,6 +104,15 @@ declare -A ARM_XORG_DEB=(
     # Same debs on all four arms; the pairs differ only in SESSION_KIND.
     [x003]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x004]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x005/x006 (BACKLOG #61e): x003/x004's configs on the INSTRUMENTED
+    # xrdp. The xorgxrdp side is untouched -- the new brackets are all
+    # inside xrdp, and the producer must stay identical or the `wait`
+    # bracket would be measuring a different capture path.
+    [x005]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x006]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x007 (#61e CONTROL): fresh pod, OLD deb -- the arm that separates
+    # "the instrumented deb is slow" from "a fresh pod is slow".
+    [x007]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -120,6 +132,11 @@ declare -A ARM_TAG=(
     # A distinct tag so x001/x002 keep the exact image they were measured on.
     [x003]=4bbf11814323.xx10fa3aa-tf
     [x004]=4bbf11814323.xx10fa3aa-tf
+    # #61e: a NEW tag, never a rebuild of the -tf image -- x003/x004
+    # keep the exact bytes their 1.12x was measured on.
+    [x005]=05847031a303.xx10fa3aa-tf
+    [x006]=05847031a303.xx10fa3aa-tf
+    [x007]=4bbf11814323.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -151,6 +168,11 @@ declare -A TAG_DEB=(
     # join). Default off in the binary; armed per arm by gfx.toml.
     [4bbf11814323.xx10fa3aa]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
     [4bbf11814323.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
+    # x005/x006 (BACKLOG #61e): the same encoder plus five perf-trace
+    # brackets -- book, rel, wait, enq, take. Behaviourally a no-op with
+    # the sink disarmed, which gate 4 (x005 vs x003, x006 vs x004) is
+    # there to confirm rather than assume.
+    [05847031a303.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801141607.05847031a303_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
