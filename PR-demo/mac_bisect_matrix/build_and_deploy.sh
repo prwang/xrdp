@@ -61,6 +61,11 @@ DIST=${DIST:-/work/dist}
 # with the trace on log.c. A control arm would buy nothing an attribution
 # that closes against its own period does not already have:
 #   build_and_deploy.sh x013
+# x014 is x013 with BACKLOG #75's rewrite optimisation and NOTHING else --
+# same xorgxrdp, same gfx.toml body, same payload. It is the one arm the
+# owner approved for #75, and its comparison target is x013's recorded
+# 25.5 ms:
+#   build_and_deploy.sh x014
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -126,6 +131,9 @@ declare -A ARM_XORG_DEB=(
     # x013 (#61e redo): the SAME xorgxrdp as x005/x006/x007, so the
     # producer side is identical to the arms whose numbers this replaces
     [x013]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x014 (#75): the SAME xorgxrdp as x013 -- the only thing that differs
+    # between the two arms is the xrdp build
+    [x014]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -160,6 +168,11 @@ declare -A ARM_TAG=(
     # the history rewrite removed, so it is rebuilt from a hash that still
     # exists rather than deployed from a package nothing can trace.
     [x013]=82babb9fe4ba.xx10fa3aa-tf
+    # x014: x013 plus BACKLOG #75 -- the LTR rewrite copies the child's
+    # already-escaped payload instead of unescaping and re-escaping the
+    # whole picture around a 30-byte header edit. gfx.toml body is
+    # x013's byte for byte, so the arms differ only in the xrdp deb.
+    [x014]=73e4cb76d483.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -200,6 +213,10 @@ declare -A TAG_DEB=(
     # x013 (#61e redo): per-frame records on common/perf_trace's ring
     # instead of log.c -- the #61h fix, plus the six-field payload
     [82babb9fe4ba.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801213501.82babb9fe4ba_amd64.deb"
+    # x014 (#75): the rewrite optimisation, output byte-identical to the
+    # x013 build (CI golden vectors + an FNV-1a digest over 120 whole 4K
+    # pictures)
+    [73e4cb76d483.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801232618.73e4cb76d483_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

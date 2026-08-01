@@ -42,6 +42,9 @@ D=$(cd "$(dirname "$0")" && pwd)
 ARM=${1:?usage: arm_certify.sh <arm> [port]}
 NS=${E_NS:-bisect-matrix}
 SECS=${CERT_SECS:-3}
+# how long the session may take to come up before the encoder sees a
+# frame; NOT part of the certified window (see the wait loop below)
+LOGIN_GRACE=${CERT_LOGIN_GRACE:-30}
 REFRESH=${E_REFRESH:-240}
 CLI=${E_DISPLAY:-:94}
 ORACLE_BIN=${E_ORACLE_BIN:-/opt/freerdp-vaapi/bin/xfreerdp}
@@ -103,6 +106,29 @@ setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib \
     >"$WORK/client.log" 2>&1 &
 PGID=$!
 unset PW RDPARGS
+# $SECS is 3s of PAYLOAD, and it does not start when the client does:
+# a cold pod spends seconds creating the session before the first frame
+# is encoded. Measured 2026-08-01 on x014's first certification -- the
+# session became available 2.9s after client launch and the client was
+# killed 0.08s later, having captured nothing, which the harness then
+# reported as "it is not encoding at all". That was a defect in this
+# script, not a red arm. So: wait for the dump to EXIST (login is done
+# and bytes are flowing), then time the window from there.
+WAITED=0
+while [ "$WAITED" -lt "$LOGIN_GRACE" ]; do
+    ls /tmp/oracle_avc_s*.bin >/dev/null 2>&1 && break
+    sleep 1
+    WAITED=$((WAITED + 1))
+done
+if [ "$WAITED" -ge "$LOGIN_GRACE" ]; then
+    cp "$WORK/client.log" "$CERTDIR/$ARM.nodump.log" 2>/dev/null
+    kill -9 -- -"$PGID" 2>/dev/null
+    kill -TERM "$XPID" 2>/dev/null
+    fail "$ARM wrote no dump within ${LOGIN_GRACE}s of connecting — the \
+session never reached the encoder; client log kept at \
+$CERTDIR/$ARM.nodump.log"
+fi
+echo "  session up after ${WAITED}s; capturing ${SECS}s of payload"
 sleep "$SECS"
 kill -9 -- -"$PGID" 2>/dev/null
 sleep 1

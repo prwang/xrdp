@@ -59,7 +59,7 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
-## #75 — The LTR rewrite re-serialised a whole picture to edit 30 bytes of slice header (CODE DONE 2026-08-01, arm pending)
+## #75 — The LTR rewrite re-serialised a whole picture to edit 30 bytes of slice header (DONE 2026-08-01)
 
 **Why.** #61e measured `collect` at 8.802 ms of a 25.474 ms period, and
 `tools/avc444_ltr_rewrite_bench.c` attributes 7.07 ms of it to the
@@ -111,12 +111,29 @@ pictures identical before and after (`12c16104c46343cb`). Predicted
 in-session effect: `collect` 8.8 -> ~2.4 ms, period 25.5 -> ~19.1 ms.
 Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`.
 
-**Known limit on (c), stated before the run.** The producer's own
-interval is 16.71 ms (#61e, FR-BENCH-1 section). If this lands as
-predicted the period approaches that number, so the arm measures a
-pipeline that is no longer clearly the bottleneck. Report the producer
-rate beside the send interval and do not quote a ratio the margin
-cannot support.
+**ARM RESULT (x014, one arm, owner-approved).** Period **25.474 ->
+18.476 ms**; `collect` **8.802 -> 1.362 ms** while `pump` held at
+16.585 (the control); 2228 -> 3075 sends, 39.2 -> 54.1 fps. Closure:
+7.440 removed minus 0.515 new wait = 6.925 against a measured 6.998.
+Certificate 7/7, 0 black frames, 0 rewrite failures over 6150 packets.
+
+**And the limit stated before the run arrived.** The producer's interval
+is 16.91 ms against an 18.476 ms pipeline: **FR-BENCH-1 margin 1.09x,
+MARGINAL**. 66 of 3074 cycles (2.15%) now stall on the producer and
+carry 99.7% of all wait time; **p99 send interval REGRESSED 31 -> 46.5
+ms** while mean and p50 improved by ~7 ms. Delivered 18.476 ms (1.38x);
+with producer stalls removed 17.96 ms (1.42x), which is the measured
+p50 and the number a further optimisation starts from.
+
+Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`;
+capture `captures/i75_x014_rewrite_20260801`.
+
+**Consequence for what comes next, and it is a blocker, not a note:**
+any further arm on this path needs the FASTER PRODUCER first (PRD design
+B, memmove scroll + strip render, 7.1 ms/frame offline). At 1.09x the
+payload is inside the measurement, so #74 Lever 2 — whose remaining
+prize is now `pump`'s 16.6 ms, not `collect`'s — cannot be measured with
+today's textflood. This reopens **#61c** with a concrete number.
 
 ## #61c — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
 

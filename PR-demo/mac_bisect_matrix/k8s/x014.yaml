@@ -1,0 +1,110 @@
+# Arm x014: BACKLOG #75 -- the LTR rewrite optimisation, measured against
+# x013 and nothing else.
+#
+# x013 measured the frame period at 25.474 ms with 8.802 ms of it in
+# `collect` (NAL pop + LTR rewrite of both views). #75 makes the rewrite
+# copy the child's already-escaped CABAC payload instead of unescaping
+# and re-escaping the whole picture around a 30-byte header edit: offline
+# 11.027 -> 1.026 ms/pair with a byte-identical output digest.
+#
+# SAME xorgxrdp, SAME gfx.toml body as x013 (verified by diff), SAME
+# payload, SAME port range. The only variable is the xrdp deb.
+#
+# BEFORE quoting any ratio, FR-BENCH-1 must PASS: the payload's own frame
+# rate (/tmp/e52_textflood_stamps.tsv in the session) must clearly exceed
+# the pipeline's send rate. On x013 the producer ran 16.71 ms/frame
+# against a 25.5 ms pipeline (1.52x). If #75 lands as predicted the
+# pipeline reaches ~19.1 ms and the margin falls to ~1.14x -- close
+# enough that the producer may become co-limiting, which is a finding to
+# report, not a number to quietly divide.
+#
+# RDP endpoint on the host: 127.0.0.1:40031.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x014
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x014
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x014
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x014
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "textflood"
+            - name: ARM_LABEL
+              value: "x014: #75 LTR rewrite optimisation, x013 config exactly (port 40031)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40031
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x014

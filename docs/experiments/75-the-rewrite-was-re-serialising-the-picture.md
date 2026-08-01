@@ -108,6 +108,97 @@ full payload, once per NAL boundary and twice per packet counting the
   rewriter is CPU code and the saving is arithmetic, but the claim is
   not measured there.
 
-## Deployed arm
+## The deployed arm: 25.474 -> 18.476 ms, and the producer is now in the frame
 
-See the section below once the arm has run.
+One arm, x014, owner-approved. Same xorgxrdp, same `gfx.toml` body as
+x013 (verified by `diff`), same payload, same client rig, same geometry,
+same day, 45 minutes apart. **The only variable is the xrdp deb.**
+Capture: `PR-demo/mac_bisect_matrix/captures/i75_x014_rewrite_20260801`.
+Trace integrity: 104 364 records, **0 drops**.
+
+### The mechanism check, run before the rate
+
+| worker cycle, `wait_beg -> wait_beg` | x013 | x014 | |
+|---|---|---|---|
+| wait for the two ffmpeg children to encode | 16.654 | 16.585 | **unchanged — the control** |
+| pop the NALs and rewrite both views' LTR refs | 8.802 | **1.362** | **-7.440** |
+| worker holds nothing to encode (`wait`) | 0.0019 | 0.515 | **new** |
+| every other stage and gap | 0.018 | 0.013 | |
+| **period** | **25.474** | **18.476** | **-6.998** |
+
+n = 3074 cycles, per-cycle closure residual max |0.000000| ms.
+
+**The intervention hit its target and nothing else.** `pump` — the
+children encoding, which #75 does not touch — moved 0.07 ms, which is
+what a control should do. `collect` fell by 7.440 ms. The period fell by
+6.998 ms. The 0.442 ms difference is the new `wait`: **7.440 - 0.515 =
+6.925 against a measured 6.998**, closing to 0.07 ms.
+
+Corroborated independently by the server's own send interval: **3075
+sends over 56.8 s, mean 18.5 ms, p50 18, p90 19** (x013: 2228 / 25.5 /
+25 / 28). 39.2 -> 54.1 fps.
+
+### Read this before quoting 1.38x: the producer is now co-limiting
+
+The margin warning written into `k8s/x014.yaml` before the run was
+correct. Producer stamps for the same 59 s window:
+
+| textflood's own loop | x013 | x014 |
+|---|---|---|
+| frame interval | 16.71 ms | 16.91 ms |
+| pipeline period | 25.47 ms | 18.48 ms |
+| **margin** | **1.52x** | **1.09x** |
+
+The producer did not change; the pipeline came down to meet it. At 1.09x
+the distributions overlap — the producer's p90 is 19.01 ms against a
+pipeline p50 of 17.96 ms — and it shows up exactly where it should:
+
+* `wait` is **bimodal and must not be quoted as a mean**. p50 is
+  **0.0015 ms**; 66 of 3074 cycles (**2.15 %**) exceed 1 ms and those 66
+  carry **1577 ms of the 1582 ms total (99.7 %)**. So 97.85 % of frames
+  are still pipeline-bound and ~2 % are producer stalls.
+* frames already enqueued when the worker asked: **97.8 %**, against
+  100 % on x013.
+
+**Two numbers, and the difference between them is the honest content of
+the result.** Delivered period **18.476 ms (1.38x)**. Period with the
+producer's stalls removed — `18.476 - 0.515` — **17.96 ms (1.42x)**,
+which is exactly the measured p50. The first is what this arm produced;
+the second is what the pipeline is capable of and is the one a further
+optimisation would start from.
+
+**FR-BENCH-1 is now MARGINAL for textflood at 3840x2400.** It is not
+failed — the pipeline is still the slower party for 98 % of frames — but
+the contract asks for a producer "strictly faster at every geometry it
+gates", and 1.09x with overlapping distributions is not that. **Any
+further work on this path needs the faster producer (PRD design B,
+7.1 ms/frame offline) before its arm is built, not after.**
+
+### The regression, stated with the win
+
+**p99 send interval went 31 ms -> 46.5 ms**, and cycle p99 went 31 ->
+46.5 ms. This is worse than x013 and it is reported because it moved the
+wrong way, not because it is unexplained: it is the 66 producer stalls
+above, whose own worst interval was 39.18 ms of producer time. Mean and
+p50 both improved by ~7 ms; the tail did not. On a payload that could
+keep up, the tail should follow the p50 — that is the prediction the
+faster producer would test.
+
+### Correctness on the deployed arm
+
+Certificate (`certs/x014.cert`, 3 s at 1920x1080, at deploy):
+**ASSERT VERDICT PASS, 7/7**, 471 pictures, **0 black frames**, one
+contiguous frame_num chain, 0 gaps. Server log over the 60 s run: **0
+rewrite failures, 0 unsupported, 0 pair aborts, 0 budget assertions, 0
+third captures** across 3075 frames x 2 views = 6150 rewritten packets —
+so the bounded-prefix fast path never once fell back, and never once
+emitted something the wire audit rejected.
+
+### Not a result
+
+**`E5 GATE: baseline 51.1 ms -> 2.77x PASS` is void as a comparison**,
+for the third time and for the same reason: 51.1 ms is the harness
+default measured under `SESSION_KIND=code` at a different geometry. The
+comparison that means something is x013's 25.5 ms, measured on this arm's
+own configuration. `E5_BASE_MS` still prints its default without
+refusing, which remains an open harness gap.

@@ -1,0 +1,62 @@
+arm:    x014
+image:  localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf
+gfx:    sha256:7266096194beb9a4
+key:    localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf|7266096194beb9a4
+when:   2026-08-01T23:29:31Z
+window: 3s at 1920x1080, 71978524 bytes
+
+=== wire audit (--assert) ===
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT0      : 235/236
+      avg P size=165695B   avg I/IDR size=199386B   inter share of pictures=99.6%
+aux  pictures=235    P(inter)=234    I(intra)=1     IDR=0
+      P slices retargeted to OWN slot LT1 : 234/234
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT1      : 235/235
+      avg P size=139576B   avg I/IDR size=167675B   inter share of pictures=99.6%
+
+merged decode-order frame_num chain: 471 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
+  A2 intra only on a scheduled index       PASS  unscheduled intra: main [] aux []
+  A3 cuts are paired across views          PASS  main intra ordinals [0] ... aux [0]
+  A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
+  A5 own-slot refs and self-marks          PASS  all pictures conform
+  A6 one contiguous frame_num chain        PASS  0 gap(s)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 235 aux 234 (bound 240)
+
+ASSERT VERDICT: PASS -- 7 checks, all clean
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 471
+  frames decoded          : 471
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+A 3s window holds roughly 100 frames. The scheduled intra
+refresh is every 240 frames, so this certification
+typically contains NO scheduled cut, and asserts A2 (intra only
+on a scheduled index), A3 (cuts paired across views) and A4 (no
+scheduled cut skipped) VACUOUSLY. What it does prove on real
+bytes from this image: A1 no mid-stream IDR, A5 own-slot refs
+and self-marking, A6 one contiguous frame_num chain, A7 chain
+depth within bound, and that every picture decodes without a
+black frame.
+The cut schedule itself is covered by CI against golden vectors
+(tests/xrdp/test_avc444_ltr.c: test_ltr_dpb_scheduled_paired_cut
+_both_modes, test_ltr_schedule_observed_vs_requested,
+test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window
+to chase A2-A4 -- that is the 10x tax this file exists to
+remove, and CI already pins the logic byte-exactly.
