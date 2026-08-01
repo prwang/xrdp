@@ -10,7 +10,9 @@
  *      of system calls, never a change to the stream;
  *   3. the accumulation reaches the send queue as ONE buffer, not as one
  *      node per write;
- *   4. the calls nest, and the flush happens on the outermost uncork.
+ *   4. the calls nest, and the flush happens on the outermost uncork;
+ *   5. one send is capped at TRANS_MAX_SEND_CHUNK, but a peer that keeps
+ *      accepting is drained in chunks until the queue is empty.
  *
  * The expected values come from those four sentences. Nothing here is
  * read off the implementation: the payload is a caller-chosen pattern
@@ -309,15 +311,16 @@ START_TEST(test_trans_cork__send_is_chunked)
         ck_assert_int_eq(write_block(t, i), 0);
     }
     ck_assert_int_eq(trans_uncork(t), 0);
-    /* the uncork flushes ONE chunk and hands the caller back its loop --
-       it does not stand there until the whole frame has gone */
-    ck_assert_int_eq(g_offer_count, 1);
-    ck_assert_int_eq(g_offer_max, TRANS_MAX_SEND_CHUNK);
-
-    drain(t, peer, sink, sizeof(sink));
-    /* every offer is within the cap, and together they are the payload */
+    /* contract 5: the cap bounds one SEND, not one call. A peer that
+       keeps accepting is fed until the queue is empty, in chunks. */
     ck_assert_int_le(g_offer_max, TRANS_MAX_SEND_CHUNK);
     ck_assert_int_eq(g_offer_total, blocks * BLOCK_BYTES);
+    ck_assert_ptr_eq(t->wait_s, NULL);
+    /* and it took more than one send to do it, or the cap did nothing */
+    ck_assert_int_gt(g_offer_count, 1);
+
+    (void) sink;
+    (void) peer;
     close_pair(t, peer);
 }
 END_TEST

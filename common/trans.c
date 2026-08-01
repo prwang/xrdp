@@ -264,17 +264,14 @@ trans_send_waiting(struct trans *self, int block)
                 bytes = (int) (temp_s->end - temp_s->p);
                 if (bytes > TRANS_MAX_SEND_CHUNK)
                 {
-                    /* Offer at most one chunk per call. ssl_tls_write()
-                       does NOT do partial writes: it loops on
-                       SSL_ERROR_WANT_WRITE until the whole length is
-                       gone, so handing it a 3.5 MB frame parks this
-                       thread until the peer has drained all of it.
-                       Measured 2026-08-01 (x008 vs x006): a corked frame
-                       written in one call took the frame period from
-                       41.8 ms to 51.2 ms -- worse than the 2400 small
-                       writes it replaced. Capping keeps the system-call
-                       saving and gives the caller back to its wait-object
-                       loop between chunks. */
+                    /* Offer at most one chunk to any single send.
+                       ssl_tls_write() does NOT do partial writes: it
+                       loops on SSL_ERROR_WANT_WRITE until the whole
+                       length is gone, so handing it a 3.5 MB frame
+                       parks this thread until the peer has drained all
+                       of it (measured, x008 vs x006: 51.2 vs 41.8 ms
+                       per frame -- worse than the 2400 small writes it
+                       replaced). */
                     bytes = TRANS_MAX_SEND_CHUNK;
                 }
                 sent = self->trans_send(self, temp_s->p, bytes);
@@ -305,6 +302,8 @@ trans_send_waiting(struct trans *self, int block)
                     {
                         return 1;
                     }
+                    /* the peer is not taking any more right now */
+                    cont = block;
                 }
             }
             else if (block)
@@ -319,12 +318,18 @@ trans_send_waiting(struct trans *self, int block)
                     }
                 }
             }
+            else
+            {
+                /* not blocking and the socket is full: stop here and let
+                   the caller's wait-object loop bring us back when the
+                   peer has made room */
+                cont = 0;
+            }
         }
         else
         {
             break;
         }
-        cont = block;
     }
     return 0;
 }

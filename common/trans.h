@@ -45,8 +45,13 @@
  * offered to it is the length of time the caller is parked. A whole
  * corked GFX frame in one call measured WORSE than the thousands of
  * small writes it replaced (BACKLOG #61f, x008 vs x006, 51.2 vs
- * 41.8 ms per frame). One chunk per call keeps the system-call saving
- * and returns the caller to its wait-object loop in between.
+ * 41.8 ms per frame).
+ *
+ * The cap bounds ONE send, not one call: a non-blocking drain keeps
+ * offering chunks until the peer refuses. Stopping after one chunk per
+ * call was measured too (x009, 127.3 ms per frame) -- the queue then
+ * advanced only once per main-loop pass, ~1.6 ms of unrelated work per
+ * 64 KB.
  */
 #define TRANS_MAX_SEND_CHUNK (64 * 1024)
 
@@ -171,9 +176,9 @@ trans_write_copy_s(struct trans *self, struct stream *out_s);
  *
  * While a transport is corked, trans_write_copy_s() only appends to an
  * accumulator: it makes no socket call at all. trans_uncork() hands the
- * whole accumulation to the send queue as ONE buffer and attempts a
- * single non-blocking flush; whatever the kernel does not take drains
- * from the main loop's writable-object pass as usual.
+ * whole accumulation to the send queue as ONE buffer and drains it
+ * without blocking until the peer refuses more; whatever is left goes
+ * out from the main loop's writable-object pass as usual.
  *
  * This exists because a GFX frame leaves xrdp as ~2400 separate
  * 1500-byte drdynvc PDUs (see xrdp_egfx_send_data), and doing a
