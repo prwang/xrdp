@@ -1106,9 +1106,19 @@ assembly **before `collect(N+1)`**, and MUST NOT join it before
   `aux_data` point into that handle's own `main_buf` / `aux_buf`, which
   the *next* collect on the handle overwrites in place. Joining any
   later — for instance before the next ack, the intuitive choice — lets
-  `collect(N+1)` overwrite buffers the assembler is still reading. The
-  failure mode is silent wrong pixels, not a crash. The only alternative
-  is to double-buffer those two buffers per handle.
+  `collect(N+1)` overwrite buffers the assembler is still reading.
+
+  *Correction, 2026-08-01:* this FR first gave the failure mode as
+  "silent wrong pixels, not a crash". That understates it.
+  `collect_pair` calls `grow(&self->main_buf, &self->main_cap, ...)`
+  before each rewrite, and `grow` **reallocs** — so `collect(N+1)` can
+  free the very allocation `pair.main_data` points at. The failure mode
+  is a use-after-free that presents as wrong pixels *most* of the time.
+  The consequence for the design is that the stated alternative —
+  "double-buffer those two buffers per handle" — is not sufficient on
+  its own: alternating two buffers still reallocs the one being written.
+  Either the join stays where it is, or the handoff takes an owned copy
+  of the two byte ranges.
 - **Not before `submit(N+1)` — required for the gain to exist.**
   Joining at the top of the loop leaves the children idle for the whole
   of `emit`, which is the starvation this FR exists to remove: the work
@@ -1118,6 +1128,119 @@ assembly **before `collect(N+1)`**, and MUST NOT join it before
   block the worker at all at this geometry. A bounded depth-1 handoff
   expresses the join, keeps PDU order trivially (one assembler thread),
   and requires no change to either ack.
+
+#### The assembler is ONE permanent thread, not a thread per frame
+
+**Required shape.** Exactly one assembler thread, created in
+`xrdp_encoder_create` alongside `proc_enc_msg` and living for the
+encoder's lifetime. Spawning a thread per emit is forbidden, for three
+independent reasons:
+
+1. **Order.** `fifo_processed` carries the PDU stream in wire order, and
+   for a given `XRDP_ENC_DATA` the `last=1` enc_done must be its last —
+   that is what releases it (`gfx_close_egfx_msg`, FR-ACK-1 rule 2).
+   Two concurrent assemblers give no defined order for either property.
+2. **The frame budget below is only provable at assembly depth 1.** N
+   concurrent assemblers put N frames in assembly and the resident set
+   is no longer `{capture N+2, children N+1, assembly N}`.
+3. **Cost.** `clone` + stack + first-touch is tens of µs against a
+   5.96 ms body, paid every frame, to buy nothing the permanent thread
+   does not already give.
+
+**Handoff.** A depth-1 slot in `struct xrdp_encoder`, guarded by two
+counting semaphores (`tc_sem_create`/`_dec`/`_inc`, already in
+`common/thread_calls.h`; no new primitive):
+
+```
+emit_req   init 0   worker -> assembler: a set is in the slot
+emit_idle  init 1   assembler -> worker: the slot is free
+```
+
+```
+worker                                   assembler
+  drain / group                            for (;;)
+  submit(N+1)                                tc_sem_dec(emit_req)
+  pump(N+1)                                  if (slot.quit) break
+  tc_sem_dec(emit_idle)   <-- THE JOIN       for each item: process_enc
+  collect(N+1)                               tc_sem_inc(emit_idle)
+  release_slots(N+1)  [eager ack]
+  fill slot with set(N+1)
+  tc_sem_inc(emit_req)
+```
+
+The join is one line, and **its position is the specification**: the
+`tc_sem_dec(emit_idle)` sits after `pump` returns and before the first
+`gfx_batch_collect_one`. Moving it earlier or later is the correctness
+question above, not a tuning knob.
+
+This also settles the enc_done ordering that the split would otherwise
+put at risk. `fifo_processed` gains a second producer — the worker still
+emits the #70 CONSUMED ack from `gfx_batch_release_slots`, while every
+PDU and the terminal ack now come from the assembler. The fifo itself is
+already safe (`fifo_add_item` under `self->mutex`). What makes the
+*order* safe is the join: `release_slots(N+1)` runs after
+`tc_sem_dec(emit_idle)`, so CONSUMED(N+1) cannot overtake the terminal
+ack of frame N. A deeper queue would break this; depth 1 is what buys
+it.
+
+**Teardown.** The worker owns the assembler and joins it: on leaving its
+loop the worker sets `slot.quit`, posts `emit_req`, waits for the
+assembler to exit, and *only then* sets `xrdp_encoder_term_done`.
+`xrdp_encoder_delete`'s contract is therefore unchanged — one wait
+object, one 5 s timeout, one `g_free(self)`. This matters because that
+delete does **not** join: it times out and frees `self` regardless, so a
+wedged worker is already a use-after-free today. The split must not
+widen that window, which is why the assembler never signals
+`term_done` itself and is never visible to `xrdp_mm`.
+
+#### Blast radius: what `emit` must stop touching first
+
+`emit` is separable because it needs no child and no capture page — but
+it is not yet *isolated*. Every `self->` field the AVC444 emit path
+touches, classified:
+
+| field | emit | worker | verdict |
+|---|---|---|---|
+| `avc444_batch_pair[m]`, `_seq[m]`, `_have[m]` | R | W | safe under the join |
+| `avc444_surface_id_live[m]` | R/W | — (main thread W) | already `self->mutex`-guarded |
+| `avc444_chroma_align`, `_v2`, `eager_slot_ack`, `_ltr_rekey_surface_reset` | R | — | config, written once at create |
+| `avc444_seq` | W | W | dead in the batched path (`enc_rv` is forced READY); assert it |
+| **`avc444_ffmpeg_handle[m]`** | **W** | **W** | **UNSAFE — blocks the join point** |
+| **`avc444_surface_reset_pending[m]`** | **W** | R | **UNSAFE — same fix** |
+
+**The handle array is the blocker.** `emit` writes
+`avc444_ffmpeg_handle[m] = NULL` at three sites — the geometry-change
+teardown inside `gfx_avc444_handle_for`, the encode-error path, and the
+post-ship `rekey_pending` teardown — while `submit(N+1)` reads and
+creates through the same array for the same monitor. Joining *after*
+`submit(N+1)` therefore races a `xrdp_ffmpeg_avc444_delete` against a
+`xrdp_ffmpeg_avc444_submit_pair` on the freed handle. This is rare (a
+resize, or one frame in ~65 000) and it is a use-after-free, which is
+the worst combination to ship.
+
+**Required before the split, as its own change:** make `emit` read-only
+with respect to the child. The worker evaluates
+`xrdp_ffmpeg_avc444_rekey_pending(ff)` immediately after
+`gfx_batch_collect_one` — it has the handle in hand there — and applies
+the teardown at the **top of the next cycle, before `submit`**. Cost:
+the re-key is deferred by exactly one frame. The margin covers it with
+room to spare: `XRDP_H264_LTR_FRAME_NUM_REKEY` is 2^16−512 and the hard
+stop is 2^16−8, so one frame spends 1 of 504.
+
+**Also required:** `avc444_debug_dump` takes `main_view` / `aux_view`,
+which point into capture shmem the eager ack may already have released.
+The GFX_TRACE `centerY` read is already skipped for exactly this reason;
+the dump is not, and moving it to the assembler widens the window from
+µs to ms. Under the split the dump either loses its NV12 arguments
+(bitstream only) or runs in the worker before the join. A forensic
+capture that silently records the *next* frame's pixels under this
+frame's sequence number is worse than no capture.
+
+**Out of scope.** The split is confined to the batched branch
+(`batching = avc444_ffmpeg && avc444_aux_ltr_chain`). The item-at-a-time
+branch — jpg, rfx, h264, non-LTR egfx — keeps calling `process_enc`
+inline on the worker and is not to be touched. Like #70, it ships behind
+a config knob, default off, until measured.
 
 #### Frame budget
 

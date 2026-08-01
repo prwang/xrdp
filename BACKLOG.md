@@ -79,11 +79,40 @@ child, no capture page and no borrowed shmem (FR-PROC-6).
 **Design constraint (correctness, not tuning).** Join the previous
 frame's assembly **after `submit(N+1)` and before `collect(N+1)`**.
 Later — e.g. before the next ack — lets `collect(N+1)` overwrite the
-handle's `main_buf`/`aux_buf` while the assembler still reads them:
-silent wrong pixels. Earlier — at the top of the loop — leaves the
-children idle for the whole of `emit` and buys nothing. Between the two
-it is free: 5.96 ms fits inside `submit+pump`'s 14.5 ms. A bounded
-depth-1 handoff expresses the join and needs no ack change.
+handle's `main_buf`/`aux_buf` while the assembler still reads them.
+Earlier — at the top of the loop — leaves the children idle for the
+whole of `emit` and buys nothing. Between the two it is free: 5.96 ms
+fits inside `submit+pump`'s 14.5 ms. One permanent assembler thread, a
+depth-1 slot, two `tc_sem`s; the join is one `tc_sem_dec` whose
+position is the specification. Full shape, teardown and shared-state
+audit in PRD FR-ACK-2 ("The assembler is ONE permanent thread").
+
+**Two blockers, found 2026-08-01 by auditing what `emit` touches. The
+join point above is NOT sound against today's code; both must land as
+their own change, before the thread exists.**
+
+1. **`emit` mutates `avc444_ffmpeg_handle[m]`** — the geometry-change
+   teardown in `gfx_avc444_handle_for`, the encode-error path, and the
+   post-ship `rekey_pending` teardown — while `submit(N+1)` reads and
+   creates through the same array for the same monitor. Joining after
+   `submit` races `xrdp_ffmpeg_avc444_delete` against
+   `submit_pair` on the freed handle: rare (a resize, or one frame in
+   ~65 000) and a use-after-free. Fix: the worker evaluates
+   `rekey_pending` right after `gfx_batch_collect_one`, where it already
+   holds the handle, and applies the teardown at the top of the next
+   cycle before `submit`. Defers the re-key one frame; margin is 504
+   frames (`REKEY` = 2^16−512, hard stop 2^16−8). Same fix covers
+   `avc444_surface_reset_pending[m]`.
+2. **The aliasing is a realloc, not just an overwrite.** `collect_pair`
+   calls `grow(&self->main_buf, ...)` before each rewrite, so
+   `collect(N+1)` can *free* what `pair.main_data` points at. Recorded
+   because it changes the fallback: "double-buffer the two buffers"
+   does not fix it — an owned copy in the handoff would.
+
+Also required: `avc444_debug_dump` reads capture shmem the eager ack may
+have released (the GFX_TRACE `centerY` read is already skipped for this
+reason; the dump is not). The split widens that window from µs to ms.
+Drop its NV12 arguments or run it in the worker before the join.
 
 **Not gated on the transport.** The main thread is at ≤39 % occupancy
 and binds only near a 12.6 ms period (~79 fps); it is the next ceiling,
