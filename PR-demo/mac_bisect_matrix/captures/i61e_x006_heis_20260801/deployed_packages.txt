@@ -1,0 +1,2 @@
+ii  xorgxrdp-dev               1:0.10.80+git20260731212221.10fa3aa23033 amd64        xorgxrdp built from the dev branch (GLAMOR), BACKLOG #70
+ii  xrdp-dev                   0.10.80+git20260801150407.2781220ae747   amd64        xrdp RDP server (developer build from git 2781220ae747)

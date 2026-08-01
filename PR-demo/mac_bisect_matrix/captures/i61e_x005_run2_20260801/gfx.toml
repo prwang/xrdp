@@ -1,22 +1,11 @@
-# ARM x007 (host port 40029) — BACKLOG #61e: the UNTRACED TWIN of x006.
-# Byte-identical image and gfx.toml to x006 (textflood, emit split ON);
-# the ONE difference is that k8s/x007.yaml does NOT set XRDP_PERF_TRACE,
-# so perf_trace_on() never arms and every PERF_TRACE is a branch on a
-# cached zero.
-#
-# This arm exists to answer one question that no other pair can: does
-# OBSERVING the pipeline change it? x003 is not a control for that --
-# it has the sink armed too, and only looked innocent because a single
-# thread wrote to it. The v1 shared-FILE* tracer moved the measured
-# frame period from 40.4 ms to 135.3 ms while looking like a result
-# (perf_trace.h, PRD FR-TRACE-1). x006 vs x007 is the same build, same
-# payload, same geometry, same client, trace ARMED vs DISARMED: any
-# difference between them is the instrument, and nothing else.
-#
-# SUPERSEDES the arm's first purpose (fresh-pod vs old-deb), which was
-# retired unrun -- a microbench inside the two existing pods answered
-# that bit in seconds, and building an arm to answer a bit is what the
-# 2026-08-01 CLAUDE.md rule forbids.
+# ARM x005 (host port 40027) — BACKLOG #61e: x003's config on the
+# INSTRUMENTED build. textflood payload, emit split OFF (CONTROL).
+# The gfx.toml is byte-identical to x003's below this header: the only
+# difference between x003 and x005 is the xrdp deb, which adds five
+# perf-trace brackets (book/rel/wait/enq/take) and nothing else. That
+# makes x005-vs-x003 the gate-4 regression check for the instrument
+# itself, and x005-vs-x006 the same emit-split A/B with the period
+# fully attributed.
 [codec]
 order = [ "H.264", "RFX" ]
 
@@ -41,9 +30,8 @@ aux_ltr_chain = true
 # this one line, so the A/B isolates the ack emission point and
 # nothing else.
 eager_slot_ack = true
-# BACKLOG #70B / PRD FR-ACK-2: EGFX assembly on its own thread,
-# joined after submit(N+1) and before collect(N+1).
-emit_thread = true
+# BACKLOG #70B: the split is OFF on this control arm.
+emit_thread = false
 
 # BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
 # pictures per view. The runner spawns BOTH children with the identical

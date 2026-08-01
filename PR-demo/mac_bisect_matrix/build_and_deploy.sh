@@ -51,6 +51,10 @@ DIST=${DIST:-/work/dist}
 # x005 / x006 are x003 / x004 on the #61e INSTRUMENTED build (the wait
 # and residency brackets). Deployed together:
 #   build_and_deploy.sh x005 x006
+# x006 / x007 are the INSTRUMENT's own control: the same image and the
+# same gfx.toml body, trace ARMED vs DISARMED. Deployed together, or
+# the traced number has nothing to be compared against:
+#   build_and_deploy.sh x006 x007
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -110,8 +114,8 @@ declare -A ARM_XORG_DEB=(
     # bracket would be measuring a different capture path.
     [x005]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x006]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x007 (#61e CONTROL): fresh pod, OLD deb -- the arm that separates
-    # "the instrumented deb is slow" from "a fresh pod is slow".
+    # x007 (#61e CONTROL): the UNTRACED twin of x006 -- same xrdp deb,
+    # same xorgxrdp deb, same gfx.toml body; XRDP_PERF_TRACE unset.
     [x007]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
@@ -134,9 +138,14 @@ declare -A ARM_TAG=(
     [x004]=4bbf11814323.xx10fa3aa-tf
     # #61e: a NEW tag, never a rebuild of the -tf image -- x003/x004
     # keep the exact bytes their 1.12x was measured on.
-    [x005]=05847031a303.xx10fa3aa-tf
-    [x006]=05847031a303.xx10fa3aa-tf
-    [x007]=4bbf11814323.xx10fa3aa-tf
+    # #61e v2: the ring-buffer tracer (FR-TRACE-1). The v1 tag
+    # 05847031a303 is the one whose SHARED FILE* measured 135 ms.
+    [x005]=2781220ae747.xx10fa3aa-tf
+    [x006]=2781220ae747.xx10fa3aa-tf
+    # x007: the UNTRACED twin of x006 -- the SAME image, differing only
+    # in that its manifest omits XRDP_PERF_TRACE. It is the only control
+    # that can show whether observing the pipeline changes it.
+    [x007]=2781220ae747.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -173,6 +182,7 @@ declare -A TAG_DEB=(
     # the sink disarmed, which gate 4 (x005 vs x003, x006 vs x004) is
     # there to confirm rather than assume.
     [05847031a303.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801141607.05847031a303_amd64.deb"
+    [2781220ae747.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801150407.2781220ae747_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

@@ -1,0 +1,72 @@
+=== #45 gate run: x006, oracle client, 60s ===
+image:    localhost/xrdp-bisect:2781220ae747.xx10fa3aa-tf
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260801150407.2781220ae747
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 1544 over 56.7 s
+send-to-send gap: mean 36.8 ms  p50 35 ms  p90 41 ms  p99 85 ms
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 1544 damage records
+27.22 sends/s = 27.22 pairs/s per monitor (1 monitor)
+surface 0 own period: n=1544 mean 36.8 ms  p50 35.0 ms
+damage coverage: surface 0: 1544
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 1544   kids_armed: 2:1544 (100%)
+
+E5 GATE: baseline 51.1 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 36.8 ms  ->  1.39x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+   1544 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== E2 — wire audit (--assert) on oracle_avc_s0.bin ===
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT0      : 1540/1541
+      avg P size=1925083B   avg I/IDR size=2448436B   inter share of pictures=99.5%
+aux  pictures=1541   P(inter)=1534   I(intra)=7     IDR=0
+      P slices retargeted to OWN slot LT1 : 1534/1534
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT1      : 1541/1541
+      avg P size=1592781B   avg I/IDR size=1996804B   inter share of pictures=99.5%
+
+merged decode-order frame_num chain: 3082 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
+  A2 intra only on a scheduled index       PASS  unscheduled intra: main [] aux []
+  A3 cuts are paired across views          PASS  main intra ordinals [0, 240, 480, 720, 960, 1200, 1440] ... aux [0, 240, 480, 720, 960, 1200, 1440]
+  A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
+  A5 own-slot refs and self-marks          PASS  all pictures conform
+  A6 one contiguous frame_num chain        PASS  0 gap(s)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 239 aux 239 (bound 240)
+
+ASSERT VERDICT: PASS -- 7 checks, all clean
+wire audit exit: 0
+
+=== E2 — black-frame check ===
+oracle_avc_s0.bin
+  pictures in capture     : 3082
+  frames decoded          : 3082
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS

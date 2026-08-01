@@ -381,52 +381,88 @@ resolution-dependent: `pump` and `coll` scale with pixel count and
 17 % at 3840x2400. The ratio at the smaller geometry should be *larger*,
 and that is a prediction this item can falsify.
 
-## #61e — Close x004's period to ≤0.5 ms unknown, and settle capture‖encode at m=1 (IN PROGRESS)
+## #61f — Cut the delivery loop's latency: the encoder is ack-clocked through a busy main thread (TODO)
 
-**The claim under test is PRD's, not a ratio.** The `capture ‖ encode =
-YES for m = 1, shipped` row asserts the frame period *equals* the encode
-duration and the capture is *fully hidden*. It was measured at 1600×912
-in a different era. At 3840×2400 on x004 the worker's serial chain is
-**29.07 ms** against a **35.95 ms** period: **6.88 ms/frame belongs to
-no stage**, and PRD's claim is exactly the claim that none of it is the
-encoder waiting for a frame.
+**Root-caused 2026-08-01 from the archived x005/x006 captures alone**
+(evidence: `docs/experiments/61e-period-attribution-and-the-tracer.md`
+addendum; instrument: `PR-demo/mac_bisect_matrix/i61f_delivery_chain.py`).
+The encoder worker's idle time (2.249 ms/cycle, 6.1 %, x006) is one
+loop at two amplitudes: **capture is not damage-clocked — it fires
+8.0 ms (IQR 2.8) after the eager slot ack of frame N−2, and the
+captured rect then waits 16.2 ms (p50) for the xrdp main thread to
+read it**, because that same thread spreads each frame's ~3.7 MB
+client-socket write over 17 ms at the client's drain pace. Steady
+state, that loop lands the frame 1.9 ms after the worker goes idle
+(the 25 % population); when the client stops draining for 50–150 ms,
+the transit spikes (p90 56 ms) and the stall echoes at two-frame
+spacing through the slotack(N−2) budget re-open (the 75 % tail).
+FR-CAPTURE-8's two slots buy no lookahead at m=1: the frontier reads
+`ack = N−2, shown = N−3` at 1524/1533 captures — permanently at cap,
+re-opened once per encoded frame.
 
-**Step 1 (DONE, no new code).** Attributing every consecutive pair of
-worker events, not just the bracketed stages, closes x004 to
-**−0.063 ms** and names the two holes: `join_end -> coll_beg`
-**2.38 ms** and `coll_end -> drain_beg` **4.49 ms**. So the 6.88 ms is
-real elapsed time on the worker thread, not a pairing artefact — but it
-is named by *tag*, not by *code*, which is not an attribution.
+**Step 1 — cut the main thread's 16 ms xup service latency.** The
+frame exists 16 ms before the thread that must enqueue it reads the
+message. Candidate shapes: service the xup fd between frame-part
+writes; or move the enqueue (or the egress writes) off the main
+thread. This attacks BOTH populations. Acceptance: `msgin − cap_sent`
+p50 drops to low single digits on a gate run; `wait` > 1 ms cycles
+fall accordingly.
 
-**Step 2 (this item).** Five new brackets under the existing
-`XRDP_PERF_TRACE` sink, shipped disarmed:
+**Step 2 — capture depth, per monitor only** (PRD forbids a global
+pool). A third slot adds one frame of real lookahead and absorbs
+client hiccups up to a full period. Only after Step 1: with a 16 ms
+service latency any extra slot drains into the same queue.
 
-| bracket | names |
-|---|---|
-| `book_beg/end` | the counters + `LOG(LOG_LEVEL_DEBUG)` + `GFX_TRACE` block — the whole of hole A |
-| `rel_beg/end` | `gfx_batch_release_slots()`, the #70 CONSUMED ack |
-| `wait_beg/end` | **`g_obj_wait` — the encoder holding nothing to encode** |
-| `enq` (main thread) | a frame becoming available, keyed by its echoed id |
-| `take` (worker) | the same id lifted off the fifo |
+**Falsifiable.** If Step 1 lands and the tail persists at unchanged
+amplitude, the client-forcing story is wrong and the stall origin is
+inside the server after all. Note the forcing is client-dependent:
+this client is the oracle harness (its dump goes to tmpfs, so disk
+writes are ruled OUT as its pause source — the pause is unattributed,
+see #61g); a real client's hiccup spectrum differs, but the 1.9 ms
+margin is ours.
 
-**What decides it.** `wait` is the per-frame millisecond count by which
-capture is NOT hidden behind encode; PRD's claim is that it is zero.
-`enq -> take` residency is the same statement in its positive form — a
-residency that is consistently positive says the data was already in
-hand and the worker was busy, i.e. ffmpeg could not have seen frame N+1
-any sooner. The two are complementary and must agree: every cycle is
-either worker-bound (residency > 0) or capture-bound (wait > 0), never
-both, never neither.
+**Why it matters beyond 6.1 %.** Any further reduction of worker-side
+serial time now converts into more of this wait rather than into rate.
+The worker is no longer the only ceiling.
 
-**Gate 4 is mandatory before reading anything.** The instrumented build
-is not the build that measured 1.12×. New arms **x005/x006** (not a
-rebuild of x003/x004, whose images stay as measured) must reproduce
-40.25 / 35.95 ms, or the attribution is of a different system.
+## #61g — The oracle client's 50–150 ms pauses tax every rate number; attribute, then fix the harness (TODO)
 
-**Falsifiable.** If `wait` is ~0 on both arms, PRD's row survives at
-3840×2400 and the 6.88 ms is all worker overhead we own. If `wait` is
-several ms, the row is wrong at this geometry and the capture pipeline —
-not the encoder — is the next lever.
+**Hypothesis.** The tail #61f traced to the client (~78 stalls/run,
+≈ 2.6 s of 56.7 s) is instrument noise, not server behaviour: removing
+it would move x006's E5 from 36.8 ms → ≈ 35.1 ms (51.1/35.1 ≈ 1.46x
+against the RED 1.39x — an estimate assuming the tail vanishes and
+nothing else moves). The dump is ruled out (`/tmp` is tmpfs); the
+remaining suspects are host CPU contention (the client shares the box
+with the whole pod fleet, the session Xorg, textflood and two ffmpeg
+children, unpinned and unprioritised) and something periodic inside
+the client itself.
+
+**Step 1 — attribute before touching anything.** One 60 s gate run
+with a 100 Hz sampler of the oracle client's
+`/proc/<pid>/schedstat` (run-delay) alongside the existing traces. If
+run-delay spikes coincide with the client's ack holes, it is
+scheduling; if not, it is internal to the client. Sampler is versioned
+in `PR-demo/`, not ad hoc.
+
+**Step 2 — the fix matching the attribution, versioned in
+`e_gate_run.sh`.** For scheduling: pin the oracle client + its Xvfb to
+cores the pods' cpuset excludes (and/or modest negative nice). This
+changes no client binary and no protocol behaviour — but it IS a
+harness change (client-rig rule): announce it, re-baseline
+x005/x006/x007 in one pass under the new harness, and never mix pre-
+and post-change numbers (gate 5). Keep the #61f stall census
+(`i61f_delivery_chain.py` sections 1+4) in every VERDICT so residual
+hiccups stay visible instead of silent.
+
+**Explicitly out of scope without owner sign-off:** enlarging the
+loopback socket buffers to hide client pauses from the server. That
+would change what E5 *means* (it removes the client-forcing the
+server currently absorbs), and buffering-away a symptom is the
+fallback shape the honesty rule exists to catch.
+
+**Not a substitute for #61f.** A perfect client removes the forcing,
+not the vulnerability: the 1.9 ms margin and the 16 ms main-thread
+service latency stay ours.
 
 ---
 
@@ -437,6 +473,7 @@ retractions are in the linked file; the code is in git.
 
 | item | outcome | record |
 |---|---|---|
+| **#61e** close the period to ≤0.5 ms unknown; settle `capture ‖ encode` at m=1 | DONE. Period closes to **0.007 ms**. PRD's row is **wrong with the emit split on** — the worker stalls 35 % of cycles on a capture path that is one frame deep (→ #61f). The v1 tracer was itself a 3.3× regression; fixed by FR-TRACE-1, its cost bounded below the ~1 ms same-build run noise by an untraced twin (36.8 vs 37.1 ms) and same-day old-build controls (40.4/41.3 vs 41.0/41.1). | [`61e-period-attribution-and-the-tracer.md`](docs/experiments/61e-period-attribution-and-the-tracer.md) |
 | **#45** intra refresh, one-thread `pump_set`, per-monitor capture budget | DONE. E5 resolved by #52 at 2.13×. | [`45-intra-refresh-and-pump-set.md`](docs/experiments/45-intra-refresh-and-pump-set.md) |
 | **#52** E5-2 saturated-payload frame interval | DONE. 2.13× GREEN; retired the 51.1 ms cadence baseline as a reading of a 10 Hz metronome. | [`52-e5-2-saturated-payload.md`](docs/experiments/52-e5-2-saturated-payload.md) |
 | **#55** E5-2 on the T4 | DONE. 1.5×–2.3× AMBER, attributed to a saturated Xorg. T4 now decommissioned. | [`55-e5-2-on-the-t4.md`](docs/experiments/55-e5-2-on-the-t4.md) |
