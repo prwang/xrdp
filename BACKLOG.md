@@ -72,11 +72,11 @@ Share of that thread, from `tools/avc444_pack_bench.c` on this CPU
 else ~92 %** — xterm glyph compositing, scroll blits, Present emulation,
 fills. Reproduces the T4's 99.9 % (#59) on different hardware.
 
-**Consequence, and it governs the queue below.** No worker-side change
-is measurable under this payload; the producer answers every question
-first. #70 (1.11×) and #70B (0.96×) were both spent against a stage with
-slack. **Do not start another xrdp-side throughput item until the
-benchmark payload is producer-unbound.**
+**Consequence.** No worker-side change is measurable under this payload;
+the producer answers every question first. **Resolved the same day** by
+#61b: textflood drops the session Xorg to 25.3 % and #70B then measures
+1.12x instead of 0.96x. Ratios taken under codeflood are void as
+throughput numbers — see #61d for the ones that need re-running.
 
 `perf` sampling is unavailable on this box (`perf_event_paranoid = 4`,
 host-owned, `sysctl -w` silently fails; `perf record` yields 0 bytes) —
@@ -349,39 +349,37 @@ content, not the pipeline.
 
 ---
 
-## #61b — A benchmark payload whose cost is not the X server's own drawing (TODO)
+## #61b — textflood wired into the fleet (DONE 2026-08-01)
 
-**Open half of #61, and now the head of the queue** — #61c showed the
-producer answers every throughput question before xrdp gets to.
+`SESSION_KIND=textflood` now exists in `banner.sh` and the binary is
+built into the fleet image (builder stage in `Containerfile`). Arms
+**x003/x004** are the #70B A/B under it at 3840x2400.
 
-GLAMOR is CLOSED-WONTFIX on NVIDIA (it renders black; the campaign built
-on it is void). The question it was meant to answer is still open:
-**E5-2 measures a payload that spends two thirds of the Xorg thread on
-its own software rendering (44.9 % xterm glyphs + 18.8 % Present
-emulation) against 13.8 % for the entire capture** on the T4, and ~92 %
-against ~4 % on the dev box (#61c) — the ratio is dominated by work xrdp
-does not own.
+Session Xorg **96.4 % -> 25.3 %** of one core; FR-BENCH-1 **PASSES**
+(producer 65.07 fps vs pipeline 24.94 = 2.61x margin) — the check #62
+lacked. GLAMOR stays CLOSED-WONTFIX.
 
-**The payload already exists and is not wired in.** `textflood`
-(#62, `PR-demo/textflood/`) rasterizes the same corpus with cairo in its
-own process and hands X one finished image over MIT-SHM: **7.7× less
-X-thread cost**, measured. `PR-demo/mac_bisect_matrix/banner.sh` has
-**no `textflood` kind at all` — it was only ever deployed to the
-decommissioned T4, so every fleet arm including x001/x002 runs xterm
-`codeflood`.
+**Every throughput number from here uses textflood.** A ratio measured
+under codeflood is a measurement of the X server (#61c).
 
-**Work:** add a `textflood` kind to `banner.sh`, build the binary into
-the fleet image, stand up an arm pair, and re-run the #70/#70B ratios
-against a producer that is not the clock.
+**Record:** `PR-demo/mac_bisect_matrix/captures/i61b_x004_ab_20260801/README.md`.
 
-**Gate before any ratio is quoted from it:** #62's own T4 result came
-back 1.41× RED and was later annotated *producer-confounded*. Swapping
-the payload is necessary, not sufficient — FR-BENCH-1's check (the
-payload's measured frame rate clearly exceeds the pipeline's) must PASS
-on the new arm first.
+## #61d — Re-measure the codeflood-era ratios under textflood (TODO)
 
-**Record:** `docs/experiments/61-glamor-on-nvidia.md`,
-`docs/experiments/62-textflood-payload.md`.
+**#70 (1.11x) and #70B (0.96x) were both measured against a saturated
+producer and are void as throughput numbers.** #70B has been re-run
+(1.12x at 3840x2400); #70's eager ack has not, and neither has #70B at
+2560x1440, where its projection was computed.
+
+**Work.** Re-run the eager-ack A/B (arm-u/arm-v config) under textflood,
+and the emit-split A/B at 2560x1440 under textflood, so the two knobs
+have numbers taken against a producer that is not the clock.
+
+**Why it matters beyond bookkeeping.** #70B's prize is
+resolution-dependent: `pump` and `coll` scale with pixel count and
+`emit` does not, so `emit` was 27 % of the serial chain at 2560x1440 and
+17 % at 3840x2400. The ratio at the smaller geometry should be *larger*,
+and that is a prediction this item can falsify.
 
 ---
 
@@ -400,4 +398,4 @@ retractions are in the linked file; the code is in git.
 | **#62** textflood payload | DONE. 1.41× RED, then annotated producer-confounded. | [`62-textflood-payload.md`](docs/experiments/62-textflood-payload.md) |
 | **#64** rect_id ack "ghost" | CLOSED. Root cause REFUTED — the ack is an echo and never drifted. Machinery survived into #70. | [`64-rect-id-ack-ghost.md`](docs/experiments/64-rect-id-ack-ghost.md) |
 | **#70** eager slot-release ack | DONE, shipped default-off. 1.11×, encode‖tail 4.8 → 8.5 ms. Step 0 answered NO. Incomplete without #70B per PRD FR-ACK-2. | [`70-eager-slot-release-ack.md`](docs/experiments/70-eager-slot-release-ack.md) |
-| **#70B** emit split | Built + measured 2026-08-01: 0.96x, FALSIFIED. Shipped default-off; its prerequisite refactor fixed a real use-after-free. Opened #61c. | [`70B-perf-trace-sink.md`](docs/experiments/70B-perf-trace-sink.md), [capture](PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md) |
+| **#70B** emit split | Built 2026-08-01. 0.96x under codeflood (producer-bound, void as a throughput number) then **1.12x under textflood at 3840x2400**. Shipped default-off; its prerequisite refactor fixed a real use-after-free. | [`70B-perf-trace-sink.md`](docs/experiments/70B-perf-trace-sink.md), [codeflood](PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md), [textflood](PR-demo/mac_bisect_matrix/captures/i61b_x004_ab_20260801/README.md) |

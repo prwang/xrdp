@@ -60,6 +60,7 @@ def report(d):
 
     # --- pair each stage within its own thread, in order ---
     durs = {s: [] for s in STAGES}
+    stage_tid = {}
     open_at = {}
     negative = 0
     for ns, tid, tag, a, b in evs:
@@ -71,6 +72,7 @@ def report(d):
         key = (tid, stage)
         if half == "beg":
             open_at[key] = ns
+            stage_tid.setdefault(stage, set()).add(tid)
         elif half == "end" and key in open_at:
             dt = ns - open_at.pop(key)
             if dt < 0:
@@ -99,6 +101,19 @@ def report(d):
                 cycle.append((ns - last_drain[tid]) / 1e6)
             last_drain[tid] = ns
 
+    # BACKLOG #70B: with gfx.toml emit_thread on, `emit` runs on the
+    # ASSEMBLER thread, concurrently with the worker's own cycle. Adding
+    # it to a serial total over-counts and prints a NEGATIVE closure --
+    # which quality gate 2c would otherwise read as a broken pairing.
+    # The worker is whichever thread drains the fifo; anything else is
+    # marked concurrent and excluded from the serial sum.
+    worker_tid = set()
+    for ns, tid, tag, a, b in evs:
+        if tag == "drain_beg":
+            worker_tid.add(tid)
+    concurrent = set(st for st, tids in stage_tid.items()
+                     if worker_tid and not (tids & worker_tid))
+
     print("  %-10s %6s %8s %8s %8s %8s %9s" %
           ("stage", "n", "mean", "p50", "p90", "max", "sum/frame"))
     n_cycles = max(1, len(cycle) + 1)
@@ -108,6 +123,12 @@ def report(d):
         if not v:
             continue
         per_frame = sum(v) / n_cycles
+        if s in concurrent:
+            print("  %-10s %6d %7.2f%s %7.2f %7.2f %7.2f %8.2f ms  "
+                  "|| CONCURRENT (own thread), not in the serial sum"
+                  % (s, len(v), sum(v) / len(v), "ms", pct(v, .5),
+                     pct(v, .9), max(v), per_frame))
+            continue
         total += per_frame
         print("  %-10s %6d %7.2f%s %7.2f %7.2f %7.2f %8.2f ms"
               % (s, len(v), sum(v) / len(v), "ms", pct(v, .5), pct(v, .9),

@@ -45,6 +45,9 @@ DIST=${DIST:-/work/dist}
 # all -- a split measurement with no same-binary control has no
 # baseline (arm-w is an older build, so it is not one):
 #   build_and_deploy.sh x001 x002
+# x003 / x004 are the SAME A/B under SESSION_KIND=textflood -- the #61b
+# payload whose X-side cost is a memcpy. Deployed together:
+#   build_and_deploy.sh x003 x004
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -94,6 +97,10 @@ declare -A ARM_XORG_DEB=(
     # move the xup contract, so this is still arm-u/v/w's xorgxrdp.
     [x001]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x002]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x003/x004 (BACKLOG #61b): the x001/x002 A/B re-run under textflood.
+    # Same debs on all four arms; the pairs differ only in SESSION_KIND.
+    [x003]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x004]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -109,6 +116,10 @@ declare -A ARM_TAG=(
     [arm-w]=e6e1f6f5641e.xx10fa3aa
     [x001]=4bbf11814323.xx10fa3aa
     [x002]=4bbf11814323.xx10fa3aa
+    # -tf = the SAME xrdp deb, image rebuilt with the textflood binary.
+    # A distinct tag so x001/x002 keep the exact image they were measured on.
+    [x003]=4bbf11814323.xx10fa3aa-tf
+    [x004]=4bbf11814323.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -139,6 +150,7 @@ declare -A TAG_DEB=(
     # touches the ffmpeg handle array; arm state published after the
     # join). Default off in the binary; armed per arm by gfx.toml.
     [4bbf11814323.xx10fa3aa]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
+    [4bbf11814323.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
@@ -159,6 +171,8 @@ fi
 BUILD="$D/.build"
 rm -rf "$BUILD" && mkdir -p "$BUILD"
 cp "$D/entrypoint.sh" "$D/startwm.sh" "$D/banner.sh" "$BUILD/"
+# BACKLOG #61b: textflood is compiled in a builder stage of the image
+cp "$D/../textflood/textflood.c" "$BUILD/"
 for arm in $ARMS; do
     tag=${ARM_TAG[$arm]}
     if [ "${FORCE_BUILD:-0}" != "1" ] \

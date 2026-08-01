@@ -18,6 +18,25 @@
 # identical in every arm, so the ONLY difference between arms is the xrdp
 # deb + gfx.toml.
 
+# --- textflood builder (BACKLOG #61b) -------------------------------------
+# textflood rasterizes the corpus with cairo in ITS OWN process and hands X
+# one finished image over MIT-SHM: 7.7x less X-thread cost than the xterm
+# codeflood payload (#62). #61c measured why that matters here -- under
+# codeflood the session Xorg is at 98.9 % of a core with NO client attached,
+# so the producer answers every throughput question before xrdp gets to.
+#
+# Built in a separate stage so the runtime image carries the binary and the
+# cairo/X11 RUNTIME libs, but none of the toolchain.
+FROM debian:trixie AS textflood-build
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential pkg-config \
+        libcairo2-dev libx11-dev libxext-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY textflood.c /src/textflood.c
+RUN cc -O2 -Wall -Wextra -Wno-unused-parameter -o /src/textflood \
+        /src/textflood.c $(pkg-config --cflags --libs cairo x11 xext)
+
 FROM debian:trixie
 
 ARG XRDP_DEB
@@ -32,7 +51,13 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         x11-xserver-utils xterm xfonts-base fonts-dejavu-core \
         dbus procps openssl ca-certificates \
         xdotool \
+        libcairo2 libx11-6 libxext6 \
     && rm -rf /var/lib/apt/lists/*
+
+# BACKLOG #61b: the textflood payload binary (SESSION_KIND=textflood).
+# Runtime libs only -- the toolchain stays in the builder stage.
+COPY --from=textflood-build /src/textflood /usr/local/bin/textflood
+RUN chmod 755 /usr/local/bin/textflood
 
 # Optional full desktop (arm-g class): real content — wallpaper
 # gradients, antialiased text, window chrome — is where the Mac

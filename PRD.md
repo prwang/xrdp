@@ -1053,19 +1053,35 @@ in NG-9.
 ### FR-ACK-2: the eager slot-release ack is incomplete without the emit split (2026-08-01, measured)
 
 > **SUPERSEDED IN PART, 2026-08-01 (same day), by measurement.** The
-> split was built and measured, and its *acceptance criterion below is
-> not met*: period 33.3 -> 34.7 ms, **0.96x**, against the 1.22x-1.44x
-> predicted here. The mechanism applied (assembly on its own tid, join
-> present) and the worker's serial chain fell 24.0 -> 17.2 ms exactly as
-> designed — the period simply did not follow, because **this FR's
-> load-bearing assumption is wrong: the encoder worker does not pace the
-> frame period.** It was 72 % occupied before the split, so it had 28 %
-> slack and was never the constraint. The requirement below therefore
-> stands as *written* only for its correctness content (the join point,
-> the thread shape, the shared-state rules — all of which held); its
-> throughput claim is withdrawn. Evidence:
-> `PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md`.
-> Text below kept verbatim, wrong projection included.
+> split was built and measured twice.
+>
+> Under the `codeflood` payload it came out at **0.96x** (33.3 ->
+> 34.7 ms) — but that measurement is VOID as a throughput number: #61c
+> showed the session Xorg was at **96.4 % of one core** and at 98.9 %
+> with no client attached at all, so the producer set the period and the
+> worker had 28 % slack before the split was applied. Re-run under
+> `textflood` at 3840x2400, with the producer at 25.3 % and FR-BENCH-1
+> passing at a **2.61x** margin, the same knob measures **1.12x**
+> (40.1 -> 35.9 ms).
+>
+> **The acceptance criterion below is still not met**, and the
+> 1.22x-1.44x projection stays withdrawn — now for a reason that
+> survives the payload fix. It was computed at 2560x1440, where `emit`
+> was 6.39 ms of a 24.02 ms serial chain (27 %). `pump` and `coll` scale
+> with pixel count and `emit` does not, so at 3840x2400 `emit` is 17 %
+> of a 35.04 ms chain and the most the split could buy is smaller.
+> **The size of the gain is resolution-dependent; the mechanism is
+> not.** What the textflood run confirms is that the mechanism does what
+> this FR specifies: 5.97 ms of serial work removed, 4.30 ms of period
+> recovered (72 % conversion), wire audit 7/7, zero black frames.
+>
+> The correctness content below — the join point, the thread shape, the
+> shared-state rules — held on every run and is NOT superseded.
+> Evidence:
+> `PR-demo/mac_bisect_matrix/captures/i70b_x001_ab_20260801/README.md`
+> (codeflood, void) and `.../i61b_x004_ab_20260801/README.md`
+> (textflood, 1.12x). Text below kept verbatim, wrong projection
+> included.
 
 **The eager slot-release ack (BACKLOG #70) MUST NOT be shipped without
 the assembly (`emit`) split of BACKLOG #70B.** On its own it converts a

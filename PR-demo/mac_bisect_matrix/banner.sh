@@ -40,6 +40,21 @@
 #   grayflood  full-screen bands with the sleep removed — the
 #              max-encode-cost bound (every macroblock damaged, every
 #              frame) beside codeflood's realistic glyph damage.
+#   textflood  the SAME corpus, rasterized by cairo in its OWN process
+#              and handed to X as one finished image per frame over
+#              MIT-SHM (PR-demo/textflood, BACKLOG #61b/#62). Use this
+#              for any THROUGHPUT number. codeflood draws through the X
+#              server -- glyph compositing, scroll blits, Present
+#              emulation -- and #61c measured the consequence: the
+#              session Xorg sits at 98.9 % of one core with NO client
+#              attached, so the producer, not xrdp, sets the frame
+#              period and no pipeline change is measurable against it.
+#              textflood costs 7.7x less X-thread time for the same
+#              pixels; its own rasterization runs on another core.
+#              Producer telemetry for FR-BENCH-1 lands in
+#              /tmp/e52_textflood_stamps.tsv (per-frame render/blit/
+#              sync), which is what proves the payload is FASTER than
+#              the pipeline rather than merely different.
 # The flood kinds are for the FRAME-INTERVAL gate only. They are NOT
 # byte-comparable across arms (the frame count is whatever the arm
 # managed), which is exactly why the cadence kinds above are left alone:
@@ -76,6 +91,22 @@ scroll|scrollfast)
             i=$((i + STEP))
             sleep 0.1
         done'
+    ;;
+textflood)
+    # BACKLOG #61b. Override-redirect over the whole root, so no window
+    # manager can re-snap it to one monitor (the failure that invalidated
+    # three T4 runs with the xterm payload). No metronome: it renders as
+    # fast as it can, which is what a frame-interval gate needs.
+    CORPUS=/usr/local/share/code_corpus.ansi
+    if [ ! -s "$CORPUS" ]; then
+        while true; do
+            xmessage -geometry 1200x200 \
+                "NO CODE CORPUS at $CORPUS - bench invalid" 2>/dev/null \
+                || sleep 5
+        done
+    fi
+    exec /usr/local/bin/textflood --corpus "$CORPUS" \
+        --stamps /tmp/e52_textflood_stamps.tsv
     ;;
 gray|grayflood)
     exec "${XTERM[@]}" -e bash -c '
