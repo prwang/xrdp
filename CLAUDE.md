@@ -83,6 +83,11 @@ All durable rules and "memory" for this project live here, in-tree and committed
    - `LOG()` stays correct for what a human reads: session lifecycle,
      configuration, errors, anything at human rates. The test is rate,
      not importance.
+   - **This holds in benches and probes too, including one whose whole
+     purpose is to measure what the forbidden pattern cost.** A
+     per-frame `LOG()` written "only as a contrast arm" is still a
+     per-frame `LOG()` in this tree, and the next reader will copy it.
+     Compare the trace against nothing (owner directive, 2026-08-01).
    - **Do not build a new tracer, sampler or ring for a measurement.**
      `common/perf_trace` is the one sink; extend it (the payload widened
      from two ints to six for exactly this reason) rather than adding a
@@ -177,6 +182,31 @@ All durable rules and "memory" for this project live here, in-tree and committed
     long run on a binary check" below: the ladder decides what the
     cheapest sufficient instrument is, and this rule decides who
     authorises it once that instrument costs minutes.
+- **An approval covers the experiment that was DESCRIBED, and the ARM
+  COUNT is part of the description (owner directive, 2026-08-01).**
+  Adding an arm, a condition, a variable or a payload to an approved
+  experiment makes it a different experiment, and the approval does not
+  stretch to cover it. State how many arms, what each one changes, and
+  the total wall time — then run exactly that.
+  - *Violated in the same turn the 2-minute rule was written.* The owner
+    approved a **two**-arm A/B of the perf ring — armed versus disarmed,
+    "the trace and none". The plan came back with **three**: the extra
+    one reintroduced the per-frame `LOG()` that coding rule 5 forbids,
+    justified as a "contrast" that would quantify the #61h defect. After
+    that was struck, a third arm appeared *again* — a calibration spin —
+    as a sensitivity check nobody had asked for. Two separate inflations
+    of one approval, in one turn.
+  - **An extra arm that looks necessary mid-experiment is a finding to
+    report, not a licence to add it.** Run the approved arms, report
+    what they showed, say what the extra arm would settle and what it
+    costs, and wait. An experiment that grew past its approval cannot be
+    compared against the one that was authorised, and the owner is left
+    auditing a design they never saw.
+  - Corollary: **a bench, a probe or a test is not an exemption from a
+    rule about what may exist in this tree.** "It is only for
+    measurement" is how a forbidden pattern gets re-added — and a
+    measurement harness is precisely where this project has already been
+    burned twice.
 - **Remote GUI process lifecycle (owner directive, 2026-07-27): only two
   operations are allowed.** (1) Log off the whole session; (2) have the
   program autostart at login (XDG autostart entry, versioned in git).
