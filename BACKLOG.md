@@ -59,6 +59,149 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
+## #76 — TOP PRIORITY: fif = 2 is hiding a bug (owner directive, 2026-08-02)
+
+**The reframing, and it is the whole item.** An earlier draft of this
+entry treated "does fif = 2 buy anything?" as the question and filed the
+34 % throughput loss at fif = 1 as an unexplained curiosity to be
+instrumented later. That is backwards. **If dropping to one frame in
+flight costs 34 % of throughput, the pipeline is leaning on a second
+in-flight frame to cover a stall — and the stall is the bug.** The design
+target is stated in PRD **FR-ACK-3**: *all the concurrency we need, at the
+cost of fif = 1.* The client ack window bounds what the CLIENT has
+outstanding; it is not a mechanism this server may use to obtain
+concurrency for itself.
+
+**Why it cannot be flow control, which is what makes it a bug.** The
+encoder's own depth is provably one frame: `pump_pairs` waits for the set
+it just submitted and `collect_pair` verifies `desktop_sequence`, so a
+second frame is never inside a child. And the worker is never starved —
+its `wait` bracket is **0.002 ms/cycle** at fif = 1 (0.515 at fif = 2).
+There is no queue for the second credit to fill and no idle worker for it
+to feed. It is covering something else.
+
+**Measured** (arms x014/x015, identical image and `gfx.toml` body, one
+environment variable apart; mechanism confirmed — all 8056 `send` records
+read `fif=1`, `id_server − id_client` = 0 on 8052 of them):
+
+| | x014 fif=2 | x015 fif=1 |
+|---|---|---|
+| send interval mean / p50 / p99 | 18.5 / 18 / 47 ms | 28.2 / 28 / 32 ms |
+| **`pump`** (feed + encode + drain) | **16.6 ms** | **26.7 ms** |
+| `coll` (LTR rewrite) | 1.363 | 1.498 |
+| `wait` (worker had nothing) | 0.515 | 0.002 |
+| capture → egress | 34.8 ms | 55.6 ms |
+| egress → client ack | 14.4 ms | 6.0 ms |
+| capture → client ack | 49.2 ms | 61.5 ms |
+
+**Where the bug is: 100 % of the regression is inside `pump`** — feed the
+NV12 in, wait for the children, drain the coded bytes out. Nothing about
+a client ack window has a route into that bracket:
+`frames_in_flight` is read in exactly two places, `xrdp_mm.c:1691`
+(gating `mod_frame_ack` to xorgxrdp) and `:4234` (the trace line), and
+neither is on the encode path. Cycle closure residual is 0.004 ms, so it
+is not a mislabelling.
+
+**Ruled out.** Coded bytes per view +0.76 % (1 734 414 → 1 747 572);
+producer unchanged (15.94 → 16.26 ms/frame); host dump I/O *lower*
+(10.67 → 7.04 GB); all five E2 error counters 0; the knob demonstrably
+applied.
+
+**Open hypotheses, in the order to try them.** All concern what changes
+inside `pump` when the frame the worker feeds was captured 17.9 ms ago
+instead of 7.3 ms ago (the measured fifo residency):
+
+1. **The capture pages are colder.** The children read 27.6 MB/frame of
+   borrowed capture shmem by page reference (`vmsplice`, FR-PROC-6). At
+   fif = 1 those pages were written 2.5× longer ago. This predicts FEED
+   grows and ENCODE does not — which #78's instrument distinguishes in
+   one run.
+2. **`pump_set`'s poll loop.** Its timeout becomes a flat 10 ms once
+   nothing is left to write (`xrdp_encoder_ffmpeg.c`, `timeout =
+   want_write_any ? deadline - now : 10`). Worth reading against a
+   cadence change before blaming hardware.
+3. **CPU/GPU clock behaviour under a slower duty cycle** on this
+   shared-memory APU. Last, because it is the least actionable and the
+   easiest to reach for.
+
+**Method note:** #78's instrument is the first step, not another arm.
+Splitting `pump` into FEED and ENCODE+DRAIN discriminates hypothesis 1
+from 2 and 3 immediately, and it is a one-record-per-cycle change.
+
+**Record:** `docs/experiments/76-fif1-costs-throughput-in-a-bracket-it-cannot-reach.md`.
+**Capture:** `PR-demo/mac_bisect_matrix/captures/i76_x015_fif1_20260802`.
+
+## #78 — `pump` has no instrument, and it now hides 10 ms (TODO)
+
+`xrdp/xrdp_encoder_ffmpeg.c` contains **zero** `PERF_TRACE` calls
+(`grep -c`, 2026-08-02). So the worker's `pump_beg → pump_end` bracket is
+one opaque block covering three different things:
+
+* **FEED** — `vmsplice` 2 × 13.824 MB of NV12 into the two child pipes
+  (1 MiB each, so ≥ 28 round trips per frame), driven by the same thread
+  and the same poll loop that is waiting;
+* the children **ENCODING**;
+* **DRAIN** — reading the coded pictures back, NUT-parsing them.
+
+Measured inside the arm's own pod with its ffmpeg, its VAAPI device and
+its `encoder_args` (no session, no client, no rewrite, no wire): FEED
+2.1–2.5 ms, ENCODE 7.2–8.1 ms, total **9.3–10.6 ms**. The deployed
+bracket is **16.6 ms on x014 and 26.7 ms on x015** — so 7 ms and 17 ms
+respectively are unattributed, and *the unattributed part is what grew
+when the ack window changed*, which is the one thing it should be
+independent of (see #76).
+
+**Scope.** One `PERF_TRACE` in `xrdp_ffmpeg_avc444_pump_pairs`, fired
+when every handle's `in_iov` has drained, splitting the bracket into
+FEED and ENCODE+DRAIN on the deployed path. One record per cycle; it
+extends `common/perf_trace`, it does not add a second sink (coding rule
+5). Plus CI for the pure part.
+
+**This is the FIRST step of #76, not a deferred nicety (owner
+directive, 2026-08-02).** #76's three hypotheses differ in exactly what
+this instrument shows: cold capture pages grow FEED, a poll-loop or
+clock effect grows ENCODE+DRAIN. One run separates them.
+
+**Sequencing against #77.** #77 (faster producer) was briefly filed
+ahead of both and is not: the FR-BENCH-1 margin at fif = 1 is **1.74×**,
+not x014's 1.09×, because the pipeline slowed and the producer did not.
+The fif = 1 configuration is therefore measurable as it stands, and the
+payload is not in the way of this work. It IS in the way of anything
+measured at fif = 2 — including any later re-measurement of #74 — so #77
+stays queued rather than closed.
+
+## #77 — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
+
+**What it is.** x014 left the FR-BENCH-1 margin at **1.09×** — the
+textflood producer at 16.91 ms
+against an 18.48 ms pipeline, with the producer's p90 (19.01 ms) inside
+the pipeline's p50 (17.96 ms). At that margin an arm measures the payload
+as much as the server, and the 66 producer stalls in x014 are already
+visible as a p99 that went the wrong way (31 → 46.5 ms) while the mean
+improved by 7 ms.
+
+**Scope.** PRD design B: memmove scroll + strip render instead of a full
+redraw. Offline it is 7.1 ms/frame against today's ~16 ms, which restores
+the margin to ~2.6× at the current pipeline rate and keeps it above 2×
+even if the pipeline reaches 14 ms.
+
+**Reprioritised the day it was filed (owner directive, 2026-08-02).**
+This item was first written as "NEXT, blocks this path", on the reasoning
+that no arm can be read through a payload 9 % from being the limit. That
+reasoning was sound for the fif = 2 configuration and does not apply to
+the one now under investigation: at fif = 1 the pipeline runs at 28.2 ms
+against a 16.26 ms producer, an FR-BENCH-1 margin of **1.74×**, so #76
+and #78 are measurable today. **#76 — a 34 % throughput loss that means
+the pipeline is leaning on a second in-flight frame — outranks it.**
+
+It still gates everything measured at fif = 2, which is the configuration
+every arm before x015 used, and it still gates #74, #61f and #61d. It is
+queued, not closed.
+
+**Acceptance.** Producer p90 strictly below the pipeline p10 at
+3840×2400, stated in the arm's own capture; FR-BENCH-1 margin ≥ 2.0×
+reported beside every ratio thereafter.
+
 ## #75 — The LTR rewrite re-serialised a whole picture to edit 30 bytes of slice header (DONE 2026-08-01)
 
 **Why.** #61e measured `collect` at 8.802 ms of a 25.474 ms period, and

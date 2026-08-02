@@ -134,6 +134,19 @@ kill -9 -- -"$PGID" 2>/dev/null
 sleep 1
 kill -TERM "$XPID" 2>/dev/null
 
+# LOG THE SESSION OFF. A certification creates a session and the payload
+# in it keeps running after the client goes away -- forever, at full
+# tilt, with nothing consuming a frame (measured on x014, 2026-08-02:
+# 85 % of a core 2 h 33 min after the run). The sanctioned operation is
+# to log the WHOLE session off, never to pkill individual GUI processes
+# in a live session (CLAUDE.md GUI lifecycle).
+kubectl -n "$NS" exec "$POD" -- bash -lc \
+    "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
+    >/dev/null 2>&1
+kubectl -n "$NS" exec "$POD" -- bash -lc \
+    "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
+     || break; sleep 1; done" >/dev/null 2>&1
+
 DUMP=$(ls -S /tmp/oracle_avc_s*.bin 2>/dev/null | head -1)
 if [ -z "$DUMP" ]; then
     # keep the evidence: a no-dump certification is a red result about

@@ -737,5 +737,38 @@ PY
         echo "  NONE -- see the abort above; this line should be unreachable"
     fi
 } | tee -a "$OUT/VERDICT.txt"
+
+# --- LOG THE SESSION OFF. Not optional, and not a courtesy ------------
+# The payload keeps running after the client goes away: the session has
+# no idea a measurement ended. Left up, a textflood arm scrolls a corpus
+# at full tilt forever -- 85 % of a core plus 15 % of another for Xorg,
+# measured on x014 on 2026-08-02, 2 h 33 min after its run finished, with
+# no consumer of a single frame. It also silently taxes whatever is
+# measured NEXT on this box, which is worse than the wasted core.
+#
+# This is the same failure sessions_off.sh was written for on 2026-07-30
+# (eight arms, ~4 cores). Writing a cleanup script did not stop it
+# recurring, because nothing CALLED it. So the gate that creates the
+# session now ends it, and sessions_off.sh goes back to being what it
+# should be: a sweep for sessions nobody owns, not the routine path.
+#
+# Logging the WHOLE session off is the sanctioned operation (CLAUDE.md
+# GUI lifecycle) -- never pkill/relaunch individual GUI processes inside
+# a live session. E_KEEP_SESSION=1 keeps it, for when the next step is
+# eyeballing the same session onscreen.
+if [ "${E_KEEP_SESSION:-0}" != 1 ]; then
+    srv "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
+        >/dev/null 2>&1
+    srv "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
+         || break; sleep 1; done" >/dev/null 2>&1
+    left=$(srv "pgrep -c -u $SU -x Xorg 2>/dev/null || true" \
+           2>/dev/null | tr -d ' \r')
+    if [ "${left:-0}" != 0 ]; then
+        echo "WARNING: $ARM still has ${left} session Xorg after log off"
+    else
+        echo "session logged off (E_KEEP_SESSION=1 to keep it)"
+    fi
+fi
+
 echo
 echo "evidence: $OUT"

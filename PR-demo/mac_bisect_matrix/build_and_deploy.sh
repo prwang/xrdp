@@ -131,6 +131,10 @@ declare -A ARM_XORG_DEB=(
     # x013 (#61e redo): the SAME xorgxrdp as x005/x006/x007, so the
     # producer side is identical to the arms whose numbers this replaces
     [x013]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x015 (#76): the SAME xorgxrdp and the SAME IMAGE as x014. This arm
+    # builds nothing: it is x014 with XRDP_GFX_FRAMES_IN_FLIGHT=1 set in
+    # k8s/x015.yaml, so the tag below is x014's and the image cache hits.
+    [x015]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     # x014 (#75): the SAME xorgxrdp as x013 -- the only thing that differs
     # between the two arms is the xrdp build
     [x014]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -173,6 +177,12 @@ declare -A ARM_TAG=(
     # whole picture around a 30-byte header edit. gfx.toml body is
     # x013's byte for byte, so the arms differ only in the xrdp deb.
     [x014]=73e4cb76d483.xx10fa3aa-tf
+    # x015: BACKLOG #76 -- the SAME TAG as x014 on purpose. This arm ships
+    # no new code; it is x014 with XRDP_GFX_FRAMES_IN_FLIGHT=1 in its
+    # manifest, so the image cache hits and nothing is built. Deploying an
+    # env-only arm this way is the cheap shape: no deb, no podman build,
+    # no k3s import.
+    [x015]=73e4cb76d483.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
