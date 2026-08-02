@@ -21,9 +21,25 @@ not a random tail but a deterministic period-3 limit cycle.**
   session per leg, **20 s per leg** (see "sample size" below), fleet
   otherwise idle (`fleet_sessions_before.txt`: no Xorg in any pod).
 * **Host DVFS pinned** (owner-set, 2026-08-02): GPU
-  `power_dpm_force_performance_level=high`, SCLK active level 2900 MHz;
-  CPU `performance`. A pinned run is its own condition — do not compare
-  these numbers with pre-pin captures except where noted.
+  `power_dpm_force_performance_level=high`, CPU `performance`. A pinned
+  run is its own condition — do not compare these numbers with pre-pin
+  captures except where noted. `clocks.tsv` covers the whole sweep at
+  1 Hz and reports **one single state on all 182 samples** — sclk 2900 /
+  mclk 1000 / fclk 2000 MHz — so no leg ran at a different operating
+  point than another. (Unpinned idle reads sclk 600, mclk `-`.)
+* **All five legs ran inside one contiguous 185 s window**
+  (1785675603 → 1785675788, ~31 s per leg), so host state had no room
+  to drift between them.
+* Fleet clean afterwards: no Xorg in any pod, no client rig left on the
+  host (`fleet_sessions_after.txt`).
+* **Disclosed instrument on the box**: a `clock_log.sh` sidecar left
+  running by #78 (~10 h) was live during this sweep — a 1 Hz shell loop
+  reading sysfs, not the #61g `/proc` sampler that cost 36 % of a core.
+  It has been stopped, the i78 capture it was appending to was restored
+  to its committed state, and its slice for this window is `clocks.tsv`
+  here. That slice is missing busy/power/cpu/level: the DVFS pin makes
+  `pp_dpm_socclk` report two active levels, which broke the script's
+  field capture. Noted rather than quietly dropped.
 * The only thing that differs between legs is when the client's bytes
   reach the server. Same server deb, same `gfx.toml`, same client
   binary, same payload, same geometry.
