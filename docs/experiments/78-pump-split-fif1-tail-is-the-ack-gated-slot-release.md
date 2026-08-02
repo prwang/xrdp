@@ -169,12 +169,21 @@ done
 echo balanced | sudo tee /sys/firmware/acpi/platform_profile
 ```
 
+> **Outcome, owner-run on the metal host, 2026-08-02.** Both pins
+> applied. The CPU recipe works as written. On the GPU, **`high` is the
+> level to use on this box**: it already pins MCLK 1000 / SCLK
+> 2900 MHz. `profile_peak` drove the package to ~**85 °C with no
+> load** — an uncomfortable thermal/power state that is itself a
+> confound and a stress risk; do not use it here. Recorded as binding
+> in `PR-demo/mac_bisect_matrix/README.md` ("Host operating point").
+
 Notes for reading the results honestly:
 
 * `profile_peak` pins every engine's clock for profiling (higher idle
   power/heat than `high`, which pins only sclk/mclk); either is
   acceptable if recorded. `manual` + writing index masks into
   `pp_dpm_vclk` is the surgical option if metal exposes it.
+  *(Superseded by the outcome note above for THIS box: `high` only.)*
 * On this APU class the likelier transient is the **STAPM/skin-temp
   power budget**, which DPM forcing does not override: a heat-soaked
   package silently lowers the sustained budget and per-IP clocks. If

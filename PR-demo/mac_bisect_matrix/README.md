@@ -68,6 +68,29 @@ construction, and the tester always knows which arm is on screen.
   host instance (VAAPI contexts are independent; fine at banner frame
   rates).
 
+## Host operating point for performance runs (owner-measured, 2026-08-02)
+
+The container cannot administer host power management (user-mode incus
+with `/dev/dri` mapped in): DVFS pinning is done on the METAL host by
+the owner, per the procedure in
+`docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`.
+Measured outcomes on this box, binding for future runs:
+
+- **CPU**: the amd_pstate recipe (`scaling_governor` +
+  `energy_performance_preference` = `performance` on all cores) works
+  as written.
+- **GPU**: use **`high`**, NOT `profile_peak`.
+  `power_dpm_force_performance_level=high` already pins
+  **MCLK 1000 MHz / SCLK 2900 MHz**, which is sufficient.
+  `profile_peak` drives the package to an uncomfortable thermal/power
+  state — **~85 °C with NO load** — which is itself a confound (skin-
+  temp/STAPM behaviour changes) and a hardware-stress risk. Do not use
+  it on this box.
+- Every capture taken with pins active must say so (the `level=` column
+  of `clock_log.sh` records the GPU side; note the CPU side in the
+  capture README). Pinned and auto runs are different conditions —
+  never compared as one arm.
+
 ## Adding/changing an arm
 
 Edit/add `gfx/arm-X.toml` + `k8s/arm-X.yaml` (next port), map the arm in

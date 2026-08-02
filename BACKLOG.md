@@ -228,22 +228,58 @@ different ack path — untouched. At fif = 2 (shipped default) the fix
 changes the 1.5 % tail cycles only; expected effect is an IMPROVED
 p99, and any change beyond that is a regression to investigate.
 
-**Test method, in ladder order.**
-1. CI: extract the emission decision (which acks are due, given
-   client/server/consumed/region_sent/server_sent/fif/eager) into a
-   pure helper next to `xrdp_gfx_ack_window_open`; table-driven Check
-   tests assert slot-ack emission is independent of `client`, ordinary
-   ack still window-gated, target ≤ consumed frontier and ≤ server+1,
-   monotone `server_sent`. Expected values derived from the PRD
-   emission point, NOT transcribed from the implementation.
-2. Local 5 s, then the fleet A/B the owner sizes: proposed x018 =
-   x017's config + fixed deb at fif = 1 (compare against the committed
-   x017 capture: mechanism check FIRST — withheld p90 must collapse to
-   ~0.05 ms — then rate: tail gone, mean → ~18 ms, wait p90 → ~0), and
-   a fif = 2 arm for non-regression (withheld 1.5 % → ~0, p99 improves,
-   mean unchanged). `arm_certify.sh` on deploy; smoke gate before any
-   handoff.
-3. Latency accounting in the same runs: capture → cliack per frame.
+**Test method, in ladder order. The defect looks like a heisenbug (a
+31 % race tail) but is not one: the race only decides HOW OFTEN the
+losing state is entered; the emission decision inside that state is a
+pure function of (client, server, consumed, region_sent, server_sent,
+fif, eager). Each layer below removes the nondeterminism instead of
+sampling it.**
+
+1. **CI — replay + enumeration, and it must be RED on HEAD first.**
+   Extract the emission decision into a pure helper next to
+   `xrdp_gfx_ack_window_open`. Two test shapes:
+   (a) **Replay test**: drive the helper through the exact event
+   sequence of the captured p90 stall (frames 10–13 of
+   `i78_x017_pumpsplit_20260802`, transcribed in the #78 record:
+   absorb 11 → egress 11 → cliack 10 → absorb 12 → egress 12 →
+   cliack 11 → cliack 12), asserting after EVERY event which acks are
+   due. Expected values from the PRD #70 emission point
+   (max(absorb N, egress N−1)), not from the implementation.
+   (b) **Exhaustive interleaving enumeration**: all orderings of
+   {cliack, egress, absorb} events over a 3-frame window at fif = 1
+   and fif = 2 — the state space is small enough to enumerate
+   completely, so no "did we pick the right interleaving" residue.
+   **Acceptance criterion for the tests themselves: they FAIL on HEAD
+   at the absorb steps** (the withheld emission) before the fix lands.
+   A detector that cannot fire on the buggy code confirms nothing
+   (2026-07-31 lesson).
+2. **Deterministic system reproduction — turn the race into a
+   dose-response.** Add a per-direction delay to the harness path so
+   the client's acks ALWAYS lose the race: a small TCP proxy between
+   the oracle client and the pod's RDP port delaying only the
+   client→server direction by D ms (server→client untouched, client
+   binary untouched — the client-rig invariance rule holds; the
+   in-tree `tools/devel/tcp_proxy` has no delay support, so extend it
+   or add a dedicated `PR-demo/mac_bisect_matrix/ack_delay_proxy`).
+   With D ≥ ~10 ms, HEAD enters the withheld branch on ~every cycle —
+   reproduction on demand, 5 s per point (mechanism check, not a
+   rate: short runs per the duration rule). Predictions that separate
+   the builds cleanly: on HEAD, withheld p50 ≈ D and period rises
+   with D (the pipeline is chained to the ack RTT); on the fixed
+   build, withheld ≈ 0 and period is FLAT in D (nothing else consumes
+   cliack at fif = 1 — egress is not gated, measured). A sweep
+   D ∈ {0, 10, 20, 40} gives a curve, not a coin-flip tail.
+3. **Fleet A/B on the unmodified harness, gated on the mechanism's own
+   telemetry, not the noisy tail.** Owner-sized arms (proposed: fixed
+   deb at fif = 1 vs the committed x017 capture; a fif = 2 arm for
+   non-regression). Acceptance metric is the **withheld distribution**
+   (782/2513 > 10 ms → expect ~0; binomially decisive in one 60 s
+   run), with the period p90/p99 improvement reported as the
+   downstream effect. fif = 2 non-regression: withheld 1.5 % → ~0,
+   p99 improves, mean unchanged. `arm_certify.sh` on deploy; smoke
+   gate before any handoff; capture → cliack latency accounting in
+   the same runs (the recorded eager-ack tradeoff must be measured,
+   not assumed).
 
 **Side effects / regression surface, stated up front.**
 * Capture age at fif = 1 rises: capture runs slot-bounded ahead again,
