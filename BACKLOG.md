@@ -235,9 +235,31 @@ pure function of (client, server, consumed, region_sent, server_sent,
 fif, eager). Each layer below removes the nondeterminism instead of
 sampling it.**
 
-1. **CI — replay + enumeration, and it must be RED on HEAD first.**
-   Extract the emission decision into a pure helper next to
-   `xrdp_gfx_ack_window_open`. Two test shapes:
+1. **Deterministic reproduction on UNMODIFIED code — validate the
+   mechanism by intervention before any model of it is enshrined
+   anywhere (owner, 2026-08-02: without this, the mechanism is
+   inferred, not confirmed).** Add a per-direction delay to the
+   harness path so the client's acks ALWAYS lose the race: a small
+   TCP proxy between the oracle client and the pod's RDP port
+   delaying only the client→server direction by D ms (server→client
+   untouched, client binary untouched, SERVER BINARY UNTOUCHED — the
+   in-tree `tools/devel/tcp_proxy` has no delay support, so extend it
+   or add a dedicated `PR-demo/mac_bisect_matrix/ack_delay_proxy`).
+   Control leg first: D = 0 THROUGH the proxy must reproduce the
+   no-proxy baseline within noise, or the proxy itself is a confound
+   and nothing downstream counts (gate 5). Then sweep
+   D ∈ {0, 10, 20, 40} on the deployed HEAD build, 5 s per point
+   (mechanism check, not a rate). **The mechanism is confirmed iff
+   the unmodified system responds as the theory demands: withheld
+   p50 ≈ D, the stall fraction goes ~31 % → ~100 % at D ≥ ~10, and
+   the period rises with D.** Any other response falsifies or
+   narrows the theory — found BEFORE a fix or a CI model is built on
+   it. (After the fix exists, the same sweep separates the builds:
+   fixed predicts withheld ≈ 0 and period FLAT in D, since nothing
+   else consumes cliack at fif = 1 — egress is not gated, measured.)
+2. **CI — replay + enumeration of the now-VALIDATED mechanism, and it
+   must be RED on HEAD first.** Extract the emission decision into a
+   pure helper next to `xrdp_gfx_ack_window_open`. Two test shapes:
    (a) **Replay test**: drive the helper through the exact event
    sequence of the captured p90 stall (frames 10–13 of
    `i78_x017_pumpsplit_20260802`, transcribed in the #78 record:
@@ -253,22 +275,6 @@ sampling it.**
    at the absorb steps** (the withheld emission) before the fix lands.
    A detector that cannot fire on the buggy code confirms nothing
    (2026-07-31 lesson).
-2. **Deterministic system reproduction — turn the race into a
-   dose-response.** Add a per-direction delay to the harness path so
-   the client's acks ALWAYS lose the race: a small TCP proxy between
-   the oracle client and the pod's RDP port delaying only the
-   client→server direction by D ms (server→client untouched, client
-   binary untouched — the client-rig invariance rule holds; the
-   in-tree `tools/devel/tcp_proxy` has no delay support, so extend it
-   or add a dedicated `PR-demo/mac_bisect_matrix/ack_delay_proxy`).
-   With D ≥ ~10 ms, HEAD enters the withheld branch on ~every cycle —
-   reproduction on demand, 5 s per point (mechanism check, not a
-   rate: short runs per the duration rule). Predictions that separate
-   the builds cleanly: on HEAD, withheld p50 ≈ D and period rises
-   with D (the pipeline is chained to the ack RTT); on the fixed
-   build, withheld ≈ 0 and period is FLAT in D (nothing else consumes
-   cliack at fif = 1 — egress is not gated, measured). A sweep
-   D ∈ {0, 10, 20, 40} gives a curve, not a coin-flip tail.
 3. **Fleet A/B on the unmodified harness, gated on the mechanism's own
    telemetry, not the noisy tail.** Owner-sized arms (proposed: fixed
    deb at fif = 1 vs the committed x017 capture; a fif = 2 arm for
