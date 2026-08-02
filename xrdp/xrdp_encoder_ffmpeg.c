@@ -56,6 +56,7 @@
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_nut.h"
 #include "xrdp_h264_annexb.h"
+#include "perf_trace.h"
 #include "log.h"
 #include "os_calls.h"
 #include "string_calls.h"
@@ -106,6 +107,10 @@ struct xrdp_ffmpeg_avc444
     int in_iov_count;
     int in_iov_head;
     size_t in_iov_off;
+
+    /* BACKLOG #78: cleared at submit so drain_stdout can stamp the
+     * FIRST output byte of the submitted picture exactly once */
+    int trace_out_seen;
 
     /* completed-packet FIFO (in coded-picture order) */
     struct ff_pkt *pk;
@@ -680,6 +685,22 @@ pk_available(struct xrdp_ffmpeg_avc444 *self)
 }
 
 /*****************************************************************************/
+/* BACKLOG #78: echoed identity for the feedend/outfirst records -- the
+ * desktop sequence of the picture this child is currently working on
+ * (the seq FIFO front), truncated to the record's int payload. -1 when
+ * no picture is in flight (records so tagged are discarded by the
+ * reader rather than mis-paired -- 2c gate). */
+static int
+trace_seq_front(const struct xrdp_ffmpeg_avc444 *self)
+{
+    if (self->seq_count - self->seq_head < 1)
+    {
+        return -1;
+    }
+    return (int)(self->seq[self->seq_head] & 0x3fffffff);
+}
+
+/*****************************************************************************/
 /* read stdout, feed NUT, append completed packets to the FIFO.            */
 /* returns bytes read (>=0), -1 error, -2 child EOF                        */
 static int
@@ -713,6 +734,15 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
             return -1;
         }
         total += n;
+        if (!self->trace_out_seen)
+        {
+            /* BACKLOG #78: first output byte since submit == the child
+             * has finished encoding and started writing the picture
+             * (input is consumed strictly before output exists) */
+            self->trace_out_seen = 1;
+            PERF_TRACE6("outfirst", trace_seq_front(self),
+                        self->leaf == NULL, n, 0, 0, 0);
+        }
         if (xrdp_nut_feed(self->nut, (unsigned char *)tmp, n) != 0)
         {
             self->metrics.parser_errors++;
@@ -805,6 +835,12 @@ feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
             {
                 self->in_iov_head = 0;
                 self->in_iov_count = 0;
+                /* BACKLOG #78: the picture is now fully in the pipe.
+                 * The child may still hold up to one pipe window
+                 * unread; FEED here means "input no longer paces the
+                 * worker", not "child copied the last byte". */
+                PERF_TRACE6("feedend", trace_seq_front(self),
+                            self->leaf == NULL, 0, 0, 0, 0);
             }
         }
         return 0;
@@ -1460,12 +1496,14 @@ xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
         return XRDP_FFMPEG_PAIR_ERROR;
     }
     self->pairs_submitted++;
+    self->trace_out_seen = 0;
     if (in_iov_push(self->leaf, aux_nv12, nv12_size) != 0 ||
             seq_push(self->leaf, desktop_sequence) != 0)
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
     self->leaf->pairs_submitted++;
+    self->leaf->trace_out_seen = 0;
     return XRDP_FFMPEG_PAIR_READY;
 }
 

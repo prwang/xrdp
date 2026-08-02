@@ -131,11 +131,61 @@ from 2 and 3 immediately, and it is a one-record-per-cycle change.
 **Record:** `docs/experiments/76-fif1-costs-throughput-in-a-bracket-it-cannot-reach.md`.
 **Capture:** `PR-demo/mac_bisect_matrix/captures/i76_x015_fif1_20260802`.
 
-## #78 — `pump` has no instrument, and it now hides 10 ms (TODO)
+## #78 — `pump` has no instrument, and it now hides 10 ms (IN PROGRESS, 2026-08-02)
 
-`xrdp/xrdp_encoder_ffmpeg.c` contains **zero** `PERF_TRACE` calls
-(`grep -c`, 2026-08-02). So the worker's `pump_beg → pump_end` bracket is
-one opaque block covering three different things:
+**Status 2026-08-02: instrument landed; two owner-approved runs next.**
+Trace-archaeology on the EXISTING x014/x015 rings (no new runs) already
+moved the hypothesis ranking before any instrument fired — full analysis
+goes to the experiment record with the run results; the load-bearing
+findings:
+
+* **#76 hypothesis 1 (colder capture pages) is refuted.** Within-arm
+  residency→pump slope is 0.05–0.28 ms/ms (needs ~1.0); 60 x014 cycles
+  after 10–37 ms producer stalls pumped frames of 0.04 ms residency at
+  baseline speed (16.64 vs 16.58 ms).
+* **#76 hypothesis 2 (10 ms poll timeout) is refuted.** The child's
+  stdout is always in the poll set, so the timeout is a wakeup floor,
+  not a delay; both arms' pump histograms are smooth flat shifts with no
+  10 ms mode.
+* **Hypothesis 3 survives only in its sustained-duty form** (a
+  window-averaged operating point: VCN/SCLK/FCLK DPM). Single 30 ms
+  idle gaps do NOT slow the next pump; per-unit throughput DOES differ:
+  pump-vs-coded-bytes regression gives 1.94 ms/MB (x014) vs 3.54 ms/MB
+  (x015) — a 1.82× per-unit slowdown — plus intercept 9.85 → 14.30 ms.
+  So ~5.6 ms of the 10.1 scales with output (post-input work) and
+  ~4.5 ms is fixed (could still be FEED — unproven either way).
+* The wait chain is fully mapped: at fif = 1 steady state NOTHING waits
+  on the ack window; capture(N+2) is released by the slot ack riding
+  behind egress(N) (+0.77 ms p50, both arms), and every stage phase —
+  egress at pump+9.2, capture copy at pump+10.3, ~3.4 MB of sends
+  inside the bracket — is IDENTICAL between arms. Residency is a
+  consequence of pump length, not a cause.
+
+**Approved design (owner, 2026-08-02: two runs, observe-only — clock
+PINNING was explicitly declined).** Run A: new arm **x017** = this
+branch's instrumented build (`feedend` + `outfirst`, below), x015's
+`gfx.toml` body, `XRDP_GFX_FRAMES_IN_FLIGHT=1`, 1 Hz host GPU clock log
+(harness sidecar, human-rate, not per-frame). Internal control: its
+`pump` must reproduce ~26.7 ms or the instrument perturbed the
+measurement. Run B: rerun of the UNTOUCHED x014 pod (fif = 2) with the
+same 1 Hz clock log — the fif = 2 side of the observational clock
+comparison. Discriminator: duty-driven clocks ⇒ x017 logs lower
+VCLK/SCLK levels than x014 under auto AND the split shows the
+inflation in ENCODE; wedged/code ⇒ clocks read the same and the split
+names the stage.
+
+**Instrument as landed** (`xrdp/xrdp_encoder_ffmpeg.c`): per child per
+cycle, `feedend` (the picture is fully in the pipe — input no longer
+paces the worker; the child may still hold ≤ 1 pipe window unread) and
+`outfirst` (first output byte since submit = the child finished
+encoding and started writing). Identity = desktop sequence echoed in
+the record (2c gate); both on `common/perf_trace` (coding rule 5), no
+new sink.
+
+**Original entry (2026-08-02), kept for scope.**
+`xrdp/xrdp_encoder_ffmpeg.c` contained **zero** `PERF_TRACE` calls, so
+the worker's `pump_beg → pump_end` bracket was one opaque block covering
+three different things:
 
 * **FEED** — `vmsplice` 2 × 13.824 MB of NV12 into the two child pipes
   (1 MiB each, so ≥ 28 round trips per frame), driven by the same thread
