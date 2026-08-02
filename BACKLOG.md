@@ -390,12 +390,71 @@ ZERO exceptions in 871 cycles.**
 * Client-outstanding at fif = 1 no longer has any enforcement. It sat
   at ≤ 2 only because the starvation stopped the capture loop; ungated,
   it becomes rate x client-ack-latency, so a SLOW client widens it
-  without limit until transport backpressure. Layer 1 measured the
-  proxy analogue of a slow client: HEAD capped at 2 under a 40 ms ack
-  delay. The fixed build must be measured at the same D values (step 3)
-  and the growth reported as the fix's cost. If a hard client-facing
-  bound is wanted, that is either the separate egress-gating decision
-  above or the slot-ack horizon variant in step 3.
+  without limit. Layer 1 measured the proxy analogue of a slow client:
+  HEAD capped at 2 under a 40 ms ack delay. The fixed build must be
+  measured at the same D values (step 3) and the growth reported as the
+  fix's cost. If a hard client-facing bound is wanted, that is either
+  the separate egress-gating decision above or the slot-ack horizon
+  variant in step 3.
+  * **CORRECTION 2026-08-02, read in code, not measured: "until
+    transport backpressure" (written the day before) is WRONG, and it
+    was the load-bearing half of that sentence.** There is no transport
+    backpressure on this path at all.
+    `frame_id_server` advances when the frame is handed to
+    `trans_write_copy_s()` (`xrdp_mm.c:4320` on `enc_done`), and that
+    call **cannot fail for want of a wire**: whatever the socket does
+    not take is `malloc`ed into a fresh stream and appended to the
+    unbounded singly-linked `self->wait_s` list, and it returns 0
+    (`common/trans.c:644-676`). So `min(consumed, server + 1)` bounds
+    frames between absorb and *handoff to xrdp's own heap*, never
+    frames on the wire.
+  * The one byte-level throttle in this transport —
+    `si->source[my_source] > MAX_SBYTES` (= **0**), which stops
+    `select()`ing a source's input while its bytes sit queued
+    (`common/trans.c:219, 376`) — **provably does not apply to GFX
+    frames**. Bytes are charged only when
+    `si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), `cur_source`
+    is set only inside `trans_check_wait_objs()` for a *transport*
+    (`trans.c:396`), and enc_done arrives on a **wait object**, not a
+    transport (`xrdp_mm.c:4061, 4538`). `cur_source` is NONE at that
+    instant, so the frame's bytes are charged to nobody and throttle
+    nothing.
+  * Consequence: **the client ack window is currently the ONLY rate
+    control between the encoder and a slow link.** On a link that
+    cannot carry the encoder's output the backlog does not settle at
+    `rate x ack-latency`; it grows in xrdp's heap until the client
+    catches up or the session dies. That is the bufferbloat shape
+    PRD:603 forbids, one level further in than a socket buffer.
+  * This does not change the layer-1 verdict (LAN, ack latency the only
+    variable) and does not change step 3's predictions. It changes what
+    step 3's **safety leg** is testing: not "does a bound take over"
+    but "is there one at all". Record the frozen-client leg's buffered
+    bytes and RSS, not just its frame count.
+
+**Default vs opt-in — DECISION, 2026-08-02 (open, do not pre-empt).**
+* **No new knob, and NOT `xrdp.ini`.** The behaviour already lives
+  behind `gfx.toml` `[avc444] eager_slot_ack`, default **false**
+  (`xrdp_tconfig.c:430, 452`), and the #79 emission is inside
+  `if (encoder->eager_slot_ack)` (`xrdp_mm.c:1724`). #79 is a change to
+  how that feature acks, not a new feature; splitting its configuration
+  across two files buys nothing. GFX/encoder config is gfx.toml's by
+  construction.
+* So #79 ships opt-in **for free** and needs no decision to do so. The
+  only live question is whether `eager_slot_ack` may later become the
+  default, and #79 as specified makes that HARDER: an option whose
+  documented meaning is "faster, and on a WAN queue without bound" is
+  a footgun that benchmarks turn on and WAN operators never turn off.
+* Preferred shape, if the safety leg is bad: **replace the bound, do
+  not remove it** — the horizon variant `client + H > server` with H
+  sized to the pipeline (2 capture slots / 3 stages), not to `fif`.
+  `fif` is doing two jobs today — it sets the latency target AND it
+  bounds client-outstanding — and FR-ACK-3 requires job 1 to hold at
+  fif = 1, which drags job 2's bound down to 1 with it. Separating them
+  is defaultable; plain ungating is not.
+* Sequence: implement the plain ungate (that is what CI pins), run
+  step 3 including the frozen leg, and let the outstanding row and the
+  buffered-bytes number choose. **Do not decide the default before the
+  safety leg has a number.**
 * Slightly more ack messages to xorgxrdp (one SLOT_ONLY per frame even
   with the window closed) — negligible, noted for completeness.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;

@@ -269,3 +269,52 @@ rather than assumed. If it is bad, the targeted change is not "ungate"
 but "gate on the right thing": `client + H > server` with H taken from
 the two-slot capture budget instead of `fif` — the pathology being that
 fif = 1 is a tighter bound than the pipeline it is gating needs.
+
+## Correction, 2026-08-02 (same day): there is no transport backpressure to fall back on
+
+The paragraph above says a slow client widens `id_server − id_client`
+"until the transport stops draining, `frame_id_server` stops advancing
+and `min(consumed, server + 1)` bites", and calls the result "a socket
+buffer's worth of frames". **That is wrong.** It was written from the
+`xrdp_mm.c:1648` comment ("what keeps this BACKPRESSURE rather than a
+queue") without following `frame_id_server` to the call that advances
+it. Kept, per the records rule, and corrected here rather than edited.
+
+`frame_id_server` advances on `enc_done` (`xrdp_mm.c:4320`), i.e. when
+the frame has been handed to `trans_write_copy_s()`. That function
+**cannot fail for want of a wire**: after one non-blocking attempt,
+whatever the socket did not take is `malloc`ed into a new stream,
+appended to the singly-linked `self->wait_s` list, and 0 is returned
+(`common/trans.c:644-676`). The list has no length or byte limit. So
+the cap bounds frames between absorb and *handoff to xrdp's own heap* —
+never frames on the wire.
+
+The transport does have one byte-level throttle,
+`si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` defined as **0**
+(`trans.c:35, 219, 376`): while a source's bytes sit queued, that
+source's input transport is dropped from the `select()` read set. It
+does not reach GFX frames. Bytes are charged only when
+`si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`); `cur_source` is
+set to a transport's own source only inside `trans_check_wait_objs()`
+(`trans.c:396`) and restored on exit; and enc_done is delivered on a
+**wait object**, not a transport (`xrdp_mm.c:4061, 4538`). At the
+instant a frame is written, `cur_source` is NONE, the bytes are charged
+to nobody, and nothing is throttled.
+
+**So the client ack window is today the only rate control anywhere
+between the encoder and the link.** That does not change anything the
+sweep measured — every leg ran on loopback with ack latency as the sole
+variable, and the client always drained — but it changes what step 3's
+frozen-client leg is testing. It is not "does another bound take over";
+it is "is there one at all". The leg must record buffered bytes and
+process RSS, not only frames produced.
+
+It also sharpens the fix's shape. On a link that cannot carry the
+encoder's output, ungated production does not settle at
+`rate x ack-latency`; the backlog grows in the server's heap until the
+client catches up. `fif` is currently doing two jobs — setting the
+latency target and bounding client-outstanding — and FR-ACK-3 requires
+the first to hold at fif = 1, which drags the second down to 1 with it.
+Removing the gate removes the second job outright; the horizon variant
+`client + H > server`, H from the pipeline's own depth, separates them.
+Only the second of those is a candidate for ever being the default.
