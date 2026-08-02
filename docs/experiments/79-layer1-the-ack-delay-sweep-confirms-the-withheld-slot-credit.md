@@ -376,3 +376,95 @@ D ≥ 20 — the signature of a control loop at a fixed point, not of a
 race. What varies at D = 0 is only whether the loop's own delay lands
 inside a frame period. Calling it a race suggested the fix was
 synchronisation; it is not, it is the loop's threshold.
+
+## Was the LAN counterfactual sound? Checked, and it holds (2026-08-02)
+
+The reassessment above leans on one number: prompt-credit cycles ran
+16.3–16.9 ms in every leg, so removing the gate on a LAN costs nothing.
+**That number has a selection problem, and it was quoted before the
+problem was faced.** The prompt class is conditioned on the ack having
+arrived in time — a statement about a cycle's history, not only its
+mechanism. In the period-3 limit cycle a prompt cycle *always* follows
+two stalled ones, and a stall gives the producer ~35 ms of idle time in
+which capture can run ahead. So 16.4 ms might be the period of a cycle
+that started from a pre-loaded pipeline, which the fixed build — where
+every cycle is prompt and none follows a stall — would not inherit.
+
+Discriminator, run on the committed captures at no session cost
+(`PR-demo/mac_bisect_matrix/i79_lan_counterfactual.py`): condition the
+prompt-cycle period on its **position within a run of consecutive prompt
+cycles**. Position 1 may be pre-loaded by the stall before it; position
+≥ 2 has no stall behind it and is the steady state the fixed build would
+run in.
+
+| leg | D | prompt-run lengths | pos 1 | pos ≥ 2 | Δ |
+|---|---|---|---|---|---|
+| direct | — | 127 runs, max **28**, 31 of length ≥ 6 | 16.6 (n=127) | 16.9 (n=397) | +0.3 |
+| d0 | 0 | 149 runs, max **22**, 20 of length ≥ 6 | 17.0 (n=149) | 16.9 (n=301) | −0.1 |
+| d10 | 10 | 170 runs, max 3 | 16.9 (n=170) | 15.9 (n=69) | −1.0 |
+| d20 | 20 | 159 runs, **all length 1** | 16.3 (n=159) | — | n/a |
+| d40 | 40 | 130 runs, **all length 1** | 16.4 (n=130) | — | n/a |
+
+**The counterfactual holds, and it is stronger than an inference.** In
+the LAN legs the period is flat across run position (d0: 17.0 / 17.0 /
+16.7 / 17.0 for positions 1 / 2 / 3 / 4+), and the unmodified server has
+already been observed running **28 consecutive frames with the gate not
+binding, at 16.9 ms**. That is the fixed build's LAN steady state,
+measured on HEAD. Pre-loading is dead as an explanation: a 28-cycle run
+cannot be living off one stall's worth of lookahead, and there is no
+drift with position.
+
+Honest limit: this settles the LAN regime for runs up to ~28 cycles
+(~0.5 s). A permanently prompt pipeline is what #79 step 4 measures, and
+only that can show effects with a longer time constant.
+
+The d20/d40 rows are not a gap in the check — they are the period-3 lock
+restated: at D ≥ 20 a prompt cycle is *never* followed by another one,
+so those legs contain no steady state to sample. The question they raise
+was already answered in the legs that do.
+
+## The `max()` model does not fit, and the reason matters
+
+Owner's proposed shape, in period form (`fps = min(...)` over times is a
+`max()` over periods): `period = max(ack_latency / K, compute_serial)`,
+with K = fif = 1. Checked against the same captures:
+
+| leg | D | ack latency p50 | compute (prompt p50) | predicted | measured | residual |
+|---|---|---|---|---|---|---|
+| direct | — | 7.5 | 16.6 | 16.6 | 21.5 | **+4.9** |
+| d0 | 0 | 10.1 | 16.5 | 16.5 | 22.5 | **+5.9** |
+| d10 | 10 | 17.1 | 16.1 | 17.1 | 27.9 | **+10.8** |
+| d20 | 20 | 27.8 | 16.1 | 27.8 | 33.1 | **+5.3** |
+| d40 | 40 | 48.1 | 15.9 | 48.1 | 40.1 | **−7.9** |
+
+It misses in **both directions**, which rules out a single wrong
+constant. Two separate causes, both already visible in the data:
+
+* **At low D it under-predicts, because the gated cycle is ADDITIVE, not
+  a maximum.** A withheld cycle waits for the client's ack *and then*
+  still has to capture and encode; the two do not overlap. `max()`
+  assumes the system is rate-limited by whichever ceiling is lower,
+  which would be true if the gate throttled every cycle uniformly. It
+  does not — it throttles a subset.
+* **At D = 40 it over-predicts, because credit arrives in PAIRS.**
+  `min(consumed, server + 1)` releases two frames' worth when the window
+  opens, so the loop delivers more than one frame per round trip:
+  3 frames per 120.4 ms against a 48.1 ms ack latency is 1.2 frames per
+  round trip, not 1.
+
+So the unmodified loop is not "clocked by the slower of two ceilings" at
+all. It **alternates between two states** and the mean is a duty-cycle
+average — which is exactly the closure already recorded above,
+⅔·52.0 + ⅓·16.4 = 40.1. A `max()` model has no way to express a duty
+cycle.
+
+**This is a property of the broken loop, and it yields a model-level
+prediction for the fix.** A horizon H converts the alternation into a
+uniform rate limit: every cycle is treated the same, so the duty cycle
+collapses and the system really does become rate-limited by whichever
+ceiling is lower. **Prediction for #79 step 4: the fixed build IS
+well-fitted by `period = max(ack_latency / H, compute_serial)`, with the
+residual collapsing from +4.9…−7.9 ms to within ~1 ms across all five
+legs.** That is a stronger claim than any single-metric row in the gate,
+because it constrains the whole curve rather than a point, and it is
+falsifiable in the same run at no extra cost. Recorded before the run.

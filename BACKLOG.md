@@ -322,6 +322,30 @@ ZERO exceptions in 871 cycles.**
    20 s — a sample-size correction to the same five legs.
    (After the fix exists, the same sweep separates the builds: fixed
    predicts withheld ≈ 0 and period FLAT in D.)
+   **LAN regime SETTLED from these same captures, 2026-08-02, at no
+   session cost** (`i79_lan_counterfactual.py`). The "prompt cycles run
+   at 16.4 ms" evidence was conditioned on the ack having arrived, so it
+   could have been measuring cycles pre-loaded by the stall in front of
+   them. Conditioning the prompt period on POSITION within a run of
+   consecutive prompt cycles kills that: the `direct` leg contains a run
+   of **28 consecutive ungated frames at 16.9 ms**, d0 a run of 22, and
+   the period is flat across positions (d0: 17.0 / 17.0 / 16.7 / 17.0 at
+   positions 1 / 2 / 3 / 4+). **The unmodified server has therefore
+   already been observed running the fixed build's LAN steady state.**
+   Limit stated: settled for runs to ~28 cycles (~0.5 s); a permanently
+   prompt pipeline is what step 4 measures. The d20/d40 legs contain no
+   runs longer than 1 — that is the period-3 lock restated, not a gap.
+   The owner's `period = max(acklat/K, compute)` model was checked on
+   the same data and does NOT fit at K = 1 (residuals +4.9 / +5.9 /
+   +10.8 / +5.3 / −7.9 ms): it misses in both directions because a
+   gated cycle is ADDITIVE (wait for the ack, then still capture and
+   encode) and because credit arrives in PAIRS at high D
+   (`min(consumed, server+1)` releases two), giving 1.2 frames per round
+   trip rather than 1. The unmodified loop is a duty cycle, which
+   `max()` cannot express — and that is what makes the model a
+   prediction for the fix rather than a dead end: a horizon makes every
+   cycle uniform, so the fixed build SHOULD fit. Added as a row in step
+   4's table.
 2. **THE CHANGE — a pipeline horizon on the slot credit, not an
    ungate** (rescoped 2026-08-02; the plain ungate is rejected, see the
    note at the top of this item and PRD FR-ACK-3 amendment clause 3).
@@ -388,6 +412,7 @@ ZERO exceptions in 871 cycles.**
    | period mean | 22.5 → 40.1 ms | 16.5–17.5 ms, \|Δperiod/ΔD\| < 0.05 | slope > 0.1 (something else consumes cliack) |
    | period vs fif = 2 | 22.5 vs 18.1 | **≤ 18.1** (FR-ACK-3's actual requirement) | above it — fif = 1 still costs throughput |
    | pump | 15.2–15.4 flat | unchanged | it moves — the fix touched encode |
+   | model residual, `period = max(acklat/H, compute)` | **+4.9 / +5.9 / +10.8 / +5.3 / −7.9 ms** — misses in both directions | within ~1 ms in all five legs | any leg off by > 3 ms — the horizon did not make the loop uniform |
    | id_server − id_client | capped at 2 by the stall | **rises to min(H, ≈1 + D/period)** and NEVER exceeds H | it stays ≤ 2 at D = 40 (credit still gated elsewhere — the "win" came from somewhere unaccounted for) **or** it exceeds H in any leg (the horizon does not hold — a RED result, stop) |
 
    The last row is not a bonus metric, it is the cost side and it must
@@ -432,6 +457,29 @@ ZERO exceptions in 871 cycles.**
    * Run HEAD's leg too, unchanged: it is the positive control that
      proves the freeze mechanism works before it is used to judge
      anything (HEAD must stop within ~1–2 frames).
+
+   **Instrumentation needed before this gate runs — two spare trace
+   fields, no new mechanism (decided 2026-08-02).** The existing ring
+   answers everything else: `send` already carries id_server and
+   id_client (that is where the 556/552/552 histogram came from),
+   `withheld` is derivable from `ackslot` + `absorb`, `pump` is
+   bracketed. Two gaps, both filled by populating fields that are
+   already reserved and already zero:
+   * **`ackslot` field d ← `frame_id_client`** (`xrdp_mm.c:1733` emits
+     `target, server, consumed, 0, 0, 0`). Without it the gate's
+     decision is inferred; with it, every emission is exactly
+     reconstructable, and after the fix it is what distinguishes "H
+     bound" from "the client was slow" — the difference the whole item
+     turns on. Costs nothing: the field is written either way.
+   * **`egress` field c ← the transport's PENDING BYTES**
+     (`xrdp_mm.c:4293` emits `frame_id, displayed, 0, 0, 0, 0`).
+     Required by the frozen-client safety leg and by #80: the queue is
+     in the heap, so bytes are the only thing that can show it. **It
+     must be an O(1) running counter maintained inside `trans` on
+     append and drain — NOT a walk of the `wait_s` chain per frame.**
+     A per-frame list walk is coding rule 5's exact trap: an instrument
+     whose cost grows with the quantity it is measuring, on the path
+     being measured.
 
    **What this gate can no longer settle, and where it went.** Until the
    rescope, this gate carried an open design question — "plain ungate
