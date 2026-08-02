@@ -5,6 +5,26 @@ record it points at. Kept verbatim, wrong claims included.
 
 # #76 — fif = 2 was hiding a bug: what fif = 1 exposed
 
+> **SUPERSEDED IN PART, 2026-08-02 (#78 Runs A/B,
+> `captures/i78_x017_pumpsplit_20260802` and
+> `captures/i78_x014_fif2_clocks_20260802`).** The load-bearing claim
+> below — pump inflates 16.6 → 26.7 ms at fif = 1 and carries 100 % of
+> the regression — **did not reproduce**: on arm x017 (this config plus
+> two ring records, clean fleet, same host, same day) fif = 1 pump was
+> **16.40 ms**, equal to fif = 2's 16.44 measured the same hour. The
+> record below stays verbatim: its instrument was sound and its numbers
+> were real; the CONDITION that produced them is unknown (candidates in
+> the #78 captures). What *does* reproduce at fif = 1 is a different
+> mechanism entirely: worker starvation in a tail (wait p90 26.7 ms,
+> 367/2514 gaps > 30 ms), because `xrdp_mm.c` withholds the eager slot
+> ack (and region ack) to xorgxrdp while `xrdp_gfx_ack_window_open` is
+> closed — at fif = 1 that chains capture-slot recycling to the client's
+> ack round trip. The trace-archaeology findings that already reordered
+> this record's hypotheses (cold pages refuted, poll timeout refuted)
+> stand; the sustained-duty clock hypothesis is refuted as the
+> steady-state explanation by the same runs (pump equal at different
+> duties; GPU power 52.9 vs 58.8 W).
+
 2026-08-02. Arm **x015**, x014's image and `gfx.toml` body exactly, one
 environment variable changed. Capture:
 `PR-demo/mac_bisect_matrix/captures/i76_x015_fif1_20260802`.

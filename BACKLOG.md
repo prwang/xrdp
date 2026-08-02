@@ -59,7 +59,30 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
-## #76 — TOP PRIORITY: fif = 2 is hiding a bug (owner directive, 2026-08-02)
+## #76 — TOP PRIORITY: fif = 2 is hiding a bug (owner directive, 2026-08-02) — REFRAMED by #78's runs, 2026-08-02
+
+**Status after #78 Runs A/B (see #78, captures
+`i78_x017_pumpsplit_20260802` / `i78_x014_fif2_clocks_20260802`):**
+
+* **The pump inflation this item was filed on did not reproduce.**
+  fif = 1 pump = 16.40 ms = fif = 2's 16.44, same hour, same host,
+  clean fleet, config identical to x015 but for two ring records.
+  x015's 26.7 ms is one unreproduced observation; its record carries a
+  dated supersede note. Open sub-question: what condition produced it
+  (candidates: transient host power/thermal state during the 02:07 run;
+  concurrent activity — the fleet-session state was not recorded then,
+  it is now, `fleet_sessions_after_runA.txt`). Reproduce-or-retire; a
+  rerun of the uninstrumented x015 pod needs owner approval.
+* **The fif = 1 defect that DOES reproduce** is the ack-window-gated
+  slot release chaining capture to the client round trip — mechanism,
+  trace and candidate fix in #78 item 3. That is the remaining
+  substance of this item.
+* Hypotheses 1 (cold capture pages) and 2 (10 ms poll timeout) were
+  refuted from the existing x014/x015 rings before the runs; hypothesis
+  3 (duty-driven clocks) is refuted as the steady-state explanation by
+  the runs themselves (pump equal at different duties, 52.9 vs 58.8 W).
+
+**Original framing below, kept for the record.**
 
 **The reframing, and it is the whole item.** An earlier draft of this
 entry treated "does fif = 2 buy anything?" as the question and filed the
@@ -131,9 +154,44 @@ from 2 and 3 immediately, and it is a one-record-per-cycle change.
 **Record:** `docs/experiments/76-fif1-costs-throughput-in-a-bracket-it-cannot-reach.md`.
 **Capture:** `PR-demo/mac_bisect_matrix/captures/i76_x015_fif1_20260802`.
 
-## #78 — `pump` has no instrument, and it now hides 10 ms (IN PROGRESS, 2026-08-02)
+## #78 — `pump` has no instrument, and it now hides 10 ms (DONE, 2026-08-02 — and the split falsified its own baseline)
 
-**Status 2026-08-02: instrument landed; two owner-approved runs next.**
+**Runs A/B complete (owner-approved observe-only design).** Captures:
+`i78_x017_pumpsplit_20260802` (instrumented x017, fif = 1, clock log)
+and `i78_x014_fif2_clocks_20260802` (untouched x014, fif = 2, clock
+log). Both mechanism-checked (fif on every send; 2+2 split records per
+cycle; closures 22.60/18.06 vs 22.60/18.08 measured).
+
+**What the runs decided:**
+
+1. **The x015 pump inflation (26.7 ms) did NOT reproduce** — the #78
+   internal control failed in the informative direction. fif = 1 pump =
+   **16.40 ms** = fif = 2's 16.44, same hour, clean fleet. #76 is
+   reframed below; x015's record carries a dated supersede note.
+2. **The split, on the reproducing pipeline:** FEED 2.61 / ENCODE 13.38
+   / DRAIN 0.41 ms. FEED matches the probe (2.1–2.5), so the ~5 ms
+   deployed-vs-probe gap is inside **ENCODE** under live-session load,
+   equally in both fif modes.
+3. **The reproducing fif = 1 cost is a starvation TAIL, not pump:**
+   22.6 vs 18.1 ms mean, all of it in `wait` (p90 26.7 ms; 367/2514
+   egress gaps > 30 ms). Cause, code-anchored: `xrdp_mm.c`
+   `xrdp_mm_update_module_frame_ack` emits the region ack AND the #70
+   eager slot ack only inside `xrdp_gfx_ack_window_open` — at fif = 1
+   the producer's capture credit is chained to the CLIENT's ack round
+   trip. Traced stall: input absorbed at −10.5 ms, credit withheld
+   until cliack at +10.1, capture +18.6, worker starved 29 ms. The slot
+   ack's safety condition is the absorb frontier (children consumed the
+   input), not client display — withholding it is the residual FR-ACK-3
+   violation. Candidate fix (needs its own item + owner sign-off, it is
+   a behaviour change): emit the SLOT_ONLY ack outside the window gate;
+   the ordinary ack stays gated.
+4. **Clocks, observe-only:** sclk floor-bound (600 MHz, GFX idle) in
+   both runs; GPU power 52.9 W (fif = 1) vs 58.8 W (fif = 2) — duty
+   tracks cadence, pump does not. No observable clock state
+   distinguishes the runs; VCN clock is not exposed on this host
+   (stated in `clock_log.sh`).
+
+**Prior status (2026-08-02, pre-run): instrument landed.**
 Trace-archaeology on the EXISTING x014/x015 rings (no new runs) already
 moved the hypothesis ranking before any instrument fired — full analysis
 goes to the experiment record with the run results; the load-bearing

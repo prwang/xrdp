@@ -138,6 +138,9 @@ declare -A ARM_XORG_DEB=(
     # x014 (#75): the SAME xorgxrdp as x013 -- the only thing that differs
     # between the two arms is the xrdp build
     [x014]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x017 (#78): the SAME xorgxrdp as x014/x015 -- the pump split is
+    # xrdp-internal and the producer must stay identical
+    [x017]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -183,6 +186,9 @@ declare -A ARM_TAG=(
     # env-only arm this way is the cheap shape: no deb, no podman build,
     # no k3s import.
     [x015]=73e4cb76d483.xx10fa3aa-tf
+    # x017 (#78): x015's config on the pump-split instrumented xrdp
+    # (feedend/outfirst on the existing perf ring, nothing else)
+    [x017]=661ff5fc64fa.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -227,6 +233,10 @@ declare -A TAG_DEB=(
     # x013 build (CI golden vectors + an FNV-1a digest over 120 whole 4K
     # pictures)
     [73e4cb76d483.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801232618.73e4cb76d483_amd64.deb"
+    # x017 (#78): the pump-split instrument -- feedend + outfirst per
+    # child per cycle on the existing ring; behaviourally a no-op with
+    # the sink disarmed
+    [661ff5fc64fa.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260802030326.661ff5fc64fa_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
