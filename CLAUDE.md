@@ -395,6 +395,54 @@ Run all five, every time, before presenting:
    changed, say so before quoting the number, and do not compare it to the
    old series.
 
+### Turn pre-flight: re-read the draft before sending it (owner directive, 2026-08-02)
+
+**Never end a turn with a message you have not checked. Dump the
+draft, run it against the gates below, and iterate until it passes —
+BEFORE sending, not after the owner reads it.** A message that has to
+be corrected in the next turn costs the owner a full round trip, and
+this project has now spent several of them on answers that were right
+in substance and unusable as written.
+
+Three checks, every turn, on the actual text about to be sent:
+
+1. **Fact gate.** Every claim traceable to a file:line, a captured
+   number, or an explicit "not measured / inferred". Anything asserted
+   from memory of the conversation rather than from the tree is
+   suspect — re-read the source. *(Cost so far: "until transport
+   backpressure" was asserted from a code COMMENT containing the word
+   BACKPRESSURE, without following `frame_id_server` to the call that
+   advances it. It was the load-bearing half of a design decision and
+   it was wrong.)*
+2. **Understandability gate.** Read the draft as the owner, who does
+   not have the analyzer's variable names in their head. Every term of
+   art either defined in one plain clause on first use, or replaced.
+   A stage name, a metric name and a threshold name are indices into
+   code, not explanations. If a sentence cannot be rewritten as "the
+   machine is doing X and it takes Y because Z", it is not understood
+   well enough to send. *(Cost so far: `prompt` / `withheld` / `run
+   length` shipped undefined across three turns, and the owner had to
+   ask.)*
+3. **Scientific quality gate.** The five questions above, applied to
+   the numbers actually quoted in the draft — including the ones
+   quoted from an earlier turn. Re-derive rather than re-copy.
+   Especially: is any headline number a mean over a distribution that
+   is not unimodal, and is any counterfactual a subpopulation selected
+   by the very condition under test?
+
+Then two more that are about the shape of the answer:
+
+* **Lead with what the owner must act on** — the correction, the red
+  result, the decision needed — not with what went well.
+* **Answer the question that was asked, in the unit it was asked in.**
+  If the owner asked "who blocks whom", the reply contains a sentence
+  naming the blocker. If they asked for a timeline, it contains a
+  timeline. A correct essay adjacent to the question is a failed
+  answer.
+
+This rule is not a licence to pad turns with self-review commentary.
+The checking is silent; only the corrected message is sent.
+
 ### Escalation ladder (owner directive, 2026-07-31)
 
 **Never make the expensive remote run the FIRST experiment.** A property

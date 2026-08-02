@@ -557,3 +557,134 @@ separate open item — the unreproduced 26.7 ms `pump` on arm x015, a
 bracket a client ack window cannot reach — and nothing here touches it.
 If a tail survives the fixed build's LAN legs, that is where to look
 next, not at the horizon.
+
+## The gate, the slot, and who actually blocks whom on a LAN (2026-08-02)
+
+Three words used throughout this record are jargon and were never
+defined. They name real things:
+
+**Slot — the exclusive resource.** xorgxrdp holds exactly two capture
+buffers for AVC444 (`XUP_CAP_AVC444_SLOT_COUNT = 2`). A capture writes a
+frame's pixels into one. That buffer cannot be written again until xrdp
+says so, so at any instant the producer has 0, 1 or 2 slots busy and can
+only start a capture when one is free.
+
+**Credit — the token that frees a slot.** xrdp sends xorgxrdp a frame
+ack naming a frame id; every slot holding a frame at or below that id
+becomes writable. It is the *only* mechanism that admits a new capture —
+there is no timer, no separate flow-control channel. "Credit withheld"
+means xrdp knew a slot was free and did not say so.
+
+**H — how far behind the client may be before xrdp stops issuing
+credit.** The test is `frame_id_client + H > frame_id_server`, i.e.
+`server − client < H`: "the client is fewer than H frames behind what we
+have sent". H is `frames_in_flight` today, so **H = 1 means credit flows
+only while the client has acked EVERYTHING sent.**
+
+### Who blocks whom on a LAN: nobody is slow, and that is the finding
+
+At the instant slot k becomes free (`absorb k`), the gate asks whether
+the client has acked frame k−1 — the frame sent just before. So credit
+is emitted if and only if
+
+    ack round trip of frame k−1   <   absorb(k) − egress(k−1)
+
+Both measured on the `direct` leg (no proxy at all, 745 decision points):
+
+| interval | p10 | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|
+| slot becomes free after the previous send | 6.2 | **7.9** | 33.3 | | |
+| client ack round trip | 5.6 | **7.6** | 17.9 | 20.1 | 27.3 |
+
+**7.6 against 7.9 ms — a 0.3 ms margin, 4 %.** The gate at H = 1 is
+decided by a photo finish between a network round trip and a pipeline
+deadline that have no relationship to each other. Nothing is slow: the
+client answers in 7.6 ms, and xrdp asks for the answer 7.9 ms after
+posing the question. Roughly a third of the time the coin lands wrong.
+
+That is the answer to "on a LAN the client is not the blocker, so who
+is?" — **xrdp is.** It made a local pipeline event wait on a round trip
+of the same duration, then treated losing that race as a reason to stop
+capturing. The client is behind by *one frame*, for 7.6 ms, because it
+is on the other end of a wire.
+
+The `server − client` value the gate actually compares, at every absorb:
+
+| leg | 0 behind | 1 behind | 2 behind |
+|---|---|---|---|
+| direct | 511 (68.6 %) | 233 (31.3 %) | 1 (0.1 %) |
+| d0 | 441 (61.9 %) | 271 (38.0 %) | 1 (0.1 %) |
+
+H = 1 shuts on the middle column: **31.4 % / 38.1 %** of decision
+points. That column *is* #76's "31 % tail", named at last — it is not a
+tail of anything, it is the fraction of frames whose ack was still in
+flight.
+
+### The one instance where H = 2 would have gated is an artifact, and it retracts yesterday's H derivation
+
+Both legs show exactly one absorb with `server − client = 2`. Neither is
+real: the only frame ids never acked in either leg are the **final three
+of the run** (direct 788/789/790, d0 749/750/751), contiguous otherwise
+— the capture ended before those acks arrived. **H = 2 would have gated
+zero times in 745 and 713 genuine decision points.**
+
+That **retracts the H derivation written earlier the same day**, which
+argued from #78's ack-latency p90 of 18.9 ms that client-outstanding
+reaches ~2.1 and therefore "H = 2 has no headroom and would bind on
+ordinary client jitter". It does not. The claim was arithmetic on a p90
+that was never checked against the quantity the gate compares, and the
+quantity was one command away in captures already committed. Kept here
+per the records rule; the corrected reasoning is in BACKLOG #79 step 2.
+
+**H = 3 still stands, on a different and weaker basis.** The data cannot
+separate H = 2 from H = 3 — HEAD stops the producer the moment
+`server − client` reaches 1, so the trajectory is prevented from ever
+reaching 2, and no number taken under H = 1 can estimate how often H = 2
+would bind without it. What is not selection-bound is the interval: at
+the observed **maximum** ack round trip of 27.3 ms against a predicted
+16.9 ms period, `server − client` reaches 1.6 — so H = 2 would gate at
+about the top 1 % of round trips and H = 3 not until ack latency exceeds
+two periods (~33.8 ms), beyond anything observed. H = 3 clears the
+observed maximum with ~1.5× headroom and H = 2 with none. That is a
+margin argument, not a claim that H = 2 is broken.
+
+### The wedge, event by event (direct leg, frames 787–790)
+
+`server` = last frame handed to the transport; `client` = last frame
+acked; `slots busy` = which frame occupies each capture buffer.
+
+```
+   t (ms)  event      id   server client  slots busy       gate
+  -59.265  absorb    787     786    786   s1=f787          H1 open
+  -59.238  CREDIT    787     786    786   -                <- both slots free, 27 us after absorb
+  -50.384  egress    787     787    786   -                H1 SHUT   (we sent 787; its ack is in flight)
+  -49.666  msgin     788     787    786   s0=f788
+  -42.930  msgin     789     787    786   s0=f788,s1=f789  <- both slots busy; no capture can start
+  -39.276  cliack    787     787    787   s0=f788,s1=f789  H1 open   (ack arrived 11.1 ms after send)
+  -32.925  absorb    788     787    787   s0=f788,s1=f789  H1 open
+  -32.884  CREDIT    788     787    787   s1=f789          <- slot 0 released, 41 us after absorb
+  -23.595  egress    788     788    787   s1=f789          H1 SHUT   (we sent 788)
+  -22.888  msgin     790     788    787   s0=f790,s1=f789  <- both slots busy again
+  -16.361  absorb    789     788    787   s0=f790,s1=f789  H1 SHUT   <- slot 1 IS FREE. Not said.
+  -12.175  egress    789     789    787   s0=f790,s1=f789  H1 SHUT
+   +0.000  absorb    790     789    787   s0=f790,s1=f789  H1 SHUT   <- slot 0 IS FREE. Not said.
+  +36.667  egress    790     790    787   s0=f790,s1=f789
+```
+
+Read the two marked lines. At **−16.361** the encoder children had
+finished reading frame 789's pixels — slot 1 was provably reusable — and
+xrdp did not tell xorgxrdp, because `server − client` was 788 − 787 = 1.
+Frame 788 had been sent 7.2 ms earlier and its ack was somewhere on the
+wire; at this leg's median round trip it was due at about −16.0 ms,
+**0.4 ms after the credit was needed.** With both slots held and no
+credit, the producer cannot start a capture. The pipeline is idle,
+holding a free buffer it has not been given permission to use.
+
+The same thing repeats at **+0.000** for slot 0, and the consequence is
+in the last line: frame 790's egress lands **36.7 ms** after that
+absorb, against a 16.9 ms period when credit is prompt.
+
+Under H = 3 every gate column in that trace reads open, the two CREDIT
+lines that are missing get emitted 27–41 µs after their absorb (the
+measured latency when the gate is open), and both captures start
+immediately. Under H = 2, likewise — the trajectory never reaches 2.

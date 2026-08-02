@@ -351,18 +351,42 @@ ZERO exceptions in 871 cycles.**
    note at the top of this item and PRD FR-ACK-3 amendment clause 3).
    * The eager SLOT_ONLY ack is gated on `client + H > server` with
      **H from the pipeline's depth, not from `frames_in_flight`**.
-     **H = 3, decided 2026-08-02**, and the derivation is the point:
-     the gate must not bind in the LAN regime, so H must exceed the
-     client-outstanding that regime actually produces, which is
-     `1 + ack_latency / period`. Measured on the sweep's LAN legs:
-     ack latency p50 7.5–10.1 ms against a 16.9 ms period → ~1.6; at
-     #78's ack-latency **p90 of 18.9 ms** — longer than one period —
-     → ~2.1. **H = 2 has no headroom against that p90** and would bind
-     on ordinary client jitter, reintroducing the thing this item
-     removes; H = 3 does not bind until ack latency exceeds ~2 periods
-     (~34 ms), which is the WAN regime where binding is correct. H is a
-     compile-time constant pinned by CI, not tuned against a run, and
-     H = 1 must reproduce HEAD exactly (see below).
+     **H = 3, decided 2026-08-02.**
+     * **CORRECTION, same day: the derivation committed a few hours
+       earlier was wrong and is retracted.** It said "client-outstanding
+       at #78's ack-latency p90 (18.9 ms) is ~2.1, so H = 2 has no
+       headroom and would bind on ordinary client jitter." That was
+       arithmetic on a p90, never checked against the quantity the gate
+       actually compares. Measured directly
+       (`i79_wedge_timeline.py`, the `server − client` value at every
+       absorb instant): **direct leg 0 in 68.6 %, 1 in 31.3 %, 2 in
+       0.1 %; d0 leg 0 in 61.9 %, 1 in 38.0 %, 2 in 0.1 %** — and the
+       single "2" in each leg is the **last frame of the capture**,
+       whose ack the trace ended before recording (the only ids never
+       acked are the final three of each run, contiguous otherwise). So
+       **H = 2 would have gated ZERO times in 745 and 713 genuine
+       decision points.** "Binds on ordinary jitter" was false.
+     * **What the data can and cannot decide.** It cannot separate
+       H = 2 from H = 3, and the reason is the selection effect this
+       item keeps re-encountering: HEAD stops the producer the moment
+       `server − client` reaches 1, so the trajectory is *prevented*
+       from reaching 2. A number measured under H = 1 cannot estimate
+       how often H = 2 would bind once H = 1 is gone.
+     * **What it can decide, and does.** The intervals are not
+       selection-bound. Ack round trip (direct leg): p50 **7.6**, p90
+       17.9, p99 20.1, **max 27.3 ms**. Predicted fixed-build period
+       ~16.9 ms. `server − client` ≈ ack_latency / period, so the
+       observed MAXIMUM round trip gives 27.3 / 16.9 = **1.6 → reaches
+       2**: H = 2 would gate at roughly the top 1 % of round trips,
+       H = 3 not until ack latency exceeds 2 periods (~33.8 ms), above
+       everything observed. **H = 3 clears the observed maximum with
+       ~1.5x headroom; H = 2 clears it with none.** That is the whole
+       basis for preferring 3, and it is a margin argument, not a
+       claim that 2 is broken.
+     * #61g's documented 50–150 ms oracle-client pauses exceed both.
+       Gating there is correct — the client really did stop.
+     * H is a compile-time constant pinned by CI, not tuned against a
+       run, and H = 1 must reproduce HEAD exactly (see below).
    * **What this bounds on the wire.** Capture k is admitted only when
      `client + H > server` held at the credit for k−2, so at most H − 1
      frames are unacked when a capture starts and at most **H + 1** are
