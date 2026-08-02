@@ -182,9 +182,12 @@ cycle; closures 22.60/18.06 vs 22.60/18.08 measured).
    until cliack at +10.1, capture +18.6, worker starved 29 ms. The slot
    ack's safety condition is the absorb frontier (children consumed the
    input), not client display — withholding it is the residual FR-ACK-3
-   violation. Candidate fix (needs its own item + owner sign-off, it is
-   a behaviour change): emit the SLOT_ONLY ack outside the window gate;
-   the ordinary ack stays gated.
+   violation. Fix specified as **#79** (scope, blast radius, test
+   method, regression surface there). Reconciliation with fif = 2:
+   the deeper window gives the ack race one full period of headroom, so
+   the same withholding drops from 31.1 % of captures to 1.5 % — which
+   is exactly x014's long-standing p99 send tail. One defect, both
+   arms' tails.
 4. **Clocks, observe-only:** sclk floor-bound (600 MHz, GFX idle) in
    both runs; GPU power 52.9 W (fif = 1) vs 58.8 W (fif = 2) — duty
    tracks cadence, pump does not. No observable clock state
@@ -277,6 +280,97 @@ The fif = 1 configuration is therefore measurable as it stands, and the
 payload is not in the way of this work. It IS in the way of anything
 measured at fif = 2 — including any later re-measurement of #74 — so #77
 stays queued rather than closed.
+
+## #79 — ungate the eager slot ack from the client-ack window (TODO — needs owner sign-off: behaviour change)
+
+**The defect** (evidence: `captures/i78_x017_pumpsplit_20260802`,
+analysis in its README and #78). `xrdp_mm_update_module_frame_ack`
+(`xrdp_mm.c:1697`) emits BOTH producer acks — the ordinary/region ack
+and the #70 eager SLOT_ONLY ack — only while
+`xrdp_gfx_ack_window_open(client, server, fif)` is true. PRD #70
+specifies the eager ack's emission point as **max(absorb N,
+egress N−1)**; the client's ack appears nowhere in it, and the in-tree
+safety condition is the absorb frontier alone. The window gate is an
+implementation artifact of where the emission code lives.
+
+**Why fif = 2 masks it, quantified (both #78 runs, same day, same
+harness).** Window-open at the absorb instant needs
+`cliack(server)` already in. At fif = 2 the needed ack is one FULL
+period older (client ≥ N−2, whose egress was ~1.5 periods before
+absorb(N)) — the ack race has a period of headroom and loses only on
+p99 client hiccups. At fif = 1 the needed ack is `cliack(N−1)`, whose
+egress was ~8–10 ms before absorb(N), against an egress→cliack of
+p50 8.5 / p90 18.9 ms — a near-fair race. Measured withheld-credit
+(credit_emit − absorb(k−2)): **fif = 1: p50 0.04 ms, p90 36.4, >10 ms
+in 31.1 %** (782/2513; 336 of 338 worker waits >20 ms id-match these);
+**fif = 2: p50 0.02, p90 0.05, >10 ms in 1.5 %** (46/3141, 23 waits
+>20 ms). The SAME mechanism at fif = 2 is the long-known p99 send tail
+(47 ms in `i75_x014_rewrite_20260801`, 27 ms in Run B; the "66 of 3074
+cycles stall on the producer" note in the PRD concurrency table) —
+one defect explains both arms' tails, scaled by the window depth.
+
+**The fix.** Emit the SLOT_ONLY ack from
+`xrdp_mm_update_module_frame_ack` OUTSIDE the window-open branch
+(target unchanged: `xrdp_mm_frame_slot_ack_target` =
+min(consumed frontier, server+1) — which IS the PRD emission point;
+`target > frame_id_server_sent` monotonicity guard unchanged). The
+ordinary ack stays window-gated. NOT in scope: gating egress by the
+window (today egress is not gated at all — measured send-time
+id_server−id_client reaches 1 in 1566/5030 payload sends and 2 twice
+at fif = 1, up to 3 at fif = 2 — so fif's client-facing bound is
+currently emergent, not enforced; making the window actually gate
+egress, per FR-ACK-3's stated purpose, is a separate decision with its
+own risks, filed here as an open question, not bundled).
+
+**Pre-implementation verification (blocking).** The emission-order
+comment says the slot ack for a frame "never runs ahead of the region
+retirement it depends on". Today's eager design already lets the slot
+target run ONE ahead of `frame_id_region_sent`; ungated it can run
+2+ ahead while the window is closed. Before coding, read xorgxrdp's
+SLOT_ONLY handler (xorgxrdp `10fa3aa23033`, the paired deb — source
+outside this tree) and confirm slot release does not consume region
+retirement state, or emit any DUE region ack (its own guard,
+`server > region_sent`, references egress only) alongside. Whichever
+holds becomes a stated invariant in the commit.
+
+**Blast radius.** Reaches only: GFX + encoder + `eager_slot_ack =
+true` (config default off in the binary; armed per-arm). Non-eager
+configs emit no slot ack — byte-identical behaviour. Non-GFX uses a
+different ack path — untouched. At fif = 2 (shipped default) the fix
+changes the 1.5 % tail cycles only; expected effect is an IMPROVED
+p99, and any change beyond that is a regression to investigate.
+
+**Test method, in ladder order.**
+1. CI: extract the emission decision (which acks are due, given
+   client/server/consumed/region_sent/server_sent/fif/eager) into a
+   pure helper next to `xrdp_gfx_ack_window_open`; table-driven Check
+   tests assert slot-ack emission is independent of `client`, ordinary
+   ack still window-gated, target ≤ consumed frontier and ≤ server+1,
+   monotone `server_sent`. Expected values derived from the PRD
+   emission point, NOT transcribed from the implementation.
+2. Local 5 s, then the fleet A/B the owner sizes: proposed x018 =
+   x017's config + fixed deb at fif = 1 (compare against the committed
+   x017 capture: mechanism check FIRST — withheld p90 must collapse to
+   ~0.05 ms — then rate: tail gone, mean → ~18 ms, wait p90 → ~0), and
+   a fif = 2 arm for non-regression (withheld 1.5 % → ~0, p99 improves,
+   mean unchanged). `arm_certify.sh` on deploy; smoke gate before any
+   handoff.
+3. Latency accounting in the same runs: capture → cliack per frame.
+
+**Side effects / regression surface, stated up front.**
+* Capture age at fif = 1 rises: capture runs slot-bounded ahead again,
+  frames queue on the fifo (x015-shaped residency, ~1 pump time), so
+  photon-latency per frame can rise while throughput and tail improve —
+  this is the RECORDED #70 tradeoff ("up to one encode-time"), now
+  exercised every cycle. Measure, don't assume, in step 3.
+* Client-outstanding at fif = 1 settles at 1–2 instead of mostly ≤1
+  (egress was never gated; the upstream starvation was what kept the
+  lag low). If a hard client-facing fif bound is wanted, that is the
+  separate egress-gating decision above.
+* Slightly more ack messages to xorgxrdp (one SLOT_ONLY per frame even
+  with the window closed) — negligible, noted for completeness.
+* Bookkeeping interplay: both branches write `frame_id_server_sent`;
+  the unit test in step 1 owns this surface.
 
 ## #77 — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
 
