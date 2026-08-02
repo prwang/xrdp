@@ -318,3 +318,61 @@ the first to hold at fif = 1, which drags the second down to 1 with it.
 Removing the gate removes the second job outright; the horizon variant
 `client + H > server`, H from the pipeline's own depth, separates them.
 Only the second of those is a candidate for ever being the default.
+
+## Reassessment: is the stall a bug, or the only honest thing to do on a WAN?
+
+Asked by the owner once the unbounded-`wait_s` finding landed, and it is
+the right question: if the ack window is the only rate control in the
+path, then starving the producer *is* rate-matching, and the "34 % of
+throughput" #76 filed might be the price of not overrunning the link.
+
+**It is not one answer. The crossover is ack latency against frame
+period, and this sweep measured both sides of it.**
+
+*Ack latency < period.* The client's ack for frame N arrives before
+frame N+1 could possibly be ready, so releasing the slot at absorb(N)
+causes nothing to be held: capture N+1 and encode N+1 overlap the round
+trip, and when the ack lands the frame is sent immediately.
+Client-outstanding stays ≤ 1 — the fif = 1 contract is honoured — and
+the period is the pipeline's, not the network's. **In this regime the
+stall buys nothing at all.** The measurement says so directly: cycles
+whose credit arrived promptly ran at **16.3–16.9 ms in every leg**,
+including the 40 ms leg, while `pump` sat at 15.2–15.4 ms. Those cycles
+are the counterfactual — the same machine, same payload, same instant,
+with the gate not binding — and they are 5–6 ms per frame faster than
+the mean. Nothing was traded for that; it is loss.
+
+*Ack latency > period.* Now the pipeline can complete frames faster than
+the client retires them, and every mechanism that keeps it busy
+accumulates finished frames somewhere. Holding them is a queue in front
+of the display — exactly what FR-ACK-3 objects to about fif = 2, just
+relocated from the wire into the server. Throttling production is the
+correct behaviour, and it is what the current code achieves. **In this
+regime the stall is not a bug; it is the design, arrived at by
+accident.**
+
+So the honest verdict on #76's 34 %: **a bug, in the regime where it was
+measured** — loopback, ack latency 7.6–10 ms against a ~16.4 ms period,
+which is the LAN case the fleet and every customer on a local network
+runs in. And **not a bug** in a regime this project has never measured.
+The defect is not that the server throttles; it is that the throttle's
+threshold is `fif`, a latency knob, so the server throttles at *one*
+frame regardless of which regime it is in.
+
+A finite horizon H makes the two regimes one mechanism. H never binds
+while ack latency < period (LAN: full speed, nothing held, outstanding
+≤ 1); H binds at H frames when ack latency > period (WAN: bounded queue,
+at most H periods of staleness, producer throttled to the link).
+Numerically, H = 2 covers this sweep's LAN legs (ack latency 7.6–10 ms,
+period 16.4) and H = 3 covers ~33 ms; at D = 40 the predicted
+ack latency of ~48 ms against a ~16.4 ms period gives ~3, so H = 3 is
+expected to *bind* in that leg and the period to rise there. That
+prediction is written into BACKLOG #79 step 4 before the run.
+
+One more thing this reframing kills: the word **race**. #76 filed this
+as a 31 % intermittent tail and #78 called it an ack race. The sweep
+shows a period-3 limit cycle with zero exceptions in 871 cycles at
+D ≥ 20 — the signature of a control loop at a fixed point, not of a
+race. What varies at D = 0 is only whether the loop's own delay lands
+inside a frame period. Calling it a race suggested the fix was
+synchronisation; it is not, it is the loop's threshold.

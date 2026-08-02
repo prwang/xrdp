@@ -840,6 +840,90 @@ that stall is the top open item (BACKLOG #76).** Until it is found, the
 `capture ‖ encode` row above is qualified: what it asserts is measured at
 fif = 2, and fif = 2 is not the configuration this requirement targets.
 
+**FR-ACK-3 AMENDMENT — the bound must count the WIRE, not only the
+pipeline (owner directive, 2026-08-02).** The clause above says the
+window "exists to bound what the *client* has outstanding". Read in code
+on 2026-08-02, while designing BACKLOG #79's fix, **it does not do that,
+and this document never said what does.** Three facts, none of them
+measured — all read from the source, and the last two confirmed by the
+#79 layer-1 sweep:
+
+* **Egress is not gated by the window at all.** `enc_done` hands the
+  frame to `trans_write_copy_s()` unconditionally (`xrdp_mm.c:4320`).
+  Under a 40 ms injected ack delay at fif = 1 — where `client + 1 >
+  server` forbids *any* outstanding frame — sends split 556 / 552 / 552
+  across 0 / 1 / 2 frames outstanding. Two thirds of all sends violated
+  the bound this clause claims the window enforces.
+* **The window is applied to the PRODUCER's slot credit instead**
+  (`xrdp_mm.c:1697`). So what `frames_in_flight` actually bounds is
+  capture admission. Client-outstanding is bounded only *emergently* —
+  by starving the producer until the pipeline drains — which is
+  approximate (it settled at 2, not 1) and is the entire cost measured
+  in BACKLOG #76/#78/#79.
+* **There is no other rate control on this path.**
+  `trans_write_copy_s()` cannot fail for want of a wire: the remainder
+  is `malloc`ed onto the unbounded `self->wait_s` list and 0 is returned
+  (`common/trans.c:644-676`). The one byte throttle,
+  `si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` = 0
+  (`trans.c:35, 219, 376`), charges bytes only when
+  `si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), and `cur_source`
+  is set only inside a *transport's* `trans_check_wait_objs()`
+  (`trans.c:396`) — enc_done arrives on a **wait object**
+  (`xrdp_mm.c:4061, 4538`), so a GFX frame's bytes are charged to nobody
+  and throttle nothing.
+
+Four requirements follow. They are binding on any change to the ack
+path, #79 included.
+
+1. **The gate is on the wrong stage, and one gate may not do both
+   jobs.** The client ack window bounds what the CLIENT holds, so it
+   belongs on **egress**. The producer's slot credit bounds what the
+   PIPELINE holds, so it must be gated on the pipeline's own depth. Any
+   design in which a single comparison serves both is rejected: the two
+   quantities have different correct values, and conflating them is what
+   made fif = 1 — a *latency* target — silently impose a *concurrency*
+   limit of 1.
+2. **"Bufferbloat" in this document covers the wire, not only the inner
+   pipeline.** Until today the prohibition (§FR-CAPTURE-8 clause 3,
+   "never a global pool of 2m ... bufferbloat, +2 frames latency, slot
+   aliasing") was written entirely about capture slots. An unbounded
+   `wait_s` is the same defect one stage further out, and worse: it
+   grows in the server's heap, it is invisible to every metric this
+   project has built, and the frames in it are stale by construction.
+   **Every queue in this path carries a stated bound, in frames, and a
+   test that the bound holds.**
+3. **No design may remove a bound without replacing it.** Specifically:
+   ungating the eager SLOT ack from the ack window *without* a
+   replacement horizon is **REJECTED, unconditionally** — not as a
+   default, not as an opt-in, not behind `eager_slot_ack`, not "for
+   evaluation". It would leave the encoder with no rate control of any
+   kind against a link slower than its output, which is every WAN. A
+   configuration flag does not make an unbounded queue acceptable; it
+   only decides who discovers it.
+4. **The horizon H, and the two regimes it distinguishes.** The
+   replacement is a finite horizon on the slot credit —
+   `client + H > server` with H taken from the pipeline's depth (two
+   capture slots; three stages) rather than from `fif`. What H buys is
+   regime-dependent, and the crossover is **ack latency versus frame
+   period**:
+   * *Ack latency < period* (LAN): the client's ack arrives before the
+     next frame is ready, so H never binds and nothing is ever held.
+     Full pipeline speed at fif = 1, with client-outstanding still ≤ 1.
+     There is no tradeoff to make here — the stall in this regime is
+     pure loss.
+   * *Ack latency > period* (WAN): completed frames would accumulate,
+     and H is what bounds the accumulation to H frames of buffered
+     video and at most H periods of added staleness. Beyond H the
+     producer throttles to the link, which is the correct behaviour and
+     is what the current code accidentally achieves.
+
+   Measured support for both rows, same sweep: cycles whose credit
+   arrived promptly ran at **16.3–16.9 ms in every leg, flat under a
+   40 ms ack delay**, while gated cycles went 31.9 → 52.0 ms. H = 2
+   covers the measured LAN ack latency (7.6–10 ms against a ~16.4 ms
+   period); H = 3 covers ~33 ms. Record:
+   `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`.
+
 **The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
 
 `encode_single()` is already **submit-then-collect** internally (it pushes to the vmsplice iov queue, then blocks in `pump()`), so the call sites split cleanly — but **the split alone buys nothing unless `submit` transfers** (corrected 2026-07-28, refined 2026-07-29). `in_iov_push()` performs no I/O; it appends to an iov array, and `feed_vmsplice()` has exactly one caller, inside `pump()`. A split whose `submit_single()` is only the push half sends nothing to the aux child until `collect_aux()` pumps it, so "submit both, then collect both" stays serial. `submit_single()` must pump until `!in_iov_pending()` without waiting for output; with that, the two children — independent processes with independent fds — genuinely encode concurrently, and sequential writes already yield `2w + e` in place of `2(w + e)` (4K: `e` = 19.6 ms measured, `w` = a ~15 MB vmsplice ⇒ ~43 ms → ~24 ms). A **union-poll pump across all children** under one shared deadline is **REQUIRED, not an optional robustness upgrade** (decision 2026-07-29, BACKLOG #45 D2/D3 — the earlier "measure the simple form first and add the union poll only if the measurement demands it" wording left the design half-specified and is withdrawn). It is not needed to avoid deadlock (the parent is never blocked on the child it is not draining), but `F_SETPIPE_SZ` is applied only to the INPUT pipe (1 MB), leaving the output pipe at the 64 KB default — several times smaller than a 4K intra packet — so an undrained child stalls mid-write and erodes the overlap precisely when packets are largest. The target shape is `n = 4`: main₁, aux₁, main₂, aux₂ armed in ONE `pump_set` call from the ONE existing worker thread.

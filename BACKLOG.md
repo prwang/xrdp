@@ -169,7 +169,23 @@ explanation (pump equal at 52.9 vs 58.8 W GPU duty).
 unreproduced condition).
 **Captures:** `i78_x017_pumpsplit_20260802`, `i78_x014_fif2_clocks_20260802`.
 
-## #79 — TOP PRIORITY (owner, 2026-08-02): ungate the eager slot ack from the client-ack window (TODO — mechanism CONFIRMED by intervention 2026-08-02; the FIX still needs owner sign-off: behaviour change)
+## #79 — TOP PRIORITY (owner, 2026-08-02): move the slot-credit gate off the client-ack window and onto a pipeline horizon (TODO — mechanism CONFIRMED by intervention 2026-08-02; the FIX still needs owner sign-off: behaviour change)
+
+> **RESCOPED 2026-08-02 (owner directive), and the item's original title
+> is now a REJECTED design.** This item was "ungate the eager slot ack".
+> Plain ungating — removing the window test from the slot ack with
+> nothing in its place — is **unconditionally rejected**, per the
+> FR-ACK-3 amendment written the same day: it would leave the encoder
+> with no rate control of any kind against a link slower than its
+> output, and `trans_write_copy_s()` absorbs the difference into an
+> unbounded heap list. **`eager_slot_ack`'s default-false status is not
+> a mitigation** — a flag decides who discovers an unbounded queue, not
+> whether it exists — so the rejection does not depend on opt-in status
+> and there is no "evaluation-only" exemption. What #79 builds is the
+> horizon form: `client + H > server` on the SLOT ack, H from the
+> pipeline's depth, with the client ack window moving to where it
+> belongs (egress). Steps 2–4 below are rewritten accordingly; the
+> layer-1 result in step 1 is unaffected.
 
 **The defect** (evidence: `captures/i78_x017_pumpsplit_20260802`,
 analysis in its README and #78; **confirmed causally by the layer-1
@@ -188,18 +204,35 @@ wrong and reading the emission code says so).** The gate is deliberate
 and documented: `xrdp_mm.c:1692` states "the client's own ack window
 stays the OUTER gate in both modes: a client that stops acking still
 stops the producer". So the gate has a JOB, and ungating the slot ack
-removes it. What replaces it is the slot target's own cap,
-`min(consumed, server + 1)` (`xrdp_mm.c:1648`, whose comment calls that
-cap "what keeps this BACKPRESSURE rather than a queue"): with the slot
-ack ungated, a client that stops acking no longer stops the producer at
-the next frame — the loop keeps running until the transport stops
-draining, `frame_id_server` stops advancing, and the `server + 1` cap
-bites. That is a bound, but it is a socket buffer's worth of frames
-rather than one, and PRD FR-ACK-3 says the window exists precisely to
-"bound what the *client* has outstanding". **The throughput defect and
-the liveness bound are therefore two separate things sharing one `if`,
-and the fix must be judged on both** — hence the validation gate at
-step 3, whose safety leg exists for exactly this.
+removes it. **The throughput defect and the liveness bound are two
+separate things sharing one `if`, and the fix must be judged on both** —
+hence the validation gate at step 3, whose safety leg exists for exactly
+this.
+
+**Second correction, 2026-08-02 (same day): what this entry said would
+replace the gate does not exist.** The paragraph above originally
+continued: with the slot ack ungated the loop "keeps running until the
+transport stops draining, `frame_id_server` stops advancing, and the
+`server + 1` cap bites — a bound, but a socket buffer's worth of frames
+rather than one". **There is no such backstop.** `frame_id_server`
+advances when the frame reaches `trans_write_copy_s()`, which cannot
+fail for want of a wire (`common/trans.c:644-676`), and the transport's
+one byte throttle never charges GFX frames (details in the side-effects
+section below, clauses under "CORRECTION"). So `min(consumed,
+server + 1)` bounds frames between absorb and *handoff to xrdp's own
+heap*, never frames on the wire, and the plain ungate has no bound at
+all. This is what rescoped the item.
+
+**And the gate is on the wrong stage in the first place.** The window is
+applied to the producer's slot credit, while EGRESS is ungated
+(`xrdp_mm.c:4320` writes unconditionally) — measured: at D = 40, 2/3 of
+all sends went out with 1 or 2 frames unacked, under a fif = 1 window
+that forbids any. So `frames_in_flight` has never bounded
+client-outstanding directly; it bounds capture admission, and bounds the
+client only emergently by starving the producer. Recorded as the
+FR-ACK-3 amendment in `PRD.md` (2026-08-02), whose clause 1 is what
+steps 2–4 now implement: the ack window gates egress, a pipeline horizon
+gates the slot credit, and one comparison may not serve both.
 
 **Why fif = 2 masks it, quantified (both #78 runs, same day, same
 harness).** Window-open at the absorb instant needs
@@ -289,7 +322,32 @@ ZERO exceptions in 871 cycles.**
    20 s — a sample-size correction to the same five legs.
    (After the fix exists, the same sweep separates the builds: fixed
    predicts withheld ≈ 0 and period FLAT in D.)
-2. **CI — replay + enumeration of the now-VALIDATED mechanism, and it
+2. **THE CHANGE — a pipeline horizon on the slot credit, not an
+   ungate** (rescoped 2026-08-02; the plain ungate is rejected, see the
+   note at the top of this item and PRD FR-ACK-3 amendment clause 3).
+   * The eager SLOT_ONLY ack is gated on `client + H > server` with
+     **H from the pipeline's depth, not from `frames_in_flight`** —
+     two capture slots, three stages, so H = 2 or 3 with the choice
+     justified in the commit and pinned by CI, never read off a
+     measurement.
+   * The ordinary/region ack and egress keep the CLIENT's window
+     (`fif`), which is the quantity that window is for. One
+     comparison must not serve both jobs (amendment clause 1).
+   * `min(consumed, server + 1)` stays exactly as it is. It is a
+     pipeline-internal ordering constraint and this item does not
+     touch it; the second correction above is only a statement that it
+     was never a *wire* bound and must not be cited as one.
+   * **Not in scope, and named so it is not done by accident:** moving
+     the ack window onto egress properly (today egress writes
+     unconditionally, `xrdp_mm.c:4320`). Amendment clause 1 requires
+     it; it is a separate behaviour change with its own risk, and it
+     is filed as **#80** rather than folded in here. #79 is complete
+     without it — with H in place, the slot credit no longer depends
+     on the client at all, so #80 changes only what the client holds.
+   * H = 1 must reproduce HEAD's behaviour exactly at fif = 1
+     (`client + 1 > server` is the current test). That is the
+     regression guard and it is a CI assertion, not a claim.
+3. **CI — replay + enumeration of the now-VALIDATED mechanism, and it
    must be RED on HEAD first.** Extract the emission decision into a
    pure helper next to `xrdp_gfx_ack_window_open`. Two test shapes:
    (a) **Replay test**: drive the helper through a captured stall,
@@ -311,7 +369,7 @@ ZERO exceptions in 871 cycles.**
    at the absorb steps** (the withheld emission) before the fix lands.
    A detector that cannot fire on the buggy code confirms nothing
    (2026-07-31 lesson).
-3. **VALIDATION GATE — re-run the layer-1 sweep against the FIXED build
+4. **VALIDATION GATE — re-run the layer-1 sweep against the FIXED build
    and check it against predictions written NOW (owner, 2026-08-02:
    after implementation and CI, before any performance A/B in the
    wild).** Same harness, same arm config, same five legs
@@ -330,12 +388,20 @@ ZERO exceptions in 871 cycles.**
    | period mean | 22.5 → 40.1 ms | 16.5–17.5 ms, \|Δperiod/ΔD\| < 0.05 | slope > 0.1 (something else consumes cliack) |
    | period vs fif = 2 | 22.5 vs 18.1 | **≤ 18.1** (FR-ACK-3's actual requirement) | above it — fif = 1 still costs throughput |
    | pump | 15.2–15.4 flat | unchanged | it moves — the fix touched encode |
-   | id_server − id_client | capped at 2 by the stall | **rises**, ≈ 1 + D/period (~1, 2, 2–3, 3–4) | it stays ≤ 2 — then the credit is still gated somewhere and the "win" came from elsewhere |
+   | id_server − id_client | capped at 2 by the stall | **rises to min(H, ≈1 + D/period)** and NEVER exceeds H | it stays ≤ 2 at D = 40 (credit still gated elsewhere — the "win" came from somewhere unaccounted for) **or** it exceeds H in any leg (the horizon does not hold — a RED result, stop) |
 
    The last row is not a bonus metric, it is the cost side and it must
-   move: the starvation was *accidentally* enforcing the
-   client-outstanding bound FR-ACK-3 asks for, and the fix removes that
-   enforcement. Same run, both halves.
+   move — and with the rescope it is now **two** assertions in one, a
+   floor and a ceiling. The starvation was *accidentally* enforcing the
+   client-outstanding bound; H is what replaces it, so the run must show
+   both that the accidental bound is gone and that the deliberate one
+   binds. At H = 3 the D = 40 leg is the interesting one: predicted
+   ack latency ≈ 48 ms against a ≈ 16.4 ms period gives ≈ 3, i.e. H is
+   expected to bind exactly there and the period to rise toward
+   ack_latency/H rather than stay flat. **That is not a falsification of
+   the fix** — it is the WAN regime of amendment clause 4 appearing on
+   schedule, and the period row's "flat in D" prediction therefore
+   applies to D ≤ 20 only. Stated before the run, per gate 3.
 
    **Safety leg (new, and the reason the gate is not just the sweep
    again): the frozen client.** `ack_delay_proxy -F <secs>` stops
@@ -346,30 +412,40 @@ ZERO exceptions in 871 cycles.**
    * HEAD: the producer must stop within ~1–2 frames (window closes,
      no credit, capture stops). This leg also proves the leg itself
      works before it is used to judge the fix.
-   * FIXED: it must still stop — via egress → transport backpressure →
-     `frame_id_server` stalls → the `min(consumed, server + 1)` cap —
-     and **the frame count and buffered bytes at which it stops are the
-     new client-outstanding bound the fix introduces.** Record them.
-   * **Acceptance: bounded, and stated.** If FIXED keeps producing for
-     more than a handful of frames, the change has traded a throughput
-     bug for an unbounded-outstanding one, and the horizon variant
-     below is taken instead of the plain ungate. Not a judgement call
-     to make later: decide the threshold before running.
+   * FIXED (rewritten 2026-08-02 by the rescope; **the version of this
+     bullet dated the day before predicted the stop would come "via
+     egress → transport backpressure → `frame_id_server` stalls → the
+     `min(consumed, server + 1)` cap". That path does not exist**, see
+     the second correction above — which is precisely why the plain
+     ungate is now rejected and this leg is judging the horizon form
+     instead.) With H in place the producer must stop **within H frames
+     of the freeze**, by the horizon itself and by nothing else. Record
+     the frame count, the buffered bytes in the transport's `wait_s`
+     chain, and the process RSS — the queue is in the heap, so bytes
+     and RSS are the only things that can show it.
+   * **Acceptance, decided now, before the run: FIXED stops within H
+     frames, and `wait_s` bytes plateau.** More than H frames means the
+     horizon is not being applied on the path that matters and the
+     result is RED — stop and diagnose, do not reach for a larger H.
+     Frames stopping but bytes still growing means something else is
+     queueing and the leg has found a second defect.
+   * Run HEAD's leg too, unchanged: it is the positive control that
+     proves the freeze mechanism works before it is used to judge
+     anything (HEAD must stop within ~1–2 frames).
 
-   **Open design question this gate may force (do not pre-empt it —
-   run the plain ungate first, since it is what CI will have pinned).**
-   If the safety leg comes back badly, the targeted change is not
-   "ungate" but "gate on the right thing": `client + H > server` for
-   the slot ack with H from the *capture-slot budget* (2) or the
-   pipeline depth (3) instead of `fif`. That keeps an explicit
-   client-liveness bound and still removes the fif = 1 pathology,
-   because the pathology is that fif = 1 is a TIGHTER bound than the
-   two-slot pipeline needs. The same sweep discriminates the two: plain
-   ungate predicts period flat in D and outstanding growing with D;
-   horizon-H predicts period flat while D < (H−1)·period then rising,
-   and outstanding capped at H.
+   **What this gate can no longer settle, and where it went.** Until the
+   rescope, this gate carried an open design question — "plain ungate
+   versus horizon-H, let the safety leg choose". **It is closed by
+   inspection, not by measurement**: the plain ungate has no bound to
+   measure, so there was never an experiment that could have chosen it.
+   Recorded rather than deleted, because the reasoning that made it look
+   like a live question — trusting the `min(consumed, server + 1)`
+   comment's word "BACKPRESSURE" without following `frame_id_server` to
+   the call that advances it — is the mistake worth remembering. The
+   remaining open question is only the VALUE of H (2 or 3), and that is
+   a design choice pinned by CI, not a knob to tune against a run.
 
-4. **Fleet A/B on the unmodified harness, gated on the mechanism's own
+5. **Fleet A/B on the unmodified harness, gated on the mechanism's own
    telemetry, not the noisy tail.** Owner-sized arms (proposed: fixed
    deb at fif = 1 vs the committed x017 capture; a fif = 2 arm for
    non-regression). Acceptance metric is the **withheld distribution**
@@ -431,7 +507,17 @@ ZERO exceptions in 871 cycles.**
     but "is there one at all". Record the frozen-client leg's buffered
     bytes and RSS, not just its frame count.
 
-**Default vs opt-in — DECISION, 2026-08-02 (open, do not pre-empt).**
+**Default vs opt-in — SETTLED 2026-08-02 (owner), same day it was
+filed.** The question as posed ("default the plain ungate, or make it
+opt-in?") has no correct answer, because **neither branch is
+acceptable**: an unbounded egress queue is a defect at any default, and
+a flag only decides who finds it. The plain ungate is rejected outright
+(PRD FR-ACK-3 amendment clause 3) and the question is replaced by: may
+the HORIZON form default? That one is answerable — it keeps a stated
+bound in both regimes — but it is not answered here; it needs step 4's
+numbers and the #80 egress work, and `eager_slot_ack` stays
+default-false until then. The reasoning below is kept as filed, with
+the third bullet's "if the safety leg is bad" now moot.
 * **No new knob, and NOT `xrdp.ini`.** The behaviour already lives
   behind `gfx.toml` `[avc444] eager_slot_ack`, default **false**
   (`xrdp_tconfig.c:430, 452`), and the #79 emission is inside
@@ -459,6 +545,57 @@ ZERO exceptions in 871 cycles.**
   with the window closed) — negligible, noted for completeness.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;
   the unit test in step 1 owns this surface.
+
+## #80 — The client ack window is not applied to egress, and nothing bounds the egress queue (TODO — filed 2026-08-02, split out of #79; needs owner sign-off, behaviour change)
+
+**The defect, read in code and confirmed by #79's layer-1 sweep.**
+`frames_in_flight` is documented (PRD FR-ACK-3) as the bound on what the
+CLIENT has outstanding. It is not applied there. `enc_done` hands every
+completed frame to `trans_write_copy_s()` unconditionally
+(`xrdp_mm.c:4320`); the window is tested only around the PRODUCER acks
+(`xrdp_mm.c:1697`). Measured consequence, arm x017 at fif = 1 under a
+40 ms injected ack delay — a window that forbids *any* outstanding
+frame — sends split **556 / 552 / 552** across 0 / 1 / 2 frames
+outstanding: two thirds of sends exceeded the bound. Today the excess is
+small only because the producer is starved by the same `if`; #79 removes
+that side effect deliberately, so after #79 this item is the only thing
+standing between the encoder and the wire.
+
+**And the queue behind egress is unbounded.** `trans_write_copy_s()`
+cannot fail for want of a wire — the remainder is `malloc`ed onto the
+singly-linked `self->wait_s` list, no length or byte limit, return 0
+(`common/trans.c:644-676`). The transport's one throttle,
+`si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` = 0
+(`trans.c:35, 219, 376`), charges bytes only when
+`si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), and `cur_source`
+is set only inside a transport's `trans_check_wait_objs()`
+(`trans.c:396`). enc_done arrives on a **wait object**
+(`xrdp_mm.c:4061, 4538`), so `cur_source` is NONE and a GFX frame's
+bytes are charged to nobody. At ~3.4 MB per 4K AVC444 frame this is the
+bufferbloat shape PRD FR-CAPTURE-8 forbids, one stage further out and
+invisible to every metric this project has built.
+
+**Scope.** (a) Gate egress on `xrdp_gfx_ack_window_open(client, server,
+fif)` — the quantity the window is actually for. (b) Decide and state
+what happens to a completed frame that may not yet be sent: held (bounded
+by #79's H, stale by up to H periods) or dropped-and-recaptured (no
+staleness, no concurrency). **This is the real design question and it is
+NOT settled** — FR-ACK-3 objects to fif = 2 precisely because "a second
+in-flight frame is a queue in front of the display", and holding a frame
+server-side is the same queue relocated. (c) A bound on `wait_s` for this
+path, in frames, with a test. Note that (a) plus (b)-as-hold makes (c)
+implied rather than independent — say which is load-bearing.
+
+**Why it is not folded into #79.** #79 is complete without it: with the
+horizon H the slot credit no longer depends on the client at all, so #79
+can be measured and landed on its own. This item changes what the client
+holds, which is a different risk surface (a bug here stalls the display
+rather than the pipeline), and PRD FR-ACK-3 amendment clause 1 requires
+both halves — one item per behaviour change.
+
+**Blocked on:** #79 landing (its H is the natural bound for (b)); the
+FR-ACK-3 amendment is already written and needs no further sign-off. Do
+not start (b) without an owner decision on hold-vs-drop.
 
 ## #77 — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
 
