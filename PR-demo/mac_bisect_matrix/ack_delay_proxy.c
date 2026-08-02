@@ -34,7 +34,10 @@
  * ring must rise by D too.
  *
  * Build:  gcc -O2 -Wall -o ack_delay_proxy ack_delay_proxy.c
- * Usage:  ack_delay_proxy -l 41000 -r 40033 -d 20 [-H 127.0.0.1]
+ * Usage:  ack_delay_proxy -l 41000 -r 40033 -d 20 [-F 10] [-H 127.0.0.1]
+ *         -d  delay client->server by this many ms
+ *         -F  stop forwarding client->server entirely after this many
+ *             seconds (a client that stops acking but keeps reading)
  *
  * Deliberately standalone: no xrdp headers, no log.c (this runs on the
  * measurement path and log.c writes unbuffered under a global mutex --
@@ -170,10 +173,22 @@ connect_remote(const char *host, int port)
 }
 
 /*****************************************************************************/
-/* one accepted connection, in its own process */
+/* one accepted connection, in its own process.
+ *
+ * freeze_s > 0 stops forwarding client->server entirely that many
+ * seconds after the connection opens, and never resumes: the client
+ * keeps RECEIVING (the video direction is untouched, so this is not
+ * TCP backpressure) but its acks stop arriving. That is the safety
+ * half of #79's validation gate -- what the ack window's own comment
+ * says it is there for ("a client that stops acking still stops the
+ * producer"). D and freeze compose: the delay applies until the
+ * freeze instant. */
 static void
-handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
+handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id,
+            int freeze_s)
 {
+    long long freeze_at = 0;
+    int frozen = 0;
     struct chunk *head = NULL;
     struct chunk *tail = NULL;
     long long *samples;
@@ -211,8 +226,12 @@ handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
     set_nodelay(cfd);
     set_nodelay(sfd);
     t_open = now_ns();
-    fprintf(stderr, "proxy[%d]: open -> %s:%d delay=%dms\n",
-            id, rhost, rport, delay_ms);
+    if (freeze_s > 0)
+    {
+        freeze_at = t_open + (long long)freeze_s * 1000000000LL;
+    }
+    fprintf(stderr, "proxy[%d]: open -> %s:%d delay=%dms freeze=%ds\n",
+            id, rhost, rport, delay_ms, freeze_s);
 
     while (!g_stop)
     {
@@ -239,7 +258,14 @@ handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
         {
             p[1].events |= POLLIN;
         }
-        if (head != NULL)
+        if (freeze_at != 0 && now >= freeze_at && !frozen)
+        {
+            frozen = 1;
+            fprintf(stderr, "proxy[%d]: FROZEN at %.1fs -- client->server "
+                    "stops here; the video direction keeps flowing\n",
+                    id, (double)(now - t_open) / 1e9);
+        }
+        if (head != NULL && !frozen)
         {
             if (head->due_ns <= now)
             {
@@ -250,8 +276,19 @@ handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
                 timeout = (int)((head->due_ns - now + 999999LL) / 1000000LL);
             }
         }
+        else if (freeze_at != 0 && !frozen)
+        {
+            /* wake at the freeze instant even with nothing queued */
+            long long dt = freeze_at - now;
+
+            if (dt > 0 && (timeout < 0 || dt / 1000000LL < timeout))
+            {
+                timeout = (int)(dt / 1000000LL) + 1;
+            }
+        }
         /* both directions finished and flushed */
-        if (c_eof && head == NULL && s_eof && s2c_off >= s2c_len)
+        if (c_eof && (head == NULL || frozen) && s_eof
+            && s2c_off >= s2c_len)
         {
             break;
         }
@@ -315,8 +352,8 @@ handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
             }
         }
 
-        /* queue -> server, when due */
-        while (head != NULL && head->due_ns <= now)
+        /* queue -> server, when due (never, once frozen) */
+        while (head != NULL && head->due_ns <= now && !frozen)
         {
             int w = (int)send(sfd, head->data + head->off,
                               head->len - head->off, MSG_NOSIGNAL);
@@ -397,7 +434,7 @@ handle_conn(int cfd, const char *rhost, int rport, int delay_ms, int id)
             }
         }
 
-        if (c_eof && head == NULL && !s_shut)
+        if (c_eof && (head == NULL || frozen) && !s_shut)
         {
             shutdown(sfd, SHUT_WR);
             s_shut = 1;
@@ -446,6 +483,7 @@ main(int argc, char **argv)
     int lport = 0;
     int rport = 0;
     int delay_ms = 0;
+    int freeze_s = 0;
     int lfd;
     int one = 1;
     int id = 0;
@@ -465,6 +503,10 @@ main(int argc, char **argv)
         {
             delay_ms = atoi(argv[++i]);
         }
+        else if (strcmp(argv[i], "-F") == 0 && i + 1 < argc)
+        {
+            freeze_s = atoi(argv[++i]);
+        }
         else if (strcmp(argv[i], "-H") == 0 && i + 1 < argc)
         {
             rhost = argv[++i];
@@ -472,14 +514,15 @@ main(int argc, char **argv)
         else
         {
             fprintf(stderr, "usage: %s -l <listen> -r <remote> "
-                    "[-H host] [-d delay_ms]\n", argv[0]);
+                    "[-H host] [-d delay_ms] [-F freeze_after_s]\n",
+                    argv[0]);
             return 1;
         }
     }
-    if (lport <= 0 || rport <= 0 || delay_ms < 0)
+    if (lport <= 0 || rport <= 0 || delay_ms < 0 || freeze_s < 0)
     {
         fprintf(stderr, "usage: %s -l <listen> -r <remote> "
-                "[-H host] [-d delay_ms]\n", argv[0]);
+                "[-H host] [-d delay_ms] [-F freeze_after_s]\n", argv[0]);
         return 1;
     }
     install_handler(SIGTERM, on_term);
@@ -508,7 +551,8 @@ main(int argc, char **argv)
         return 1;
     }
     fprintf(stderr, "proxy: listening 127.0.0.1:%d -> %s:%d delay=%dms "
-            "(client->server only)\n", lport, rhost, rport, delay_ms);
+            "freeze=%ds (client->server only)\n", lport, rhost, rport,
+            delay_ms, freeze_s);
     while (!g_stop)
     {
         int cfd = accept(lfd, NULL, NULL);
@@ -527,7 +571,7 @@ main(int argc, char **argv)
         if (pid == 0)
         {
             close(lfd);
-            handle_conn(cfd, rhost, rport, delay_ms, id);
+            handle_conn(cfd, rhost, rport, delay_ms, id, freeze_s);
             _exit(0);
         }
         if (pid > 0 && id <= MAX_CONNS)

@@ -180,8 +180,26 @@ and the #70 eager SLOT_ONLY ack — only while
 `xrdp_gfx_ack_window_open(client, server, fif)` is true. PRD #70
 specifies the eager ack's emission point as **max(absorb N,
 egress N−1)**; the client's ack appears nowhere in it, and the in-tree
-safety condition is the absorb frontier alone. The window gate is an
-implementation artifact of where the emission code lives.
+safety condition is the absorb frontier alone.
+
+**Correction, 2026-08-02 (this entry previously called the window gate
+"an implementation artifact of where the emission code lives" — that is
+wrong and reading the emission code says so).** The gate is deliberate
+and documented: `xrdp_mm.c:1692` states "the client's own ack window
+stays the OUTER gate in both modes: a client that stops acking still
+stops the producer". So the gate has a JOB, and ungating the slot ack
+removes it. What replaces it is the slot target's own cap,
+`min(consumed, server + 1)` (`xrdp_mm.c:1648`, whose comment calls that
+cap "what keeps this BACKPRESSURE rather than a queue"): with the slot
+ack ungated, a client that stops acking no longer stops the producer at
+the next frame — the loop keeps running until the transport stops
+draining, `frame_id_server` stops advancing, and the `server + 1` cap
+bites. That is a bound, but it is a socket buffer's worth of frames
+rather than one, and PRD FR-ACK-3 says the window exists precisely to
+"bound what the *client* has outstanding". **The throughput defect and
+the liveness bound are therefore two separate things sharing one `if`,
+and the fix must be judged on both** — hence the validation gate at
+step 3, whose safety leg exists for exactly this.
 
 **Why fif = 2 masks it, quantified (both #78 runs, same day, same
 harness).** Window-open at the absorb instant needs
@@ -235,7 +253,9 @@ p99, and any change beyond that is a regression to investigate.
 losing state is entered; the emission decision inside that state is a
 pure function of (client, server, consumed, region_sent, server_sent,
 fif, eager). Each layer below removes the nondeterminism instead of
-sampling it.**
+sampling it — and layer 1 has now shown this is not a hopeful framing:
+under injected ack delay the "tail" resolves into a period-3 cycle with
+ZERO exceptions in 871 cycles.**
 
 1. **Deterministic reproduction on UNMODIFIED code — DONE
    2026-08-02, mechanism CONFIRMED by intervention.** Record:
@@ -291,7 +311,65 @@ sampling it.**
    at the absorb steps** (the withheld emission) before the fix lands.
    A detector that cannot fire on the buggy code confirms nothing
    (2026-07-31 lesson).
-3. **Fleet A/B on the unmodified harness, gated on the mechanism's own
+3. **VALIDATION GATE — re-run the layer-1 sweep against the FIXED build
+   and check it against predictions written NOW (owner, 2026-08-02:
+   after implementation and CI, before any performance A/B in the
+   wild).** Same harness, same arm config, same five legs
+   (`ack_delay_sweep.sh`, D ∈ {none, 0, 10, 20, 40}, 20 s each,
+   ~4 min), so HEAD and FIXED differ by the deb and nothing else. The
+   point is not "is it faster" — the fleet A/B answers that — it is
+   **does the change act on the mechanism layer 1 demonstrated, and
+   what does it cost.** Predictions, HEAD measured → FIXED expected:
+
+   | quantity | HEAD (measured) | FIXED (predicted) | falsified if |
+   |---|---|---|---|
+   | withheld p50 | 0.04 → 57.0 ms with D | ≤ 0.1 ms at every D | it rises with D at all |
+   | withheld p90 | 35.4 → 77.1 ms | < 2 ms at every D | > 5 ms in any leg |
+   | stall fraction | 30 → 67 % | < 1 % at every D | > 5 % in any leg |
+   | `SS.` pattern | period-3 lock at D ≥ 20 | no `S` runs at all | any periodic `S` structure survives |
+   | period mean | 22.5 → 40.1 ms | 16.5–17.5 ms, \|Δperiod/ΔD\| < 0.05 | slope > 0.1 (something else consumes cliack) |
+   | period vs fif = 2 | 22.5 vs 18.1 | **≤ 18.1** (FR-ACK-3's actual requirement) | above it — fif = 1 still costs throughput |
+   | pump | 15.2–15.4 flat | unchanged | it moves — the fix touched encode |
+   | id_server − id_client | capped at 2 by the stall | **rises**, ≈ 1 + D/period (~1, 2, 2–3, 3–4) | it stays ≤ 2 — then the credit is still gated somewhere and the "win" came from elsewhere |
+
+   The last row is not a bonus metric, it is the cost side and it must
+   move: the starvation was *accidentally* enforcing the
+   client-outstanding bound FR-ACK-3 asks for, and the fix removes that
+   enforcement. Same run, both halves.
+
+   **Safety leg (new, and the reason the gate is not just the sweep
+   again): the frozen client.** `ack_delay_proxy -F <secs>` stops
+   forwarding client→server mid-session while the video direction keeps
+   flowing — a client that stops acking but keeps reading, which is what
+   `xrdp_mm.c:1692` says the window is there for. Run it on HEAD and on
+   FIXED and count frames produced after the freeze instant.
+   * HEAD: the producer must stop within ~1–2 frames (window closes,
+     no credit, capture stops). This leg also proves the leg itself
+     works before it is used to judge the fix.
+   * FIXED: it must still stop — via egress → transport backpressure →
+     `frame_id_server` stalls → the `min(consumed, server + 1)` cap —
+     and **the frame count and buffered bytes at which it stops are the
+     new client-outstanding bound the fix introduces.** Record them.
+   * **Acceptance: bounded, and stated.** If FIXED keeps producing for
+     more than a handful of frames, the change has traded a throughput
+     bug for an unbounded-outstanding one, and the horizon variant
+     below is taken instead of the plain ungate. Not a judgement call
+     to make later: decide the threshold before running.
+
+   **Open design question this gate may force (do not pre-empt it —
+   run the plain ungate first, since it is what CI will have pinned).**
+   If the safety leg comes back badly, the targeted change is not
+   "ungate" but "gate on the right thing": `client + H > server` for
+   the slot ack with H from the *capture-slot budget* (2) or the
+   pipeline depth (3) instead of `fif`. That keeps an explicit
+   client-liveness bound and still removes the fif = 1 pathology,
+   because the pathology is that fif = 1 is a TIGHTER bound than the
+   two-slot pipeline needs. The same sweep discriminates the two: plain
+   ungate predicts period flat in D and outstanding growing with D;
+   horizon-H predicts period flat while D < (H−1)·period then rising,
+   and outstanding capped at H.
+
+4. **Fleet A/B on the unmodified harness, gated on the mechanism's own
    telemetry, not the noisy tail.** Owner-sized arms (proposed: fixed
    deb at fif = 1 vs the committed x017 capture; a fif = 2 arm for
    non-regression). Acceptance metric is the **withheld distribution**
@@ -308,11 +386,16 @@ sampling it.**
   frames queue on the fifo (x015-shaped residency, ~1 pump time), so
   photon-latency per frame can rise while throughput and tail improve —
   this is the RECORDED #70 tradeoff ("up to one encode-time"), now
-  exercised every cycle. Measure, don't assume, in step 3.
-* Client-outstanding at fif = 1 settles at 1–2 instead of mostly ≤1
-  (egress was never gated; the upstream starvation was what kept the
-  lag low). If a hard client-facing fif bound is wanted, that is the
-  separate egress-gating decision above.
+  exercised every cycle. Measure, don't assume, in step 4.
+* Client-outstanding at fif = 1 no longer has any enforcement. It sat
+  at ≤ 2 only because the starvation stopped the capture loop; ungated,
+  it becomes rate x client-ack-latency, so a SLOW client widens it
+  without limit until transport backpressure. Layer 1 measured the
+  proxy analogue of a slow client: HEAD capped at 2 under a 40 ms ack
+  delay. The fixed build must be measured at the same D values (step 3)
+  and the growth reported as the fix's cost. If a hard client-facing
+  bound is wanted, that is either the separate egress-gating decision
+  above or the slot-ack horizon variant in step 3.
 * Slightly more ack messages to xorgxrdp (one SLOT_ONLY per frame even
   with the window closed) — negligible, noted for completeness.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;

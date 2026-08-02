@@ -24,6 +24,10 @@
 #           proxy itself is not the confound. If this does not reproduce
 #           `direct` within noise, nothing downstream counts (gate 5).
 #   D=10 / D=20 / D=40   the dose-response.
+#   freeze  (A_LEGS=freeze, #79 step 3 only) the client stops acking
+#           mid-run and never resumes, while still reading. Not part of
+#           the dose-response: it tests the OTHER thing the ack window
+#           does, which the fix removes -- see BACKLOG #79 step 3.
 #
 # Each leg is a cold-session gate run of E_SECS seconds against arm x017
 # (the deployed HEAD build, fif = 1, the arm #78 measured). Sequential:
@@ -62,6 +66,7 @@ tail -1 "$OUT/proxy_selftest_$STAMP.txt"
 run_leg() {
     leg=$1
     delay=$2
+    freeze=${3:-0}
     legout=$OUT/leg_$leg
     mkdir -p "$legout"
     if [ "$delay" = none ]; then
@@ -69,8 +74,10 @@ run_leg() {
         echo "=== leg $leg: NO proxy, port $port ==="
     else
         port=$PXY_PORT
-        echo "=== leg $leg: proxy 127.0.0.1:$port -> $POD_PORT, delay ${delay}ms ==="
+        echo "=== leg $leg: proxy 127.0.0.1:$port -> $POD_PORT," \
+             "delay ${delay}ms freeze ${freeze}s ==="
         setsid "$PROXY" -l "$PXY_PORT" -r "$POD_PORT" -d "$delay" \
+            -F "$freeze" \
             </dev/null >/dev/null 2>"$legout/proxy.log" &
         PXY_PGID=$!
         sleep 1
@@ -88,12 +95,14 @@ run_leg() {
     echo "t0 $T0" > "$legout/window.txt"
     echo "t1 $T1" >> "$legout/window.txt"
     echo "delay_ms $delay" >> "$legout/window.txt"
+    echo "freeze_s $freeze" >> "$legout/window.txt"
     echo "secs $SECS" >> "$legout/window.txt"
     if [ "$delay" != none ]; then
         kill -TERM -- -"$PXY_PGID" 2>/dev/null
         sleep 1
         pkill -f "ack_delay_proxy -l $PXY_PORT" 2>/dev/null
-        grep -E "applied delay|close after" "$legout/proxy.log" | sed 's/^/   /'
+        grep -E "applied delay|close after|FROZEN" "$legout/proxy.log" \
+            | sed 's/^/   /'
     fi
     if [ $rc -ne 0 ]; then
         tail -15 "$legout/gate.txt"
@@ -116,9 +125,15 @@ done
 # A_LEGS selects which legs THIS invocation runs (the capture dir is
 # A_OUT, so a sweep can be split across invocations without becoming two
 # experiments). Default: all of them, in order.
+# `freeze` is the #79 step-3 SAFETY leg, not part of the dose-response:
+# the proxy stops forwarding client->server A_FREEZE seconds in, while
+# the video direction keeps flowing, and the question is how many frames
+# the server keeps producing with a client that has stopped acking.
 for leg in ${A_LEGS:-direct $DELAYS}; do
     if [ "$leg" = direct ]; then
         run_leg direct none
+    elif [ "$leg" = freeze ]; then
+        run_leg freeze 0 "${A_FREEZE:-8}"
     else
         run_leg "d$leg" "$leg"
     fi

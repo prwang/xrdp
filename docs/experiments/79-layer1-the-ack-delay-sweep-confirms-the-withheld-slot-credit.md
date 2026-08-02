@@ -219,3 +219,53 @@ is untouched by this run and remains blocking. Nor is the fix's effect
 measured: the prediction for the fixed build is withheld ≈ 0 and a
 period **flat in D**, and this same sweep is what will separate the two
 builds.
+
+## What the sweep implies for the fix — and a correction to #79
+
+Reading the emission code to write those predictions turned up an error
+in #79's own description, recorded here because it changes what the fix
+has to be judged on.
+
+**#79 called the window gate on the slot ack "an implementation artifact
+of where the emission code lives". It is not.** `xrdp_mm.c:1692` states
+the intent in the code: *"the client's own ack window stays the OUTER
+gate in both modes: a client that stops acking still stops the
+producer."* The gate has a second job, and only one of its two jobs is
+the defect.
+
+So the honest form of "does ungating address the phenomenon" is: **yes
+for the phenomenon measured, and it removes something else at the same
+time.**
+
+* *Addresses it.* Every millisecond this sweep injected reached the
+  period through the withheld credit and through nothing else — the
+  prompt-credit class never moved. Emitting the slot credit at the
+  absorb frontier removes exactly that interval. Predicted: withheld
+  ≈ 0 at every D, no `S` runs, period 16.5–17.5 ms flat in D, and
+  therefore fif = 1 at or below fif = 2's 18.1 ms, which is what
+  FR-ACK-3 actually asks for.
+* *Removes something else.* What bounded client-outstanding at fif = 1
+  was the starvation itself: capture stopped, so nothing new could be
+  sent. Measured here — HEAD holds outstanding at ≤ 2 even at D = 40.
+  Ungated, outstanding becomes rate × client-ack-latency and grows with
+  a slow client until the transport stops draining, `frame_id_server`
+  stops advancing and the slot target's own cap
+  (`min(consumed, server + 1)`, whose comment calls it "what keeps this
+  BACKPRESSURE rather than a queue") bites. That is a bound, but a
+  socket buffer's worth of frames rather than one — and PRD FR-ACK-3
+  says the window is there to bound precisely what the client has
+  outstanding.
+
+Hence the validation gate now sitting at #79 step 3, between CI and the
+fleet A/B: the same five legs against the fixed deb (the win *and* its
+cost measured in one run, since `id_server − id_client` must RISE if the
+fix really ungated anything), plus a **frozen-client leg** —
+`ack_delay_proxy -F <secs>` stops client→server mid-session while the
+video direction keeps flowing — which asks the question the gate's own
+comment cares about: with the client no longer acking, how many frames
+does the server keep producing? HEAD should stop within 1–2. The fixed
+build's number is the new bound it introduces, and it must be recorded
+rather than assumed. If it is bad, the targeted change is not "ungate"
+but "gate on the right thing": `client + H > server` with H taken from
+the two-slot capture budget instead of `fif` — the pathology being that
+fif = 1 is a tighter bound than the pipeline it is gating needs.
