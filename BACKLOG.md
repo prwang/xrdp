@@ -350,10 +350,26 @@ ZERO exceptions in 871 cycles.**
    ungate** (rescoped 2026-08-02; the plain ungate is rejected, see the
    note at the top of this item and PRD FR-ACK-3 amendment clause 3).
    * The eager SLOT_ONLY ack is gated on `client + H > server` with
-     **H from the pipeline's depth, not from `frames_in_flight`** —
-     two capture slots, three stages, so H = 2 or 3 with the choice
-     justified in the commit and pinned by CI, never read off a
-     measurement.
+     **H from the pipeline's depth, not from `frames_in_flight`**.
+     **H = 3, decided 2026-08-02**, and the derivation is the point:
+     the gate must not bind in the LAN regime, so H must exceed the
+     client-outstanding that regime actually produces, which is
+     `1 + ack_latency / period`. Measured on the sweep's LAN legs:
+     ack latency p50 7.5–10.1 ms against a 16.9 ms period → ~1.6; at
+     #78's ack-latency **p90 of 18.9 ms** — longer than one period —
+     → ~2.1. **H = 2 has no headroom against that p90** and would bind
+     on ordinary client jitter, reintroducing the thing this item
+     removes; H = 3 does not bind until ack latency exceeds ~2 periods
+     (~34 ms), which is the WAN regime where binding is correct. H is a
+     compile-time constant pinned by CI, not tuned against a run, and
+     H = 1 must reproduce HEAD exactly (see below).
+   * **What this bounds on the wire.** Capture k is admitted only when
+     `client + H > server` held at the credit for k−2, so at most H − 1
+     frames are unacked when a capture starts and at most **H + 1** are
+     unacked when it is sent. That is a hard bound in frames, present in
+     both regimes, and it is what amendment clause 2 requires. It is
+     approximate at the +1 because egress is still ungated; **#80 makes
+     it exact.**
    * The ordinary/region ack and egress keep the CLIENT's window
      (`fif`), which is the quantity that window is for. One
      comparison must not serve both jobs (amendment clause 1).

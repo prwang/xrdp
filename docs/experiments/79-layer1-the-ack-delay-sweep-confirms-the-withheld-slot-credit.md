@@ -468,3 +468,92 @@ residual collapsing from +4.9…−7.9 ms to within ~1 ms across all five
 legs.** That is a stronger claim than any single-metric row in the gate,
 because it constrains the whole curve rather than a point, and it is
 falsifiable in the same run at no extra cost. Recorded before the run.
+
+## Terms used above, in the domain's words (added 2026-08-02 on request)
+
+Three words in the tables are the instrument's, not the machine's. What
+they mean:
+
+**Cycle.** One frame's worth of pipeline work — the interval between two
+consecutive frames reaching the transport, `egress(k−1) → egress(k)`.
+That is the frame period. Every row that says "period" is a mean or
+median over these.
+
+**Prompt vs withheld (`.` vs `S`).** For each cycle the analyzer asks
+one yes/no question about the *producer's* side: when the capture slot
+became safe to recycle, did xrdp tell xorgxrdp straight away, or sit on
+the news? The slot in question is frame **k−2**'s — with two capture
+slots, the slot that frame k will use is the one k−2 just vacated, so
+the credit that admits capture k is the credit for k−2. (Paired by that
+identity, never by a time window.)
+
+* **prompt** — the credit went out within 10 ms of the slot becoming
+  safe. In practice ~0.03 ms: the window was already open, nothing was
+  waiting on the client.
+* **withheld / gated / `S`** — the credit sat for more than 10 ms
+  because `client + fif > server` was false. xrdp knew the slot was
+  free and would not say so until the client's ack arrived.
+
+The 10 ms threshold is inherited from #78's ">10 ms" definition so the
+two items' numbers are comparable.
+
+**Run length.** How many prompt cycles happened back to back before a
+withheld one interrupted. A run of 28 means 28 consecutive frames in
+which the gate never bound — the producer was told immediately every
+time. That is why run length is the load-bearing statistic and not a
+curiosity: **a long prompt run is the unmodified server transiently
+behaving exactly as the fixed build would behave permanently**, and its
+period is therefore a measurement of the fix rather than a prediction
+about it.
+
+## So: is there a LAN fix with no tail AND a bounded wire? Yes, and it is not a compromise
+
+The two goals only look like they conflict because one `if` is doing
+both jobs today. Separate them and the LAN case has slack in it:
+
+* **The tail comes from throttling the PRODUCER** (xorgxrdp is not told
+  its slot is free).
+* **The wire bound comes from throttling the CLIENT** (do not get more
+  than N frames ahead of what it has acked).
+
+Different parties. The LAN's short ack latency is what makes them
+independent: bounding the client never requires throttling the producer,
+because on a LAN the client is never far enough behind for the bound to
+be reached.
+
+With `client + H > server` on the slot credit, H = 3:
+
+* **The bound is always present.** Capture k is admitted only while
+  fewer than H frames are unacked, so at most H + 1 are unacked when k
+  is sent — in both regimes, LAN or WAN, slow client or fast. It does
+  not switch off.
+* **On a LAN it never binds.** Measured client-outstanding on these
+  legs is 0 or 1 in 3157 of 3161 sends (2 in four), and the fixed
+  build's predicted value is `1 + ack_latency / period` = 1.6 at p50 and
+  2.1 at #78's ack-latency p90. H = 3 sits above both. The gate is
+  there, and nothing ever touches it.
+* **The 28-frame run is the existence proof.** During it,
+  `client + 1 > server` happened to hold on every frame — the client was
+  never behind at all — and the machine ran at 16.9 ms against the leg's
+  21.5 ms mean. H = 3 turns that from luck into a guarantee, because the
+  gate is looser than what the client actually does.
+
+So on a LAN the answer is: **no tail, bound intact, nothing traded.** On
+a WAN the bound binds and costs up to H periods of staleness — that is
+the real tradeoff, and it is the one worth paying, because the
+alternative the plain ungate offered was no bound at all.
+
+**H = 2 is the tempting answer and it is wrong.** It matches the
+two-slot capture budget, which makes it look principled, but
+client-outstanding at #78's ack-latency p90 (18.9 ms — longer than one
+frame period) is already ~2.1. H = 2 would bind on ordinary client
+jitter and put back a smaller version of the tail this item exists to
+remove. H = 3 binds only past ~2 periods of ack latency (~34 ms), which
+is genuinely the WAN regime.
+
+**What this does NOT fix, stated so it is not assumed away.** #79
+removes the tail whose mechanism layer 1 confirmed. #76 has a second,
+separate open item — the unreproduced 26.7 ms `pump` on arm x015, a
+bracket a client ack window cannot reach — and nothing here touches it.
+If a tail survives the fixed build's LAN legs, that is where to look
+next, not at the horizon.
