@@ -169,10 +169,12 @@ explanation (pump equal at 52.9 vs 58.8 W GPU duty).
 unreproduced condition).
 **Captures:** `i78_x017_pumpsplit_20260802`, `i78_x014_fif2_clocks_20260802`.
 
-## #79 — TOP PRIORITY (owner, 2026-08-02): ungate the eager slot ack from the client-ack window (TODO — needs owner sign-off: behaviour change)
+## #79 — TOP PRIORITY (owner, 2026-08-02): ungate the eager slot ack from the client-ack window (TODO — mechanism CONFIRMED by intervention 2026-08-02; the FIX still needs owner sign-off: behaviour change)
 
 **The defect** (evidence: `captures/i78_x017_pumpsplit_20260802`,
-analysis in its README and #78). `xrdp_mm_update_module_frame_ack`
+analysis in its README and #78; **confirmed causally by the layer-1
+ack-delay sweep, `captures/i79_x017_ackdelay_20260802_s20` —
+step 1 below**). `xrdp_mm_update_module_frame_ack`
 (`xrdp_mm.c:1697`) emits BOTH producer acks — the ordinary/region ack
 and the #70 eager SLOT_ONLY ack — only while
 `xrdp_gfx_ack_window_open(client, server, fif)` is true. PRD #70
@@ -235,38 +237,52 @@ pure function of (client, server, consumed, region_sent, server_sent,
 fif, eager). Each layer below removes the nondeterminism instead of
 sampling it.**
 
-1. **Deterministic reproduction on UNMODIFIED code — validate the
-   mechanism by intervention before any model of it is enshrined
-   anywhere (owner, 2026-08-02: without this, the mechanism is
-   inferred, not confirmed).** Add a per-direction delay to the
-   harness path so the client's acks ALWAYS lose the race: a small
-   TCP proxy between the oracle client and the pod's RDP port
-   delaying only the client→server direction by D ms (server→client
-   untouched, client binary untouched, SERVER BINARY UNTOUCHED — the
-   in-tree `tools/devel/tcp_proxy` has no delay support, so extend it
-   or add a dedicated `PR-demo/mac_bisect_matrix/ack_delay_proxy`).
-   Control leg first: D = 0 THROUGH the proxy must reproduce the
-   no-proxy baseline within noise, or the proxy itself is a confound
-   and nothing downstream counts (gate 5). Then sweep
-   D ∈ {0, 10, 20, 40} on the deployed HEAD build, 5 s per point
-   (mechanism check, not a rate). **The mechanism is confirmed iff
-   the unmodified system responds as the theory demands: withheld
-   p50 ≈ D, the stall fraction goes ~31 % → ~100 % at D ≥ ~10, and
-   the period rises with D.** Any other response falsifies or
-   narrows the theory — found BEFORE a fix or a CI model is built on
-   it. (After the fix exists, the same sweep separates the builds:
-   fixed predicts withheld ≈ 0 and period FLAT in D, since nothing
-   else consumes cliack at fif = 1 — egress is not gated, measured.)
+1. **Deterministic reproduction on UNMODIFIED code — DONE
+   2026-08-02, mechanism CONFIRMED by intervention.** Record:
+   `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`;
+   capture `captures/i79_x017_ackdelay_20260802_s20`; harness
+   `PR-demo/mac_bisect_matrix/{ack_delay_proxy.c, ack_delay_sweep.sh,
+   i79_ack_delay_analyze.py}` + its self-test. Five legs on arm x017
+   (deployed HEAD, fif = 1): no-proxy, then D ∈ {0, 10, 20, 40} ms of
+   client→server delay, 20 s each. Control OK (proxy at D = 0 within
+   4.3 % of no-proxy; both reproduce #78 Run A). Delay confirmed
+   in-server, not from the proxy: `egress→cliack` +7.0/+17.8/+38.0 ms.
+   **Δwithheld/ΔD = 1.10; period 22.5 → 40.1 ms = 0.44 ms per ms of
+   ack delay; and the added period lands ENTIRELY in the withheld
+   cycles — the prompt-credit class is flat at 16.3–16.9 ms under a
+   40 ms ack delay, `pump` flat at 15.2–15.4.** The rival (egress
+   itself ack-gated) is excluded: at D = 40 exactly ⅓ of sends carry
+   2 unacked frames and ⅓ carry 1.
+   Two predictions were FALSIFIED as written, both from treating a
+   closed loop as open: withheld p50 came out 24.1/36.0/57.0 rather
+   than ≈ D (right slope, ~13 ms offset — the rate drops too, so the
+   opening ack is itself later), and the stall fraction saturates at
+   **exactly 2/3**, not 100 %. The reason is the finding: at D ≥ 20
+   the system locks into a **deterministic period-3 cycle,
+   `SS.SS.SS.`** — two captures withheld, one prompt, zero exceptions
+   in 480 and 391 cycles — because the credit target
+   `min(consumed, server+1)` releases the pair when the window opens.
+   **The 31 % "heisenbug" tail is that same cycle, intermittently
+   modulated by the ack race.** Deviation recorded: the item said 5 s
+   per leg; at 5 s the gate yields 45–51 usable cycles and the control
+   leg failed on noise (kept: `..._s5`), so the legs were rerun at
+   20 s — a sample-size correction to the same five legs.
+   (After the fix exists, the same sweep separates the builds: fixed
+   predicts withheld ≈ 0 and period FLAT in D.)
 2. **CI — replay + enumeration of the now-VALIDATED mechanism, and it
    must be RED on HEAD first.** Extract the emission decision into a
    pure helper next to `xrdp_gfx_ack_window_open`. Two test shapes:
-   (a) **Replay test**: drive the helper through the exact event
-   sequence of the captured p90 stall (frames 10–13 of
-   `i78_x017_pumpsplit_20260802`, transcribed in the #78 record:
-   absorb 11 → egress 11 → cliack 10 → absorb 12 → egress 12 →
-   cliack 11 → cliack 12), asserting after EVERY event which acks are
-   due. Expected values from the PRD #70 emission point
-   (max(absorb N, egress N−1)), not from the implementation.
+   (a) **Replay test**: drive the helper through a captured stall,
+   asserting after EVERY event which acks are due. Expected values
+   from the PRD #70 emission point (max(absorb N, egress N−1)), not
+   from the implementation. **Use the layer-1 D = 40 capture, not the
+   #78 p90 stall**: layer 1 showed the withheld cycles are a fixed
+   3-frame pattern, so the sequence to replay is the one that repeats
+   160 times without exception — absorb 74 → egress 74 → absorb 75 →
+   egress 75 → cliack 73 → cliack 74 → cliack 75 (capture 76's stall,
+   transcribed in the layer-1 record). A test built on a
+   once-observed p90 sample would have been a weaker claim about the
+   same defect.
    (b) **Exhaustive interleaving enumeration**: all orderings of
    {cliack, egress, absorb} events over a 3-frame window at fif = 1
    and fif = 2 — the state space is small enough to enumerate

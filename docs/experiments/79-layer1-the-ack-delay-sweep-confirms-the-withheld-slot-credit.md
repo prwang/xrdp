@@ -1,0 +1,221 @@
+<!--
+Experiment record. BACKLOG.md is the OPEN work list; this file is the
+record it points at. Kept verbatim, wrong claims included.
+-->
+
+# #79 layer 1 — the ack-delay sweep: the mechanism is confirmed by intervention, and the tail turns out to be a period-3 limit cycle
+
+2026-08-02. Capture:
+`PR-demo/mac_bisect_matrix/captures/i79_x017_ackdelay_20260802_s20`
+(plus the discarded first attempt, `..._s5`). Harness:
+`PR-demo/mac_bisect_matrix/{ack_delay_proxy.c, ack_delay_proxy_selftest.py,
+ack_delay_sweep.sh, i79_ack_delay_analyze.py}`.
+
+## Lead with the answer
+
+**#78's attribution is validated.** Delaying only the client's acks, on
+the unmodified deployed build, moves the withheld slot credit ~1:1
+(Δwithheld/ΔD = 1.10) and the frame period at 0.44 ms per ms of delay —
+and the added period lands **entirely** in the cycles whose credit was
+withheld. Cycles whose credit was prompt run at 16.3–16.9 ms in every
+leg, unmoved by a 40 ms ack delay; `pump` (encode) is 15.2–15.4 ms
+everywhere. The rival explanation — that egress is ack-gated and the
+whole pipeline is simply later — is excluded by measurement: at D = 40
+exactly two thirds of sends go out with 1 or 2 frames unacked.
+
+**And the tail is not a race.** At D ≥ 20 the system locks into a
+deterministic period-3 cycle, `SS.SS.SS.` — two captures withheld, one
+prompt — with zero exceptions in 480 and 391 cycles. The 31 % tail #76
+was filed on is the same motif, intermittent. This changes what layer 2
+has to assert and makes the CI target concrete rather than statistical.
+
+**Two of my four predictions were wrong**, both because they were
+written as if the loop were open. Stated below before the numbers that
+falsified them, because the point of writing them down was to be able
+to be wrong in public.
+
+## Design
+
+Legs (the whole experiment; the arm count was not changed): `direct`
+(no proxy), then D = 0, 10, 20, 40 ms through the proxy. Arm x017 — the
+deployed HEAD build, fif = 1, the arm #78 measured — one monitor
+3840×2400, textflood, oracle client, cold session per leg, fleet idle,
+host DVFS pinned (GPU `high` / SCLK 2900, CPU `performance`, owner-set
+earlier the same day). Nothing differs between legs except when the
+client's bytes arrive.
+
+Predictions, written before the run:
+
+* **P0** the delay applies, measured *inside* the server: `egress →
+  cliack` rises by ~D. (Not the proxy's own telemetry — quality gate 2.)
+* **P1** withheld p50 ≈ D.
+* **P2** the stall fraction (withheld > 10 ms) goes 31 % → ~100 % for
+  D ≥ 10.
+* **P3** the period rises with D.
+* **CONTROL** D = 0 through the proxy reproduces `direct`, or nothing
+  downstream counts.
+
+Falsifiers, equally explicit: withheld flat while the period rises would
+mean #78 named the wrong mechanism; withheld rising while the period
+does not would mean the withholding is real but off the critical path,
+and the fix pointless.
+
+## The instrument, and the two things it had to prove first
+
+`ack_delay_proxy.c` forwards server→client immediately and releases each
+client→server read D ms after arrival. It cannot parse RDP (TLS), so it
+delays the whole direction — legitimate here because an oracle session's
+client→server traffic is one small ack PDU per frame and nothing else:
+**775 chunks of ~70 B for 751 frames** at D = 0. It terminates both TCP
+connections, so transport-level flow control between proxy and server is
+untouched; only application bytes are held.
+
+Self-test before any session time (`ack_delay_proxy_selftest.py`):
+applied delay matches the knob to ±0.2 ms, D = 0 costs 0.037 ms of RTT,
+server→client sustains ≥ 3.3 GB/s against the session's 153 MB/s.
+
+*The self-test lied on its first run and had to be fixed first*: it
+packed the ping counter as `'<Q'`, so ping 66 serialised its low byte as
+0x42 = `'B'`, the bulk-transfer trigger — the client then read 200 MB of
+zeros eight bytes at a time and reported 0.011 ms RTT for a 10 ms delay
+line that was working perfectly. Recorded because it is the same class
+of error as everything else in this file: a measurement that measured
+itself.
+
+## The sample-size correction (a deviation from the item's "5 s per leg")
+
+The first sweep ran the specified 5 s per leg and its **control leg
+failed**: `direct` and D = 0 came out 18.5 % apart, with `egress →
+cliack` 7 ms *lower* through the proxy — which no delay line can cause.
+Cause: the gate spends most of a 5 s window on the cold login, so 5 s
+yields 1.9 s of frames, 45–51 usable cycles. A distribution whose signal
+is a 31 % tail cannot be compared at n = 45.
+
+Rerun at 20 s/leg: 391–746 cycles, control closes to 4.3 %. This is a
+sample-size change to the same five legs, not an added arm, condition or
+payload — but it is a deviation from what the item described and is
+recorded as one. The 5 s figure came from "a mechanism check, not a
+rate", which was right in principle and wrong in arithmetic: it counted
+wall time instead of frames. The underpowered run is kept at
+`captures/i79_x017_ackdelay_20260802_s5`.
+
+## Result
+
+| leg | D | cycles | egress→cliack p50 | withheld p50 / p90 | withheld > 10 ms | period mean / p50 / p90 | wait mean |
+|---|---|---|---|---|---|---|---|
+| direct | — | 746 | 7.6 | 0.03 / 35.3 | 29.7 % | 21.5 / 17.1 / 42.7 | 4.9 |
+| d0 | 0 | 714 | 10.1 | 0.04 / 35.4 | 36.9 % | 22.5 / 17.1 / 43.6 | 5.9 |
+| d10 | 10 | 569 | 17.1 | 24.10 / 43.3 | 58.0 % | 27.9 / 18.1 / 52.4 | 11.4 |
+| d20 | 20 | 480 | 27.8 | 35.99 / 54.7 | 66.7 % | 33.1 / 18.4 / 63.8 | 16.4 |
+| d40 | 40 | 391 | 48.1 | 56.96 / 77.1 | 66.8 % | 40.1 / 18.8 / 85.6 | 23.2 |
+
+`withheld` = credit emission − `absorb(k−2)`: the interval between the
+in-tree safety condition (the children have absorbed frame k−2's input,
+so its capture slot is reusable) and the credit actually reaching
+xorgxrdp. Zero negatives in every leg (gate 2c). Both control legs
+reproduce #78 Run A (22.6 ms period, 31.1 % stalls, withheld p90 36.4),
+measured 60 s at 03:08 the same day — gate 4, no regression against the
+recorded number.
+
+* **CONTROL: OK.** period 21.5 vs 22.5 ms (4.3 %), withheld p90 35.3 vs
+  35.4.
+* **P0: OK.** `egress → cliack` p50 +7.0 / +17.8 / +38.0 ms for
+  D = 10 / 20 / 40, from the server's own ring.
+* **P1: FALSIFIED.** withheld p50 24.1 / 36.0 / 57.0 against a predicted
+  10 / 20 / 40. The slope is right (1.10 between D = 10 and 40); there is
+  a ~13 ms offset. The prediction assumed only the ack moved. In a closed
+  loop the rate drops too, so the ack that opens the window is itself
+  emitted later, and the p50 additionally jumps discontinuously once the
+  median frame changes class from unstalled to stalled. The prediction
+  should have been about the stalled subpopulation.
+* **P2: FALSIFIED, and this is the finding.** The stall fraction
+  saturates at exactly 2/3 — see below.
+* **P3: CONFIRMED.** 22.5 → 27.9 → 33.1 → 40.1 ms: 0.44 ms of frame
+  period per ms of ack delay.
+
+## Why P2 was wrong: it is a limit cycle, not a race
+
+Per-capture credit classes in order (`S` = withheld > 10 ms,
+`.` = prompt):
+
+```
+d0    SS....................S............SS.SS..SS...SS.S..SS.S...SS.SS.S..SS..SS
+d10   SS..SS.S..SS..SS.SS.S...SS..SS.SS.SS..SS.SS..SS..SS.SS.SS..SS..SS.SS.SS..SS
+d20   SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.
+d40   SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.
+```
+
+Run-length census: D = 20 — 160 runs of `SS`, 160 singleton `.`, nothing
+else. D = 40 — 131 and 130, nothing else. D = 10 — 160 `SS`, 10 `S`,
+gaps of 1–3. D = 0 — the same motif, intermittent: 115 `SS`, 33 `S`,
+gaps up to 22.
+
+So the stall fraction *cannot* reach 100 %: every third capture finds
+its credit already emitted, because the credit target
+`min(consumed, server + 1)` covers a frame ahead, and one opening of the
+window releases the pair. **The "31 % heisenbug" is a deterministic
+period-3 cycle whose duty the ack race modulates.** Under injected delay
+the modulation disappears and the cycle stands alone.
+
+*Why period 3 exactly* is not proven here — it is the question layer 2's
+3-frame interleaving enumeration answers by construction, which is a
+lucky coincidence of scope, not a plan.
+
+## The discriminator: the slot credit, not the send path
+
+Delaying acks would also slow the server if egress were gated by the
+same window — a rival that predicts the same period curve. Excluded:
+
+| leg | sends by (id_server − id_client) at send time | period, credit withheld | period, credit prompt |
+|---|---|---|---|
+| direct | 0:2223 1:933 2:4 | 32.7 (n=221) | 16.8 (n=524) |
+| d0 | 0:1884 1:1116 2:4 | 31.9 (n=263) | 16.9 (n=450) |
+| d10 | 0:1001 1:1395 2:4 | 36.1 (n=329) | 16.6 (n=239) |
+| d20 | 0:676 1:975 2:373 | 41.5 (n=320) | 16.3 (n=159) |
+| d40 | 0:556 1:552 2:552 | 52.0 (n=260) | 16.4 (n=130) |
+
+1. The send path never waits: at D = 40, one third of sends carry 2
+   unacked frames and another third carry 1. (#78's static finding, now
+   confirmed under stress.)
+2. All of the added period is in the gated cycles. The prompt-credit
+   class is **flat at 16.3–16.9 ms under a 40 ms ack delay**. If any
+   other stage — encode, assembly, send, client — were on the path, that
+   class would have moved.
+3. The split closes against the mean: ⅔·52.0 + ⅓·16.4 = 40.1 =
+   measured (D = 40); 41.5·320/479 + 16.3·159/479 = 33.1 = measured
+   (D = 20). Gate 1.
+
+## One stalled capture, in the domain's words (D = 40, capture 76)
+
+```
+  -27.56 ms  absorb  73     the children absorbed frame 73's input
+  -27.50 ms  ackslot 73     ...and its slot credit went out at once
+  -18.26 ms  egress  73
+  -17.46 ms  msgin   74
+   -8.30 ms  msgin   75
+   +0.00 ms  absorb  74     frame 74's capture slot is SAFE to reuse
+   +8.88 ms  egress  74     no credit: the ack window is closed
+  +16.14 ms  absorb  75
+  +24.78 ms  egress  75     the server sends on, 2 frames unacked
+  +31.91 ms  cliack  73     73+1 > 75 false — window stays closed
+  +61.98 ms  cliack  74     74+1 > 75 false — still closed
+  +79.59 ms  credit for frame 74 emitted        withheld 79.59 ms
+  +88.21 ms  msgin   76     the capture itself took 8.62 ms
+```
+
+The slot was safe at +0.00 and the producer was told at +79.59. None of
+that interval is encode, send or capture: it is a wait for a round trip
+the safety condition does not require.
+
+## What is settled, and what is not
+
+Settled: the client's frame ack is on the critical path of capture-slot
+release at fif = 1; the effect is deterministic; the send path and the
+encoder are not involved; the fix targets the right code.
+
+Not settled: that ungating is safe — the blocking pre-step in #79
+(xorgxrdp's SLOT_ONLY handler must not consume region-retirement state)
+is untouched by this run and remains blocking. Nor is the fix's effect
+measured: the prediction for the fixed build is withheld ≈ 0 and a
+period **flat in D**, and this same sweep is what will separate the two
+builds.
