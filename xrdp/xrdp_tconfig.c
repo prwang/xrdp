@@ -429,6 +429,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_fault_strip_mmco = 0;
     config->avc444_ffmpeg_eager_slot_ack = 0;
     config->avc444_ffmpeg_emit_thread = 0;
+    config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
@@ -451,9 +452,29 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t fm = toml_bool_in(avc, "fault_strip_mmco");
             toml_datum_t es = toml_bool_in(avc, "eager_slot_ack");
             toml_datum_t et = toml_bool_in(avc, "emit_thread");
+            toml_datum_t ww = toml_int_in(avc, "wire_window");
             if (es.ok)
             {
                 config->avc444_ffmpeg_eager_slot_ack = es.u.b ? 1 : 0;
+            }
+            if (ww.ok)
+            {
+                /* same contract as the other bounded ints: out of range
+                 * is REFUSED and the default stands, never clamped */
+                if (ww.u.i < XRDP_GFX_WIRE_WINDOW_MIN ||
+                        ww.u.i > XRDP_GFX_WIRE_WINDOW_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg wire_window "
+                          "%lld out of range [%d,%d]; keeping the default "
+                          "%d", (long long)ww.u.i,
+                          XRDP_GFX_WIRE_WINDOW_MIN,
+                          XRDP_GFX_WIRE_WINDOW_MAX,
+                          config->avc444_ffmpeg_wire_window);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_wire_window = (int)ww.u.i;
+                }
             }
             if (et.ok)
             {

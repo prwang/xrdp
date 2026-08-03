@@ -330,6 +330,47 @@ START_TEST(test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_wire_window)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C is USER configuration,
+     * because the value a deployment wants follows from its round-trip
+     * time and the server cannot measure that. Absent -> the placeholder
+     * default (#81's RTT sweep is what will choose the shipped one). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_DEFAULT);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_wire_window.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 6);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_MIN);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_MAX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_wire_window_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* wire_window = 0 would let the credit frontier reach only
+     * frame_id_client, so no capture is ever admitted past the first
+     * outstanding frame and the session stops drawing. Refused; the
+     * default stands, and it is never silently clamped. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_wire_window_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_DEFAULT);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -366,6 +407,10 @@ make_suite_tconfig_load_gfx(void)
                    test_tconfig_gfx_avc444_intra_refresh);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_wire_window);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_wire_window_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_empty_args_fallback);
 

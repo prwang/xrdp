@@ -661,7 +661,35 @@ the third bullet's "if the safety leg is bad" now moot.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;
   the unit test in step 1 owns this surface.
 
-## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (IN PROGRESS — design accepted by owner 2026-08-03; BLOCKS every item from #82 down)
+## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (steps 1–3 DONE 2026-08-03; steps 4–5 OPEN; BLOCKS every item from #82 down)
+
+> **Landed 2026-08-03 (steps 1, 2, 3).** The credit frontier is
+> implemented behind `eager_slot_ack`, C is `gfx.toml [avc444_ffmpeg]
+> wire_window` (default 2, a placeholder — #81 has not run), and CI is
+> green at 197/197 in `tests/xrdp` (422 across the tree). The
+> cross-layer gate's absence is asserted, not described:
+> `test_joint_machine_enumeration` walks the entire reachable joint
+> xrdp/xorgxrdp state space for C ∈ {1,2,3} and RED-on-HEAD was
+> **verified** — reinstating the shipped gate inside the planner turns
+> 4 cases red, including the D=40 wedge golden replay. Record and the
+> failure output: `docs/experiments/80-the-credit-frontier.md`.
+>
+> **Two findings from implementing, neither in the approved design:**
+> (a) the region-disposing ack is a SECOND admission token — it is not
+> `SLOT_ONLY`, so `xup_ack_frontier_apply` moves the producer's slot
+> frontier with it — and is now clamped by the same window, safe
+> because the clamped target never lags the credit by more than one id
+> and xorgxrdp's `cap_sent` ring holds slots + 1; (b) the
+> `NOT_DISPLAYED` region-return is deliberately NOT clamped (its frame
+> never reached the wire and owes pixels back), so the bound is a
+> statement about frames that reached the transport. Also: the bound is
+> `C + 2·M` at M monitors, not `C + 2` — the producer's budget is per
+> monitor.
+>
+> **What is still red/unknown:** no live measurement of this code
+> exists, and the shipped default C = 2 does NOT satisfy FR-FLOW-1
+> clause 4's "default chosen with #81's data". Steps 4 and 5 below are
+> the remaining work, and #81 is their prerequisite.
 
 **The defect, read in code and confirmed by #79's layer-1 sweep.**
 `frames_in_flight` is documented (PRD FR-ACK-3) as the bound on what the
@@ -784,23 +812,39 @@ is not stalled, it is *dropping* (coalescing) by construction.
   preserves today's behaviour bit for bit).
 
 **Steps (linear, 2026-08-03; absorbing #79's plan):**
-1. **Blocking pre-step (unchanged from #79):** read xorgxrdp's
-   SLOT_ONLY handler (xorgxrdp `10fa3aa23033`, source outside this
-   tree) and confirm slot release does not consume region-retirement
-   state.
-2. **Implement the frontier**, plus the user-facing window C as config
-   (owner directive 2026-08-03: C relates to the deployment's WAN RTT,
-   so it must NOT be hardcoded or PRD-required — it is the user's to
-   set; PRD FR-FLOW-1.4). Config home: `gfx.toml` per the 2026-08-02
-   one-home decision — the owner's message said "e.g. in the ini
-   file"; FLAGGED: one home only, and it is gfx.toml unless the owner
-   says xrdp.ini. Shipped default: chosen with #81's data, not
-   guessed; until then default-off `eager_slot_ack` preserves today's
-   behaviour bit for bit (rule 2).
-3. **CI, RED on HEAD first:** exhaustive {cliack, egress, absorb}
-   interleaving enumeration of the pure frontier function; the D = 40
-   wedge (capture 76, and frames 787–790 from the direct leg) as
-   golden replays.
+1. **DONE 2026-08-03. Blocking pre-step:** xorgxrdp's SLOT_ONLY
+   handler read at `/workUpdateXorgXrdp` (`10fa3aa23033`). Slot release
+   does NOT consume region-retirement state: `xup_ack_frontier_apply`
+   advances `f->shown` only for a non-SLOT_ONLY ack, retirement is
+   driven from `rect_id_ack_shown` and admission from `rect_id_ack`,
+   and `rdpClientConReturnFrameRegion` is unreachable for a SLOT_ONLY
+   ack. The same read confirmed the drop path needs zero new code
+   (`rdpDeferredUpdateCallback:3984` returns early, damage stays in
+   `dirtyRegion`). Detail: `docs/experiments/80-the-credit-frontier.md`.
+2. **DONE 2026-08-03. The frontier**, plus C as user config in
+   `gfx.toml [avc444_ffmpeg] wire_window` (owner confirmed gfx.toml
+   2026-08-03), range 1–64, out-of-range REFUSED, default 2 as a
+   PLACEHOLDER pending #81. Code: `xrdp_gfx_credit_frontier()`,
+   `xrdp_gfx_region_ack_target()`, `xrdp_gfx_plan_acks()` in
+   `xrdp/xrdp_encoder.h`; `xrdp_mm_emit_credit_frontier()` in
+   `xrdp/xrdp_mm.c`, with the shipped gated emission kept verbatim as
+   `xrdp_mm_emit_legacy_frame_ack()` for `eager_slot_ack = false`
+   (rule 2). Telemetry: `ackslot`/`ackregion` carry `frame_id_client`
+   and C; `egress` field c carries transport bytes queued, in KiB, from
+   a new O(1) `struct trans::wait_bytes` counter — never a per-frame
+   walk of `wait_s` (coding rule 5). Man page: `gfx.toml(5)`.
+3. **DONE 2026-08-03. CI, RED on HEAD verified:**
+   `tests/xrdp/test_avc444_credit_frontier.c` (9 cases) plus 2 config
+   cases in `test_tconfig.c`. The enumeration walks the entire
+   reachable joint xrdp/xorgxrdp state space for C ∈ {1,2,3} asserting
+   INV-SENT / INV-WIRE / INV-LIVE / INV-HELD / deadlock freedom, with
+   three non-vacuity checks (pipeline runs to the end, the wire bound
+   is ATTAINED, the window term is the strict minimum somewhere). The
+   D = 40 wedge is replayed at C = 2 and C = 1 with the event ORDER
+   measured (`i79_x017_ackdelay_20260802_s20/leg_d40`, frames 406–409)
+   and the expected values hand-derived from FR-FLOW-1 clause 3.
+   Reinstating the shipped gate inside the planner turns 4 cases red;
+   the mutation was reverted and is not committed.
 4. **#81 harness, then the VALIDATION GATE:** ack-delay sweep + freeze
    leg + netem RTT legs against the fixed deb, predictions re-derived
    for DROP semantics before the run — period ~flat at ALL D
@@ -808,7 +852,22 @@ is not stalled, it is *dropping* (coalescing) by construction.
    `id_server − id_client` at send never > C + 2; freeze leg stops
    production within C + 2 frames and `wait_s` bytes plateau; the
    drop visible as damage-area growth per admitted frame at high RTT.
+   The freeze leg is now readable: `egress` field c is the transport's
+   queued KiB, so "`wait_s` plateaus" is a number rather than a claim.
 5. **Fleet A/B** (intent unchanged from the superseded #79 step 5).
+
+**Deliberately NOT done in steps 1–3, and why:**
+* **No live run.** Step 4 needs #81, and #81 has not been built. Every
+  number quoted for this item is from the pre-change captures or from
+  CI; the code has never encoded a frame on a real link.
+* **The default C = 2 is not a recommendation.** It matches the legacy
+  `frames_in_flight` so short-RTT behaviour is preserved, and
+  FR-FLOW-1 clause 4's "default chosen with #81's data" is unmet.
+* **xorgxrdp is unchanged**, as the design predicted: the wire's credit
+  semantics did not move, only the arithmetic producing the value.
+  `/workUpdateXorgXrdp` is now on branch `wip/eager-ack` at the same
+  commit, to keep the two repositories' branch names in step (CLAUDE.md
+  "The other half of the pipeline").
 
 The paragraphs below are the original egress-gate filing, kept for the
 record; its sequencing question is moot (there is no egress gate to

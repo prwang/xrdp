@@ -43,6 +43,199 @@ xrdp_gfx_ack_window_open(int frame_id_client, int frame_id_server,
     return frame_id_client + frames_in_flight > frame_id_server;
 }
 
+/**
+ * How many capture slots xorgxrdp holds per monitor for CC_GFX_AVC444.
+ *
+ * Mirrors XUP_CAP_AVC444_SLOT_COUNT (common/xup_client_info.h), repeated
+ * here only so the wire bound below can be written down; the producer
+ * remains the owner of the number.
+ */
+#define XRDP_GFX_CAPTURE_SLOTS 2
+
+/**
+ * BACKLOG #80 / PRD FR-FLOW-1 -- the CREDIT FRONTIER.
+ *
+ * xorgxrdp captures a frame only when xrdp has told it a frame id it may
+ * overwrite; that ack is the single admission token for the whole
+ * pipeline. This function is the arithmetic that produces the token's
+ * value, and it is the ONLY place the three layers meet. Each term
+ * consults exactly its own layer, and the smallest wins:
+ *
+ *   frame_id_consumed      SLOT FACT. The encoder children have drained
+ *                          frame N's vmsplice'd input, so the borrowed
+ *                          capture pages are free. Anything above this
+ *                          would hand back pages a child is reading.
+ *
+ *   frame_id_server + 1    NEAREST-NEIGHBOUR BACKPRESSURE (FR-FLOW-1
+ *                          clause 1). One frame of pipeline inventory,
+ *                          no more: the stage downstream of capture is
+ *                          allowed to be one frame behind, and the
+ *                          producer waits for it. This is a stall, and
+ *                          it consults only the immediately adjacent
+ *                          stage -- never the network.
+ *
+ *   frame_id_client + C    END-TO-END WIRE WINDOW (FR-FLOW-1 clause 2).
+ *                          The farthest consumer -- the RDP client --
+ *                          throttling the nearest producer, at the one
+ *                          place where refusing costs nothing: capture
+ *                          admission. When this term binds, the producer
+ *                          is NOT stalled holding a finished frame; it
+ *                          simply does not capture, and xorgxrdp
+ *                          coalesces the damage into its dirty region.
+ *                          Fewer frames, each of them fresher.
+ *
+ * The critical property is that this value is emitted UNCONDITIONALLY.
+ * The shipped code instead wraps the whole emission in
+ * xrdp_gfx_ack_window_open() -- so when the client falls behind, the
+ * SLOT credit is withheld too, and the producer stalls on a fact about
+ * the network that has nothing to do with whether its pages are free.
+ * That is the cross-layer stall FR-FLOW-1 clause 1 forbids, and it is
+ * the defect BACKLOG #79 measured.
+ *
+ * Wire bound that follows, by induction on capture admission: a capture
+ * is admitted only at ids at most XRDP_GFX_CAPTURE_SLOTS above the
+ * credit (that is xorgxrdp's own budget), frame_id_client never
+ * decreases, and frames reach the transport in id order. So at the
+ * instant any frame is handed to the transport,
+ *
+ *     frame_id - frame_id_client <= C + XRDP_GFX_CAPTURE_SLOTS * M
+ *
+ * with M the monitor count (the budget is per monitor). Every frame
+ * that exists is therefore already inside the window by the time it
+ * reaches egress -- which is why there is no gate at egress and nothing
+ * anywhere in the pipeline ever holds a completed frame.
+ *
+ * @param frame_id_consumed contiguous frontier of absorbed input
+ * @param frame_id_server   last frame id handed to the transport
+ * @param frame_id_client   last frame id the client acknowledged
+ * @param wire_window       C, gfx.toml [avc444_ffmpeg] wire_window
+ * @return the frame id the producer may be told about now
+ */
+static inline int
+xrdp_gfx_credit_frontier(int frame_id_consumed, int frame_id_server,
+                         int frame_id_client, int wire_window)
+{
+    int credit;
+
+    credit = frame_id_consumed;
+    if (credit > frame_id_server + 1)
+    {
+        credit = frame_id_server + 1;
+    }
+    if (credit > frame_id_client + wire_window)
+    {
+        credit = frame_id_client + wire_window;
+    }
+    return credit;
+}
+
+/**
+ * BACKLOG #80 -- the ordinary, region-disposing ack's target.
+ *
+ * That ack says "every region up to N is disposed of; forget the pixels
+ * you were holding for it". It is NOT flagged SLOT_ONLY, so on the
+ * producer it moves the slot frontier as well
+ * (xup_ack_frontier_apply()) -- which makes it a second admission token
+ * and means it must obey the same wire window, or the window would be
+ * enforced on one ack and bypassed on the other.
+ *
+ * Clamping it is safe for the producer's region bookkeeping: xorgxrdp
+ * sizes cap_sent at XUP_CAP_SENT_SLOTS = capture slots + 1 per monitor,
+ * and min(frame_id_server, frame_id_client + C) never lags the credit
+ * frontier by more than one id, so the held-region count stays inside
+ * that ring. Delaying it costs held pixels in the producer, never lost
+ * ones.
+ *
+ * @param frame_id_server last frame id handed to the transport
+ * @param frame_id_client last frame id the client acknowledged
+ * @param wire_window     C, gfx.toml [avc444_ffmpeg] wire_window
+ * @return the frame id the region-disposing ack may name now
+ */
+static inline int
+xrdp_gfx_region_ack_target(int frame_id_server, int frame_id_client,
+                           int wire_window)
+{
+    if (frame_id_server > frame_id_client + wire_window)
+    {
+        return frame_id_client + wire_window;
+    }
+    return frame_id_server;
+}
+
+/**
+ * BACKLOG #80 -- everything xrdp knows when it decides what to tell the
+ * producer. Grouped into one struct so the decision below can be a PURE
+ * function of it and driven from CI, rather than a decision buried in a
+ * method that needs a live session to reach.
+ */
+struct xrdp_gfx_ack_state
+{
+    int frame_id_consumed;    /* children have drained input up to here */
+    int frame_id_server;      /* handed to the transport up to here     */
+    int frame_id_client;      /* client has acknowledged up to here     */
+    int wire_window;          /* C, gfx.toml wire_window                */
+    int frame_id_region_sent; /* highest region-disposing ack sent      */
+    int frame_id_server_sent; /* highest ack of any kind sent           */
+};
+
+/**
+ * BACKLOG #80 -- which acks to send now. -1 means "send none".
+ */
+struct xrdp_gfx_ack_plan
+{
+    int region; /* value for the region-disposing ack (flags 0)   */
+    int slot;   /* value for the SLOT_ONLY ack                    */
+};
+
+/**
+ * BACKLOG #80 / PRD FR-FLOW-1 -- the whole emission decision, pure.
+ *
+ * This is the ONLY place that decides whether the producer is told
+ * anything, and it has no branch that can decide to tell it nothing
+ * while the frontier has advanced. That property is what FR-FLOW-1
+ * clause 1 asks for and what BACKLOG #79 measured the absence of, so it
+ * is asserted directly in CI (tests/xrdp/test_avc444_credit_frontier.c)
+ * over an exhaustive enumeration of event interleavings.
+ *
+ * Each ack is sent only when its own frontier has advanced -- resending
+ * a value the producer already has is harmless (the producer applies
+ * acks with max()) but it is wire traffic for nothing.
+ *
+ * @param st   current state
+ * @param plan out; region/slot values, -1 for "do not send"
+ */
+static inline void
+xrdp_gfx_plan_acks(const struct xrdp_gfx_ack_state *st,
+                   struct xrdp_gfx_ack_plan *plan)
+{
+    int region;
+    int credit;
+    int sent;
+
+    plan->region = -1;
+    plan->slot = -1;
+    region = xrdp_gfx_region_ack_target(st->frame_id_server,
+                                        st->frame_id_client,
+                                        st->wire_window);
+    credit = xrdp_gfx_credit_frontier(st->frame_id_consumed,
+                                      st->frame_id_server,
+                                      st->frame_id_client,
+                                      st->wire_window);
+    sent = st->frame_id_server_sent;
+    if (region > st->frame_id_region_sent)
+    {
+        plan->region = region;
+        if (region > sent)
+        {
+            sent = region;
+        }
+    }
+    if (credit > sent)
+    {
+        plan->slot = credit;
+    }
+}
+
 #define ENC_IS_BIT_SET(_flags, _bit) (((_flags) & (1 << (_bit))) != 0)
 #define ENC_SET_BIT(_flags, _bit) do { _flags |= (1 << (_bit)); } while (0)
 #define ENC_CLR_BIT(_flags, _bit) do { _flags &= ~(1 << (_bit)); } while (0)
@@ -254,6 +447,13 @@ struct xrdp_encoder
      * ahead of it. */
     int frame_id_region_sent;
     int eager_slot_ack;  /* gfx.toml eager_slot_ack, batch path only */
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C, the end-to-end wire
+     * window, in frames. USER configuration (gfx.toml [avc444_ffmpeg]
+     * wire_window) because its right value is a property of the
+     * deployment's round-trip time, which the server cannot know. Read
+     * only on the eager_slot_ack path -- the legacy path keeps
+     * frames_in_flight and its behaviour is unchanged. */
+    int wire_window;
     /* BACKLOG #70B / PRD FR-ACK-2: the EGFX assembly pass on its own
      * permanent thread. emit_thread is the armed knob (batch path
      * only); the rest is the depth-1 handoff. emit_outstanding is

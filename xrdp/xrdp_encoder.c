@@ -261,6 +261,20 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_fault_strip_mmco = mm->avc444_fault_strip_mmco;
         self->avc444_aux_ltr_chain = mm->avc444_aux_ltr_chain;
         self->eager_slot_ack = mm->avc444_eager_slot_ack;
+        self->wire_window = mm->avc444_wire_window;
+        /* BACKLOG #80: a window of zero admits no capture at all once
+         * one frame is outstanding, i.e. a session that never draws
+         * again. tconfig refuses such a value, so reaching here with one
+         * means the encoder was built before the config was read; say so
+         * and use the default rather than wedge the session. */
+        if (self->wire_window < XRDP_GFX_WIRE_WINDOW_MIN)
+        {
+            LOG(LOG_LEVEL_WARNING, "xrdp_encoder_create: wire_window %d "
+                "is below the minimum %d; using %d",
+                self->wire_window, XRDP_GFX_WIRE_WINDOW_MIN,
+                XRDP_GFX_WIRE_WINDOW_DEFAULT);
+            self->wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
+        }
         self->avc444_ltr_rekey_frame_num = mm->avc444_ltr_rekey_frame_num;
         self->avc444_intra_refresh_frames =
             mm->avc444_intra_refresh_frames;

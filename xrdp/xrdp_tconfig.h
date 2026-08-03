@@ -33,6 +33,17 @@
 #define NUM_CONNECTION_TYPES 7
 #define GFX_CONF XRDP_CFG_PATH "/gfx.toml"
 
+/* BACKLOG #80 / PRD FR-FLOW-1 clause 4: bounds and placeholder default
+ * for [avc444_ffmpeg] wire_window (C). See the field's comment below.
+ * The MIN is 1 because C = 0 admits no capture at all once the first
+ * frame is outstanding -- a session that never draws again -- and the
+ * MAX exists only so a typo cannot ask for an unbounded wire; a value
+ * outside the range is REFUSED with a log line, never silently
+ * clamped. */
+#define XRDP_GFX_WIRE_WINDOW_DEFAULT 2
+#define XRDP_GFX_WIRE_WINDOW_MIN 1
+#define XRDP_GFX_WIRE_WINDOW_MAX 64
+
 /* nc stands for new config */
 struct xrdp_tconfig_gfx_x264_param
 {
@@ -195,6 +206,26 @@ struct xrdp_tconfig_gfx
      * thread, joined after submit(N+1) and before collect(N+1).
      * Requires aux_ltr_chain (the batch path). Default off. */
     int avc444_ffmpeg_emit_thread;
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C, the end-to-end window on
+     * how far the client may fall behind before xrdp stops admitting
+     * captures. In FRAMES. The number a deployment wants is set by its
+     * round-trip time -- a link that takes longer to acknowledge a frame
+     * than to display one needs a larger C or the frame rate is capped
+     * at C/RTT -- and the server cannot measure that for the user, which
+     * is why the PRD requires the knob to EXIST and refuses to fix its
+     * value.
+     *
+     * Meaning, stated once and only once: at the instant a frame is
+     * handed to the transport, at most C + 2 * monitors frames are
+     * unacknowledged by the client (the 2 is xorgxrdp's per-monitor
+     * capture-slot budget, which the frame rides above the credit).
+     *
+     * Read only when eager_slot_ack is on. Default XRDP_GFX_WIRE_WINDOW
+     * = 2, which is a PLACEHOLDER matching the legacy
+     * frames_in_flight -- BACKLOG #81's RTT sweep is what chooses the
+     * shipped default, and until it has run no measured number exists
+     * to put here. */
+    int avc444_ffmpeg_wire_window;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

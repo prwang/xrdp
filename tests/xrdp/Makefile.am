@@ -41,6 +41,8 @@ EXTRA_DIST = \
   gfx/gfx_avc444_intra_refresh_bad.toml \
   gfx/gfx_avc444_rekey_nochurn.toml \
   gfx/gfx_avc444_rekey_churn.toml \
+  gfx/gfx_avc444_wire_window.toml \
+  gfx/gfx_avc444_wire_window_bad.toml \
   gfx/fake_encoder_hang.sh \
   avc444/fixture_4frame.nut \
   avc444/PROVENANCE.md \
@@ -69,6 +71,7 @@ test_xrdp_SOURCES = \
     test_avc444_ffmpeg.c \
     test_avc444_multimon.c \
     test_avc444_emit_split.c \
+    test_avc444_credit_frontier.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \

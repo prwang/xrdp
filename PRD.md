@@ -1006,6 +1006,40 @@ reviewed against.
    (restating amendment clause 2). The egress queue's bound follows
    from 3: ≤ C + 2 frames on `wait_s`.
 
+**IMPLEMENTED 2026-08-03 (BACKLOG #80, behind `eager_slot_ack`).**
+Where each clause now lives, so a reviewer can check the code against
+the requirement rather than against a description of it:
+
+| clause | code | test |
+|---|---|---|
+| 3, the credit itself | `xrdp_gfx_credit_frontier()`, `xrdp/xrdp_encoder.h` | `test_credit_frontier_each_term_binds` |
+| 3, emitted unconditionally | `xrdp_gfx_plan_acks()` — the whole decision, pure, no branch that can emit nothing while the frontier advanced; called from `xrdp_mm_emit_credit_frontier()`, `xrdp/xrdp_mm.c` | `test_planner_never_withholds_an_earned_credit`, and INV-LIVE in `test_joint_machine_enumeration` |
+| 2, one decision point | the region-disposing ack is clamped by the same window (`xrdp_gfx_region_ack_target()`), because it is not `SLOT_ONLY` and therefore also moves the producer's slot frontier | `test_region_ack_obeys_the_same_window` |
+| 4, C is user config | `gfx.toml [avc444_ffmpeg] wire_window`, range 1–64, out-of-range REFUSED; documented in `gfx.toml(5)` | `test_tconfig_gfx_avc444_wire_window{,_out_of_range_refused}` |
+| the wire bound | — | INV-WIRE in `test_joint_machine_enumeration`, over an exhaustive enumeration of the joint xrdp/xorgxrdp state space; asserted TIGHT (the bound is attained) so it is not a vacuous inequality |
+| 5, egress queue observable | `struct trans::wait_bytes`, an O(1) counter; surfaced per frame in the `egress` perf-trace field c, in KiB | live only — the counter is what makes the frozen-client leg of #80 step 4 readable |
+
+Two things the implementation states that the requirement did not, both
+recorded because quoting "≤ C + 2" without them would be wrong:
+
+* **The bound is per monitor.** xorgxrdp's capture budget is
+  `XUP_CAP_AVC444_SLOT_COUNT` per monitor, never a global pool, so the
+  bound is `C + 2·M` frame ids with M monitors.
+* **One ack is deliberately not clamped**: the `NOT_DISPLAYED`
+  region-return for a frame that produced no output (`xrdp_mm.c`, the
+  `!displayed` branch of the `enc_done` handler). That frame never
+  reached the transport, so it occupies no wire, and its pixels are
+  owed straight back to the producer under FR-ACK-1 Invariant III.
+  Releasing its slot does lift the admission ceiling by one frame, so
+  "≤ C + 2·M unacked at send" is a statement about frames that reached
+  the transport, and a run of discarded frames relaxes it transiently.
+
+**Shipped default C = 2 is a PLACEHOLDER, not a measured value**
+(`XRDP_GFX_WIRE_WINDOW_DEFAULT`). It matches the legacy
+`frames_in_flight` so short-RTT behaviour is preserved, and clause 4's
+"stated default, chosen with BACKLOG #81's RTT-harness data" is NOT yet
+satisfied — #81 has not run. Do not quote 2 as a recommendation.
+
 **The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
 
 `encode_single()` is already **submit-then-collect** internally (it pushes to the vmsplice iov queue, then blocks in `pump()`), so the call sites split cleanly — but **the split alone buys nothing unless `submit` transfers** (corrected 2026-07-28, refined 2026-07-29). `in_iov_push()` performs no I/O; it appends to an iov array, and `feed_vmsplice()` has exactly one caller, inside `pump()`. A split whose `submit_single()` is only the push half sends nothing to the aux child until `collect_aux()` pumps it, so "submit both, then collect both" stays serial. `submit_single()` must pump until `!in_iov_pending()` without waiting for output; with that, the two children — independent processes with independent fds — genuinely encode concurrently, and sequential writes already yield `2w + e` in place of `2(w + e)` (4K: `e` = 19.6 ms measured, `w` = a ~15 MB vmsplice ⇒ ~43 ms → ~24 ms). A **union-poll pump across all children** under one shared deadline is **REQUIRED, not an optional robustness upgrade** (decision 2026-07-29, BACKLOG #45 D2/D3 — the earlier "measure the simple form first and add the union poll only if the measurement demands it" wording left the design half-specified and is withdrawn). It is not needed to avoid deadlock (the parent is never blocked on the child it is not draining), but `F_SETPIPE_SZ` is applied only to the INPUT pipe (1 MB), leaving the output pipe at the 64 KB default — several times smaller than a 4K intra packet — so an undrained child stalls mid-write and erodes the overlap precisely when packets are largest. The target shape is `n = 4`: main₁, aux₁, main₂, aux₂ armed in ONE `pump_set` call from the ONE existing worker thread.

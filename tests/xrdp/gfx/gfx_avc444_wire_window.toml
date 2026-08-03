@@ -1,0 +1,10 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+eager_slot_ack = true
+# BACKLOG #80 / PRD FR-FLOW-1 clause 4: C, the end-to-end wire window,
+# in frames. In range, so it must be honoured verbatim.
+wire_window = 6

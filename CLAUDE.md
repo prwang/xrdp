@@ -34,6 +34,25 @@ All durable rules and "memory" for this project live here, in-tree and committed
   See README.md's "Directory Structure" for the complete, authoritative tree.
 - `BACKLOG.md`         — transparent, in-tree task backlog for in-flight work
 
+## The other half of the pipeline: xorgxrdp
+
+- **xorgxrdp lives at `/workUpdateXorgXrdp` on this box** (owner directive,
+  2026-08-03) — a separate git repository, not a submodule of `/work`. It is
+  the X server side: the Xorg driver that captures the screen (`module/`,
+  `xrdpdev/`, `xrdpmouse/`, `xrdpkeyb/`) and the producer half of every
+  flow-control mechanism xrdp's `xup/` module talks to.
+- **It carries the SAME BRANCH NAME as `/work` and stays in sync with it,
+  unless a turn says otherwise.** The two repositories are one change: the
+  xup wire contract in `common/xup_client_info.h` is duplicated verbatim on
+  both sides, so a branch that exists on one and not the other is a pair of
+  builds that disagree about the protocol. Check `git -C /workUpdateXorgXrdp
+  rev-parse --abbrev-ref HEAD` before doing pipeline work.
+- Read it whenever a question is about what the PRODUCER does — capture
+  admission (`rdpClientConMonitorHasCapacity`), the ack frontiers
+  (`rect_id_ack` for slots, `rect_id_ack_shown` for regions), damage
+  coalescing into `dirtyRegion`. Answering those from xrdp's side alone is
+  guessing.
+
 ## Build & test
 
 - Submodules: `librfxcodec` and `libpainter` are git submodules — run

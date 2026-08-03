@@ -106,6 +106,21 @@ struct trans
     char *listen_filename;
     tis_term is_term; /* used to test for exit */
     struct stream *wait_s;
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 5: how many bytes are sitting
+     * on the wait_s list right now, i.e. written by xrdp and not yet
+     * accepted by the kernel socket. Maintained as an O(1) counter --
+     * incremented where a remainder is appended, decremented by what
+     * each send drains -- because the only other way to know is to walk
+     * the list, and this number is read once per frame on the egress
+     * path (coding rule 5: nothing per-frame may cost a walk).
+     *
+     * It exists to make the egress queue's bound OBSERVABLE. wait_s is
+     * a malloc'd singly-linked list with no length or byte limit, and
+     * the source-info throttle does not apply to it on the GFX path, so
+     * "the queue is bounded" was a claim with no instrument behind it.
+     * long long, not int: the failure this measures is unbounded growth
+     * at ~3.4 MB per 4K AVC444 frame, which passes 2 GB in seconds. */
+    long long wait_bytes;
     int no_stream_init_on_data_in;
     int extra_flags; /* user defined */
     void *extra_data; /* user defined */
