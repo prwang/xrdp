@@ -81,3 +81,6 @@ vm
 PR-demo/mac_bisect_matrix/captures/**/*.bin
 PR-demo/mac_bisect_matrix/captures/**/*.dump
 PR-demo/mac_bisect_matrix/captures/**/oracle/
+
+# turn pre-flight draft (CLAUDE.md "Turn pre-flight") — scratch, never committed
+.turn_draft.md

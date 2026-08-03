@@ -414,7 +414,7 @@ Run all five, every time, before presenting:
    changed, say so before quoting the number, and do not compare it to the
    old series.
 
-### Turn pre-flight: re-read the draft before sending it (owner directive, 2026-08-02)
+### Turn pre-flight: re-read the draft before sending it (owner directive, 2026-08-02; the file and the edit pass added 2026-08-03)
 
 **Never end a turn with a message you have not checked. Dump the
 draft, run it against the gates below, and iterate until it passes —
@@ -423,7 +423,61 @@ be corrected in the next turn costs the owner a full round trip, and
 this project has now spent several of them on answers that were right
 in substance and unusable as written.
 
-Three checks, every turn, on the actual text about to be sent:
+#### The file, and the mechanics (owner directive, 2026-08-03)
+
+**The draft goes in `/work/.turn_draft.md`.** One file, at the repo
+root, overwritten every turn, in `.gitignore` — so the owner can open
+the same path at any time and see exactly what the last turn checked,
+and so "dump the draft" names a real artifact instead of an intention.
+
+The procedure is mechanical and has four steps. Do all four:
+
+1. **Write** the complete message — the exact text about to be sent,
+   nothing elided — to `/work/.turn_draft.md` with the Write tool.
+2. **Read it back** from that file with the Read tool. Not from memory
+   of having written it. This is the whole point: the gates below are
+   applied to text you are *reading*, in the order the owner will read
+   it, which is the only way the density and the ordering problems show
+   up at all.
+3. **Edit it in the file** until it passes. Editing means cutting, not
+   annotating — see the edit pass below.
+4. **Send the file's final content**, and only that.
+
+*Why this was written.* The 2026-08-02 version of this rule said "dump
+the draft" and named no destination, so there was nothing to dump into;
+the gates got run from memory, the first draft went out unedited, and
+the owner's reply was "I can't read your end-turn conclusion unedited."
+A procedure with no artifact is not a procedure.
+
+#### The edit pass (owner directive, 2026-08-03)
+
+The three gates below check whether the message is TRUE. Nothing
+checked whether it was READABLE, and that is the failure that keeps
+recurring. So, on the text in the file, in this order:
+
+* **Cut it. A draft that is not shorter after the edit pass was not
+  edited.** Every number that is not load-bearing for a decision the
+  owner has to make comes out. Supporting detail lives in the capture
+  README and `docs/experiments/` — that is what those files are for,
+  and a reader who wants the fourth decimal can open them.
+* **At most ONE table**, and only when the comparison is the point.
+  Two tables in one message means the second one is elaboration and
+  belongs in the record.
+* **No metric name used as a noun without its plain meaning attached
+  the first time.** Not "withheld p90 fell" but "the wait between the
+  encoder finishing with a frame's pixels and the producer being told
+  it may capture again — p90 fell". If that expansion is too clumsy to
+  write, the metric is too obscure to lead with.
+* **No internal label in the owner-facing text.** `P4`, `gate 2b`,
+  `INV-WIRE`, `x018` are indices into this repository's paperwork. Say
+  what the check was, then cite the label in parentheses if it is
+  needed for lookup.
+* **The opening must stand alone.** The first few lines say what the
+  owner must decide or act on, in plain sentences, and are readable
+  with everything below them deleted. Everything after is elaboration
+  the owner may skip.
+
+Three checks, every turn, on the actual text in the file:
 
 1. **Fact gate.** Every claim traceable to a file:line, a captured
    number, or an explicit "not measured / inferred". Anything asserted
@@ -460,7 +514,10 @@ Then two more that are about the shape of the answer:
   answer.
 
 This rule is not a licence to pad turns with self-review commentary.
-The checking is silent; only the corrected message is sent.
+The checking is silent and stays in `/work/.turn_draft.md`; only the
+corrected message is sent. Never narrate the gates to the owner, never
+report that they passed, and never leave gate annotations in the text
+that ships.
 
 ### Escalation ladder (owner directive, 2026-07-31)
 
