@@ -681,9 +681,43 @@ holds, which is a different risk surface (a bug here stalls the display
 rather than the pipeline), and PRD FR-ACK-3 amendment clause 1 requires
 both halves — one item per behaviour change.
 
-**Blocked on:** #79 landing (its H is the natural bound for (b)); the
-FR-ACK-3 amendment is already written and needs no further sign-off. Do
-not start (b) without an owner decision on hold-vs-drop.
+**Blocked on:** an owner decision on hold-vs-drop in (b). The FR-ACK-3
+amendment is already written and needs no further sign-off.
+
+**SEQUENCING QUESTION — this item may belong BEFORE #79, not after
+(raised 2026-08-03, owner decision needed).** #80 was filed as "blocked
+on #79 landing". Tracing the gate's provenance and drawing the
+pipeline's backpressure map suggests the opposite order, and possibly a
+simpler #79.
+
+* The rejection of #79's plain ungate was **conditional on egress being
+  ungated**. With egress gated (this item), a client that falls behind
+  stops `frame_id_server` advancing; the **existing** cap
+  `min(frame_id_consumed, frame_id_server + 1)` then stops the slot
+  credit within one frame, both capture slots fill, and xorgxrdp
+  coalesces and drops (PRD FR-CAPTURE-8 clause 4). That is a bound —
+  and it is the *near-end* drop firing because the pipeline is
+  genuinely full, which is what the drop guard was always meant to
+  mean.
+* If that holds, **#79 needs no horizon H at all**: emit the slot
+  credit at absorb with only the existing cap, and the client bound
+  lives entirely here. One less constant, one less thing pinned by CI,
+  and each signal on its own layer — the slot credit consulting only
+  its immediate neighbour (are the children done with the pixels), the
+  client window consulting only the client.
+* Cost of this order: (b)'s hold-vs-drop question must be answered
+  first, and holding a completed frame at egress is new machinery in
+  the main thread (the assembler produces one buffer per frame; it
+  would have to be held rather than written). On a LAN the hold is
+  ~0.4 ms — ack round trip 7.6 ms against a 7.9 ms slot-free deadline,
+  both measured — so the "queue in front of the display" FR-ACK-3
+  objects to is negligible there; on a WAN it is bounded by the same
+  cap.
+* **Not acted on.** #79's CI and validation gate are written against
+  the horizon form. Reordering means rewriting both, and the decision
+  is the owner's. Evidence and derivation:
+  `docs/experiments/79-layer1-...md`, section "Where the gate came
+  from, and the mechanism mismatch it encodes".
 
 ## #77 — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
 

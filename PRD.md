@@ -840,6 +840,26 @@ that stall is the top open item (BACKLOG #76).** Until it is found, the
 `capture ‖ encode` row above is qualified: what it asserts is measured at
 fif = 2, and fif = 2 is not the configuration this requirement targets.
 
+**FR-ACK-3 PROVENANCE (traced 2026-08-03, and it changes what the clause
+is claiming).** The window is not this project's design. It arrives with
+`fde04e80` (2017-02-11, Jay Sorg, "rfx fixes for large tile sets,
+performance change, **Xorg will start next frame earlier**"), whose
+parameter was `client_info->max_unacknowledged_frame_count` — the value
+the CLIENT advertises in the Frame Acknowledge capability set
+(`libxrdp/xrdp_caps.c:743-749`). So the original intent WAS bounding
+end-to-end frames in flight, at the client's own stated limit, and the
+window was the safety condition attached to a performance change rather
+than a flow-control mechanism anyone designed.
+**That tether is cut in the GFX path** (`xrdp/xrdp_encoder.c:427-476`):
+when `client_info->gfx` is set, `frames_in_flight` is
+`DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT` = 2 plus an environment override,
+and the client's advertised value is consulted only in the legacy
+`else` branch. In GFX the number therefore has **no protocol meaning**:
+not the client's limit, not the pipeline's depth, and nothing re-derived
+what it should bound when the tether was cut. Every fif = 1 vs fif = 2
+result in BACKLOG #76/#78/#79 is a result about that untethered
+constant.
+
 **FR-ACK-3 AMENDMENT — the bound must count the WIRE, not only the
 pipeline (owner directive, 2026-08-02).** The clause above says the
 window "exists to bound what the *client* has outstanding". Read in code

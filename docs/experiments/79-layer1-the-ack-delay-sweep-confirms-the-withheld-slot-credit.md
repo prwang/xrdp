@@ -688,3 +688,171 @@ Under H = 3 every gate column in that trace reads open, the two CREDIT
 lines that are missing get emitted 27–41 µs after their absorb (the
 measured latency when the gate is open), and both captures start
 immediately. Under H = 2, likewise — the trajectory never reaches 2.
+
+## Where the gate came from, and the mechanism mismatch it encodes (2026-08-03)
+
+Owner asked who designed the gate, when, what for, and whether the
+lossless/lossy layering is right. Answered from `git log` and the source,
+not from this project's own summaries of it.
+
+### Provenance
+
+* **2015-03-28, `33167a7c`, Jay Sorg — "add frame acks and h264 codec
+  mode basics".** The frame-ack machinery arrives.
+* **2016-12-29, `1f930f25`, speidy — "can handle zero unacked frames
+  now ... Parallels Client always want zero unacked frames on the
+  wire".** Note what the window is being made to do here: satisfy a
+  *client's* stated requirement.
+* **2017-02-11, `fde04e80`, Jay Sorg — "rfx fixes for large tile sets,
+  performance change, Xorg will start next frame earlier".** This is the
+  commit that put a window test around the producer ack:
+
+```c
+ex = self->wm->client_info->max_unacknowledged_frame_count;
+if (self->encoder->frame_id_client + ex >= self->encoder->frame_id_server)
+{
+    ... self->mod->mod_frame_ack(self->mod, 0, frame_id_server);
+}
+```
+
+Two things follow directly from that source line, and they answer "what
+for":
+
+1. **The window's parameter was the CLIENT's own advertised limit.**
+   `max_unacknowledged_frame_count` is parsed out of the Frame
+   Acknowledge capability set the client sends
+   (`libxrdp/xrdp_caps.c:743-749`). The gate existed to honour a
+   protocol obligation — do not leave more frames unacknowledged than
+   the client said it can hold. **Yes, the goal was bounding end-to-end
+   frames in flight**, and the bound was the client's number.
+2. **The gate was the safety condition on a performance change, not the
+   point of it.** The commit subject is "Xorg will start next frame
+   earlier": it *added* an earlier producer ack, and attached the window
+   as the condition under which the early ack was allowed. Nobody
+   designed a producer flow-control mechanism here; a protocol check was
+   placed on the producer's admission path because that is where the new
+   ack happened to be.
+
+### The tether was cut for GFX, and that is not recorded anywhere
+
+`xrdp/xrdp_encoder.c:427-476`:
+
+```c
+if (client_info->gfx)
+{
+    self->frames_in_flight = DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT;   /* 2 */
+    ... XRDP_GFX_FRAMES_IN_FLIGHT env override ...
+}
+else
+{
+    self->frames_in_flight = client_info->max_unacknowledged_frame_count;
+}
+```
+
+**In the GFX path — the only path this project runs — the client's
+advertised value is never consulted.** `frames_in_flight` is a hardcoded
+2 with an environment override. So the number that gates the producer
+today has no protocol meaning: it is not the client's limit, it is not
+derived from the pipeline's depth, and nothing re-derived what it ought
+to bound when the tether was cut. Every conclusion in #76/#78/#79 about
+"fif = 1 vs fif = 2" is a conclusion about that untethered constant.
+
+### How `frames_in_flight` is actually enforced: one site, and not on the wire
+
+Exactly one enforcement site exists: `xrdp_mm.c:1697`, around the two
+producer acks. The only other mention, `xrdp_mm.c:4234`, is a field in a
+`PERF_TRACE6("send", ...)` record. **`fif` is never consulted before a
+frame is sent.**
+
+So `frames_in_flight` does not bound frames in flight. It gates *telling
+the producer it may capture*, and the client-facing bound is emergent:
+starve the producer long enough and it stops making frames. Measured
+consequence — at fif = 1, which forbids *any* unacknowledged frame, two
+thirds of sends went out with 1 or 2 unacknowledged.
+
+### The layer map, and where backpressure actually exists
+
+| edge | queue depth | backpressure signal |
+|---|---|---|
+| xorgxrdp capture → xup | 2 slots | **the credit ack — the only one** |
+| xup → encoder fifo | measured **1** at all 3088 enqueues (#61e) | none needed: never queues |
+| fifo → ffmpeg children | provably 1 (`pump_pairs` waits for the set it just submitted) | none needed |
+| children → LTR rewrite → assembler | 1 | none |
+| assembler → transport | **unbounded** (`trans wait_s`, `common/trans.c:644-676`) | **none** |
+| transport → client | network | none |
+
+**There is exactly one backpressure edge in the entire pipeline, and it
+is cross-layer**: it connects the farthest consumer (the remote client)
+to the nearest producer (capture), skipping every stage between. The
+intermediate stages need no backpressure because they are depth-1 by
+construction — except the last one, which has none and is unbounded.
+
+### The mismatch, stated precisely
+
+The credit signal carries two facts on one wire:
+
+* **"a capture slot is free"** — a *lossless, immediate, nearest-
+  neighbour* handshake. Its only correct input is whether the encoder
+  children have finished reading those pixels. Saying so costs nothing
+  and loses nothing.
+* **"the client may receive another frame"** — a *lossy, end-to-end*
+  admission control. Its correct input is the client's ack position, and
+  its correct response when it binds is to **drop** (coalesce damage),
+  not to stall.
+
+Today the second is implemented by suppressing the first. The
+consequence is visible in the trace: **at the withheld instants the slot
+IS free.** The gate reports "no capacity" to the producer at a moment
+when the pipeline demonstrably has capacity, because the signal is being
+used to express a fact about the network instead.
+
+### Is the drop guard "farthest end gates, nearest end drops"? The topology is right; the trigger is wrong
+
+The drop mechanism exists and is in the correct place. PRD FR-CAPTURE-8
+clause 4: with both slots outstanding, damage accumulates only in the
+dirty region (union + extents collapse) — "frames are dropped before
+they exist, the only legal drop point, since the single H.264 reference
+chain forbids dropping later". The region accounting around it is
+careful: `XUP_ACK_FLAGS_SLOT_ONLY` frees the slot while the region stays
+held, and `XUP_ACK_FLAGS_NOT_DISPLAYED` returns the region to the dirty
+region (`common/xup_client_info.h:30-70`, Invariant III).
+
+So the shape the owner describes is what the design intends. What is
+wrong is what *fires* it. The near-end drop is supposed to mean "the
+pipeline is full". Today it fires when an ack has not come back, and at
+that instant the pipeline is not full. The stall's duration is therefore
+set by the round-trip time rather than by consumer readiness, and both
+producer and consumer sit idle inside it — frame 790's egress landed
+36.7 ms after its slot was free, against a 16.9 ms period when credit is
+prompt.
+
+### What this implies for the fix — and the planned sequencing may be backwards
+
+Put each signal on its own layer:
+
+* **Slot credit (nearest neighbour):** emit at absorb, unconditionally.
+  The only fact it should consult is whether the children are done with
+  the pixels.
+* **Client window (farthest end):** enforce at **egress** — do not
+  *send* past the window. That is #80.
+
+The interesting consequence is what happens when they are combined. With
+egress gated, a client that falls behind stops `frame_id_server`
+advancing; the **existing** cap `min(frame_id_consumed,
+frame_id_server + 1)` then stops the slot credit within one frame; both
+slots fill; and xorgxrdp coalesces and drops. **The near-end drop now
+fires because the pipeline is genuinely full — which is what the drop
+guard was always meant to mean — and no new constant is required.**
+
+So #80 does not merely add a bound; it may make **H unnecessary**. And
+the rejection of the plain ungate was conditional on egress being
+ungated: with #80 in place, "ungate the slot ack and let the existing
+cap bound it" is bounded, and is simpler than a horizon.
+
+**This reverses the sequencing currently in BACKLOG** (#79 first, #80
+"blocked on #79 landing"). It is filed as an open design question for
+the owner rather than acted on, because #80's hold-vs-drop decision is
+unresolved and holding a completed frame at egress is new machinery in
+the main thread. On a LAN the hold is ~0.4 ms (7.6 ms round trip against
+a 7.9 ms slot-free deadline), so the cost is negligible there; on a WAN
+it is bounded by the same cap.
