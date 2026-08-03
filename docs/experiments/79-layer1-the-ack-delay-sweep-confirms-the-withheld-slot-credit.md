@@ -856,3 +856,84 @@ unresolved and holding a completed frame at egress is new machinery in
 the main thread. On a LAN the hold is ~0.4 ms (7.6 ms round trip against
 a 7.9 ms slot-free deadline), so the cost is negligible there; on a WAN
 it is bounded by the same cap.
+
+## The change surface under the two axioms (2026-08-03)
+
+Owner stated the design as axioms and asked what it costs to conform:
+*backpressure is nearest-neighbour; drop is end-to-end* — and observed
+that under full enforcement #80's hold-vs-drop question should not
+exist, because a frame that cannot be sent should never be captured.
+
+**The observation is correct, and provable.** Admit capture k only
+while `k ≤ frame_id_client + C_eff`. The client frontier only rises and
+frames are sent in id order, so when k reaches egress,
+`k − client ≤ C_eff` — every frame that exists is inside the window at
+send time. An egress gate can never fire; nothing intermediate holds.
+The precision the induction demands: **count the window from the
+CAPTURE frontier, not the egress frontier.** #79's horizon
+(`client + H > server`) counts from egress, which leaves pipeline
+inventory able to arrive at egress after the window moved — the exact
+frames an egress gate would have had to hold. The owner's axiom forces
+the correct frontier choice.
+
+**The drop needs zero new code.** No credit → both slots stay busy →
+xorgxrdp coalesces damage (FR-CAPTURE-8 clause 4: dropped before they
+exist, the only legal drop point given the single H.264 reference
+chain). A slow client gets fewer, fresher frames instead of stale
+queued ones. Little's law caveat, stated so the WAN gate is not
+over-promised: nothing raises frame rate above window/RTT; drop buys
+freshness and bounded memory, not throughput.
+
+### The mechanism: one arithmetic change at one site
+
+    credit = min(frame_id_consumed,      /* slot: children done with pixels */
+                 frame_id_server + 1,    /* pipeline-inventory cap          */
+                 frame_id_client + C)    /* end-to-end wire window          */
+
+emitted unconditionally whenever the frontier advances. Each term
+consults exactly its own layer. The conflation dies not because the two
+facts travel on different wires — a credit frontier is allowed to be a
+min of constraints — but because the wire constraint no longer
+SUPPRESSES the slot constraint's emission: when `client + C` binds the
+producer is dropping, not stalled, and the 0.3 ms photo finish is gone
+because prompt emission no longer depends on winning an ack race.
+
+Capture rides at most 2 slots above the credit, so the resulting hard
+wire bound is **C + 2 unacked frames at send**. C = 2 keeps the wedge's
+f789 credit immediate (replayed from the trace); the exact value is
+pinned by exhaustive enumeration of the pure frontier function, not
+tuned against a run.
+
+### Surface, file by file
+
+| where | change | size |
+|---|---|---|
+| `xrdp/xrdp_mm.c` ~1690–1745 | frontier arithmetic replaces the `xrdp_gfx_ack_window_open()` emission test; both producer acks use it | ~30 lines |
+| `xrdp/xrdp_encoder.h` | frontier as a pure helper (replacing/absorbing `xrdp_gfx_ack_window_open`, which keeps its one remaining semantic for the legacy path) | ~15 lines |
+| `xrdp/xrdp_encoder.c` | C as a named constant; `frames_in_flight` keeps its legacy meaning in the non-GFX branch only | small |
+| `tests/xrdp` | pure-function enumeration of the frontier over all {cliack, egress, absorb} interleavings (the #79 step-3 plan, retargeted); D=40 wedge replay as golden vector | the existing planned CI, re-aimed |
+| `common/trans.c` | O(1) pending-bytes counter (telemetry only — the bound itself is now upstream) | small |
+| xorgxrdp | **none** — wire semantics of the credit are unchanged; only the arithmetic producing the frontier moves. The #79 blocking pre-step (read the SLOT_ONLY handler) stands | 0 |
+| PRD | FR-ACK-3 amendment clause 1 needs its own amendment: "the window belongs on egress" is superseded — with capture-frontier admission an egress gate is dead code by induction | doc |
+| config | everything behind `eager_slot_ack` (default false): rule-2 backward compatibility, and the legacy/non-GFX path untouched | 0 new knobs |
+
+What does NOT change: `min(consumed, server+1)` (it is the pipeline
+term, kept verbatim); egress (no gate — the induction makes it
+unreachable); the drop machinery in xorgxrdp (already correct); the
+EGFX suspend path (`gfx_ack_off` snaps client to server, which
+self-disables the C term for suspend clients); cliack already
+re-invokes the emission function, so the frontier wakes on ack arrival
+with no new plumbing.
+
+### What this supersedes
+
+* #80's egress gate and its hold-vs-drop question: dissolved, not
+  decided. The rewritten #80 is the frontier change plus telemetry.
+* The #79 horizon-H form: superseded by the same change (H counted
+  from the wrong frontier). The validation-gate predictions must be
+  re-derived for drop semantics — notably the D = 40 leg: period stays
+  ~16.9 ms at ALL D (admission drops instead of stalling), with the
+  drop visible as coalesced damage per frame rather than a longer
+  period. `id_server − id_client` at send must never exceed C + 2.
+* The sequencing question (#80 before #79): moot — they are now one
+  change.

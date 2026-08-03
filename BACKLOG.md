@@ -684,8 +684,82 @@ both halves — one item per behaviour change.
 **Blocked on:** an owner decision on hold-vs-drop in (b). The FR-ACK-3
 amendment is already written and needs no further sign-off.
 
-**SEQUENCING QUESTION — this item may belong BEFORE #79, not after
-(raised 2026-08-03, owner decision needed).** #80 was filed as "blocked
+**SUPERSEDED 2026-08-03 (owner axioms) — the egress gate is the wrong
+fix and this item is REWRITTEN below.** The owner stated the two
+principles as axioms — *lossless backpressure stalls come only from the
+immediate next neighbour; the lossy end-to-end guard runs from the
+farthest end (client) to the nearest end (capture admission), and its
+response is drop-by-coalesce, never a hold* — and observed that under
+full enforcement there is no hold-vs-drop decision at egress at all: a
+frame that could not be sent should never have been captured, so
+nothing intermediate ever holds. That is correct, provable by
+induction, and it deletes scope (a)/(b) of the original filing:
+
+* **Induction (no egress hold is reachable).** Admit capture k only
+  while `k ≤ frame_id_client + C_eff` for a constant `C_eff`.
+  `frame_id_client` only rises, frames are sent in id order, so at the
+  instant k is sent, `k − client ≤ k − client_at_admission ≤ C_eff`.
+  Every frame that exists is inside the window when it reaches egress;
+  an egress gate would never fire; there is nothing to hold or drop
+  mid-pipeline. The one precision the induction demands: **the window
+  must be counted from the CAPTURE frontier, not the egress frontier**
+  — counting from `frame_id_server` (what #79's horizon H did) leaves
+  pipeline inventory that can arrive at egress after the window moved,
+  which is exactly what would need a hold.
+* **The drop path already exists and needs zero new code.** Admission
+  denied = no credit = both slots stay busy = xorgxrdp coalesces
+  damage into the dirty region (PRD FR-CAPTURE-8 clause 4, "frames are
+  dropped before they exist — the only legal drop point"). Content is
+  never delayed in a queue; the next admitted capture carries the
+  union, so a slow client gets fewer, *fresher* frames. (Little's law
+  note: on a WAN nothing raises frame rate above window/RTT — drop
+  keeps latency and staleness low, it does not buy throughput.)
+
+**The REWRITTEN item — source admission via the credit frontier
+(design proposed 2026-08-03, awaiting owner sign-off).**
+Replace the emission-time window test with a third term in the credit
+frontier itself, at the one existing site:
+
+    credit = min(frame_id_consumed,       /* slot fact: children done */
+                 frame_id_server + 1,     /* pipeline-inventory cap   */
+                 frame_id_client + C)     /* end-to-end wire window   */
+
+and emit unconditionally whenever the frontier advances. Each term now
+consults exactly its own layer; the stall signal (slots) is never
+suppressed by the wire signal — when `client + C` binds, the producer
+is not stalled, it is *dropping* (coalescing) by construction.
+* Wire bound that results: capture rides ≤ 2 slots above the credit,
+  so unacked-at-send ≤ **C + 2**. C is a server policy constant — EGFX
+  has NO client-advertised window (the `max_unacknowledged_frame_count`
+  that fde04e80 honoured is the legacy TS frame-ack capset, which is
+  why the GFX path hardcodes 2 — re-tethering to the client is not
+  possible in GFX), so C's meaning must be stated singularly: "max
+  frames unacked on the wire = C + 2". Wedge replay says C = 2 keeps
+  the credit for f789 immediate; C's exact value is pinned by the
+  step-3 exhaustive enumeration (the frontier is a pure function),
+  not tuned against a run.
+* Client pathologies already handled: EGFX SUSPEND snaps
+  `frame_id_client = frame_id_server` (`xrdp_mm.c:1854-1866`), and
+  cliack already re-invokes `xrdp_mm_update_module_frame_ack`
+  (`xrdp_mm.c:1867`), so the frontier wakes on ack arrival with no new
+  plumbing.
+* What remains of the original #80: only the **telemetry** — the O(1)
+  pending-bytes counter in `trans` (`egress` field c) stays required,
+  because `wait_s ≤ C + 2 frames` is now a claim CI can state but only
+  the counter can verify live; and the frozen-client leg verifies the
+  whole bound end to end.
+* Change surface is enumerated in
+  `docs/experiments/79-layer1-...md` §"The change surface under the
+  two axioms". xorgxrdp: **no change** — credit semantics on the wire
+  are unchanged, only the arithmetic producing the frontier moves.
+  Behaviour stays behind `eager_slot_ack` (coding rule 2: default-off
+  preserves today's behaviour bit for bit).
+
+The paragraphs below are the original egress-gate filing, kept for the
+record; its sequencing question is moot (there is no egress gate to
+sequence).
+
+**ORIGINAL FILING (superseded).** #80 was filed as "blocked
 on #79 landing". Tracing the gate's provenance and drawing the
 pipeline's backpressure map suggests the opposite order, and possibly a
 simpler #79.
