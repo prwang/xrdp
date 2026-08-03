@@ -1040,27 +1040,33 @@ recorded because quoting "≤ C + 2" without them would be wrong:
 "stated default, chosen with BACKLOG #81's RTT-harness data" is NOT yet
 satisfied. Do not quote 2 as a recommendation.
 
-**What C costs, measured 2026-08-03 (BACKLOG #80 step 4, capture
-`i80_wanpair_20260803_125816_s20`).** #81's netem harness landed and the
-frontier ran at 0.078 ms and 40.4 ms RTT, one monitor, C = 1. Two
-durable facts:
+**What C costs, measured 2026-08-03 (BACKLOG #80 step 4; LAN leg in
+`i80_wanpair_20260803_125816_s20`, corrected 40 ms leg in
+`i80_wan40_fixedlimit_20260803_221910_s20` — the first 40 ms leg was
+VOIDED: its netem carried an undeclared 73 MB/s bottleneck; see
+`docs/experiments/80-the-credit-frontier.md` §"Step 4, corrected").**
 
 * **A 4K AVC444 frame is 3 386 KiB on the wire** at 3840×2400
   textflood. The window is denominated in FRAMES, so **each unit of C
   buys up to ~3.3 MB of transport queue per monitor** — the FR-ACK-3
-  "queue in front of the display", in bytes. At 40 ms RTT the measured
-  queue behind egress was 4.9 MB mean (1.95 frames of a C + 2 = 3 frame
-  bound; 0.0 % of samples above it), and it showed up end to end: 4.9 MB
-  draining at 58 MB/s is 84 ms, and the server measured egress→client
-  ack at 122.9 ms against a 40.4 ms link.
+  "queue in front of the display", in bytes. At 40 ms RTT with C = 1
+  the measured standing queue was 6.7 MB mean.
 * **The wire bound holds live.** `id_server − id_client` at send never
-  exceeded 2 on either leg, against the C + 2 = 3 the enumeration in
+  exceeded 2 on any leg, against the C + 2 = 3 the enumeration in
   `tests/xrdp/test_avc444_credit_frontier.c` asserts.
+* **On a WAN at 4K the binding constraint is BYTES through one TCP
+  flow, not frames in the window.** A burst-then-wait flow never keeps
+  the pipe full, so Linux congestion-window validation pins the
+  congestion window far below the bandwidth-delay product (measured:
+  ~600 KB in a shape-replica probe; ~1.6 MB effective on the live leg),
+  and a 3.4 MB frame takes multiple RTTs to deliver — send-to-ack
+  203.7 ms on a 40.45 ms link, 11.5 fps at C = 1. Raising C deepens the
+  queue; it cannot buy frame rate past the TCP byte ceiling. **The
+  clause-4 C table must hold the TCP environment fixed and declared, or
+  it measures TCP, not C.**
 
-Choosing the default is therefore a trade between (C + 2·M)/RTT of frame
-rate and ~3.3·C MB per monitor of display latency at 4K. Two RTT points
-at one C are not enough to state it; the table clause 4 asks for is still
-owed.
+Two RTT points at one C are not enough for the clause-4 table; it is
+still owed, and it now has a prerequisite: a declared TCP environment.
 
 **The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
 

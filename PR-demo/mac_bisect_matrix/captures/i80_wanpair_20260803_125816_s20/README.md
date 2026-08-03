@@ -1,5 +1,22 @@
 # i80_wanpair_20260803_125816_s20 — the credit frontier, first live run
 
+**THE WAN LEG OF THIS CAPTURE IS VOID AND ITS FILES ARE DELETED
+(2026-08-03, instrument-on-path rule).** The harness left netem at the
+kernel-default `limit 1000` packets. netem holds every packet for the
+configured delay, so the limit is a bandwidth ceiling: 1000 packets x
+1464 B / 20 ms = 73 MB/s, with tail drops above it — measured 73.5 MB/s
+against 1614 MB/s unshaped, 64 drops. The leg therefore ran on "40 ms
+RTT plus an undeclared 73 MB/s bottleneck with a 1.5 MB buffer", and
+every number derived from it (period 58.6 ms, 16.8 fps, queue 4.9 MB,
+send-to-ack 122.9 ms) is a property of that bottleneck. Deleted, not
+superseded; git history keeps the bytes. The replacement run, on the
+fixed harness (`limit 25000`, 120 MB/s, zero drops, ceiling declared):
+`captures/i80_wan40_fixedlimit_20260803_221910_s20`.
+
+**The LAN leg is untouched by the defect** — no netem was applied to
+it — and everything below about leg_lan stands.
+
+
 BACKLOG #80 step 4, on the #81 netem harness. Two legs, 20 s each,
 sequential, the arm count the owner approved on 2026-08-03.
 
@@ -16,8 +33,8 @@ x014/x015/x017 — #80 needed no producer change). `eager_slot_ack = true`,
 oracle client on the host. Both arms certified at deploy
 (`certs/x018.cert`, `certs/x019.cert`, 7/7 asserts, 0 black frames).
 
-Reproduce: `./i80_wan_pair.sh 20`
-Analyse:   `./i80_wan_pair_analyze.py x018-lan=leg_lan x019-wan40=leg_wan \
+Reproduce: `./i80_wan_pair.sh 20` (now runs with the fixed netem limit)
+Analyse:   `./i80_wan_pair_analyze.py x018-lan=leg_lan \
              x017-direct=../i79_x017_ackdelay_20260802_s20/leg_direct`
 
 ## The head-to-head, LAN against LAN
@@ -45,12 +62,11 @@ build's cross-layer gate lived and the tail is what moved.
 
 * 3386 KiB on the wire per frame at 3840×2400 AVC444 — the "~3.4 MB per
   4K frame" #80's filing predicted, measured.
-* wan leg: 4.9 MB mean queued behind egress, drained at
-  278 × 3.49 MB / 16.6 s = 58 MB/s ⇒ **84 ms**. Measured
-  egress→client-ack is 122.9 ms against a 40.4 ms link. 40 + 84 = 124.
-* wan leg period model: capture k needs the client to have acked k−3, so
-  3P = L + ack latency. 3 × 58.6 = 175.8 against 43.7 + 122.9 = 166.6 —
-  closes within 6 %.
+* (two wan-leg closure checks stood here; VOIDED with the leg — see
+  the notice at the top. That they "closed" is itself the lesson: a
+  self-consistent set of numbers can still all be downstream of an
+  undeclared bottleneck. Internal consistency is necessary, never
+  sufficient.)
 * No derived interval came out negative on any leg (gate 2c).
 
 ## Uncontrolled variables, stated rather than assumed away
@@ -73,3 +89,15 @@ build's cross-layer gate lived and the tail is what moved.
   (157/157 ties), so the record cannot say which term had been holding.
   See the experiments file for the arithmetic that makes `client + C`
   the plausible candidate and for what would settle it.
+
+## Voided with the wan leg (moved here from the sections above so the
+## next reader does not re-quote them)
+
+* the 16.8 fps / 58.6 ms period at 40 ms
+* the 4.9 MB mean transport queue and the "84 ms drain" arithmetic
+* the 122.9 ms send-to-ack figure
+* the wan rows of the outstanding-frames histogram
+
+What survives from this capture: the whole LAN head-to-head, the
+3 386 KiB/frame wire size (measured on leg_lan's send records), and the
+wire-bound check on leg_lan.

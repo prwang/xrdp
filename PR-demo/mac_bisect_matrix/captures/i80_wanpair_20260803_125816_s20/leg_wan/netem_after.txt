@@ -1,7 +1,0 @@
-arm       x019
-pod ip    10.42.0.9
-pod pid   970441
-host veth veth2f62153b
-host qdisc  qdisc netem 8081: root refcnt 33 limit 1000 delay 20ms seed 1301035930807540109
-pod  qdisc  qdisc netem 8081: root refcnt 33 limit 1000 delay 20ms seed 13091888600929502963
-measured rtt 40.428 ms

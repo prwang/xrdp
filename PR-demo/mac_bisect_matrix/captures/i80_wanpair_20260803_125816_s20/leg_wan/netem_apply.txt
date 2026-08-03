@@ -1,3 +1,0 @@
-netem_rtt: x019 applied 40 ms RTT (20000 us each way, jitter 0 ms, loss 0 %)
-netem_rtt: requested 40 ms, measured 40.490 ms, tolerance 6.000 ms -> OK
-40.490

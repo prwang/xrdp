@@ -705,25 +705,42 @@ the third bullet's "if the safety leg is bad" now moot.
 > **1.49**; throughput 46.5 → **54.1 /s**. The wire bound
 > `id_server − id_client ≤ C + 2` held live on both legs.
 >
+> **CORRECTED SAME DAY — the first 40 ms leg was VOID (instrument on
+> the measured path) and its numbers are deleted.** The owner flagged
+> that the wan numbers did not make sense; investigating found netem at
+> its kernel-default `limit 1000` = an undeclared 73 MB/s bottleneck
+> with tail drops (measured 73.5 vs 1614 MB/s unshaped, 64 drops). Leg
+> deleted, harness fixed (`limit 25000`, environment declared, selftest
+> now asserts zero drops), leg re-run:
+> `i80_wan40_fixedlimit_20260803_221910_s20`. Corrected 40 ms numbers,
+> C = 1: **11.5 fps, period 86.7 ms, send-to-ack 203.7 ms on a 40.45 ms
+> link, queue 6.7 MB mean; wire bound held on every send.** The re-run
+> is SLOWER than the voided leg because the accidental bottleneck queue
+> had been keeping the pipe full; on the honest link, TCP's
+> congestion-window validation pins cwnd far below the BDP for xrdp's
+> burst-then-wait shape (~600 KB in a shape-replica probe), so **at 4K
+> the WAN constraint is BYTES through one TCP flow, not frames in the
+> window** — raising C deepens the queue without buying rate. Detail:
+> `docs/experiments/80-the-credit-frontier.md` §"Step 4, corrected".
+>
 > **The two results that are NOT green.** (a) The predicted stall
-> fraction was ≤ 5 %; it is 18.2 %, and the ack record CANNOT attribute
-> it — all three frontier terms are equal at emission (157/157 ties),
-> a gate-2b situation. One 20 s leg at C = 2 on the LAN arm would
-> settle it (~2 min); not run, not in the approved description.
-> (b) The transport queue is NOT ~0 at 40 ms: **4.9 MB mean behind
-> egress**. The induction survives — 1.95 frames against a C + 2 = 3
-> frame bound, 0.0 % of samples above it — because a 4K AVC444 frame
-> is **3 386 KiB measured**. So **each unit of C costs ~3.3 MB of
-> transport queue at 4K**, which is the unit of account the shipped
-> default has to be chosen in, and it is the FR-ACK-3 "queue in front
-> of the display" measured rather than argued. It shows up end to end:
-> 4.9 MB at 58 MB/s = 84 ms, and egress→client-ack measured 122.9 ms
-> against a 40.4 ms link.
+> fraction on the LAN leg was ≤ 5 %; it is 18.2 %, and the ack record
+> CANNOT attribute it — all three frontier terms are equal at emission
+> (157/157 ties), a gate-2b situation. One 20 s leg at C = 2 on the LAN
+> arm would settle it (~2 min); not run, not in the approved
+> description. (b) The wan-leg prediction ("queue ≈ 0") was wrong twice
+> — see the corrected block above. A 4K AVC444 frame is **3 386 KiB
+> measured**, so each unit of C is up to ~3.3 MB of standing transport
+> queue per monitor — the FR-ACK-3 "queue in front of the display",
+> measured rather than argued.
 >
 > **Still unchosen: the shipped default C.** Two RTT points at one C do
-> not make FR-FLOW-1 clause 4's RTT → C table. Also not run: the freeze
-> leg, and any old-build leg under netem (so there is no A/B at 40 ms —
-> x017's D = 40 used the retired proxy, a different instrument, gate 5).
+> not make FR-FLOW-1 clause 4's RTT → C table — and the table now has a
+> stated prerequisite: the TCP environment (congestion control, buffer
+> sizes, pacing) must be held fixed and DECLARED, or the table measures
+> TCP, not C. Also not run: the freeze leg, and any old-build leg under
+> netem (so there is no A/B at 40 ms — x017's D = 40 used the retired
+> proxy, a different instrument, gate 5).
 >
 > **CAUTION for the return to 2 monitors (owner directive,
 > 2026-08-03).** Finding (c) — the producer's capture budget is

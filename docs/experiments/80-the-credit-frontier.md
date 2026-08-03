@@ -319,15 +319,13 @@ Predicted: transport bytes queued stay at ~0 KiB. Falsifier: "queued
 bytes grow with RTT ⇒ frames are being held at egress and the induction
 in #80 is wrong."
 
-Measured, from `trans::wait_bytes` sampled at every egress:
-
-| leg | mean | p90 | max | max in FRAMES |
-|---|---|---|---|---|
-| x018 lan | 5 KiB | 0 KiB | 3 620 KiB | 1.07 |
-| x019 wan40 | 4 906 KiB | 5 613 KiB | 6 822 KiB | **1.95** |
-
-The bytes plainly do grow with RTT — **~4.9 MB sitting behind egress at
-40 ms**. So the prediction as written is false.
+Measured, from `trans::wait_bytes` sampled at every egress: the LAN leg
+sat at 5 KiB mean (max 3 620 KiB, 1.07 frames, one transient). *(A wan
+figure of 4.9 MB stood here; VOIDED 2026-08-03 with the wan leg — its
+netem carried an undeclared 73 MB/s bottleneck. The corrected wan
+numbers are in "Step 4, corrected" below.)* On the corrected leg the
+queue is LARGER still — 6.7 MB mean — and the reason is TCP, not the
+harness; see below. The prediction as written is false either way.
 
 **The falsifier does not fire.** A 4K AVC444 frame measures **3 386 KiB
 on the wire** (measured here; #80's filing predicted "~3.4 MB"), so
@@ -343,10 +341,9 @@ costs about 3.3 MB of potential transport queue at 4K.** That is the
 than argued — and it is the number the shipped default has to be chosen
 against.
 
-The queue's cost is visible end to end and the arithmetic closes:
-4.9 MB draining at 278 × 3.49 MB / 16.6 s = 58 MB/s is **84 ms**, and the
-server measured egress→client-ack at **122.9 ms** against a 40.4 ms link.
-40 + 84 = 124.
+*(An end-to-end closure of the voided wan numbers stood here; deleted
+with them. It closed — which is the standing lesson that internal
+consistency cannot detect an undeclared bottleneck.)*
 
 ## P4 — the wire bound: MET, live
 
@@ -355,7 +352,7 @@ server measured egress→client-ack at **122.9 ms** against a 40.4 ms link.
 | leg | histogram | worst | bound |
 |---|---|---|---|
 | x018 lan | 0:2396 1:1252 2:4 | 2 | 3 |
-| x019 wan40 | 0:4 1:4 2:1104 | 2 | 3 |
+| x019 wan40 (fixed harness) | 0:4 1:4 2:756 | 2 | 3 |
 | x017 d40 (old, proxy) | 0:556 1:552 2:552 | 2 | (no window enforced) |
 
 CI asserts this over the whole reachable state space; it now also holds
@@ -363,7 +360,9 @@ on real hardware at 40 ms. Note the shape difference: the old build at
 D = 40 split evenly across 0/1/2 because the window was not being
 enforced at all (BACKLOG #80: "two thirds of sends exceeded the bound"),
 while the frontier at 40 ms sits at 2 for 99 % of sends — the window is
-saturated and holding.
+saturated and holding. (Both the voided and the corrected wan leg show
+the same shape; the bound held under the harsher, undeclared-bottleneck
+environment too.)
 
 ## P5 — mechanism check: MET
 
@@ -377,10 +376,8 @@ Ack traffic, which is the change itself: x018 emits 601 slot acks and
 
 ## The rate at 40 ms, and what it does NOT say
 
-x019 ran at **16.8 frames/s, period 58.6 ms**, against x018's 54.1 /s.
-The period model closes: capture k needs the client to have acked k−3, so
-3P = L + ack latency; 3 × 58.6 = 175.8 against 43.7 + 122.9 = 166.6,
-within 6 %.
+*(This section quoted 16.8 fps / 58.6 ms from the first wan leg; VOIDED
+2026-08-03 — instrument on the measured path. Corrected numbers below.)*
 
 **There is no old-build leg under netem, so this is not an A/B at 40 ms.**
 x017's D = 40 leg used the ack-delay proxy, which delayed one direction
@@ -401,3 +398,102 @@ reading those against each other, and the analysis output labels that row
 * **The per-monitor bound is untested.** Everything here is one monitor.
   At M monitors the wire bound is C + 2·M and the queue term scales with
   it — see BACKLOG #80's note.
+
+---
+
+# Step 4, corrected (2026-08-03, same day): the wan leg was measuring the harness, and the re-run found the real WAN mechanism
+
+The owner looked at the first wan leg's numbers and said they did not
+make sense — with only C + 2 = 3 frames ever unacknowledged, the bytes
+should be in flight in the delay line, not sitting in the server's
+queue; send-to-ack should be ~RTT, not 3×RTT. **The owner was right,
+twice over.**
+
+## The harness bug
+
+netem was left at the kernel-default `limit 1000` packets. netem holds
+every packet for the configured delay, so the limit is a bandwidth
+ceiling: 1000 packets × 1464 B (measured average on this path) per
+20 ms one-way delay = **73.2 MB/s**, with tail drops above it. Measured
+by bulk TCP through the same interfaces: **73.5 MB/s against
+1 614 MB/s unshaped, 64 packets dropped**. The first wan leg therefore
+ran on "40 ms RTT plus an undeclared 73 MB/s bottleneck with a 1.5 MB
+buffer". Instrument on the measured path: **the leg is deleted** (its
+files removed from the capture; git history keeps them), and every
+number derived from it is void — 16.8 fps, period 58.6 ms, queue
+4.9 MB, send-to-ack 122.9 ms, and both "closure" checks that
+rationalised them. That they closed internally is the lesson: internal
+consistency cannot detect an undeclared bottleneck.
+
+Fix: `netem_rtt.sh` now sets `limit 25000` (~36 MB resident, far above
+anything one TCP flow can put in flight here), prints the DECLARED
+environment on every apply (the limit, and the single-flow ceiling
+implied by the host's `tcp_wmem` max at the requested RTT), and its
+selftest gained step 5: bulk TCP through the applied netem must clear
+half the declared ceiling and drop NOTHING. Verified: 120.1 MB/s,
+0 drops.
+
+## The re-run (`captures/i80_wan40_fixedlimit_20260803_221910_s20`)
+
+Same arm, image, config, geometry, payload; netem 40 ms with the fixed
+limit; zero qdisc drops confirmed after the leg.
+
+Prediction, written before the run: with the 73 MB/s ceiling gone,
+delivery speeds up — period ~38–45 ms, ~22–27 fps, queue ~2–3.5 MB.
+
+**Measured: the opposite.** Period **86.7 ms** (11.5 fps), send-to-ack
+**203.7 ms** against a 40.45 ms link, queue **6.7 MB mean**. Removing
+the bottleneck made the leg SLOWER. The prediction was wrong twice in
+one day, in opposite directions, which means the model behind it (a
+frame is delivered at "the ceiling") was wrong, not merely mistuned.
+
+## The mechanism, isolated without xrdp
+
+A probe replicating xrdp's traffic shape — 3.4 MB bursts every 87 ms on
+one persistent TCP connection through netem 40, no xrdp involved —
+while sampling the kernel's own TCP state inside the pod:
+
+* **cwnd sat pinned at 414 packets ≈ 600 KB** (36 of 39 samples) and
+  never ramped.
+* This is TCP congestion-window validation (RFC 7661) plus app-limited
+  growth suppression: a flow that bursts and then waits for
+  application-level acks never keeps the pipe full, so Linux refuses to
+  grow the congestion window it could not validate.
+* Delivery of a 3.4 MB frame through a window of this size takes
+  multiple round trips. On the re-run leg the effective in-flight
+  works out to ~1.6 MB (40 MB/s × 40 ms), so a frame needs ~2+ RTTs,
+  and the marginal frame also waits behind ~2 queued frames —
+  send-to-ack ≈ 204 ms follows.
+* Why the VOIDED leg was FASTER: the 1000-packet bottleneck queue kept
+  a standing backlog that fed the link continuously at 73 MB/s — the
+  bufferbloat configuration accidentally kept the pipe full. A smoother
+  link with an honest window is slower for this traffic shape.
+
+## What this means for FR-FLOW-1 clause 4 (choosing C)
+
+**On a 40 ms WAN at 4K, the binding constraint is BYTES through one
+TCP flow, not frames in the ack window.** Little's law in bytes: rate ≤
+in-flight/RTT. Even at the host's `tcp_wmem` cap (4 MB) the ceiling is
+~100 MB/s ≈ 29 fps of 3.4 MB frames; at the ~1.6 MB the flow actually
+sustains, ~11–12 fps — which is what was measured. Raising C cannot buy
+frame rate past that; it can only deepen the standing queue (the
+FR-ACK-3 objection, measured here at 6.7 MB for C = 1). The C-table
+work must therefore hold the TCP environment fixed and DECLARED
+(congestion control, buffer sizes, pacing) or it will measure TCP, not
+C. Candidate levers that belong to a different backlog item, not to
+this one: sender pacing/BBR, `tcp_wmem`, and frame sizes (a 3.4 MB 4K
+frame is 2 300 packets — burst dynamics at exactly the scale TCP's
+heuristics are worst at).
+
+## Corrected step-4 status
+
+* Wire bound `id_server − id_client ≤ C + 2`: **held on every send**
+  of the corrected leg (worst 2 of bound 3), as on the LAN leg and in
+  CI's exhaustive enumeration.
+* Mechanism check: C = 1 on every ack record; RTT verified through the
+  RDP port before the leg; zero qdisc drops after it.
+* The `client + C` term was the binding term on 100 % of the corrected
+  leg's stalled cycles — at 40 ms the window genuinely governs, and it
+  is governing a TCP flow that cannot fill it.
+* The LAN head-to-head is untouched by any of this (no netem on either
+  side of it).

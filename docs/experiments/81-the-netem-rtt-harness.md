@@ -119,3 +119,41 @@ the event ORDER from `leg_d40`. That ordering is a sequence of xrdp's own
 internal events; its expected values are hand-derived from FR-FLOW-1, not
 read off the capture. CPU contention could change the intervals between
 those events; it cannot invent an ordering the pipeline does not produce.
+
+---
+
+# 2026-08-03, later the same day: the default netem limit was a 73 MB/s bottleneck, and the first #80 wan leg is void because of it
+
+The harness as first landed left netem's queue at the kernel default,
+`limit 1000` packets. netem holds every packet for the configured
+delay, so the limit is a bandwidth ceiling — `limit × packet size /
+one-way delay` — with tail drops above it. On this path (1464 B average
+packets, measured from the qdisc's own counters) at 20 ms each way that
+is 73.2 MB/s. Measured by bulk TCP through the same interfaces:
+**73.5 MB/s against 1 614 MB/s unshaped, with 64 drops**. The self-check
+as first written verified delay, statelessness, refusal and the RDP
+path — and never asked whether the delay stage could carry the traffic.
+
+Consequence: the first #80 wan leg ran on an undeclared 590 Mbit/s
+bottleneck and is DELETED under the instrument-on-path rule (its
+conclusions reopened in `BACKLOG.md` #80 and re-established from a
+re-run; see `docs/experiments/80-the-credit-frontier.md` §"Step 4,
+corrected").
+
+Fixes, all landed:
+* `qdisc_add` sets `limit 25000` (~36 MB resident per direction —
+  far above what one TCP flow can put in flight against this host's
+  4 MB `tcp_wmem` cap). Overridable via `NETEM_LIMIT_PKTS`.
+* `apply` prints the DECLARED environment: the limit, and the
+  single-flow TCP ceiling implied by `tcp_wmem`/RTT — because an
+  emulated link has a bandwidth ceiling whether or not one was
+  requested, and a capture that does not state it will misattribute it.
+* selftest step 5: 300 MB of bulk TCP through the applied netem must
+  clear half the declared ceiling and the qdiscs must drop NOTHING.
+  Verified after the fix: 120.1 MB/s, 0 drops.
+
+The general lesson for this file: **a delay instrument has a throughput
+spec, and it must be verified like the delay itself.** The first
+self-check proved the knob that was asked about and not the ceiling
+nobody asked about — the exact shape of the mode-name lesson it was
+built to avoid.

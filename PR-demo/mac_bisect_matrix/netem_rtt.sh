@@ -182,10 +182,23 @@ qdisc_del()
     return 0
 }
 
+# The queue limit is NOT optional and its default is a trap. netem holds
+# every packet for the configured delay, so the limit is a BANDWIDTH
+# CEILING: at most `limit` packets can be resident in the delay stage,
+# giving  limit x pkt_size / one_way_delay  of throughput, with TAIL
+# DROPS above it. The kernel default is 1000; at this path's 1464-byte
+# packets and 20 ms that is a 73 MB/s bottleneck -- measured 2026-08-03,
+# 73.5 MB/s against 1614 MB/s unshaped, 64 drops -- which contaminated
+# the first #80 wan leg as an UNDECLARED environment. 25000 packets
+# (~36 MB resident) is far above anything a single TCP flow can put in
+# flight here (tcp_wmem max is 4 MB), so with this limit the emulated
+# link is delay-only, and the selftest asserts zero drops to keep it so.
+NETEM_LIMIT_PKTS=${NETEM_LIMIT_PKTS:-25000}
+
 qdisc_add()
 {
     local side=$1 pid=$2 dev=$3 us=$4 jit=$5 loss=$6
-    local args="delay ${us}us"
+    local args="limit $NETEM_LIMIT_PKTS delay ${us}us"
     if [ "$jit" != 0 ]
     then
         args="$args ${jit}ms distribution normal"
@@ -325,8 +338,20 @@ cmd_apply()
     qdisc_add pod "$PPID_NS" eth0 "$half_us" "$jit" "$loss" \
         || { qdisc_del host "$PPID_NS" "$VETH"; fail "tc failed in pod netns"; }
 
+    # Declare the WHOLE environment, not just the knob that was asked
+    # for. An emulated link has a bandwidth ceiling whether or not one
+    # was requested -- from the netem queue limit, and from the host's
+    # tcp_wmem cap on a single flow's in-flight bytes -- and a capture
+    # that does not state it will misattribute that ceiling to the
+    # thing it was measuring (it did, 2026-08-03).
+    local wmem_max ceil
+    wmem_max=$(awk '{print $3}' /proc/sys/net/ipv4/tcp_wmem)
+    ceil=$(python3 -c "print('%.0f' % ($wmem_max / ($rtt / 1000.0) / 1e6))")
     echo "netem_rtt: $arm applied ${rtt} ms RTT" \
          "(${half_us} us each way, jitter ${jit} ms, loss ${loss} %)"
+    echo "netem_rtt: declared environment: netem limit $NETEM_LIMIT_PKTS" \
+         "pkts/direction; single-flow TCP ceiling ~= tcp_wmem_max" \
+         "($wmem_max B) / RTT = ~${ceil} MB/s"
     cmd_verify "$arm" "$rtt"
 }
 
@@ -354,11 +379,56 @@ print('%.3f' % tol)
     echo "$got"
 }
 
-# The <=60 s self-check BACKLOG #81 names. It proves the three things the
+# Bulk-throughput probe: <bytes> from INSIDE the pod to a sink on the
+# host's cni0 address, through the pod's eth0 -- the same direction and
+# the same interfaces the RDP video crosses. Uses only bash + head,
+# which the fleet image has; prints MB/s.
+bulk_probe_mbs()
+{
+    local arm=$1 bytes=${2:-300000000}
+    local pod sink_ip
+    pod=$(pod_name "$arm")
+    sink_ip=$(ip -4 addr show cni0 | sed -n 's/.*inet \([0-9.]*\).*/\1/p')
+    python3 - "$sink_ip" "$bytes" <<'PYEOF' &
+import socket, sys, time
+ip, want = sys.argv[1], int(sys.argv[2])
+l = socket.socket(); l.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+l.bind((ip, 5599)); l.listen(1); l.settimeout(30)
+c, _ = l.accept()
+t0 = time.perf_counter(); n = 0
+while n < want:
+    b = c.recv(1 << 20)
+    if not b:
+        break
+    n += len(b)
+print("%.1f" % (n / 1e6 / (time.perf_counter() - t0)))
+PYEOF
+    local sink=$!
+    sleep 0.5
+    kubectl -n "$NS" exec "$pod" -- bash -c \
+        "head -c $bytes /dev/zero > /dev/tcp/$sink_ip/5599" 2>/dev/null
+    wait "$sink"
+}
+
+# total drops on our two netem qdiscs (host veth + pod eth0)
+netem_drops()
+{
+    local d1 d2
+    d1=$(tc -s qdisc show dev "$VETH" \
+         | sed -n 's/.*dropped \([0-9]*\).*/\1/p' | head -1)
+    d2=$(nsenter -t "$PPID_NS" -n tc -s qdisc show dev eth0 \
+         | sed -n 's/.*dropped \([0-9]*\).*/\1/p' | head -1)
+    echo $(( ${d1:-0} + ${d2:-0} ))
+}
+
+# The <=60 s self-check BACKLOG #81 names. It proves the things the
 # harness claims, on a pod that is not running a measurement:
 #   1. a requested RTT appears as a MEASURED RTT (both directions),
 #   2. clear() restores the interface to what it was,
-#   3. apply() refuses an interface carrying somebody else's qdisc.
+#   3. apply() refuses an interface carrying somebody else's qdisc,
+#   4. the delay is on the RDP port the client dials,
+#   5. the delay stage is NOT a bandwidth bottleneck: a bulk TCP flow
+#      through the applied netem must clear a floor and drop NOTHING.
 cmd_selftest()
 {
     local arm=$1
@@ -459,6 +529,29 @@ if got > 60.0:
     else
         echo "4.  SKIPPED -- no hostPort found for $arm in k8s/"
     fi
+
+    # 5. the delay must not be a bandwidth ceiling. The kernel-default
+    # netem limit of 1000 packets was one -- 73.5 MB/s measured with
+    # tail drops, against 1614 MB/s unshaped -- and it shipped inside
+    # the first #80 wan leg as an undeclared bottleneck. Floor: half
+    # the tcp_wmem-implied single-flow ceiling at this RTT; drops: 0.
+    cmd_apply "$arm" 40 > /dev/null || fail "selftest: apply 40 failed"
+    local mbs drops wmem_max floor
+    mbs=$(bulk_probe_mbs "$arm" 300000000)
+    drops=$(netem_drops)
+    cmd_clear "$arm" > /dev/null
+    wmem_max=$(awk '{print $3}' /proc/sys/net/ipv4/tcp_wmem)
+    floor=$(python3 -c "print('%.0f' % (0.5 * $wmem_max / 0.040 / 1e6))")
+    echo "5a. bulk TCP through netem 40: ${mbs} MB/s, qdisc drops ${drops}" \
+         "(floor ${floor} MB/s, drops must be 0)"
+    python3 -c "
+import sys
+if float('$mbs') < float('$floor'):
+    sys.exit('selftest RED: the delay stage is a bandwidth bottleneck')
+if int('$drops') != 0:
+    sys.exit('selftest RED: the delay stage dropped packets')
+" || fail "selftest step 5 RED"
+    echo "5b. OK -- the emulated link is delay-only at this flow rate"
 
     local final_h final_p
     final_h=$(qdisc_show host "$PPID_NS" "$VETH")

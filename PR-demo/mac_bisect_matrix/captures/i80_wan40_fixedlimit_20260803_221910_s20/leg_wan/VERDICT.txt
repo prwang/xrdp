@@ -8,21 +8,21 @@ refresh:  intra_refresh_frames = 240
 #TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
 
 === E5 / rate — send interval from the server's own log ===
-sends: 278 over 16.6 s
-send-to-send gap: mean 59.8 ms  p50 58 ms  p90 70 ms  p99 82 ms
-session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 278 damage records
-16.80 sends/s = 16.80 pairs/s per monitor (1 monitor)
-surface 0 own period: n=278 mean 59.8 ms  p50 58.0 ms
-damage coverage: surface 0: 278
+sends: 191 over 16.6 s
+send-to-send gap: mean 87.1 ms  p50 85 ms  p90 100 ms  p99 111 ms
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 191 damage records
+11.54 sends/s = 11.54 pairs/s per monitor (1 monitor)
+surface 0 own period: n=191 mean 87.1 ms  p50 85.0 ms
+damage coverage: surface 0: 191
          one monitor, one surface — this is the single-monitor control (BACKLOG #64)
-cycles: 278   kids_armed: 2:278 (100%)
+cycles: 191   kids_armed: 2:191 (100%)
 
 E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
-         measured 59.8 ms  ->  0.38x
+         measured 87.1 ms  ->  0.26x
          under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
 
 === E4 — poll-set size the worker actually armed ===
-    278 kids_armed=2
+    191 kids_armed=2
 
 === E2 — server log, four things that must be zero ===
 rewrite failed           0
