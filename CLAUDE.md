@@ -455,14 +455,30 @@ The three gates below check whether the message is TRUE. Nothing
 checked whether it was READABLE, and that is the failure that keeps
 recurring. So, on the text in the file, in this order:
 
-* **Cut it. A draft that is not shorter after the edit pass was not
-  edited.** Every number that is not load-bearing for a decision the
-  owner has to make comes out. Supporting detail lives in the capture
-  README and `docs/experiments/` — that is what those files are for,
-  and a reader who wants the fourth decimal can open them.
-* **At most ONE table**, and only when the comparison is the point.
-  Two tables in one message means the second one is elaboration and
-  belongs in the record.
+* **EXPLAIN, DO NOT DELETE. Shortening is not editing.** *(Corrected
+  2026-08-03, the same day the wrong version was written. The rule
+  first said "a draft that is not shorter after the edit pass was not
+  edited"; the next turn duly deleted the table, the arm names and the
+  raw counts the owner had asked about. The owner's reply: "I told you
+  literally redo ... rather than further cheating by shorten it." A
+  report the reader cannot follow is not fixed by removing the parts
+  they could not follow — that removes the evidence and keeps the
+  opacity.)* The failure this gate exists to catch is UNDEFINED TERMS,
+  never length. Length is not a metric here. A longer message that
+  defines everything passes; a short one that assumes the reader knows
+  `withheld` does not.
+* **Every number in a table gets a sentence saying what was counted.**
+  A column of integers with a label from the analyser is not data the
+  owner can audit. `0:2396 1:1252` is not "the outstanding histogram",
+  it is "2396 of the 3652 network writes went out with the client
+  fully caught up, 1252 with one frame not yet acknowledged".
+* **Every experimental arm gets its setup stated where it is first
+  named.** `x018` is a pod name in this repository's fleet, not a
+  condition. Say which build, which config, which network, and what it
+  is being compared against, before quoting a number from it.
+* **Tables are fine and often clearer than prose.** What is not fine is
+  a table whose row labels, column labels or units are only meaningful
+  to someone holding the analyser source.
 * **No metric name used as a noun without its plain meaning attached
   the first time.** Not "withheld p90 fell" but "the wait between the
   encoder finishing with a frame's pixels and the producer being told
