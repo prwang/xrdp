@@ -59,7 +59,34 @@ default. Gate status and evidence: `PRD.md` FR-H264-8.
 
 # Open work
 
-## #76 — fif = 2 is hiding a bug (owner directive, 2026-08-02) — REFRAMED by #78's runs; the fix moved to #79, which is now TOP PRIORITY
+## Execution order (owner directive, 2026-08-03): the backlog is LINEAR
+
+#80 is the first FR-FLOW-1-conforming design and BLOCKS everything
+below it. Open items are renumbered #82+ into one line. Historical
+numbers stay as "(was #NN)" in each header and body cross-references
+keep the old numbers — this table is the map. DONE items keep their
+numbers.
+
+1. **#80** — credit frontier (absorbs #79; steps inside the item)
+2. **#81** — WAN RTT simulation harness (netem on the fleet netns)
+3. **#82** (was #76) — the unreproduced 26.7 ms x015 pump: reproduce or retire
+4. **#83** (was #77) — a faster producer
+5. **#84** (was #61f) — delivery-loop latency: encoder ack-clocked through a busy main thread
+6. **#85** (was #61c) — is the producer the ceiling (re-run on the ring)
+7. **#86** (was #61b) — textflood numbers re-established
+8. **#87** (was #61d) — codeflood-era ratios under textflood
+9. **#88** (was #61g) — oracle client 50–150 ms pauses
+10. **#89** (was #70B) — does the emit split buy anything
+11. **#90** (was #74) — lever-2 architecture decision
+12. **#91** (was #71) — multimon per-monitor ack window + m≥2 serial cost
+13. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest
+14. **#93** (was #73) — T4 re-runs under restored concurrency
+15. **#94** (was #53) — arm a monitor only when its pixels changed
+16. **#95** (was #54) — capture-side handoff: the remaining 2×
+17. **#96** (was #59) — capture share of the bottleneck thread
+18. **#97** (was #60) — T4 E5-2 bimodality
+
+## #82 (was #76) — fif = 2 is hiding a bug (owner directive, 2026-08-02) — REFRAMED by #78's runs; the fix moved to #79, since merged into #80
 
 **Status after #78 Runs A/B (see #78, captures
 `i78_x017_pumpsplit_20260802` / `i78_x014_fif2_clocks_20260802`):**
@@ -169,7 +196,7 @@ explanation (pump equal at 52.9 vs 58.8 W GPU duty).
 unreproduced condition).
 **Captures:** `i78_x017_pumpsplit_20260802`, `i78_x014_fif2_clocks_20260802`.
 
-## #79 — TOP PRIORITY (owner, 2026-08-02): move the slot-credit gate off the client-ack window and onto a pipeline horizon (TODO — mechanism CONFIRMED by intervention 2026-08-02; the FIX still needs owner sign-off: behaviour change)
+## #79 — MERGED INTO #80 (2026-08-03; was TOP PRIORITY). The horizon form is superseded by the credit frontier; layer-1 evidence (step 1, DONE) and the retargeted steps are carried by #80. Body kept for the record.
 
 > **RESCOPED 2026-08-02 (owner directive), and the item's original title
 > is now a REJECTED design.** This item was "ungate the eager slot ack".
@@ -634,7 +661,7 @@ the third bullet's "if the safety leg is bad" now moot.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;
   the unit test in step 1 owns this surface.
 
-## #80 — The client ack window is not applied to egress, and nothing bounds the egress queue (TODO — filed 2026-08-02, split out of #79; needs owner sign-off, behaviour change)
+## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (IN PROGRESS — design accepted by owner 2026-08-03; BLOCKS every item from #82 down)
 
 **The defect, read in code and confirmed by #79's layer-1 sweep.**
 `frames_in_flight` is documented (PRD FR-ACK-3) as the bound on what the
@@ -716,7 +743,8 @@ induction, and it deletes scope (a)/(b) of the original filing:
   keeps latency and staleness low, it does not buy throughput.)
 
 **The REWRITTEN item — source admission via the credit frontier
-(design proposed 2026-08-03, awaiting owner sign-off).**
+(design proposed 2026-08-03; owner ACCEPTED same day as the first
+FR-FLOW-1-conforming design — it blocks every item from #82 down).**
 Replace the emission-time window test with a third term in the credit
 frontier itself, at the one existing site:
 
@@ -754,6 +782,33 @@ is not stalled, it is *dropping* (coalescing) by construction.
   are unchanged, only the arithmetic producing the frontier moves.
   Behaviour stays behind `eager_slot_ack` (coding rule 2: default-off
   preserves today's behaviour bit for bit).
+
+**Steps (linear, 2026-08-03; absorbing #79's plan):**
+1. **Blocking pre-step (unchanged from #79):** read xorgxrdp's
+   SLOT_ONLY handler (xorgxrdp `10fa3aa23033`, source outside this
+   tree) and confirm slot release does not consume region-retirement
+   state.
+2. **Implement the frontier**, plus the user-facing window C as config
+   (owner directive 2026-08-03: C relates to the deployment's WAN RTT,
+   so it must NOT be hardcoded or PRD-required — it is the user's to
+   set; PRD FR-FLOW-1.4). Config home: `gfx.toml` per the 2026-08-02
+   one-home decision — the owner's message said "e.g. in the ini
+   file"; FLAGGED: one home only, and it is gfx.toml unless the owner
+   says xrdp.ini. Shipped default: chosen with #81's data, not
+   guessed; until then default-off `eager_slot_ack` preserves today's
+   behaviour bit for bit (rule 2).
+3. **CI, RED on HEAD first:** exhaustive {cliack, egress, absorb}
+   interleaving enumeration of the pure frontier function; the D = 40
+   wedge (capture 76, and frames 787–790 from the direct leg) as
+   golden replays.
+4. **#81 harness, then the VALIDATION GATE:** ack-delay sweep + freeze
+   leg + netem RTT legs against the fixed deb, predictions re-derived
+   for DROP semantics before the run — period ~flat at ALL D
+   (admission drops instead of stalling); withheld ≈ 0 at every D;
+   `id_server − id_client` at send never > C + 2; freeze leg stops
+   production within C + 2 frames and `wait_s` bytes plateau; the
+   drop visible as damage-area growth per admitted frame at high RTT.
+5. **Fleet A/B** (intent unchanged from the superseded #79 step 5).
 
 The paragraphs below are the original egress-gate filing, kept for the
 record; its sequencing question is moot (there is no egress gate to
@@ -793,7 +848,40 @@ simpler #79.
   `docs/experiments/79-layer1-...md`, section "Where the gate came
   from, and the mechanism mismatch it encodes".
 
-## #77 — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
+## #81 — WAN RTT simulation harness on the container network namespaces (TODO — after #80 step 3, before #80 step 4's WAN legs and any default-C decision)
+
+**What.** `tc netem` applied from the host to a fleet pod's veth:
+delay in BOTH directions (true RTT), optional jitter/loss, optional
+`tbf` rate cap. Legs at RTT ∈ {loopback baseline, 10, 40, 80, 150 ms}.
+Harness versioned in `PR-demo/mac_bisect_matrix/`.
+
+**Why a second instrument when `ack_delay_proxy` exists.** They answer
+different questions and both stay. The proxy delays ONLY client→server
+bytes, above TLS — it isolates the ack variable while video delivery
+stays instant, which is what made layer 1 a mechanism test. netem
+delays both directions below TCP — video delivery, TCP ACK clocking
+and frame acks all move together, which is the environment the user's
+"set C by your RTT" guidance and the shipped default C must be derived
+from. Mechanism instrument vs environment instrument; do not compare
+their numbers directly (quality gate 5).
+
+**Requirements.**
+* Verify the applied RTT by measurement through the same path before
+  each leg (ping through the pod netns) — never trust the knob
+  (the 2026-07-31 mode-name lesson).
+* Stateless: restore qdiscs on exit; REFUSE to run if a qdisc the
+  harness did not create is already present on the interface.
+* Server side only; the client rig stays exactly as deployed.
+
+**Output feeds:** #80 step 4's WAN-leg predictions; the shipped
+default C (FR-FLOW-1.4); the RTT → suggested-window table for the
+config docs.
+
+**2-minute rule:** this entry names the harness build and a ≤60 s
+self-check only. A full RTT matrix is a multi-leg session run — owner
+approval with the arm count before running.
+
+## #83 (was #77) — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
 
 **What it is.** x014 left the FR-BENCH-1 margin at **1.09×** — the
 textflood producer at 16.91 ms
@@ -901,7 +989,7 @@ payload is inside the measurement, so #74 Lever 2 — whose remaining
 prize is now `pump`'s 16.6 ms, not `collect`'s — cannot be measured with
 today's textflood. This reopens **#61c** with a concrete number.
 
-## #61c — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
+## #85 (was #61c) — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
 
 **Answered the day it was opened.** The session Xorg runs at **98.9 % of
 one core with NO client connected at all** — the payload alone saturates
@@ -927,7 +1015,7 @@ blocker as the seccomp `bpf()` denial in #70B.
 
 **Record:** `captures/i61c_xorg_profile_20260801 (DELETED by #61h, git history only)`.
 
-## #71 (was #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
+## #91 (was #71, earlier #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
 
 At m≥2 two further issues sit ON TOP of the m=1 serializer (#70):
 
@@ -949,7 +1037,7 @@ Acceptance: per-monitor window (never a pool), CI updated
 deliberately, fleet-arm decomposition showing per-monitor depth 2 at
 m=2, negative arm gaps on both monitors.
 
-## #72 (was #66, earlier #63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (blocked by #71 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #70/#71 concurrency first)
+## #92 (was #72, earlier #66/#63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (blocked by #71 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #70/#71 concurrency first)
 
 Motivated by #62's measured decomposition, not by intuition. On the T4 with
 the textflood payload the 173.7 ms period is:
@@ -1009,7 +1097,7 @@ what a 1.41x says is needed.
 * the E5-2 pair re-run and DECOMPOSED, not just rated;
 * a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
 
-## #73 (was #67) — T4 benchmark re-runs under restored concurrency (blocked by #70 + #71; #72 optional but preferred)
+## #93 (was #73, earlier #67) — T4 benchmark re-runs under restored concurrency (blocked by #70 + #71; #72 optional but preferred)
 
 The numbers the PR sells, re-measured on the representative box once
 the mechanism is proven locally. Requires re-provisioning the T4 from
@@ -1026,7 +1114,7 @@ measurable with no ad-hoc steps).
 
 ---
 
-## #53 — Arm a monitor only when its pixels changed (TODO, NEXT)
+## #94 (was #53) — Arm a monitor only when its pixels changed (TODO, NEXT)
 
 **Why.** Measured 2026-07-30 (#52 results, first flood pair): with one
 active monitor beside an idle one, the batch is **~9 % SLOWER** than the
@@ -1058,7 +1146,7 @@ one. Plus E2 clean and no monitor left un-updated over a 180 s run.
 
 ---
 
-## #54 — Capture-side handoff: the remaining 2× (TODO)
+## #95 (was #54) — Capture-side handoff: the remaining 2× (TODO)
 
 **Why.** #52 proved the encode side is no longer the constraint: at
 2.13× the worker is **32 % busy**, per-pair service is 14.7 ms (encode
@@ -1085,7 +1173,7 @@ remainder is attributed, not re-tuned.
 
 ---
 
-## #59 — The capture is 14 % of the bottleneck thread; the rest is not ours to optimise (TODO — one lever left, see #61b)
+## #96 (was #59) — The capture is 14 % of the bottleneck thread; the rest is not ours to optimise (TODO — one lever left, see #61b)
 
 Answers "which function is slow despite the vectorized capture, and does
 capture dominate the interval?" — profiled on the T4 with
@@ -1156,7 +1244,7 @@ attribute a stripped stack by inference.
 
 ---
 
-## #60 — The T4's E5-2 is bimodal and it is not root-caused (TODO)
+## #97 (was #60) — The T4's E5-2 is bimodal and it is not root-caused (TODO)
 
 Sixteen repeats of the batched arm split into two tight clusters — 47–49 ms
 (8 runs) and 67–74 ms (8) — with nothing in between, and the baseline
@@ -1191,7 +1279,7 @@ content, not the pipeline.
 
 ---
 
-## #61b — textflood wired into the fleet (plumbing DONE; its NUMBERS reopened by #61h)
+## #86 (was #61b) — textflood wired into the fleet (plumbing DONE; its NUMBERS reopened by #61h)
 
 `SESSION_KIND=textflood` now exists in `banner.sh` and the binary is
 built into the fleet image (builder stage in `Containerfile`). Arms
@@ -1212,7 +1300,7 @@ under codeflood is a measurement of the X server (#61c).
 **Record:** the capture was deleted by #61h's garbage collection; it is
 in git history only.
 
-## #61d — Re-measure the codeflood-era ratios under textflood (TODO)
+## #87 (was #61d) — Re-measure the codeflood-era ratios under textflood (TODO)
 
 **#70 (1.11x) and #70B (0.96x) were both measured against a saturated
 producer and are void as throughput numbers.** #70B has been re-run
@@ -1229,7 +1317,7 @@ resolution-dependent: `pump` and `coll` scale with pixel count and
 17 % at 3840x2400. The ratio at the smaller geometry should be *larger*,
 and that is a prediction this item can falsify.
 
-## #61f — Cut the delivery loop's latency: the encoder is ack-clocked through a busy main thread (TODO)
+## #84 (was #61f) — Cut the delivery loop's latency: the encoder is ack-clocked through a busy main thread (TODO)
 
 **The shape of the loop is established; every DURATION in it is void
 (#61h).** What survives is ordering, which a slow logger cannot
@@ -1308,7 +1396,7 @@ margin is ours.
 serial time now converts into more of this wait rather than into rate.
 The worker is no longer the only ceiling.
 
-## #61g — The oracle client's 50–150 ms pauses: NOT scheduling; what they are is still open (TODO)
+## #88 (was #61g) — The oracle client's 50–150 ms pauses: NOT scheduling; what they are is still open (TODO)
 
 **Step 1 is ANSWERED, and it rules the planned fix out.** One 60 s gate
 run on x006 with per-thread `/proc/<tid>/schedstat` sampling
@@ -1443,7 +1531,7 @@ capture, so FR-CAPTURE-8's two slots buy no lookahead at m=1.
 `capture ‖ encode` verdict, control and treatment in ONE pass. Do not
 compare anything to a pre-#61h number.
 
-## #70B — REOPENED 2026-08-01: does the emit split buy anything?
+## #89 (was #70B) — REOPENED 2026-08-01: does the emit split buy anything?
 
 Previously marked DONE at 1.12x under textflood (and 0.96x under
 codeflood, already void as producer-bound). **The 1.12x is void (#61h)**
@@ -1454,7 +1542,7 @@ real use-after-free and that is unaffected. What has to be measured
 again is whether splitting the emit off the worker moves the rate at
 all, and by how much. PRD FR-ACK-2 still names it as #70's completion.
 
-## #74 — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
+## #90 (was #74) — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
 
 Lever 2 was queued as "implement FR-PROC-7's submit/collect
 construction + the three policies" on the implicit shape of ONE worker

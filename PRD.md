@@ -824,6 +824,24 @@ to obtain concurrency, and a second in-flight frame is a queue in front
 of the display that costs a frame of latency. The design target is
 therefore: **all the concurrency we need, at the cost of fif = 1.**
 
+> **NARROWED 2026-08-03 (owner directive), after the provenance trace
+> and FR-FLOW-1 below.** `frames_in_flight` is RETIRED as a concept:
+> the constant is untethered in GFX (no protocol meaning, see
+> provenance) and was doing two jobs at once. They separate:
+> (a) The CONCURRENCY requirement stays, restated wire-free — every
+> stage pair in the table must hold with the end-to-end wire window at
+> its TIGHTEST setting. Pipeline concurrency comes from pipeline
+> structure, never from wire-window slack.
+> (b) The WINDOW is end-to-end and its correct value depends on the
+> deployment's RTT, so it is USER CONFIGURATION, not a PRD constant.
+> This document requires that it exist, that it be enforced at capture
+> admission (FR-FLOW-1), that it have one documented meaning and a
+> stated default — and it no longer requires or names fif = 1.
+> (c) The corollary below is NARROWED to short-RTT networks
+> (ack latency < frame period): there a tighter window must cost no
+> throughput and a regression stays a BUG. On long RTT,
+> frame rate ≤ window/RTT is physics (Little's law), not a defect.
+
 The corollary, and it is why this clause was written rather than assumed:
 **a throughput regression from fif = 2 to fif = 1 is a BUG in this
 pipeline, not a property of the workload.** Measured 2026-08-02 (arms
@@ -896,7 +914,9 @@ Four requirements follow. They are binding on any change to the ack
 path, #79 included.
 
 1. **The gate is on the wrong stage, and one gate may not do both
-   jobs.** The client ack window bounds what the CLIENT holds, so it
+   jobs.** *(placement SUPERSEDED 2026-08-03 by
+   FR-FLOW-1.3 — with capture-frontier admission the egress gate is
+   dead code by induction; the two-quantities analysis stands.)* The client ack window bounds what the CLIENT holds, so it
    belongs on **egress**. The producer's slot credit bounds what the
    PIPELINE holds, so it must be gated on the pipeline's own depth. Any
    design in which a single comparison serves both is rejected: the two
@@ -920,7 +940,10 @@ path, #79 included.
    kind against a link slower than its output, which is every WAN. A
    configuration flag does not make an unbounded queue acceptable; it
    only decides who discovers it.
-4. **The horizon H, and the two regimes it distinguishes.** The
+4. **The horizon H, and the two regimes it distinguishes.** *(mechanism SUPERSEDED
+   2026-08-03 by FR-FLOW-1.3 — H counted from the egress frontier,
+   which is what would have needed an egress hold; the two-regime
+   analysis stands.)* The
    replacement is a finite horizon on the slot credit —
    `client + H > server` with H taken from the pipeline's depth (two
    capture slots; three stages) rather than from `fif`. What H buys is
@@ -943,6 +966,45 @@ path, #79 included.
    covers the measured LAN ack latency (7.6–10 ms against a ~16.4 ms
    period); H = 3 covers ~33 ms. Record:
    `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`.
+
+**FR-FLOW-1: backpressure is nearest-neighbour; drop is end-to-end at
+the source (owner directive, 2026-08-03).** Binding on every queue and
+signal in the frame path, and the test every flow-control change is
+reviewed against.
+
+1. **A lossless stall consults only the immediate downstream
+   neighbour.** A stage may wait only on "my neighbour has no capacity"
+   (capture slot busy, depth-1 stage buffer full) — never on state
+   further down the pipe, and never on the network. The 2017 gate
+   (provenance above) is the precedent violation: a capture-admission
+   signal was made to wait on a client round trip, and the measured
+   cost is BACKLOG #76/#78/#79.
+2. **The lossy guard runs farthest end → nearest end, and its only
+   response is drop-by-coalesce at the source.** The client's ack
+   frontier reaches exactly one decision point: capture ADMISSION.
+   Denied admission = damage coalesces in the dirty region
+   (FR-CAPTURE-8 clause 4) — the frame is dropped before it exists,
+   the only legal drop point. No intermediate stage may hold or drop a
+   completed frame for wire reasons.
+3. **The window counts from the CAPTURE frontier, so egress needs no
+   gate.** Admit capture k only while `k ≤ frame_id_client + C`. The
+   client frontier only rises and sends are in id order, so
+   `k − client ≤ C` at send — by induction every frame that exists is
+   inside the window at egress, and an egress gate is dead code.
+   Enforcement point: the credit frontier
+   `credit = min(frame_id_consumed, frame_id_server + 1,
+   frame_id_client + C)`, emitted unconditionally whenever it advances.
+4. **C is user configuration, not a PRD constant.** Its correct value
+   depends on the deployment's RTT (frame rate ≤ (C + 2)/RTT). This
+   document requires only: it exists; it is enforced at admission; it
+   has exactly one documented meaning (at most C + 2 frames unacked at
+   send — capture rides ≤ 2 slots above the credit); it has a stated
+   default, chosen with BACKLOG #81's RTT-harness data, that preserves
+   short-RTT behaviour; and its bound has a test. The RTT → suggested
+   value guidance belongs with the config docs, fed by #81.
+5. **Every queue carries a stated bound in frames and a test**
+   (restating amendment clause 2). The egress queue's bound follows
+   from 3: ≤ C + 2 frames on `wait_s`.
 
 **The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
 
