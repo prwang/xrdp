@@ -1,0 +1,3 @@
+netem_rtt: x018 RTT=0 leg -- no shaping applied
+netem_rtt: measured loopback baseline rtt 0.078 ms
+0.078

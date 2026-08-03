@@ -1038,7 +1038,29 @@ recorded because quoting "≤ C + 2" without them would be wrong:
 (`XRDP_GFX_WIRE_WINDOW_DEFAULT`). It matches the legacy
 `frames_in_flight` so short-RTT behaviour is preserved, and clause 4's
 "stated default, chosen with BACKLOG #81's RTT-harness data" is NOT yet
-satisfied — #81 has not run. Do not quote 2 as a recommendation.
+satisfied. Do not quote 2 as a recommendation.
+
+**What C costs, measured 2026-08-03 (BACKLOG #80 step 4, capture
+`i80_wanpair_20260803_125816_s20`).** #81's netem harness landed and the
+frontier ran at 0.078 ms and 40.4 ms RTT, one monitor, C = 1. Two
+durable facts:
+
+* **A 4K AVC444 frame is 3 386 KiB on the wire** at 3840×2400
+  textflood. The window is denominated in FRAMES, so **each unit of C
+  buys up to ~3.3 MB of transport queue per monitor** — the FR-ACK-3
+  "queue in front of the display", in bytes. At 40 ms RTT the measured
+  queue behind egress was 4.9 MB mean (1.95 frames of a C + 2 = 3 frame
+  bound; 0.0 % of samples above it), and it showed up end to end: 4.9 MB
+  draining at 58 MB/s is 84 ms, and the server measured egress→client
+  ack at 122.9 ms against a 40.4 ms link.
+* **The wire bound holds live.** `id_server − id_client` at send never
+  exceeded 2 on either leg, against the C + 2 = 3 the enumeration in
+  `tests/xrdp/test_avc444_credit_frontier.c` asserts.
+
+Choosing the default is therefore a trade between (C + 2·M)/RTT of frame
+rate and ~3.3·C MB per monitor of display latency at 4K. Two RTT points
+at one C are not enough to state it; the table clause 4 asks for is still
+owed.
 
 **The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
 

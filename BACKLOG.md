@@ -68,7 +68,7 @@ keep the old numbers — this table is the map. DONE items keep their
 numbers.
 
 1. **#80** — credit frontier (absorbs #79; steps inside the item)
-2. **#81** — WAN RTT simulation harness (netem on the fleet netns)
+2. ~~**#81** — WAN RTT simulation harness (netem on the fleet netns)~~ **DONE 2026-08-03**
 3. **#82** (was #76) — the unreproduced 26.7 ms x015 pump: reproduce or retire
 4. **#83** (was #77) — a faster producer
 5. **#84** (was #61f) — delivery-loop latency: encoder ack-clocked through a busy main thread
@@ -661,7 +661,7 @@ the third bullet's "if the safety leg is bad" now moot.
 * Bookkeeping interplay: both branches write `frame_id_server_sent`;
   the unit test in step 1 owns this surface.
 
-## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (steps 1–3 DONE 2026-08-03; steps 4–5 OPEN; BLOCKS every item from #82 down)
+## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (steps 1–3 DONE, step 4 PARTLY DONE 2026-08-03; step 5 OPEN; BLOCKS every item from #82 down)
 
 > **Landed 2026-08-03 (steps 1, 2, 3).** The credit frontier is
 > implemented behind `eager_slot_ack`, C is `gfx.toml [avc444_ffmpeg]
@@ -690,6 +690,54 @@ the third bullet's "if the safety leg is bad" now moot.
 > exists, and the shipped default C = 2 does NOT satisfy FR-FLOW-1
 > clause 4's "default chosen with #81's data". Steps 4 and 5 below are
 > the remaining work, and #81 is their prerequisite.
+>
+> **UPDATED 2026-08-03 — the code has now run on a link.** #81's netem
+> harness landed and the owner approved two legs: arms x018 (loopback
+> baseline) and x019 (40 ms true RTT), one monitor, C = 1, perf trace
+> on. Capture `i80_wanpair_20260803_125816_s20`; record:
+> `docs/experiments/80-the-credit-frontier.md` §"Step 4".
+>
+> **LAN head to head against x017 `direct`** (same payload, geometry,
+> monitors, client rig and xorgxrdp; old build at fif = 1; nothing in
+> the network path on either):
+> withheld p90 **35.3 → 10.6 ms**, mean 8.45 → 3.46, stalls 29.7 →
+> 18.2 %; period p90 **42.7 → 25.9**, p99 52.2 → 30.4, p90/p50 2.51 →
+> **1.49**; throughput 46.5 → **54.1 /s**. The wire bound
+> `id_server − id_client ≤ C + 2` held live on both legs.
+>
+> **The two results that are NOT green.** (a) The predicted stall
+> fraction was ≤ 5 %; it is 18.2 %, and the ack record CANNOT attribute
+> it — all three frontier terms are equal at emission (157/157 ties),
+> a gate-2b situation. One 20 s leg at C = 2 on the LAN arm would
+> settle it (~2 min); not run, not in the approved description.
+> (b) The transport queue is NOT ~0 at 40 ms: **4.9 MB mean behind
+> egress**. The induction survives — 1.95 frames against a C + 2 = 3
+> frame bound, 0.0 % of samples above it — because a 4K AVC444 frame
+> is **3 386 KiB measured**. So **each unit of C costs ~3.3 MB of
+> transport queue at 4K**, which is the unit of account the shipped
+> default has to be chosen in, and it is the FR-ACK-3 "queue in front
+> of the display" measured rather than argued. It shows up end to end:
+> 4.9 MB at 58 MB/s = 84 ms, and egress→client-ack measured 122.9 ms
+> against a 40.4 ms link.
+>
+> **Still unchosen: the shipped default C.** Two RTT points at one C do
+> not make FR-FLOW-1 clause 4's RTT → C table. Also not run: the freeze
+> leg, and any old-build leg under netem (so there is no A/B at 40 ms —
+> x017's D = 40 used the retired proxy, a different instrument, gate 5).
+>
+> **CAUTION for the return to 2 monitors (owner directive,
+> 2026-08-03).** Finding (c) — the producer's capture budget is
+> **per monitor**, so the wire bound is `C + 2·M`, not `C + 2` — is
+> UNTESTED. Everything measured for #80 so far is single monitor. Do
+> not carry any C, any bound and any queue number from this work over
+> to a 2-monitor configuration by arithmetic: at M = 2 the bound is
+> C + 4 frames and, at the 3.3 MB/frame measured here, the transport
+> queue term roughly doubles with it. Revisit this deliberately —
+> probably as its own A/B — only **after the single-monitor stall work
+> is fully closed**, and re-derive the bound from measurement rather
+> than from the multiplication. (Findings (a) two-token clamp and (b)
+> unclamped `NOT_DISPLAYED` are accepted as-is by the owner until a
+> later test rejects them.)
 
 **The defect, read in code and confirmed by #79's layer-1 sweep.**
 `frames_in_flight` is documented (PRD FR-ACK-3) as the bound on what the
@@ -845,7 +893,17 @@ is not stalled, it is *dropping* (coalescing) by construction.
    and the expected values hand-derived from FR-FLOW-1 clause 3.
    Reinstating the shipped gate inside the planner turns 4 cases red;
    the mutation was reverted and is not committed.
-4. **#81 harness, then the VALIDATION GATE:** ack-delay sweep + freeze
+4. **PARTLY DONE 2026-08-03 (2 of the legs, owner-approved arm
+   count). #81 harness, then the VALIDATION GATE.** #81 landed;
+   `i80_wan_pair.sh` ran the two approved legs with the predictions
+   written in its header BEFORE the run. Results and the two red
+   findings are in the landed block above and in
+   `docs/experiments/80-the-credit-frontier.md` §"Step 4". The
+   ack-delay sweep is gone with its proxy (see #81). **Still owed:**
+   the freeze leg; an old-build leg under netem so there is an actual
+   A/B at 40 ms; a C = 2 LAN leg to attribute the residual 18.2 %
+   stalls; and enough RTT points to choose the shipped default.
+   Original scope, kept for the record: ack-delay sweep + freeze
    leg + netem RTT legs against the fixed deb, predictions re-derived
    for DROP semantics before the run — period ~flat at ALL D
    (admission drops instead of stalling); withheld ≈ 0 at every D;
@@ -856,10 +914,15 @@ is not stalled, it is *dropping* (coalescing) by construction.
    queued KiB, so "`wait_s` plateaus" is a number rather than a claim.
 5. **Fleet A/B** (intent unchanged from the superseded #79 step 5).
 
-**Deliberately NOT done in steps 1–3, and why:**
+**Deliberately NOT done in steps 1–3, and why** (written 2026-08-03
+before step 4 ran; the first bullet was answered later the same day —
+see the UPDATED block at the top of this item):
 * **No live run.** Step 4 needs #81, and #81 has not been built. Every
   number quoted for this item is from the pre-change captures or from
   CI; the code has never encoded a frame on a real link.
+  *(2026-08-03, later: #81 landed and two legs ran. This bullet is
+  superseded — the code has now encoded frames at 0.078 ms and at
+  40.4 ms RTT.)*
 * **The default C = 2 is not a recommendation.** It matches the legacy
   `frames_in_flight` so short-RTT behaviour is preserved, and
   FR-FLOW-1 clause 4's "default chosen with #81's data" is unmet.
@@ -907,7 +970,39 @@ simpler #79.
   `docs/experiments/79-layer1-...md`, section "Where the gate came
   from, and the mechanism mismatch it encodes".
 
-## #81 — WAN RTT simulation harness on the container network namespaces (TODO — after #80 step 3, before #80 step 4's WAN legs and any default-C decision)
+## #81 — WAN RTT simulation harness on the container network namespaces (DONE 2026-08-03)
+
+> **Landed 2026-08-03** as
+> `PR-demo/mac_bisect_matrix/netem_rtt.sh`: delay split in half and
+> applied to BOTH ends of a pod's veth pair, so a round trip picks up
+> the whole RTT. `selftest` is GREEN in 22 s and checks four things —
+> the requested delay appears as a measured one, `clear` restores the
+> exact qdisc lines and the baseline RTT, `apply` REFUSES an interface
+> carrying a foreign qdisc, and the delay is on the **RDP port the
+> client rig dials** rather than only on ICMP to the pod IP. First use:
+> #80 step 4. Record, including the two things that went wrong while
+> building it (`nsenter -n` does not swap the mount namespace, so
+> `/sys/class/net/eth0/iflink` silently returns the host's answer; six
+> stale veths for four pods make name-based resolution unsafe):
+> `docs/experiments/81-the-netem-rtt-harness.md`.
+>
+> **The ack-delay proxy is RETIRED (owner directive, 2026-08-03)** — it
+> burns 100 % of a core when idle and overlaps with netem.
+> `ack_delay_proxy.c`, its self-test and `ack_delay_sweep.sh` are
+> deleted; `i79_ack_delay_analyze.py` is KEPT, because it is the
+> measurement layer both builds' numbers are computed by and the #80
+> head-to-head imports it. **The i79 results are NOT void**: the sweep's
+> own control leg (`d0` through the proxy vs `direct` with no proxy)
+> came out 4.3 % apart, which a spinning core would not have left, and
+> the #80 head-to-head quotes only `direct`. Three idle states were
+> probed on 2026-08-03 and none reproduced the CPU burn, so the state
+> that causes it is not identified — if it happens DURING a leg rather
+> than between legs, the control-leg argument is what to re-examine.
+>
+> **What the harness did NOT do, and it is the one that matters:** two
+> RTT points is not the RTT ∈ {0, 10, 40, 80, 150} matrix this entry
+> specified. That matrix is a multi-leg session run and still needs
+> owner approval with an arm count.
 
 **What.** `tc netem` applied from the host to a fleet pod's veth:
 delay in BOTH directions (true RTT), optional jitter/loss, optional

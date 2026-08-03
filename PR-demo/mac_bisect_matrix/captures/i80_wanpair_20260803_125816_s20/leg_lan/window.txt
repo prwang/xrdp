@@ -1,0 +1,6 @@
+t0 1785761923
+t1 1785761954
+delay_ms 0
+rtt_measured_ms 0.078
+arm x018
+secs 20

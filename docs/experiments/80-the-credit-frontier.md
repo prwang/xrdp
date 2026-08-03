@@ -235,3 +235,169 @@ signal from being suppressed by a *network* fact.
 * Little's law is unchanged by any of this: on a long link nothing
   raises the frame rate above (C + 2)/RTT. The item buys latency and
   freshness, not throughput.
+
+---
+
+# Step 4 (2026-08-03) — the first live run: two legs on the #81 netem harness
+
+Owner-approved 2026-08-03: "stand up two more arms comparing RTT0 and
+RTT40ms, perf trace on for the new mechanism single monitor
+in-flight=1, and analyse against old data." Exactly two legs were run.
+
+Capture: `PR-demo/mac_bisect_matrix/captures/i80_wanpair_20260803_125816_s20`
+(reproduce with `i80_wan_pair.sh`, which carries the predictions below in
+its header so they are versioned before the run rather than after it).
+Arms x018 (loopback baseline) and x019 (40 ms true RTT) carry the same
+image, the same xorgxrdp as x014/x015/x017, the same gfx.toml body
+(diff-verified) and `wire_window = 1`.
+
+## What this settles, first
+
+**The section above says "no live measurement of this code exists" and
+"the code has never encoded a frame on a real link". That is no longer
+true.** Both arms were certified on real bytes at deploy — 584 pictures,
+7/7 wire asserts, 0 black frames each — and both legs ran a verified
+single-monitor 3840×2400 session.
+
+## P1 — the defect: PARTIALLY MET, and the part that failed matters
+
+Head to head, LAN against LAN. x017 `direct` is the same payload,
+geometry, monitor count, client rig and xorgxrdp on the OLD build at
+`fif = 1`, with nothing in the network path — the only apples-to-apples
+comparison available.
+
+| | x017 direct (old) | x018 (frontier, C=1) | |
+|---|---|---|---|
+| withheld p50 | 0.03 ms | 0.03 ms | — |
+| withheld p90 | 35.3 ms | **10.6 ms** | −70 % |
+| withheld mean | 8.45 ms | **3.46 ms** | −59 % |
+| stalls (> 10 ms) | 29.7 % | **18.2 %** | −39 % |
+
+The prediction was "p50 ≤ 1 ms **and** stall fraction ≤ 5 %". The p50
+half was already true of the old build, so it was never a discriminator
+and should not have been written as one. The stall half is **not met**:
+18.2 % against a predicted 5 %.
+
+What did move is the tail, which is where the cross-layer gate lived.
+
+**The residual 18.2 % is NOT attributed, and the instrument cannot
+attribute it.** The ack record carries the frontier's three inputs at the
+instant of emission, and at that instant all three are equal — 157 of 157
+stalled cycles are ties. This is a "2b" situation: the metric cannot show
+the thing, so its silence is not evidence. What the measured means make
+plausible: at C = 1 capture k needs the client to have acknowledged k−3;
+with L = 32.3 ms capture→egress and a 7.3 ms ack, that permission arrives
+about 12.6 ms *earlier* than the natural 17.4 ms cadence — comfortable at
+p50, and inside the noise once a frame runs long (period p90 25.9 ms).
+That is the end-to-end guard firing correctly, not the old defect. It is
+a derivation from means, not a measurement, and it is stated as such.
+
+**What would settle it: one more leg at C = 2 on the LAN arm** (a
+configmap edit, a roll and a 20 s run, ~2 min). If the residual stalls
+are the `client + C` term they disappear; if they persist, something
+else is holding the credit. Not run — it is not in the approved
+description, and an extra leg is a finding to report, not a licence.
+
+## P2 — the long tail: MET
+
+| | x017 direct | x018 |
+|---|---|---|
+| period mean | 21.5 ms | **18.5 ms** |
+| period p90 | 42.7 ms | **25.9 ms** |
+| period p99 | 52.2 ms | **30.4 ms** |
+| period max | 64.1 ms | **50.1 ms** |
+| **p90 / p50** | **2.51** | **1.49** |
+| throughput | 46.5 /s | **54.1 /s** |
+
+Predicted below 2.0; measured 1.49. The p99 fell 42 % and throughput
+rose 16 % on an unshaped link, with the client window nominally *tighter*
+(C = 1 permits one unacknowledged frame, the same as fif = 1).
+
+## P3 — drop, not hold: the PREDICTION was wrong, the INDUCTION holds
+
+Predicted: transport bytes queued stay at ~0 KiB. Falsifier: "queued
+bytes grow with RTT ⇒ frames are being held at egress and the induction
+in #80 is wrong."
+
+Measured, from `trans::wait_bytes` sampled at every egress:
+
+| leg | mean | p90 | max | max in FRAMES |
+|---|---|---|---|---|
+| x018 lan | 5 KiB | 0 KiB | 3 620 KiB | 1.07 |
+| x019 wan40 | 4 906 KiB | 5 613 KiB | 6 822 KiB | **1.95** |
+
+The bytes plainly do grow with RTT — **~4.9 MB sitting behind egress at
+40 ms**. So the prediction as written is false.
+
+**The falsifier does not fire.** A 4K AVC444 frame measures **3 386 KiB
+on the wire** (measured here; #80's filing predicted "~3.4 MB"), so
+6 822 KiB is 1.95 frames against a bound of C + 2 = 3 frames, and
+**0.0 %** of egress samples exceed 3 frames' worth on either leg. P4
+confirms the same bound independently from the send records. Nothing is
+held beyond the window; the window is simply denominated in frames, and a
+frame at 4K is 3.3 MB.
+
+**The real finding, which the prediction's threshold hid: each unit of C
+costs about 3.3 MB of potential transport queue at 4K.** That is the
+"queue in front of the display" FR-ACK-3 objects to, now measured rather
+than argued — and it is the number the shipped default has to be chosen
+against.
+
+The queue's cost is visible end to end and the arithmetic closes:
+4.9 MB draining at 278 × 3.49 MB / 16.6 s = 58 MB/s is **84 ms**, and the
+server measured egress→client-ack at **122.9 ms** against a 40.4 ms link.
+40 + 84 = 124.
+
+## P4 — the wire bound: MET, live
+
+`id_server − id_client` at send, per record:
+
+| leg | histogram | worst | bound |
+|---|---|---|---|
+| x018 lan | 0:2396 1:1252 2:4 | 2 | 3 |
+| x019 wan40 | 0:4 1:4 2:1104 | 2 | 3 |
+| x017 d40 (old, proxy) | 0:556 1:552 2:552 | 2 | (no window enforced) |
+
+CI asserts this over the whole reachable state space; it now also holds
+on real hardware at 40 ms. Note the shape difference: the old build at
+D = 40 split evenly across 0/1/2 because the window was not being
+enforced at all (BACKLOG #80: "two thirds of sends exceeded the bound"),
+while the frontier at 40 ms sits at 2 for 99 % of sends — the window is
+saturated and holding.
+
+## P5 — mechanism check: MET
+
+Every `ackslot` and `ackregion` record on both new legs reads C = 1.
+RTT verified by measurement through each arm's own RDP port before the
+leg (40.490 ms) and again after it (40.428 ms), so a qdisc that fell off
+mid-run could not hide.
+
+Ack traffic, which is the change itself: x018 emits 601 slot acks and
+911 region acks in 20 s where x017 emitted 559 and 558.
+
+## The rate at 40 ms, and what it does NOT say
+
+x019 ran at **16.8 frames/s, period 58.6 ms**, against x018's 54.1 /s.
+The period model closes: capture k needs the client to have acked k−3, so
+3P = L + ack latency; 3 × 58.6 = 175.8 against 43.7 + 122.9 = 166.6,
+within 6 %.
+
+**There is no old-build leg under netem, so this is not an A/B at 40 ms.**
+x017's D = 40 leg used the ack-delay proxy, which delayed one direction
+above TLS; netem delays both directions below TCP. Quality gate 5 forbids
+reading those against each other, and the analysis output labels that row
+`x017-d40prox` for exactly this reason. A true old-vs-new comparison at
+40 ms needs one more leg (x017 behind netem 40, ~2 min).
+
+## Still not known after this run
+
+* **The shipped default C is still unchosen.** Two RTT points do not make
+  the RTT → C table FR-FLOW-1 clause 4 asks for, and the run measured C = 1
+  only. What it did produce is the missing unit of account: 3.3 MB of
+  transport queue per unit of C at 4K, against (C+2)/RTT of frame rate.
+* **The freeze leg has not run.** #80 step 4 also calls for a client that
+  stops acking; that tests whether production stops within C + 2 frames
+  and `wait_bytes` plateaus. Not part of the approved two.
+* **The per-monitor bound is untested.** Everything here is one monitor.
+  At M monitors the wire bound is C + 2·M and the queue term scales with
+  it — see BACKLOG #80's note.

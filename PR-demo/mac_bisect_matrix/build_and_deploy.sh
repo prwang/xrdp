@@ -66,6 +66,12 @@ DIST=${DIST:-/work/dist}
 # owner approved for #75, and its comparison target is x013's recorded
 # 25.5 ms:
 #   build_and_deploy.sh x014
+# x018 / x019 are the BACKLOG #80 step 4 / #81 WAN PAIR: the same image,
+# the same xorgxrdp and the same gfx.toml body, measured at two round
+# trip times (loopback baseline and 40 ms) applied from the host with
+# netem_rtt.sh. Deployed together or not at all -- a WAN measurement
+# with no same-build LAN leg has no baseline:
+#   build_and_deploy.sh x018 x019
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -141,6 +147,14 @@ declare -A ARM_XORG_DEB=(
     # x017 (#78): the SAME xorgxrdp as x014/x015 -- the pump split is
     # xrdp-internal and the producer must stay identical
     [x017]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x018/x019 (#80 step 4 / #81): the credit frontier. The SAME
+    # xorgxrdp as x014/x015/x017 -- #80 changed only the arithmetic that
+    # produces the credit, not the wire's credit semantics, so the
+    # producer side is byte-identical to the arms this pair is read
+    # against. If this deb ever differs from x017's, the head-to-head
+    # against x017 is void.
+    [x018]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x019]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -189,6 +203,12 @@ declare -A ARM_TAG=(
     # x017 (#78): x015's config on the pump-split instrumented xrdp
     # (feedend/outfirst on the existing perf ring, nothing else)
     [x017]=661ff5fc64fa.xx10fa3aa-tf
+    # x018/x019 (#80 step 4 / #81): the SAME TAG on both. The pair is a
+    # WAN comparison, so a build difference between its two halves would
+    # be the one thing that ruins it; the RTT is applied from the host by
+    # netem_rtt.sh and lives in neither image nor manifest.
+    [x018]=1d5bc0960db8.xx10fa3aa-tf
+    [x019]=1d5bc0960db8.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -237,6 +257,11 @@ declare -A TAG_DEB=(
     # child per cycle on the existing ring; behaviourally a no-op with
     # the sink disarmed
     [661ff5fc64fa.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260802030326.661ff5fc64fa_amd64.deb"
+    # x018/x019 (#80): the credit frontier. Supersedes x017's build and
+    # keeps its instrumentation -- feedend/outfirst are still there, plus
+    # ackslot/ackregion carrying the client frontier and C, and egress
+    # carrying the transport's queued KiB from trans::wait_bytes.
+    [1d5bc0960db8.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260803024109.1d5bc0960db8_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

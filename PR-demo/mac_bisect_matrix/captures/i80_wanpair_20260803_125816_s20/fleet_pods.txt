@@ -1,0 +1,7 @@
+NAME                         READY   STATUS    RESTARTS      AGE
+xrdp-x013-5c46f4d6db-2bmlj   1/1     Running   1 (37h ago)   39h
+xrdp-x014-84dbb77fc6-wggdt   1/1     Running   0             37h
+xrdp-x015-64679c686-2qdtw    1/1     Running   0             34h
+xrdp-x017-5cc89b487-dj4xw    1/1     Running   0             33h
+xrdp-x018-7f9bd48555-pnk8k   1/1     Running   0             3m15s
+xrdp-x019-57c6676486-s7fhw   1/1     Running   0             3m15s

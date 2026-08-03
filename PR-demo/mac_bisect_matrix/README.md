@@ -52,6 +52,19 @@ construction, and the tester always knows which arm is on screen.
 - `e52_flood_analyze.py` — where the frame interval goes, per arm: service
   split, per-monitor period, the `last=1 → next own dmg` wait that says
   whether the pipeline was full, `kids_armed` histogram, ack path.
+- `netem_rtt.sh` — BACKLOG #81: simulate a WAN by putting a `tc netem`
+  delay on BOTH ends of one arm's veth pair (half the RTT each way), so
+  a round trip picks up the whole thing. Verifies the applied RTT by
+  measurement through that arm's own RDP hostPort, refuses an interface
+  carrying a qdisc it did not create, and restores everything on exit.
+  `netem_rtt.sh selftest <arm>` proves all four in 22 s.
+  **It replaces `ack_delay_proxy` / `ack_delay_sweep.sh`, deleted
+  2026-08-03** (owner: 100 % CPU when idle, and it overlaps with netem).
+  `i79_ack_delay_analyze.py` stays — it is the measurement layer the
+  #80 head-to-head imports, not part of the proxy.
+- `i80_wan_pair.sh` + `i80_wan_pair_analyze.py` — BACKLOG #80 step 4:
+  the credit frontier measured at two round-trip times (arms x018/x019),
+  with the predictions written into the runner's header before the run.
 - **`sessions_off.sh` — run this after a campaign.** A fleet session keeps
   running its payload after the client disconnects; accumulated sessions
   were found burning ~4 cores (2026-07-30). One command logs every session
