@@ -1814,6 +1814,40 @@ settles about our measured 40 ms equilibrium:
     Tier 3 buys loss-resilience (irrelevant on our loss-free testbed,
     relevant on real WANs).
 
+**Logistics recon (2026-08-04, probed live on this box, the pods and
+the veths — not assumed):**
+* Feasible from inside the incus box / pods with no metal-host help:
+  every per-netns sysctl (`tcp_slow_start_after_idle`, `tcp_wmem`,
+  `tcp_notsent_lowat`, `tcp_congestion_control` — all verified
+  WRITABLE in both the incus netns and a pod netns); every per-socket
+  option (`TCP_NOTSENT_LOWAT`, `SO_MAX_PACING_RATE`, `SO_SNDBUF` to
+  8 MB verified accepted in the pod netns — xrdp runs as root in
+  privileged pods, so the `wmem_max` cap does not bind, but note an
+  explicit `SO_SNDBUF` disables kernel autotuning and must be sized
+  deliberately); and the `fq` pacing qdisc (`sch_fq` is available —
+  installed and removed cleanly on a fleet veth).
+* NOT feasible from here: **BBR**. `tcp_available_congestion_control`
+  is `reno cubic` only; `setsockopt(TCP_CONGESTION, "bbr")` in the pod
+  netns fails ENOENT; the incus container has NO `/lib/modules` tree
+  and cannot load kernel modules (module loading is a metal-host
+  operation; the shared kernel is `7.0.0-27-generic`).
+* **Metal-host accommodation (owner action, two lines + persistence):**
+      sudo modprobe tcp_bbr
+      echo tcp_bbr | sudo tee /etc/modules-load.d/tcp_bbr.conf
+  Optionally, so non-privileged namespaces may also select it:
+      sudo sysctl -w net.ipv4.tcp_allowed_congestion_control="reno cubic bbr"
+  If `modprobe` reports the module missing, the metal host needs its
+  kernel's standard modules package (`tcp_bbr.ko` ships in the stock
+  Ubuntu `linux-modules` for -generic kernels). Once loaded it is
+  global: it appears in the available list in every namespace, and our
+  privileged processes (CAP_NET_ADMIN) can select it per-socket or
+  per-netns with nothing else changed.
+* Interplay with the netem harness: netem owns the root qdisc on the
+  shaped interfaces, so `fq` cannot also be root there. Not a blocker:
+  BBR paces internally since kernel 4.13 (fq optional), and
+  `SO_MAX_PACING_RATE` works without fq (verified). If fq is ever
+  wanted under netem it can stack as netem's child.
+
 **Decisions this item needs from the owner, in order:**
 1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
    floor + stall rate + quality×delay Pareto) in place of / beside
