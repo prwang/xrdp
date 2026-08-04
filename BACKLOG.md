@@ -85,6 +85,7 @@ numbers.
 16. **#95** (was #54) — capture-side handoff: the remaining 2×
 17. **#96** (was #59) — capture share of the bottleneck thread
 18. **#97** (was #60) — T4 E5-2 bimodality
+19. **#98** — act on the flow-control literature survey (filed 2026-08-04; owner decisions needed on FoM + tier)
 
 ## #82 (was #76) — fif = 2 is hiding a bug (owner directive, 2026-08-02) — REFRAMED by #78's runs; the fix moved to #79, since merged into #80
 
@@ -1771,3 +1772,63 @@ retractions are in the linked file; the code is in git.
 | **#62** textflood payload | DONE. 1.41× RED, then annotated producer-confounded. | [`62-textflood-payload.md`](docs/experiments/62-textflood-payload.md) |
 | **#64** rect_id ack "ghost" | CLOSED. Root cause REFUTED — the ack is an echo and never drifted. Machinery survived into #70. | [`64-rect-id-ack-ghost.md`](docs/experiments/64-rect-id-ack-ghost.md) |
 | **#70** eager slot-release ack | DONE, shipped default-off. 1.11×, encode‖tail 4.8 → 8.5 ms. Step 0 answered NO. Incomplete without #70B per PRD FR-ACK-2. | [`70-eager-slot-release-ack.md`](docs/experiments/70-eager-slot-release-ack.md) |
+
+## #98 — act on the flow-control literature survey (TODO — filed 2026-08-04; OWNER DECISIONS NEEDED before any code)
+
+**What.** The owner suspected we were re-deriving known theory; a
+web-verified literature survey (15 years of SIGCOMM/NSDI/MobiCom/CoNEXT
++ deployed cloud-gaming systems) confirms it and is filed at
+`docs/research/flow-control-survey-2026-08.md`. Summary of what it
+settles about our measured 40 ms equilibrium:
+
+* The measured closed form (`ack_latency = 50.5 ms + queue/43.1 MiB/s`,
+  standing queue = window_bytes − BDP, drain = cwnd/RTT) is textbook —
+  it is BBR's window-limited operating-region equation plus Little's
+  law, and the multiple-equilibria property is Kleinrock (1979) /
+  Jaffe (1981). The cwnd pinning is RFC 7661 behaving as specified,
+  and its own recommended mitigation is pacing.
+* **The bound to chase:** send-to-ack ≥ RTT + frame_size/bandwidth
+  ≈ 60–100 ms on our 40 ms link, vs 203.7 measured.
+* **The field's figures of merit** (every deployed system: Stadia/GCC,
+  Google SQP, Tencent Pudica NSDI '24, Salsify NSDI '18): p95/p99
+  per-frame delivery delay at a quality floor, stall rate, and the
+  quality×delay Pareto — NOT frames/s at a given RTT. Industry latency
+  budgets: <100 ms end-to-end for gaming-class, <150 ms RTC-class.
+* **Remedies by implementation weight**, with the survey's expected
+  effect on our numbers:
+  - Tier 0 (config, hours): BBR + fq pacing on the server egress,
+    `tcp_slow_start_after_idle=0`, buffers ≥ BDP + 2 frames.
+  - Tier 1 (socket code, days): `TCP_NOTSENT_LOWAT` (~128 KB) so the
+    standing queue lives in xrdp where damage-coalescing can eat it,
+    plus userspace frame pacing (Trickle ATC '12 / SQP): spread each
+    frame over the period at ~1.2× the needed rate instead of a
+    3.4 MB burst. Tier 0+1 expected: 203.7 → ~60–100 ms send-to-ack,
+    11.5 → ~25–45 fps at 40 ms.
+  - Tier 2 (app rate control, weeks): encoder per-frame byte budget =
+    delivered_rate × period — the direction EVERY deployed system
+    converged on; the only tier that survives a genuinely slow link;
+    what 60 fps at 40 ms requires (≤750 KB/frame at 43 MiB/s). Also:
+    size the credit C to ⌈RTT/period⌉ + 1 rather than a constant.
+  - Tier 3 (transport, months): QUIC / RDPEUDP2-style UDP. The survey's
+    read: most of the latency win is already captured at Tier 2;
+    Tier 3 buys loss-resilience (irrelevant on our loss-free testbed,
+    relevant on real WANs).
+
+**Decisions this item needs from the owner, in order:**
+1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
+   floor + stall rate + quality×delay Pareto) in place of / beside
+   fps-at-RTT? This changes what every future WAN gate asserts.
+2. Authorize a Tier 0+1 experiment (the cheapest lever the survey
+   predicts moves 203.7 ms materially; needs an arm count + wall time
+   stated before running, per the 2-minute rule).
+3. Whether Tier 2 (encoder rate adaptation) enters the roadmap as its
+   own item — it is a new control loop touching the encoder config
+   surface, not a tweak.
+
+**Interaction with #80:** none of this reopens #80's steps 1–3 — the
+credit frontier is about WHO stalls WHOM inside the server, and its
+LAN result stands. It reframes step 4's remaining work: the C-table's
+prerequisite ("declared TCP environment") now has a concrete shape —
+declare CC algorithm, pacing, and buffer sizes per leg — and C's own
+sizing rule has a candidate closed form (⌈RTT/period⌉ + 1) to test
+instead of a table search.
