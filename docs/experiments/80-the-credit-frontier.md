@@ -497,3 +497,42 @@ heuristics are worst at).
   is governing a TCP flow that cannot fill it.
 * The LAN head-to-head is untouched by any of this (no netem on either
   side of it).
+
+## Addendum 2026-08-04: the 203.7 ms decomposed per frame (owner challenge: "40 + 87 = 127, so 73 ms unexplained")
+
+The owner's arithmetic assumed the frame's bytes start transmitting at
+its own egress — true only if the transport queue is EMPTY when the
+frame arrives. It never is. From the corrected leg's trace (the
+`egress` record fires after the frame's LAST byte is handed to the
+transport, and its field c is the queue INCLUDING that frame's own
+unaccepted bytes):
+
+* **The queue never empties.** Queue at egress across 182 frames:
+  min 5 516 KiB (1.58 frames), p50 6 714 (1.92), max 7 669 (2.20).
+  There is no instant in the whole leg where a frame found less than
+  1.58 frames' worth of bytes ahead-and-including itself.
+* **Per-frame regression** of (cliack_k − egress_k) against queue_k,
+  n = 179:
+
+      ack_latency_k = 50.5 ms + queue_k / 43.1 MiB/s      R² = 0.914
+
+  Cross-check: the drain rate measured independently, from how much the
+  queue fell between consecutive egresses, is 39.8 MiB/s p50 —
+  consistent with the fitted 43.1.
+* **Median frame:** 6 714 KiB ahead-and-own ÷ 43.1 MiB/s = 152.2 ms of
+  queue wait+transmission, plus the queue-independent 50.5 ms
+  (40.45 ms measured RTT + ~10 ms client receive/ack processing)
+  = 202.8 ms, against the measured p50 of 203.7.
+
+So the "missing" 73 ms is the ~0.9 extra frame of STANDING backlog
+(152 ms of drain instead of the assumed ≤ 87 ms) plus ~10 ms of client
+side. Why the backlog stands at ~2 frames: admission is window-clocked
+— capture k is admitted precisely when the client acks k−3, i.e. always
+at the moment 2 frames are unacknowledged (99 % of sends at exactly 2)
+— which commits ~6.8 MB to the transport while TCP is flying only
+43.1 MiB/s × 40 ms ≈ 1.7 MB of it. The remainder is the queue, and the
+equilibrium is self-reinforcing: cwnd sets the drain rate, the drain
+rate sets the ack latency, the ack latency sets the period, and the
+period sets the offered load right back at the drain rate. The voided
+bufferbloat leg had found a *different, faster* equilibrium of the same
+loop, which is why its removal slowed the pipeline.
