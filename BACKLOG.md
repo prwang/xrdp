@@ -1848,6 +1848,18 @@ the veths — not assumed):**
   `SO_MAX_PACING_RATE` works without fq (verified). If fq is ever
   wanted under netem it can stack as netem's child.
 
+**Tier 0 A/B RUN 2026-08-05 (owner-directed) — CONFIRMED AT THE
+FLOOR.** Two legs on x019 at netem 40 ms, cubic-control vs
+bbr+ssai=0+wmem16M, knob proven on the live socket, control leg
+reproduced the 2026-08-03 baseline to 0.1 %. Result: send-to-ack
+204.2 → **50.1 ms** (theory floor ≈ 50–55 on a 40.38 ms link), fps
+11.5 → **36.6**, transport queue 6.65 MB → **25 KiB**, wire bound
+held, cwnd 4.5k → 23k pkts. The survey's Tier-0 mechanism claim is
+confirmed by intervention; details and the BBR ProbeRTT caveat in
+`docs/experiments/98-tier0-bbr-ab.md`. Still owed: LAN regression
+check of tier0, C>1 under tier0 (model now predicts ~56 fps at C=2),
+Tier 1, and the FoM decision.
+
 **Decisions this item needs from the owner, in order:**
 1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
    floor + stall rate + quality×delay Pareto) in place of / beside

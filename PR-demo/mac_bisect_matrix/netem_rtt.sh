@@ -345,7 +345,13 @@ cmd_apply()
     # that does not state it will misattribute that ceiling to the
     # thing it was measuring (it did, 2026-08-03).
     local wmem_max ceil
-    wmem_max=$(awk '{print $3}' /proc/sys/net/ipv4/tcp_wmem)
+    # the POD's tcp_wmem, not the host's -- the server socket lives in
+    # the pod netns and that is the value that caps its in-flight bytes
+    # (caught 2026-08-05: a leg with pod wmem raised to 16 MB printed
+    # the host's 4 MB as its declared ceiling)
+    wmem_max=$(nsenter -t "$PPID_NS" -n awk '{print $3}' \
+               /proc/sys/net/ipv4/tcp_wmem 2>/dev/null \
+               || awk '{print $3}' /proc/sys/net/ipv4/tcp_wmem)
     ceil=$(python3 -c "print('%.0f' % ($wmem_max / ($rtt / 1000.0) / 1e6))")
     echo "netem_rtt: $arm applied ${rtt} ms RTT" \
          "(${half_us} us each way, jitter ${jit} ms, loss ${loss} %)"
