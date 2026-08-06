@@ -71,3 +71,32 @@ RTT estimate). One ~250 ms hiccup per ~10 s; in the max, not the p99.
   sysctl applied by hand and reverted. Shipping it means either
   per-socket `TCP_CONGESTION` in xrdp (Tier 1 code, works without any
   sysctl) or documented host guidance — owner's call in #98.
+
+---
+
+# Addendum 2026-08-06: bandwidth-limited links — graceful by the pre-registered definition, and the window bound is the whole story
+
+Owner-directed: "bandwidth limited links: the fps needs to downgrade
+gracefully without excessive added delay, report that test." Harness
+gained a DECLARED bottleneck (tbf under the pod-side netem, drop-tail,
+100 ms buffer, server→client only, rate verified by bulk measurement
+per leg — no repeat of the undeclared-ceiling incident). Four legs on
+x019 (C = 1, 40 ms RTT): bbr at 400/200/100 Mbit, cubic at 200 as the
+contrast. Capture: `i98_bwlimit_20260806_003023_s20`, predictions
+pre-registered in its README.
+
+Verdict, per the pre-registered criteria: **GRACEFUL at every rate.**
+fps = B/S within 3 % (12.8 / 6.5 / 3.35 against links of 44.1 / 22.4 /
+11.3 MB/s); send-to-ack sits at 0.72–0.90 of the window bound
+`(C+2)·S/B + RTT` and is flat across each leg (±2 % — nothing
+accumulates); wire bound held on every send; drop-by-coalesce kept
+every delivered frame fresh; bottleneck drops 0–30 packets per leg.
+cubic ≈ bbr when the link binds (window is the governor; CC is
+second-order there), though cubic pushes the standing 2 frames back
+into xrdp's wait_s and re-inflates capture-to-send L 21 → 52 ms.
+
+The number that matters going forward: **the bounded delay is still
+large in absolute terms** — ~0.44 s at 200 Mbit, ~0.9 s at 100 Mbit —
+because at fixed S the window bound IS (C+2) frame-serializations.
+Interactivity budgets (<100–150 ms) at these rates require S ≈ 0.5 MB
+at 200 Mbit: Tier 2 encoder rate adaptation, as the survey concluded.

@@ -47,7 +47,14 @@
 # two ends of one pod's veth pair.
 #
 # Usage:
-#   netem_rtt.sh apply  <arm> <rtt_ms> [jitter_ms] [loss_pct]
+#   netem_rtt.sh apply  <arm> <rtt_ms> [jitter_ms] [loss_pct] [rate_mbit]
+#       rate_mbit adds a DECLARED bottleneck on the server->client
+#       (video) direction: a tbf shaper stacked under the pod-side
+#       netem, drop-tail, buffer = NETEM_TBF_BUF_MS (default 100 ms at
+#       the configured rate) -- the shape of a real access link. The
+#       ack direction stays unshaped (asymmetric, like real broadband).
+#       The applied rate is verified by a bulk-transfer MEASUREMENT
+#       sized to ~3 s at the configured rate.
 #   netem_rtt.sh verify <arm> <expect_rtt_ms>
 #   netem_rtt.sh clear  <arm>
 #   netem_rtt.sh status <arm>
@@ -228,6 +235,21 @@ pod_host_port()
         | head -1
 }
 
+# Declared bottleneck buffer, in milliseconds at the configured rate.
+# 100 ms drop-tail is a typical access-link buffer; it is part of the
+# declared environment and printed on every apply.
+NETEM_TBF_BUF_MS=${NETEM_TBF_BUF_MS:-100}
+
+# tbf child under the pod-side netem: the bottleneck sits in the
+# server->client direction only. Deleting the root netem removes it.
+tbf_add_pod()
+{
+    local pid=$1 rate_mbit=$2
+    nsenter -t "$pid" -n tc qdisc add dev eth0 parent "$HANDLE:" \
+        handle 8082: tbf rate "${rate_mbit}mbit" burst 256kb \
+        latency "${NETEM_TBF_BUF_MS}ms"
+}
+
 # --- measurement --------------------------------------------------------
 
 # median TCP handshake time in ms to 127.0.0.1:<port>. One handshake is
@@ -302,7 +324,7 @@ cmd_clear()
 
 cmd_apply()
 {
-    local arm=$1 rtt=$2 jit=${3:-0} loss=${4:-0}
+    local arm=$1 rtt=$2 jit=${3:-0} loss=${4:-0} rate=${5:-0}
     resolve "$arm"
 
     local h p
@@ -337,6 +359,13 @@ cmd_apply()
         || fail "tc failed on host $VETH"
     qdisc_add pod "$PPID_NS" eth0 "$half_us" "$jit" "$loss" \
         || { qdisc_del host "$PPID_NS" "$VETH"; fail "tc failed in pod netns"; }
+    if [ "$rate" != 0 ]
+    then
+        tbf_add_pod "$PPID_NS" "$rate" \
+            || { qdisc_del host "$PPID_NS" "$VETH"
+                 qdisc_del pod "$PPID_NS" eth0
+                 fail "tbf failed in pod netns"; }
+    fi
 
     # Declare the WHOLE environment, not just the knob that was asked
     # for. An emulated link has a bandwidth ceiling whether or not one
@@ -358,7 +387,31 @@ cmd_apply()
     echo "netem_rtt: declared environment: netem limit $NETEM_LIMIT_PKTS" \
          "pkts/direction; single-flow TCP ceiling ~= tcp_wmem_max" \
          "($wmem_max B) / RTT = ~${ceil} MB/s"
+    if [ "$rate" != 0 ]
+    then
+        echo "netem_rtt: declared bottleneck: ${rate} Mbit/s" \
+             "server->client, drop-tail buffer ${NETEM_TBF_BUF_MS} ms" \
+             "at that rate; ack direction unshaped"
+    fi
     cmd_verify "$arm" "$rtt"
+    if [ "$rate" != 0 ]
+    then
+        # verify the RATE by measurement too: bulk transfer sized to
+        # ~3 s at the configured rate, through the same interfaces
+        local want_MBs meas bytes
+        want_MBs=$(python3 -c "print('%.1f' % ($rate / 8.0))")
+        bytes=$(python3 -c "print(int($rate / 8.0 * 1e6 * 3))")
+        meas=$(bulk_probe_mbs "$arm" "$bytes")
+        echo "netem_rtt: bottleneck verify: configured ${want_MBs} MB/s," \
+             "bulk-measured ${meas} MB/s"
+        python3 -c "
+import sys
+want, got = float('$want_MBs'), float('$meas')
+if abs(got - want) > 0.15 * want:
+    sys.exit('netem_rtt: ABORT: measured rate %.1f is not the '
+             'configured %.1f MB/s' % (got, want))
+" || fail "bottleneck rate did not verify"
+    fi
 }
 
 cmd_verify()

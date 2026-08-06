@@ -1860,6 +1860,20 @@ confirmed by intervention; details and the BBR ProbeRTT caveat in
 check of tier0, C>1 under tier0 (model now predicts ~56 fps at C=2),
 Tier 1, and the FoM decision.
 
+**Bandwidth-limited legs RUN 2026-08-06 (owner-directed) — GRACEFUL
+by the pre-registered definition.** Harness gained a declared tbf
+bottleneck (rate verified by measurement per leg). bbr at 400/200/100
+Mbit + cubic contrast at 200, all C = 1, RTT 40: fps tracks link/frame
+within 3 % (12.8/6.5/3.35), send-to-ack flat at 0.72–0.90 of the
+window bound (C+2)·S/B + RTT, wire bound held, drops ≤ 30 pkts/leg,
+frames stay fresh by coalescing. cubic ≈ bbr when the link binds — the
+window governs; but cubic re-inflates capture-to-send 21 → 52 ms and
+parks the standing frames in wait_s instead of the socket. The bounded
+delay is still ~0.9 s at 100 Mbit: interactivity at low rates needs
+smaller frames (Tier 2), quantified at ≤0.5 MB/frame for a 150 ms
+budget at 200 Mbit. Record: `docs/experiments/98-tier0-bbr-ab.md`
+addendum; capture `i98_bwlimit_20260806_003023_s20`.
+
 **Decisions this item needs from the owner, in order:**
 1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
    floor + stall rate + quality×delay Pareto) in place of / beside
