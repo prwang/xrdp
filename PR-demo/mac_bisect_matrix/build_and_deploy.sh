@@ -72,6 +72,18 @@ DIST=${DIST:-/work/dist}
 # netem_rtt.sh. Deployed together or not at all -- a WAN measurement
 # with no same-build LAN leg has no baseline:
 #   build_and_deploy.sh x018 x019
+# x020 / x021 are the MERGED EAGER-ACK A/B (owner-approved 2026-08-06):
+# the same image as x018/x019, the same xorgxrdp, the same payload, and
+# gfx.toml bodies differing by ONE line -- eager_slot_ack, false on x020
+# (the shipped gated ack) and true on x021 (the credit frontier). Both
+# arms run a client window of 2, reached by DIFFERENT mechanisms: x020
+# through XRDP_GFX_FRAMES_IN_FLIGHT=2 in its manifest, x021 through
+# gfx.toml wire_window = 2, the value the code ships as its default and
+# which no arm in this tree has ever run (every other wire_window here
+# is 1). Holding the number equal is what makes the A/B about the ack
+# mechanism instead of window size. Neither arm builds anything -- both
+# are config-only on a cached image. Deployed together or not at all:
+#   build_and_deploy.sh x020 x021
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
 ARMS="${*:-arm-e arm-m arm-n}"
 
@@ -155,6 +167,12 @@ declare -A ARM_XORG_DEB=(
     # against x017 is void.
     [x018]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x019]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x020/x021 (the merged eager-ack A/B): the SAME xorgxrdp as
+    # x017/x018/x019 and the SAME image on both halves. The producer is
+    # not part of this experiment -- the treatment is one gfx.toml line
+    # in xrdp -- so any difference here would void the pair.
+    [x020]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x021]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     [arm-e]=c693eeab5ec2
@@ -209,6 +227,14 @@ declare -A ARM_TAG=(
     # netem_rtt.sh and lives in neither image nor manifest.
     [x018]=1d5bc0960db8.xx10fa3aa-tf
     [x019]=1d5bc0960db8.xx10fa3aa-tf
+    # x020/x021 (the merged eager-ack A/B): x018/x019's TAG on both, on
+    # purpose. These arms ship no new code -- they are gfx.toml and one
+    # env var -- so the image cache hits, nothing is built, and the two
+    # halves of the A/B are the same bytes by construction. This tag
+    # predates the payload-identity suffix below; it is grandfathered
+    # and must not be rebuilt (see PAYLOAD_HASH).
+    [x020]=1d5bc0960db8.xx10fa3aa-tf
+    [x021]=1d5bc0960db8.xx10fa3aa-tf
 )
 declare -A TAG_DEB=(
     [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
@@ -278,7 +304,60 @@ if [ -s /root/.oracle_cred ]; then
     chmod 600 /etc/xrdp-matrix/probe.hash
 fi
 
-# --- images: one per distinct xrdp-dev commit ---
+# --- payload identity: hash the benchmark payload into the tag --------
+# (2026-08-06) A tag used to name TWO things: the xrdp build (<commit>)
+# and the xorgxrdp build (.xx<hash>). It did NOT name the benchmark
+# payload, even though the payload is compiled INTO the image (the
+# textflood builder stage in the Containerfile) and is what generates
+# every frame the measurement is about. So a change to
+# PR-demo/textflood/*.c had two possible outcomes, both wrong: the tag
+# already existed, the build was skipped, and the arm quietly ran the
+# OLD payload; or FORCE_BUILD=1 overwrote the image in place, and every
+# result previously measured on that tag now pointed at bytes that no
+# longer existed. The arm certificate cannot catch either one -- its key
+# is image tag plus config hash, and the image tag did not move.
+#
+# THE SCHEME. New tags carry a third component:
+#
+#     <xrdp commit>.xx<xorgxrdp hash>[-tf][-xfce].p<payload hash>
+#
+# where <payload hash> is the first 8 hex digits of a SHA-256 over every
+# PR-demo/textflood/*.c file, in LC_ALL=C name order, each preceded by
+# its basename (so a rename moves the hash too). Change the payload and
+# the tag necessarily changes; the old image keeps its own name and the
+# results measured on it stay meaningful.
+#
+# EXISTING TAGS ARE LEFT ALONE. Every tag registered above predates this
+# scheme and has no .p component. Those are grandfathered: they deploy
+# from cache exactly as before, are never renamed, and are never
+# rebuilt -- rebuilding one today would compile whatever payload is
+# checked out into an image whose name promises the payload of the day
+# it was first built. If a legacy image is genuinely missing and must be
+# rebuilt, that is a decision with consequences for every past capture
+# that cites it, so it is refused here and re-enabled deliberately with
+# ALLOW_LEGACY_PAYLOAD_REBUILD=1.
+#
+# CONSERVATIVE ON PURPOSE. Only textflood.c enters the build context
+# today, but the hash covers every .c in the payload directory. The
+# error direction is "a new tag when the image would have been
+# identical", never "the same tag for a different image".
+PAYLOAD_SRC=()
+while IFS= read -r f; do
+    # an unmatched glob comes back as itself; drop it rather than hash it
+    [ -f "$f" ] && PAYLOAD_SRC+=("$f")
+done < <(printf '%s\n' "$D"/../textflood/*.c | LC_ALL=C sort)
+[ "${#PAYLOAD_SRC[@]}" -gt 0 ] || {
+    echo "ABORT: no payload sources in PR-demo/textflood"; exit 1; }
+PAYLOAD_HASH=$(
+    for f in "${PAYLOAD_SRC[@]}"; do
+        printf '%s\n' "${f##*/}"
+        cat "$f"
+    done | sha256sum | cut -c1-8)
+echo "payload identity: .p$PAYLOAD_HASH over" \
+     "$(printf '%s ' "${PAYLOAD_SRC[@]##*/}")"
+echo "  (a NEW arm's tag should end .p$PAYLOAD_HASH)"
+
+# --- images: one per distinct xrdp-dev commit + payload ---
 BUILD="$D/.build"
 rm -rf "$BUILD" && mkdir -p "$BUILD"
 cp "$D/entrypoint.sh" "$D/startwm.sh" "$D/banner.sh" "$BUILD/"
@@ -286,12 +365,57 @@ cp "$D/entrypoint.sh" "$D/startwm.sh" "$D/banner.sh" "$BUILD/"
 cp "$D/../textflood/textflood.c" "$BUILD/"
 for arm in $ARMS; do
     tag=${ARM_TAG[$arm]}
+    # split the payload component off the tag, if it has one
+    case $tag in
+        *.p[0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f][0-9a-f])
+            tag_payload=${tag##*.p}
+            core_tag=${tag%.p*}
+            ;;
+        *)
+            tag_payload=""
+            core_tag=$tag
+            ;;
+    esac
+    # The grep is anchored: without the $ a legacy tag would also match
+    # the payload-suffixed image built from it, and the build would be
+    # skipped because a DIFFERENT image happened to share a prefix.
     if [ "${FORCE_BUILD:-0}" != "1" ] \
-            && k3s ctr images ls -q | grep -q "xrdp-bisect:$tag"; then
+            && k3s ctr images ls -q | grep -q "xrdp-bisect:$tag\$"; then
+        if [ -n "$tag_payload" ] && [ "$tag_payload" != "$PAYLOAD_HASH" ]; then
+            echo "note: $arm deploys cached image payload .p$tag_payload" \
+                 "while the tree holds .p$PAYLOAD_HASH — right when" \
+                 "reproducing an earlier result, wrong otherwise"
+        fi
         continue
     fi
-    base_tag=${tag%-xfce}
-    xfce=0; [ "$base_tag" != "$tag" ] && xfce=1
+    # From here the image WILL be built, so its name has to be honest
+    # about the payload going into it.
+    if [ -n "$tag_payload" ]; then
+        if [ "$tag_payload" != "$PAYLOAD_HASH" ]; then
+            echo "ABORT: $arm's tag names payload .p$tag_payload but" \
+                 "PR-demo/textflood/*.c hashes to .p$PAYLOAD_HASH." >&2
+            echo "Building would put today's payload under a name that" >&2
+            echo "promises a different one. Either check out the payload" >&2
+            echo "that tag was built from, or register the arm with a" >&2
+            echo "tag ending .p$PAYLOAD_HASH." >&2
+            exit 1
+        fi
+    elif [ "${ALLOW_LEGACY_PAYLOAD_REBUILD:-0}" != "1" ]; then
+        echo "ABORT: $arm's tag '$tag' predates the payload component" >&2
+        echo "and its image is not in the store, so this run would" >&2
+        echo "rebuild it from whatever payload is checked out now —" >&2
+        echo "silently replacing the bytes earlier captures cite." >&2
+        echo "Register the arm as '$tag.p$PAYLOAD_HASH' for a fresh" >&2
+        echo "image, or set ALLOW_LEGACY_PAYLOAD_REBUILD=1 if you have" >&2
+        echo "restored the payload that tag was built from." >&2
+        exit 1
+    else
+        echo "WARNING: rebuilding legacy tag '$tag' with payload" \
+             ".p$PAYLOAD_HASH (ALLOW_LEGACY_PAYLOAD_REBUILD=1). The" \
+             "tag does not record which payload is inside it."
+    fi
+    base_tag=${core_tag%-xfce}
+    xfce=0; [ "$base_tag" != "$core_tag" ] && xfce=1
     deb=${TAG_DEB[$base_tag]}
     xorg_deb="${ARM_XORG_DEB[$arm]:-$XORGXRDP_DEB}"
     cp "$DIST/$deb" "$DIST/$xorg_deb" "$BUILD/"

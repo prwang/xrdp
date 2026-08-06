@@ -1,0 +1,125 @@
+# Arm x020: the CONTROL half of the merged eager-ack A/B
+# (owner-approved 2026-08-06). Shipped behaviour: the legacy gated ack.
+#
+# THE PAIR. x020 and x021 carry the SAME image, the SAME xorgxrdp, the
+# SAME payload (SESSION_KIND=textflood) and gfx.toml bodies that differ
+# by EXACTLY ONE LINE (diff-verified):
+#
+#     x020   eager_slot_ack = false   the shipped gated ack; the window
+#                                     is XRDP_GFX_FRAMES_IN_FLIGHT below
+#     x021   eager_slot_ack = true    the credit frontier; the window is
+#                                     gfx.toml wire_window = 2
+#
+# BOTH ARMS RUN A WINDOW OF 2. That is deliberate, and it is what makes
+# the comparison about the ack MECHANISM rather than about window size.
+# The two arms reach 2 through DIFFERENT mechanisms -- this arm through
+# the legacy frames_in_flight environment variable, x021 through the
+# credit frontier's wire_window -- and that difference IS the treatment,
+# not an uncontrolled variable. See gfx/x020.toml's header.
+#
+# XRDP_GFX_FRAMES_IN_FLIGHT = 2 below is the window this arm's ack gate
+# actually uses (xrdp_gfx_ack_window_open, xrdp/xrdp_mm.c:1770). It is
+# also the binary's compiled-in default (DEFAULT_XRDP_GFX_FRAMES_IN_
+# FLIGHT = 2, xrdp/xrdp_encoder.c:51); it is written here rather than
+# left implicit so the deployed value is visible in the manifest, and so
+# the 'send' perf record's sixth field (encoder->frames_in_flight,
+# xrdp/xrdp_mm.c:4308) reads 2 on both arms and means the same thing on
+# both.
+#
+# NOTHING IS BUILT FOR THIS ARM. The image tag is x018/x019's, already
+# in the k3s image store; x020 and x021 are config-only arms, so no deb,
+# no podman build and no k3s import -- and no build difference can enter
+# the comparison.
+#
+# RDP endpoint on the host: 127.0.0.1:40036.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x020
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x020
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x020
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x020
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "textflood"
+            - name: ARM_LABEL
+              value: "x020: eager-ack A/B CONTROL, legacy gated ack, frames_in_flight=2 (port 40036)"
+            - name: XRDP_GFX_FRAMES_IN_FLIGHT
+              value: "2"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40036
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x020
