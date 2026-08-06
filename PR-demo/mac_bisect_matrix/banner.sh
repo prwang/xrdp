@@ -108,6 +108,36 @@ textflood)
     exec /usr/local/bin/textflood --corpus "$CORPUS" \
         --stamps /tmp/e52_textflood_stamps.tsv
     ;;
+textflood_strip)
+    # BACKLOG #83. The SAME payload as textflood, in its strip-render
+    # mode: the frame is scrolled with a copy and only the newly exposed
+    # band is rasterized, instead of every row being redrawn. Offline on
+    # this host that is 11.6 -> 2.68 ms/frame at 3840x2400.
+    #
+    # WHY IT IS A SEPARATE KIND AND NOT A FLAG ON textflood. Twenty-six
+    # archived captures were measured with the full redraw. A ratio is
+    # only comparable within one payload, so the two must be nameable
+    # apart in a capture's deployed_session_kind.txt, not distinguished
+    # by an argument nobody records.
+    #
+    # --lines-per-sec keeps the CONTENT rate fixed at what the full
+    # redraw actually achieved on x014 (25 lines per 16.901 ms frame).
+    # Without it a producer that draws 4x faster would also put 4x more
+    # motion into every encoded frame, and "the producer got faster"
+    # would silently also mean "the encoder's job got harder" -- the
+    # confound BACKLOG #83 exists to remove.
+    CORPUS=/usr/local/share/code_corpus.ansi
+    if [ ! -s "$CORPUS" ]; then
+        while true; do
+            xmessage -geometry 1200x200 \
+                "NO CODE CORPUS at $CORPUS - bench invalid" 2>/dev/null \
+                || sleep 5
+        done
+    fi
+    exec /usr/local/bin/textflood --corpus "$CORPUS" \
+        --scroll strip --lines-per-sec 1479.2 \
+        --stamps /tmp/e52_textflood_stamps.tsv
+    ;;
 gray|grayflood)
     exec "${XTERM[@]}" -e bash -c '
         DELAY=0.2
