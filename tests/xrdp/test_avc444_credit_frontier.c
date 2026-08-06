@@ -739,6 +739,180 @@ START_TEST(test_wedge_replay_d40_c1)
 END_TEST
 
 /****************************************************************************/
+/*
+ * THE FROZEN CLIENT -- the end-to-end guard doing its job, and then
+ * letting go of it.
+ *
+ * FR-FLOW-1 clause 2 puts the client's ack frontier at exactly one
+ * decision point, capture ADMISSION, and clause 4 states the one meaning
+ * of C there: at most C + 2 frames unacknowledged at send, the "+ 2"
+ * being xorgxrdp's per-monitor capture budget riding above the credit.
+ * Read together with clause 3's credit
+ * min(consumed, server + 1, client + C), a client that stops
+ * acknowledging at frame F pins every one of those:
+ *
+ *   the credit halts at F + C exactly -- the third term is the strict
+ *   minimum once the children and the transport have drained everything
+ *   the producer was allowed to make;
+ *
+ *   capture halts at F + C + MODEL_SLOTS, because xorgxrdp admits a
+ *   capture only while captured + 1 <= its own frontier + slots;
+ *
+ *   so the wire carries C + MODEL_SLOTS unacknowledged frames and not
+ *   one more, and the planner must then emit NOTHING, however many
+ *   further absorb or egress events arrive -- there is no ack left to
+ *   send that the window permits.
+ *
+ * Expected values are computed from those clauses by hand above; nothing
+ * here is read off the implementation. F is arbitrary (100) and the
+ * arithmetic is stated relative to it.
+ *
+ * The RESUME half is asserted in the same case on purpose. A pipeline
+ * that halts correctly and never restarts satisfies every assertion in
+ * the first half -- "emit nothing forever" is the trivially safe
+ * behaviour and it is a total stall. So: one client ack must move the
+ * credit by exactly one, twice, until the SLOT FACT takes over as the
+ * binding term and the credit stops again on a fact about the encoder
+ * rather than the network.
+ */
+#define FROZEN_F 100
+
+START_TEST(test_credit_frontier_frozen_client_halts_at_client_plus_c)
+{
+    int c;
+
+    for (c = 1; c <= 3; ++c)
+    {
+        struct model m;
+        int rounds;
+        int i;
+        int before;
+
+        /* Everything is drained and current at frame F: the client, the
+         * transport and the children all name F, and the producer has
+         * been told F. Then the client stops acknowledging, and NO
+         * CLIACK event occurs for the rest of the first half. */
+        m.captured = FROZEN_F;
+        m.consumed = FROZEN_F;
+        m.server = FROZEN_F;
+        m.client = FROZEN_F;
+        m.ack = FROZEN_F;
+        m.region = FROZEN_F;
+
+        /* Run capture, the encoder children and the transport as fast as
+         * they will go. Each round admits every capture xorgxrdp's own
+         * budget allows, drains all of it and sends all of it, planning
+         * after every absorb and every egress exactly as the live code
+         * does. Two rounds reach the halt; twenty is slack. */
+        for (rounds = 0; rounds < 20; ++rounds)
+        {
+            while (m.captured + 1 <= m.ack + MODEL_SLOTS)
+            {
+                m.captured += 1;
+            }
+            while (m.consumed < m.captured)
+            {
+                m.consumed += 1;
+                model_plan(&m, c);
+            }
+            while (m.server < m.consumed)
+            {
+                m.server += 1;
+                model_plan(&m, c);
+                /* clause 4's bound, checked at every send and not only
+                 * at the end */
+                ck_assert_int_le(m.server - m.client, c + MODEL_SLOTS);
+            }
+        }
+
+        /* (a) and (c): the halt is EXACT, not merely bounded. */
+        ck_assert_int_eq(m.ack, FROZEN_F + c);
+        ck_assert_int_eq(m.region, FROZEN_F + c);
+        ck_assert_int_eq(m.captured, FROZEN_F + c + MODEL_SLOTS);
+        ck_assert_int_eq(m.server, FROZEN_F + c + MODEL_SLOTS);
+        ck_assert_int_eq(m.client, FROZEN_F);
+        /* the wire bound is ATTAINED here, so the inequality above is a
+         * tight statement in this case rather than a comfortable one */
+        ck_assert_int_eq(m.server - m.client, c + MODEL_SLOTS);
+        /* and capture really is refused: one more frame would sit
+         * MODEL_SLOTS + 1 above the frontier */
+        ck_assert_int_gt(m.captured + 1, m.ack + MODEL_SLOTS);
+        /* the credit ITSELF, not merely the frontier the producer ended
+         * up holding. Both acks move the producer's slot frontier, so a
+         * credit that is one id too small or too large is masked by the
+         * region ack in the state above; asserted here directly against
+         * clause 3, min(F + C + MODEL_SLOTS, F + C + MODEL_SLOTS + 1,
+         * F + C) = F + C, so neither direction can hide. */
+        ck_assert_int_eq(xrdp_gfx_credit_frontier(m.consumed, m.server,
+                         m.client, c),
+                         FROZEN_F + c);
+
+        /* (b) once halted the planner emits nothing at all, no matter
+         * how far the stages downstream of capture are pushed. The
+         * pushed states are counterfactual -- the producer cannot reach
+         * them while the client is frozen -- which is the point: even
+         * handed them, the planner has no ack the window permits. */
+        for (i = 1; i <= 5; ++i)
+        {
+            struct xrdp_gfx_ack_state st;
+            struct xrdp_gfx_ack_plan plan;
+
+            st.frame_id_consumed = m.consumed + i;
+            st.frame_id_server = m.server + i;
+            st.frame_id_client = m.client;
+            st.wire_window = c;
+            st.frame_id_region_sent = m.region;
+            st.frame_id_server_sent = m.ack;
+            xrdp_gfx_plan_acks(&st, &plan);
+            ck_assert_int_eq(plan.region, -1);
+            ck_assert_int_eq(plan.slot, -1);
+        }
+        /* replanning the halted state itself is also silent */
+        before = m.ack;
+        model_plan(&m, c);
+        ck_assert_int_eq(m.ack, before);
+        ck_assert_int_eq(m.region, FROZEN_F + c);
+
+        /* RESUME. The client acknowledges ONE frame. The window moves by
+         * one id and both other terms are above it (consumed is
+         * F + C + MODEL_SLOTS, server + 1 is one more), so the credit
+         * must move by exactly one -- not zero, and not up to the
+         * transport frontier. */
+        before = m.ack;
+        m.client += 1;
+        model_plan(&m, c);
+        ck_assert_int_eq(m.ack - before, 1);
+        ck_assert_int_eq(m.ack, FROZEN_F + c + 1);
+        ck_assert_int_eq(xrdp_gfx_credit_frontier(m.consumed, m.server,
+                         m.client, c),
+                         FROZEN_F + c + 1);
+        /* the capture that was refused a moment ago is admitted now:
+         * this is the assertion a pipeline that never restarts fails */
+        ck_assert_int_le(m.captured + 1, m.ack + MODEL_SLOTS);
+
+        /* a second ack buys exactly one more id, for the same reason */
+        before = m.ack;
+        m.client += 1;
+        model_plan(&m, c);
+        ck_assert_int_eq(m.ack - before, 1);
+        ck_assert_int_eq(m.ack, FROZEN_F + c + MODEL_SLOTS);
+
+        /* a third buys nothing, and now for a LOCAL reason: no further
+         * frame has been captured or absorbed, so the SLOT FACT
+         * (frame_id_consumed) is the strict minimum. The credit stopping
+         * here is the nearest-neighbour behaviour clause 1 requires,
+         * not the network's doing. */
+        before = m.ack;
+        m.client += 1;
+        model_plan(&m, c);
+        ck_assert_int_eq(m.ack - before, 0);
+        ck_assert_int_eq(m.ack, m.consumed);
+        ck_assert_int_lt(m.consumed, m.client + c);
+    }
+}
+END_TEST
+
+/****************************************************************************/
 Suite *
 make_suite_avc444_credit_frontier(void)
 {
@@ -759,6 +933,8 @@ make_suite_avc444_credit_frontier(void)
     tcase_add_test(tc, test_joint_machine_enumeration);
     tcase_add_test(tc, test_wedge_replay_d40_c2);
     tcase_add_test(tc, test_wedge_replay_d40_c1);
+    tcase_add_test(tc,
+                   test_credit_frontier_frozen_client_halts_at_client_plus_c);
 
     return s;
 }
