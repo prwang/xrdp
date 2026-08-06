@@ -1,0 +1,10 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# Below XRDP_H264_INTRA_REFRESH_FRAMES_MIN: the loader must REFUSE this
+# and keep the default (a typo must not turn every frame into a cut),
+# while the rest of the table still parses.
+intra_refresh_frames = 8

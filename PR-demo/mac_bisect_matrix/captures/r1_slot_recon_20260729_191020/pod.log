@@ -1,0 +1,5 @@
+total 0
+drwxr-xr-x 2 root root       80 Jul 28 18:23 .
+drwxr-xr-x 7 root root      440 Jul 29 19:08 ..
+crw-rw---- 1 root root 226,   0 Jul 28 18:23 card0
+crw-rw---- 1 root root 226, 128 Jul 28 18:23 renderD128

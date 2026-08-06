@@ -3,6 +3,7 @@
 #endif
 
 #include "xrdp_tconfig.h"
+#include "xrdp_h264_annexb.h"
 #include "test_xrdp.h"
 #include "xrdp.h"
 #include "string_calls.h"
@@ -230,6 +231,146 @@ START_TEST(test_tconfig_gfx_avc444_empty_args_fallback)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_rekey_threshold)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #48: the aux_ltr_chain re-key threshold is settable so the
+     * boundary can be exercised without ~18 min of continuous animation.
+     * Absent -> the shipped default. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num, 536);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY_MIN);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_rekey_surface_reset)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #48 (2026-07-29): the surface teardown is separable from
+     * the re-key. It defaults ON (the shipped mechanism), and can be
+     * masked so the client sees only a full-surface repaint from a fresh
+     * IDR -- macOS renders the surface swap itself as a black flash. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 0);
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 0);
+    /* explicitly masked, threshold it travels with still honoured */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey_nochurn.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 0);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num, 536);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+    /* and the known-bad behaviour is still reachable on purpose */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey_churn.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_surface_reset, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_rekey_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* Above the max the wrap guard would be defeated: the loader must
+     * keep the default rather than weaken it silently (BACKLOG #48). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_rekey_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_ltr_rekey_frame_num,
+                     XRDP_H264_LTR_FRAME_NUM_REKEY_MAX);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_intra_refresh)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #45 D6 / PRD FR-H264-6: the scheduled paired refresh
+     * interval. Absent -> the shipped default; there is deliberately no
+     * 0/off value, because an off switch would keep the deleted aux
+     * respawn path alive as a shadow fallback. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_intra_refresh.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames, 48);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_MIN);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_MAX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* Below the minimum every frame would become a cut and the bandwidth
+     * gate would silently change meaning: the loader keeps the default
+     * rather than honouring it (#45 D6, "loader refuses"). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_intra_refresh_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames,
+                     XRDP_H264_INTRA_REFRESH_FRAMES);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_wire_window)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C is USER configuration,
+     * because the value a deployment wants follows from its round-trip
+     * time and the server cannot measure that. Absent -> the placeholder
+     * default (#81's RTT sweep is what will choose the shipped one). */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_DEFAULT);
+    /* an in-range value is honoured verbatim */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_wire_window.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 6);
+    ck_assert_int_ge(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_MIN);
+    ck_assert_int_le(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_MAX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_wire_window_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* wire_window = 0 would let the credit frontier reach only
+     * frame_id_client, so no capture is ever admitted past the first
+     * outstanding frame and the session stops drawing. Refused; the
+     * default stands, and it is never silently clamped. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_wire_window_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window,
+                     XRDP_GFX_WIRE_WINDOW_DEFAULT);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -256,6 +397,20 @@ make_suite_tconfig_load_gfx(void)
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_h264_invalid);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_defaults);
     tcase_add_test(tc_tconfig_load_gfx, test_tconfig_gfx_avc444_override);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_threshold);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_surface_reset);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_rekey_out_of_range_refused);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_intra_refresh);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_wire_window);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_wire_window_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_empty_args_fallback);
 

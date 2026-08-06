@@ -267,7 +267,7 @@ Still required:
    (0x000B) and RFX perfectly on the same client. Every run below was a
    FRESH LOGIN bracketed by a green AVC420 baseline (a black baseline
    voids the run — the first pass was thrown out for exactly that; see
-   the contamination note and `PR-demo/tail_flush_ab/reset_420.sh`), on
+   the contamination note; its `reset_420.sh` bracketing harness was removed 2026-07-28, superseded by one fresh container per arm), on
    the post-regression build (adaptive dump_extra, single SPS/PPS per
    keyframe verified in-log), VAAPI hardware, pristine branch:
    - 420 baseline → renders (bracket)

@@ -1,0 +1,31 @@
+#!/bin/sh
+# Refuse to commit a blob large enough to make the repository unpushable.
+#
+# GitHub rejects any file over 100 MB outright. Before this hook existed,
+# four commits put 13.6 GB of oracle/transport dumps into history -- the
+# largest single file 1.6 GB -- and the branch could not be pushed at all
+# until the history was rewritten (BACKLOG #61h, 2026-08-01).
+#
+# Install with:  git config core.hooksPath .githooks
+LIMIT=$((50 * 1024 * 1024))
+fail=0
+for f in $(git diff --cached --name-only --diff-filter=AM); do
+    [ -f "$f" ] || continue
+    size=$(wc -c < "$f")
+    if [ "$size" -gt "$LIMIT" ]; then
+        printf '%s is %s MB\n' "$f" "$((size / 1048576))" >&2
+        fail=1
+    fi
+done
+if [ "$fail" = 1 ]; then
+    cat >&2 <<'MSG'
+
+Refusing the commit: a staged file is over 50 MB.
+
+Capture evidence (oracle dumps, transport dumps) is regenerable and must
+not be committed -- the README, VERDICT.txt and logs beside it are the
+record. If this file genuinely belongs in git, commit it with
+--no-verify and say why in the message.
+MSG
+    exit 1
+fi

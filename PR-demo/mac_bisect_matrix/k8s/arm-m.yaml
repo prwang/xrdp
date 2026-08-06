@@ -27,7 +27,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:39bb08a48377-xfce
+          image: localhost/xrdp-bisect:39bb08a48377.xx5b9650c-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -42,6 +42,8 @@ spec:
               hostIP: 127.0.0.1
               protocol: TCP
           volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
             - name: dri
               mountPath: /dev/dri
             - name: matrix-cred
@@ -53,7 +55,18 @@ spec:
             - name: banner
               mountPath: /usr/local/bin/banner.sh
               subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
       volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi; the packed-view AVC444
+          # capture shmem (two slots x two views, all monitors) needs
+          # ~74MB for a dual-4K layout -- an undersized tmpfs SIGBUSes
+          # Xorg mid-session (2026-07-28 multimon incident)
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
         - name: dri
           hostPath:
             path: /dev/dri

@@ -1,0 +1,114 @@
+# Arm x018: BACKLOG #80 step 4 / #81 -- the credit frontier, live.
+#
+# THE PAIR. x018 and x019 carry the SAME image, the SAME xorgxrdp, the
+# SAME gfx.toml body (diff-verified) and the SAME payload and geometry.
+# The only thing that differs between them is the round-trip time on
+# their veth pair, applied from the host by netem_rtt.sh:
+#
+#     x018   loopback baseline, no shaping
+#     x019   40 ms true RTT (20 ms each way, host veth + pod eth0)
+#
+# The RTT is NOT in this manifest and NOT in the image, on purpose: a
+# qdisc is host state, and a manifest that claimed to carry it would be
+# claiming something it cannot enforce. netem_rtt.sh verifies the RTT by
+# MEASUREMENT through this arm's own hostPort before every leg, and the
+# capture records what it measured.
+#
+# WHY TWO PODS RATHER THAN ONE POD RUN TWICE. So neither leg has to
+# add, remove and re-add a qdisc on an interface between measurements.
+# The cost is that pod identity is not held fixed across the pair; it is
+# the only uncontrolled variable in the comparison and it is stated in
+# the capture README rather than assumed away.
+#
+# RDP endpoint on the host: 127.0.0.1:40034.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x018
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x018
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x018
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x018
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "textflood"
+            - name: ARM_LABEL
+              value: "x018: #80 credit frontier, C=1, RTT loopback baseline (port 40034)"
+            - name: XRDP_GFX_FRAMES_IN_FLIGHT
+              value: "1"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40034
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x018

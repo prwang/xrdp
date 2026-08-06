@@ -21,7 +21,7 @@ the "one-frame lag", superseding the memory-level note in `BACKLOG.md`.
 > `encode_pair()/encode_single()` **synchronous** (bounded wait for the
 > submitted picture + sequence verification). This *relies on* the shallow
 > pipeline documented below — a deep pipeline now errors loudly instead of
-> desyncing. See PRD §25 and `PR-demo/tail_flush_ab/`.
+> desyncing. See PRD §25. (The `PR-demo/tail_flush_ab/` live-flip harness was removed 2026-07-28; diagnosis now uses one fresh container per arm.)
 >
 > **Correction (2026-07-17, later).** The "input side costs ~1 frame, not
 > several" conclusion below holds only for a credible declared framerate.
@@ -151,5 +151,5 @@ returns the just-submitted pair immediately — no display lag, and the tail-flu
 never fires. Keeping the pipeline shallow via `encoder_args` is the root-cause
 guarantee; it is also the correct tune for an interactive remote-desktop encoder
 (the in-tree x264 GFX path likewise uses `tune = "zerolatency"`). This was
-validated on-screen with the harness in `PR-demo/tail_flush_ab/` (5/5 delivered
+validated on-screen with the (since-removed) `PR-demo/tail_flush_ab/` harness (5/5 delivered
 at `async_depth 1`; 5/5 withheld at `async_depth 2` with the flush off).

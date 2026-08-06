@@ -33,6 +33,17 @@
 #define NUM_CONNECTION_TYPES 7
 #define GFX_CONF XRDP_CFG_PATH "/gfx.toml"
 
+/* BACKLOG #80 / PRD FR-FLOW-1 clause 4: bounds and placeholder default
+ * for [avc444_ffmpeg] wire_window (C). See the field's comment below.
+ * The MIN is 1 because C = 0 admits no capture at all once the first
+ * frame is outstanding -- a session that never draws again -- and the
+ * MAX exists only so a typo cannot ask for an unbounded wire; a value
+ * outside the range is REFUSED with a log line, never silently
+ * clamped. */
+#define XRDP_GFX_WIRE_WINDOW_DEFAULT 2
+#define XRDP_GFX_WIRE_WINDOW_MIN 1
+#define XRDP_GFX_WIRE_WINDOW_MAX 64
+
 /* nc stands for new config */
 struct xrdp_tconfig_gfx_x264_param
 {
@@ -131,6 +142,39 @@ struct xrdp_tconfig_gfx
      * timing SEI it announces; suspected VideoToolbox output-pacing
      * trigger for the measured one-frame aux/chroma lag. Default 0. */
     int avc444_ffmpeg_strip_pic_struct;
+    /* EXPERIMENTAL (PRD FR-H264-8): aux-refs-aux via Windows-style
+     * long-term reference slots -- the aux child encodes a normal
+     * refs=1 P chain and both views are rewritten into one shared
+     * frame_num chain (LT0 = main, LT1 = aux). Default 0: FR-H264-7
+     * all-intra leaves remain the shipped architecture until the
+     * FR-H264-8 acceptance gate (incl. the bandwidth gate) passes. */
+    int avc444_ffmpeg_aux_ltr_chain;
+    /* aux_ltr_chain re-key threshold: the shared frame_num value at
+     * which the encoder pair is rebuilt and the EGFX surface reset
+     * (BACKLOG #48). Default XRDP_H264_LTR_FRAME_NUM_REKEY (2^16-512,
+     * ~18 min of continuous 30 fps animation); clamped to
+     * [XRDP_H264_LTR_FRAME_NUM_REKEY_MIN, ..._MAX]. Lower it to
+     * exercise the re-key boundary in a test arm without an hour of
+     * animation; the MAX is a ceiling, since a higher value would let
+     * a decoder meet the frame_num wrap. */
+    int avc444_ffmpeg_ltr_rekey_frame_num;
+    /* scheduled paired intra refresh interval, in pictures per view
+     * (PRD FR-H264-6; gfx.toml [avc444_ffmpeg] intra_refresh_frames).
+     * Default XRDP_H264_INTRA_REFRESH_FRAMES, range
+     * [MIN,MAX] refused by the loader and clamped by the runner,
+     * effective only when aux_ltr_chain is on. No off value (#45 D6). */
+    int avc444_ffmpeg_intra_refresh_frames;
+    /* Emit the EGFX surface delete/create/map teardown at a re-key.
+     * Default 0 -- MASKED. The re-key exists only to keep the shared
+     * frame_num counter away from its 2^16 wrap, and the encoder
+     * restart alone achieves that: the replacement child opens with a
+     * real IDR, the counter resets, and the frame carries full-surface
+     * damage. The surface teardown was belt-and-braces on top, and it
+     * is what a client repaints on: macOS flashed black at EVERY
+     * boundary, in both emission orders (owner-confirmed 2026-07-29,
+     * and confirmed gone once masked). Set to 1 only to reproduce that
+     * behaviour deliberately. */
+    int avc444_ffmpeg_ltr_rekey_surface_reset;
     /* NOTE: AVC444 reference partitioning (aux encoded by a second
      * all-IDR child and spliced in as non-reference, non-IDR I leaves)
      * is NOT configurable: it is a structural requirement of the
@@ -147,6 +191,41 @@ struct xrdp_tconfig_gfx
      * visualize a main/aux pairing slip (2026-07-27 arm-K). Default 0;
      * the runner logs a WARNING whenever it is active. */
     int avc444_ffmpeg_fault_aux_delay;
+    /* BACKLOG #70: release the producer's capture slot as soon as the
+     * frame's input has been ABSORBED by the encoder children, instead
+     * of after its last byte reaches the transport. The module ack is
+     * the only token that admits the next capture, so riding it on the
+     * last transport write serialises capture, encode, LTR rewrite and
+     * egress behind one another. Default 0 = the shipped behaviour,
+     * byte for byte. Effective only on the AVC444 ffmpeg batch path
+     * (aux_ltr_chain), which is where the absorb marker exists, and
+     * requires the paired xorgxrdp (xup contract 20260731+): an older
+     * producer frees the slot with no region-return safety behind it.*/
+    int avc444_ffmpeg_eager_slot_ack;
+    /* BACKLOG #70B / PRD FR-ACK-2: run the EGFX assembly on its own
+     * thread, joined after submit(N+1) and before collect(N+1).
+     * Requires aux_ltr_chain (the batch path). Default off. */
+    int avc444_ffmpeg_emit_thread;
+    /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C, the end-to-end window on
+     * how far the client may fall behind before xrdp stops admitting
+     * captures. In FRAMES. The number a deployment wants is set by its
+     * round-trip time -- a link that takes longer to acknowledge a frame
+     * than to display one needs a larger C or the frame rate is capped
+     * at C/RTT -- and the server cannot measure that for the user, which
+     * is why the PRD requires the knob to EXIST and refuses to fix its
+     * value.
+     *
+     * Meaning, stated once and only once: at the instant a frame is
+     * handed to the transport, at most C + 2 * monitors frames are
+     * unacknowledged by the client (the 2 is xorgxrdp's per-monitor
+     * capture-slot budget, which the frame rides above the credit).
+     *
+     * Read only when eager_slot_ack is on. Default XRDP_GFX_WIRE_WINDOW
+     * = 2, which is a PLACEHOLDER matching the legacy
+     * frames_in_flight -- BACKLOG #81's RTT sweep is what chooses the
+     * shipped default, and until it has run no measured number exists
+     * to put here. */
+    int avc444_ffmpeg_wire_window;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

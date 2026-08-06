@@ -1,0 +1,12 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+eager_slot_ack = true
+# Below XRDP_GFX_WIRE_WINDOW_MIN. A window of zero admits no capture at
+# all once one frame is outstanding -- a session that stops drawing --
+# so the loader must REFUSE it and keep the default, while the rest of
+# the table still parses.
+wire_window = 0

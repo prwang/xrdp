@@ -1,0 +1,104 @@
+# Arm R: the BACKLOG #45 arm — scheduled paired intra refresh
+# (FR-H264-6), one-thread 4-view pump_set, and the per-monitor capture
+# budget (steps 0-7). Encoder config is arm-n's byte for byte
+# (gfx/arm-r.toml below the header), so arm-n is the controlled A/B
+# partner for every #45 gate.
+#
+# XRDP_GFX_TRACE=1 is deliberate and part of the gate, not debugging
+# leftovers: E4 (the per-cycle poll-set size) and E5 (the oracle frame
+# interval, computed from the server's own send timestamps) are both read
+# out of those log lines. e_gate_run.sh refuses to judge a run without
+# them.
+#
+# /dev/shm is 1 GiB: the capture arena at the E3 target geometry
+# (2560x1440 + 3840x2400) is exactly w*h*1.5 * 2 views * 2 slots summed
+# over monitors = 77,414,400 B (73.8 MiB), measured — 1 GiB is ~13.9x
+# that, deliberately flat rather than tuned (recon gate R2, owner
+# directive 2026-07-29).
+#
+# RDP endpoint on the host: 127.0.0.1:40017.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-arm-r
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: arm-r
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: arm-r
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: arm-r
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:f7acb5979788.xxd77d054
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "code"
+            - name: ARM_LABEL
+              value: "R: BACKLOG #45 - scheduled paired refresh + pump_set + per-monitor capture budget  (port 40017)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+          ports:
+            - containerPort: 3389
+              hostPort: 40017
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-arm-r

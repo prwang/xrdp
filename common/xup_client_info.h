@@ -27,6 +27,49 @@
 #include "xrdp_client_info.h"
 
 /**
+ * Flags of the xup paint-rect-ex ack (message 106), PRD FR-ACK-1.
+ *
+ * The ack value is the ECHOED rect_id of a specific received paint msg,
+ * never a count the consumer maintains itself, and EVERY received paint
+ * msg is acked exactly once when it reaches a terminal state:
+ *
+ *   displayed=1 (no flag) - encoded and last EGFX byte sent;
+ *   displayed=0 (this flag) - consumed with no output frame, i.e. the
+ *       AVC444 warmup PENDING return, an encoder error, or a dropped
+ *       pair. The producer frees the slot AND returns that frame's
+ *       captured region to its dirty region (Invariant III).
+ *
+ * Wire-compatible: the flags word already existed and old peers ignore
+ * unknown bits, so an old xorgxrdp under a new xrdp keeps today's
+ * behaviour and a new xorgxrdp under an old xrdp simply never sees the
+ * bit set.
+ */
+#define XUP_ACK_FLAGS_NOT_DISPLAYED 0x00000001
+
+/**
+ * BACKLOG #70: this ack releases the capture SLOT only -- it says
+ * nothing about the frame's disposition, and the region that frame took
+ * out of the dirty region MUST stay held.
+ *
+ * The eager slot-release ack fires when the encoder children have
+ * absorbed the frame's input (its borrowed capture pages are free) and
+ * the previous frame has left for the transport. That is early enough
+ * to admit the next capture while this frame's tail -- LTR rewrite,
+ * EGFX assembly, egress -- is still running, which is the whole point;
+ * but the tail can still fail, and a failure owes the producer its
+ * pixels back. So the two things one ack used to do are split: this
+ * flag frees the slot, and the frame's ordinary terminal ack (which
+ * still arrives, with displayed=1 or 0) is what disposes of the region.
+ *
+ * NOT wire-compatible with an old producer, and that is why the
+ * contract version below moves: an old xorgxrdp ignores the bit,
+ * retires the region on the early ack, and silently loses those pixels
+ * if the tail then fails -- a stale rectangle on screen with no event
+ * anywhere. Mixed pairs are refused at connect instead.
+ */
+#define XUP_ACK_FLAGS_SLOT_ONLY 0x00000002
+
+/**
  * Information about the xrdp client which is passed to xorgxrdp
  *
  * This is a subset of 'struct xrdp_client_info'
@@ -91,10 +134,23 @@ struct xup_client_info
  * page-aligned (XUP_CAP_REGION_ALIGN 64 -> XUP_CAP_PAGE_ALIGN 4096).
  * 20260727: CC_GFX_AVC444 per-monitor regions hold TWO slots (PRD
  * FR-CAPTURE-8 two-slot pipelined capture); the slot for a frame is
- * selected by the parity of its rect_id and carried in the existing
- * per-frame shmem_offset field, so capture of frame N+1 can overlap
- * the synchronous encode of frame N. Single-slot modes unchanged. */
-#define XUP_CLIENT_INFO_CURRENT_VERSION 20260727
+ * carried in the existing per-frame shmem_offset field, so capture of
+ * frame N+1 can overlap the synchronous encode of frame N. Single-slot
+ * modes unchanged.
+ * The slot is chosen by the capture side alone and is NEVER derived
+ * from rect_id: it advances per monitor on that monitor's own send
+ * (xup_cap_budget below). The rect_id-parity rule this entry
+ * originally described is dead — with m monitors rect_id advances by m
+ * between one monitor's consecutive sends, so parity pinned each
+ * monitor to a single slot (measured: the same slot on 1079 of 1079
+ * full-pass sends). That is a capture-side rule only, shmem_offset was
+ * always explicit on the wire, and both daemons compare this version
+ * for EXACT equality, so the number below does NOT move for it.
+ *
+ * 20260731 (BACKLOG #70): XUP_ACK_FLAGS_SLOT_ONLY. A producer that does
+ * not know the bit would retire a held region on an ack that only means
+ * "the slot is free", so the pair must match exactly. */
+#define XUP_CLIENT_INFO_CURRENT_VERSION 20260731
 
 /*
  * Shared-memory layout for the GFX H.264 capture family
@@ -296,11 +352,443 @@ xup_cap_h264_shmem_layout(const struct display_size_description *displays,
         }
         total += xup_cap_page_align(
                      xup_cap_h264_mon_region_bytes(capture_code,
-                                                   capture_format,
-                                                   chroma_align,
-                                                   mwidth, mheight));
+                             capture_format,
+                             chroma_align,
+                             mwidth, mheight));
     }
     return total;
+}
+
+/*
+ * Per-monitor outstanding-capture accounting for CC_GFX_AVC444
+ * (PRD FR-CAPTURE-8, restated per monitor).
+ *
+ * The capture budget is m INDEPENDENT caps of at most
+ * XUP_CAP_AVC444_SLOT_COUNT outstanding frames each, never a global
+ * pool: a pool lets one damaged monitor take all of it, which is extra
+ * raw inventory and slot aliasing rather than pipelining. The aggregate
+ * is a consequence of the m caps and is never a quantity to gate on.
+ *
+ * Per monitor this carries a ring of the rect_ids it has sent and not
+ * yet seen acked, plus the slot the monitor's NEXT capture writes.
+ * rect_id_ack is CUMULATIVE (every rect_id at or below it is acked),
+ * which is exactly why a ring of XUP_CAP_AVC444_SLOT_COUNT ascending
+ * entries is sufficient: retiring is "drop every entry the ack covers",
+ * never a per-id match.
+ *
+ * The slot advances in xup_cap_budget_record_send() only, i.e. exactly
+ * once per send and strictly after that send is committed. The slot of
+ * a frame in flight is read several times before the send (it goes on
+ * the wire as the frame's shmem_offset, and it selects which slot's
+ * missing region a capture refreshed), so an earlier advance would
+ * point the encoder at the sibling of the slot just captured.
+ *
+ * All-zero is the valid initial state: nothing outstanding, slot 0.
+ */
+struct xup_cap_budget
+{
+    /* ascending rect_ids sent and not yet retired, per monitor */
+    int ids[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS][XUP_CAP_AVC444_SLOT_COUNT];
+    /* how many of ids[mon][] are live */
+    int count[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+    /* slot the monitor's next capture writes */
+    int slot[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+};
+
+static inline void
+xup_cap_budget_reset(struct xup_cap_budget *budget)
+{
+    int mon;
+    int index;
+
+    if (budget == NULL)
+    {
+        return;
+    }
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        for (index = 0; index < XUP_CAP_AVC444_SLOT_COUNT; ++index)
+        {
+            budget->ids[mon][index] = 0;
+        }
+        budget->count[mon] = 0;
+        budget->slot[mon] = 0;
+    }
+}
+
+/* a monitor index outside the contract's range is not addressable */
+static inline int
+xup_cap_budget_mon_ok(const struct xup_cap_budget *budget, int mon)
+{
+    return budget != NULL && mon >= 0 &&
+           mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+}
+
+/* the depth the layout can actually hold; single-slot modes pass 1 */
+static inline int
+xup_cap_budget_clamp_cap(int cap)
+{
+    if (cap < 1)
+    {
+        return 1;
+    }
+    if (cap > XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        return XUP_CAP_AVC444_SLOT_COUNT;
+    }
+    return cap;
+}
+
+/* drop every entry the cumulative ack covers and return the monitor's
+ * surviving outstanding count */
+static inline int
+xup_cap_budget_retire(struct xup_cap_budget *budget, int mon,
+                      int rect_id_ack)
+{
+    int index;
+    int live;
+    int kept;
+
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    live = budget->count[mon];
+    if (live < 0)
+    {
+        live = 0;
+    }
+    if (live > XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        live = XUP_CAP_AVC444_SLOT_COUNT;
+    }
+    kept = 0;
+    for (index = 0; index < live; ++index)
+    {
+        if (budget->ids[mon][index] > rect_id_ack)
+        {
+            budget->ids[mon][kept] = budget->ids[mon][index];
+            ++kept;
+        }
+    }
+    budget->count[mon] = kept;
+    return kept;
+}
+
+/* can this monitor take one more outstanding frame? Retires first, so
+ * a stale ring never denies capacity. An unaddressable monitor fails
+ * closed. */
+static inline int
+xup_cap_budget_has_capacity(struct xup_cap_budget *budget, int mon,
+                            int rect_id_ack, int cap)
+{
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    return xup_cap_budget_retire(budget, mon, rect_id_ack) <
+           xup_cap_budget_clamp_cap(cap);
+}
+
+/* count a send of rect_id for mon and advance that monitor's slot.
+ * Returns 0 normally, non-zero when the monitor was ALREADY at cap:
+ * that send is a third outstanding capture for a two-slot layout, which
+ * the caller must report loudly. The ring then keeps the newest ids —
+ * the oldest is the first a cumulative ack retires anyway. */
+static inline int
+xup_cap_budget_record_send(struct xup_cap_budget *budget, int mon,
+                           int rect_id, int rect_id_ack, int cap)
+{
+    int limit;
+    int index;
+    int over;
+
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 1;
+    }
+    limit = xup_cap_budget_clamp_cap(cap);
+    over = xup_cap_budget_retire(budget, mon, rect_id_ack) >= limit;
+    while (budget->count[mon] >= limit && budget->count[mon] > 0)
+    {
+        for (index = 1; index < budget->count[mon]; ++index)
+        {
+            budget->ids[mon][index - 1] = budget->ids[mon][index];
+        }
+        --budget->count[mon];
+    }
+    budget->ids[mon][budget->count[mon]] = rect_id;
+    ++budget->count[mon];
+    budget->slot[mon] = (budget->slot[mon] + 1) % limit;
+    return over;
+}
+
+/* slot the monitor's next capture must write */
+static inline int
+xup_cap_budget_slot(const struct xup_cap_budget *budget, int mon)
+{
+    if (!xup_cap_budget_mon_ok(budget, mon))
+    {
+        return 0;
+    }
+    if (budget->slot[mon] < 0 ||
+            budget->slot[mon] >= XUP_CAP_AVC444_SLOT_COUNT)
+    {
+        return 0;
+    }
+    return budget->slot[mon];
+}
+
+/*
+ * PRD FR-ACK-1, the ack's flags word.
+ *
+ * Written by xrdp (xup send_paint_rect_ex_ack) and read by xorgxrdp.
+ * Kept here, as two one-line functions, so BOTH ends encode and decode
+ * the same bit rather than each open-coding it: displayed is the only
+ * thing the flags word carries on this message today, and a reader that
+ * disagreed with the writer would silently re-dirty (or silently lose)
+ * every frame.
+ *
+ * xup_ack_flags_make(1) is 0 -- the exact value xrdp already sends -- so
+ * the happy-path byte stream is unchanged, which is what makes the
+ * upgrade wire-compatible with an old peer in either direction.
+ */
+static inline int
+xup_ack_flags_make(int displayed)
+{
+    return displayed ? 0 : XUP_ACK_FLAGS_NOT_DISPLAYED;
+}
+
+static inline int
+xup_ack_flags_displayed(int flags)
+{
+    return (flags & XUP_ACK_FLAGS_NOT_DISPLAYED) == 0;
+}
+
+/* BACKLOG #70: does this ack dispose of the frame's captured region, or
+ * does it only free the capture slot? */
+static inline int
+xup_ack_flags_slot_only(int flags)
+{
+    return (flags & XUP_ACK_FLAGS_SLOT_ONLY) != 0;
+}
+
+/*
+ * BACKLOG #70: the producer's two ack frontiers.
+ *
+ *   slot   how far the consumer has finished READING. A capture may
+ *          overwrite the pages of any frame at or below it.
+ *   shown  how far the consumer has DISPOSED of frames. A held region
+ *          may be forgotten only at or below it.
+ *
+ * They are the same number until an eager slot-release ack runs ahead,
+ * and `shown <= slot` always: nothing disposes of a frame the consumer
+ * has not finished with. The rule lives here, in the one header both
+ * daemons and the unit tests compile, so there is a single copy of the
+ * decision that keeps captured pixels from being dropped on the floor.
+ */
+struct xup_ack_frontier
+{
+    int slot;
+    int shown;
+};
+
+static inline void
+xup_ack_frontier_reset(struct xup_ack_frontier *f)
+{
+    if (f != NULL)
+    {
+        f->slot = 0;
+        f->shown = 0;
+    }
+}
+
+/* apply one ack. rect_id_ack must already be resolved (a producer turns
+ * INT_MAX into its own rect_id before calling). Cumulative and
+ * monotonic: a reordered or duplicated ack can never walk a frontier
+ * backwards and resurrect a retired slot or a forgotten region. */
+static inline void
+xup_ack_frontier_apply(struct xup_ack_frontier *f, int flags,
+                       int rect_id_ack)
+{
+    if (f == NULL)
+    {
+        return;
+    }
+    if (rect_id_ack > f->slot)
+    {
+        f->slot = rect_id_ack;
+    }
+    if (!xup_ack_flags_slot_only(flags) && rect_id_ack > f->shown)
+    {
+        f->shown = rect_id_ack;
+    }
+}
+
+/*
+ * PRD FR-ACK-1 Invariant III: which outstanding frame owns which capture
+ * slot.
+ *
+ * A capture takes a region OUT of the producer's dirty region, and until
+ * that frame reaches a terminal state no wire carries those pixels. If
+ * the terminal state is displayed=0 the region must come back, so the
+ * producer has to answer "which region did rect_id r take?" from the id
+ * alone -- the ack carries nothing else.
+ *
+ * The pixels themselves are the X server's (a RegionPtr per slot); this
+ * header owns only the identity map, which is the part with an
+ * invariant to test: one entry per capture slot is exactly enough,
+ * because a monitor may have at most XUP_CAP_AVC444_SLOT_COUNT frames
+ * outstanding and each occupies its own slot. Id 0 means empty
+ * (rect_id is 1-based: xorgxrdp pre-increments before its first send).
+ */
+/*
+ * BACKLOG #70: one MORE entry than there are capture slots.
+ *
+ * Before the eager slot-release ack the two counts were the same: a
+ * frame held its capture slot until the ack that disposed of it, so a
+ * monitor could never hold more regions than slots. The eager ack frees
+ * the slot at absorb and leaves the region held until the frame's tail
+ * finishes, so at the instant the tail of N is running, N holds a
+ * region with no slot while N+1 and N+2 hold the two slots. Condition
+ * (b) -- ack(N) waits for egress(N-1) -- bounds that lag at exactly one
+ * frame, which is where the +1 comes from and why it is not +2.
+ *
+ * Sizing this at the slot count is not a smaller ring, it is LOST
+ * PIXELS: a capture would overwrite the entry of a frame whose tail can
+ * still fail, and the failure would then find no region to give back.
+ */
+#define XUP_CAP_SENT_SLOTS (XUP_CAP_AVC444_SLOT_COUNT + 1)
+
+struct xup_cap_sent
+{
+    int ids[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS][XUP_CAP_SENT_SLOTS];
+};
+
+static inline void
+xup_cap_sent_reset(struct xup_cap_sent *sent)
+{
+    int mon;
+    int slot;
+
+    if (sent == NULL)
+    {
+        return;
+    }
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        for (slot = 0; slot < XUP_CAP_SENT_SLOTS; ++slot)
+        {
+            sent->ids[mon][slot] = 0;
+        }
+    }
+}
+
+static inline int
+xup_cap_sent_ok(const struct xup_cap_sent *sent, int mon, int slot)
+{
+    return sent != NULL && mon >= 0 &&
+           mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS &&
+           slot >= 0 && slot < XUP_CAP_SENT_SLOTS;
+}
+
+/* Take a FREE entry for rect_id and return its index, or -1 when the
+ * monitor already holds XUP_CAP_SENT_SLOTS undisposed frames. There is
+ * no overwrite path on purpose: the caller must treat -1 as the loud
+ * invariant violation it is (and hand the region straight back), never
+ * as a reason to evict a region someone may still ask for. */
+static inline int
+xup_cap_sent_take(struct xup_cap_sent *sent, int mon, int rect_id)
+{
+    int slot;
+
+    if (!xup_cap_sent_ok(sent, mon, 0) || rect_id == 0)
+    {
+        return -1;
+    }
+    for (slot = 0; slot < XUP_CAP_SENT_SLOTS; ++slot)
+    {
+        if (sent->ids[mon][slot] == 0)
+        {
+            sent->ids[mon][slot] = rect_id;
+            return slot;
+        }
+    }
+    return -1;
+}
+
+/* which slot holds rect_id? Returns 1 and fills the amon/aslot outputs
+ * when found, 0 otherwise -- a late or duplicated ack for an
+ * already-retired frame must find nothing, never an unrelated slot. */
+static inline int
+xup_cap_sent_find(const struct xup_cap_sent *sent, int rect_id,
+                  int *amon, int *aslot)
+{
+    int mon;
+    int slot;
+
+    if (sent == NULL || rect_id == 0)
+    {
+        return 0;
+    }
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        for (slot = 0; slot < XUP_CAP_SENT_SLOTS; ++slot)
+        {
+            if (sent->ids[mon][slot] == rect_id)
+            {
+                if (amon != NULL)
+                {
+                    *amon = mon;
+                }
+                if (aslot != NULL)
+                {
+                    *aslot = slot;
+                }
+                return 1;
+            }
+        }
+    }
+    return 0;
+}
+
+static inline void
+xup_cap_sent_clear(struct xup_cap_sent *sent, int mon, int slot)
+{
+    if (!xup_cap_sent_ok(sent, mon, slot))
+    {
+        return;
+    }
+    sent->ids[mon][slot] = 0;
+}
+
+/* the ack is cumulative, so every entry at or below it belongs to a
+ * frame that reached the wire. Returns how many entries were dropped. */
+static inline int
+xup_cap_sent_retire(struct xup_cap_sent *sent, int rect_id_ack)
+{
+    int mon;
+    int slot;
+    int dropped;
+
+    if (sent == NULL)
+    {
+        return 0;
+    }
+    dropped = 0;
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; ++mon)
+    {
+        for (slot = 0; slot < XUP_CAP_SENT_SLOTS; ++slot)
+        {
+            if (sent->ids[mon][slot] != 0 &&
+                    sent->ids[mon][slot] <= rect_id_ack)
+            {
+                sent->ids[mon][slot] = 0;
+                ++dropped;
+            }
+        }
+    }
+    return dropped;
 }
 
 #endif // XUP_CLIENT_INFO_H

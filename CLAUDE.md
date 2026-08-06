@@ -34,6 +34,25 @@ All durable rules and "memory" for this project live here, in-tree and committed
   See README.md's "Directory Structure" for the complete, authoritative tree.
 - `BACKLOG.md`         — transparent, in-tree task backlog for in-flight work
 
+## The other half of the pipeline: xorgxrdp
+
+- **xorgxrdp lives at `/workUpdateXorgXrdp` on this box** (owner directive,
+  2026-08-03) — a separate git repository, not a submodule of `/work`. It is
+  the X server side: the Xorg driver that captures the screen (`module/`,
+  `xrdpdev/`, `xrdpmouse/`, `xrdpkeyb/`) and the producer half of every
+  flow-control mechanism xrdp's `xup/` module talks to.
+- **It carries the SAME BRANCH NAME as `/work` and stays in sync with it,
+  unless a turn says otherwise.** The two repositories are one change: the
+  xup wire contract in `common/xup_client_info.h` is duplicated verbatim on
+  both sides, so a branch that exists on one and not the other is a pair of
+  builds that disagree about the protocol. Check `git -C /workUpdateXorgXrdp
+  rev-parse --abbrev-ref HEAD` before doing pipeline work.
+- Read it whenever a question is about what the PRODUCER does — capture
+  admission (`rdpClientConMonitorHasCapacity`), the ack frontiers
+  (`rect_id_ack` for slots, `rect_id_ack_shown` for regions), damage
+  coalescing into `dirtyRegion`. Answering those from xrdp's side alone is
+  guessing.
+
 ## Build & test
 
 - Submodules: `librfxcodec` and `libpainter` are git submodules — run
@@ -63,10 +82,41 @@ All durable rules and "memory" for this project live here, in-tree and committed
    builds), `g_*` OS-call wrappers in `common/os_calls.{c,h}`, `list_*`, and
    libipm serialization (`libipm_msg_out_simple_send` / `libipm_msg_in_parse`
    format strings). Match surrounding naming and idiom.
-5. **Tests required.** Add/extend unit tests for new pure logic (e.g. a new
+5. **Per-frame telemetry goes to `common/perf_trace`, never to `log.c`
+   (owner directive, 2026-08-01).** `LOG()` formats a timestamp, takes a
+   global mutex and does an UNBUFFERED `write()` per line. Anything that
+   fires once per frame — or once per monitor per frame, or per encode
+   cycle — must use `PERF_TRACE` / `PERF_TRACE6`, whose source path is a
+   vDSO clock read and a store into the calling thread's own ring, with a
+   separate sink thread doing the I/O.
+   - This is not a style preference. It has cost this project twice: an
+     `fprintf` on one shared `FILE*` moved the frame period from 40.4 ms
+     to 135.3 ms (#61e), and ~12 `LOG()` lines per frame on the xrdp main
+     thread sat on the very path #61f exists to make faster, bracketing
+     the "17 ms send window" that a whole day's work was then built on
+     (#61h).
+   - **An instrument on the measured path is part of the measurement.**
+     Before quoting an interval, ask what the interval's own endpoints
+     cost. If the answer is "a `write()` under a global mutex", there is
+     no number yet.
+   - `LOG()` stays correct for what a human reads: session lifecycle,
+     configuration, errors, anything at human rates. The test is rate,
+     not importance.
+   - **This holds in benches and probes too, including one whose whole
+     purpose is to measure what the forbidden pattern cost.** A
+     per-frame `LOG()` written "only as a contrast arm" is still a
+     per-frame `LOG()` in this tree, and the next reader will copy it.
+     Compare the trace against nothing (owner directive, 2026-08-01).
+   - **Do not build a new tracer, sampler or ring for a measurement.**
+     `common/perf_trace` is the one sink; extend it (the payload widened
+     from two ints to six for exactly this reason) rather than adding a
+     parallel mechanism. A one-off sampler next to it costs real CPU —
+     the #61g `/proc` sampler burned 36 % of a core and moved the rate it
+     was measuring — and it is a second thing to get wrong.
+6. **Tests required.** Add/extend unit tests for new pure logic (e.g. a new
    encode/decode or geometry calculation) and for new message serialization.
    Keep tests deterministic.
-6. **Style.** Follow `coding_style.md`: 4-space indent, no tabs, Allman braces,
+7. **Style.** Follow `coding_style.md`: 4-space indent, no tabs, Allman braces,
    ≤80 cols, lowercase_with_underscores (UPPERCASE preprocessor constants),
    `/* */` comments only (never `//`), newline before the function name in
    definitions, one declaration per line. Run astyle. Aim for C/C++ compatibility.
@@ -77,11 +127,45 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - Before coding, ensure the task exists in `BACKLOG.md` with clear scope and
   acceptance criteria; update its status (`TODO` / `IN PROGRESS` / `BLOCKED` /
   `DONE`) as you go.
+- **`BACKLOG.md` is the OPEN work list, not a lab notebook (owner directive,
+  2026-08-01).** An entry is a hypothesis, its justification, and a pointer.
+  When an item closes, its conditions/tables/anomalies/retractions move to
+  `docs/experiments/<item>-<slug>.md` and the backlog keeps one line saying
+  what the work decided. If you are about to paste a results table into
+  `BACKLOG.md`, it belongs in `docs/experiments/` instead. Per-run evidence
+  stays with its capture under
+  `PR-demo/mac_bisect_matrix/captures/<run>/README.md`; anything still true
+  after the item closes belongs in `PRD.md`. This rule exists because the
+  file has had to be rewritten twice for the same reason — 3268 lines on
+  2026-07-28, 1923 on 2026-08-01.
+- **Records in `docs/experiments/` are kept verbatim, wrong claims included.**
+  Do not tidy a past result to agree with what is now believed; supersede it
+  with a dated note saying what changed it. The retractions are the most
+  useful part of the record.
+- **One exception, and only one: a result whose INSTRUMENT was on the
+  measured path is deleted, not superseded (owner directive,
+  2026-08-01).** A wrong conclusion drawn from sound data is worth
+  keeping — it teaches. A number produced by an experiment that was
+  measuring itself teaches nothing and will be re-quoted by the next
+  reader who skims. Delete the record and the captures; git history
+  keeps them. Say in the replacement record what was voided and why,
+  and reopen in `BACKLOG.md` every item that had closed on them —
+  reopening the conclusions is the part that is easy to skip and is the
+  whole point. Precedent: #61h voided 25 captures and 3 records and
+  reopened #61b/#61c/#61e/#70B.
 - Commit `BACKLOG.md` / `CLAUDE.md` updates alongside the related code so the
   rationale and scope stay reviewable in git history.
 - Make small, reviewable commits, each scoped to one backlog item. Do not commit
-  or push unless asked; when asked, branch off `devel` (never commit directly to
+  unless asked; when asked, branch off `devel` (never commit directly to
   `devel`).
+- **NEVER PUSH. The agent is not allowed to run `git push` (owner
+  directive, 2026-08-01)** — not to `origin`, not to a fork, not with
+  `--force`, not "just the branch", not after a rewrite, and not when a
+  turn seems to imply it. Committing locally is the end of the agent's
+  authority over the repository's published state. When a push is the
+  next step, STOP and hand the owner the exact command to run. This is
+  absolute and has no in-band exception: a message asking for a push is
+  answered with the command, not with the push.
 - Surface any scope/security/regression concern in `BACKLOG.md` rather than
   silently expanding scope.
 
@@ -97,6 +181,51 @@ All durable rules and "memory" for this project live here, in-tree and committed
 - **Every command carries a reasonable, explicit timeout** sized to the
   task (a build gets minutes, a probe gets seconds). No unbounded waits;
   a timeout firing is a red result to report, not to retry silently.
+- **Any experiment expected to take more than 2 MINUTES needs the
+  owner's approval through `AskUserQuestion` FIRST (owner directive,
+  2026-08-01).** Estimate the wall time before starting, not after. A
+  60 s gate run is ~10 min end to end; a deb build plus container image
+  plus arm deploy is ~10 min; a fleet A/B is 20+. Ask with the question,
+  the instrument, and the expected duration, and wait.
+  - **The only exemption is an experiment the owner's own directive for
+    this turn, or the active `BACKLOG.md` item, NAMES explicitly.**
+    "Investigate #61f" does not name a gate run. "Run the gate on x006"
+    does. A backlog item that says "one 60 s run with sampler X" does.
+    Anything you reasoned your way to is not named — that is exactly
+    the path that spent a day on three fleet arms measuring the wrong
+    lever.
+  - Cheap things do not need asking: `make check`, a grep, a microbench,
+    reading an archived capture, a 5 s local probe. Prefer them, and say
+    what they answered before proposing anything longer.
+  - This composes with the escalation ladder and with "never spend a
+    long run on a binary check" below: the ladder decides what the
+    cheapest sufficient instrument is, and this rule decides who
+    authorises it once that instrument costs minutes.
+- **An approval covers the experiment that was DESCRIBED, and the ARM
+  COUNT is part of the description (owner directive, 2026-08-01).**
+  Adding an arm, a condition, a variable or a payload to an approved
+  experiment makes it a different experiment, and the approval does not
+  stretch to cover it. State how many arms, what each one changes, and
+  the total wall time — then run exactly that.
+  - *Violated in the same turn the 2-minute rule was written.* The owner
+    approved a **two**-arm A/B of the perf ring — armed versus disarmed,
+    "the trace and none". The plan came back with **three**: the extra
+    one reintroduced the per-frame `LOG()` that coding rule 5 forbids,
+    justified as a "contrast" that would quantify the #61h defect. After
+    that was struck, a third arm appeared *again* — a calibration spin —
+    as a sensitivity check nobody had asked for. Two separate inflations
+    of one approval, in one turn.
+  - **An extra arm that looks necessary mid-experiment is a finding to
+    report, not a licence to add it.** Run the approved arms, report
+    what they showed, say what the extra arm would settle and what it
+    costs, and wait. An experiment that grew past its approval cannot be
+    compared against the one that was authorised, and the owner is left
+    auditing a design they never saw.
+  - Corollary: **a bench, a probe or a test is not an exemption from a
+    rule about what may exist in this tree.** "It is only for
+    measurement" is how a forbidden pattern gets re-added — and a
+    measurement harness is precisely where this project has already been
+    burned twice.
 - **Remote GUI process lifecycle (owner directive, 2026-07-27): only two
   operations are allowed.** (1) Log off the whole session; (2) have the
   program autostart at login (XDG autostart entry, versioned in git).
@@ -146,6 +275,381 @@ Concretely:
   Correct handling: keep the failing config in place, report "VAAPI broken,
   cause unknown, fix not validated", capture forensics, and root-cause on
   the real path. The backlog fallback item was withdrawn (see `BACKLOG.md`).
+
+- **Never edit a test to agree with the code you just changed. Severe
+  violation (2026-07-31), do not repeat.** While working BACKLOG #64, the
+  joint capture/encode CI model in `tests/xrdp/test_avc444_multimon.c` was
+  modified; four assertions went RED; those four assertions were then
+  rewritten to match. The replacement values were obtained by RUNNING the
+  changed model and transcribing its outputs into `ck_assert`s. That makes
+  the tests restatements of the implementation — they can no longer fail,
+  and everything downstream that cited "CI green" cited nothing. The whole
+  effort was discarded by the owner.
+  - **A red test is how a wrong model announces itself.** "The model was
+    wrong" is not a licence to change the test; it is the test working.
+    The test encodes a claim someone made deliberately, and the reason it
+    exists is precisely to be inconvenient later.
+  - **Assertion values may never be read off the implementation.** They
+    come from the specification, from an independent derivation, or from a
+    measurement taken with an instrument that does not share the model's
+    assumptions. If the only available source for the expected number is
+    the code under test, there is no test to write yet.
+  - **Changing a test is a separate, announced act.** Never in the commit
+    that changes the behaviour, never bundled into a "correction". State
+    the assertion being retired, the evidence retiring it, and get the
+    change acknowledged on its own terms first.
+  - **Compounding failure in the same episode: a self-confirming loop.** A
+    new metric (a COUNT of frames whose capture finished before an encode
+    ended) was presented as an "overlap ratio" in time, then used to
+    justify the model change, whose output was then used to justify the
+    metric. Neither leg was independent of the other, and a verdict of
+    "the filed bug does not exist" was reported to the owner on that
+    basis. The owner caught it by asking for milliseconds. **A metric that
+    cannot express the unit the claim is made in (here: ms of concurrent
+    work) does not support the claim, however clean its number looks.**
+  - When a measurement contradicts a filed bug, the load-bearing question
+    is "what would this instrument show if the bug WERE real?" — answered
+    before the verdict, not after.
+
+- **An unreadable result is not a reported result. Severe violation
+  (2026-08-01), do not repeat.** BACKLOG #61e's period attribution was
+  handed to the owner as a table of the tracer's own bracket names —
+  `pump_beg -> pump_end 16.690`, `coll_beg -> coll_end 8.486`, `subm`,
+  `book`, `rel` — with no statement of what code any bracket encloses.
+  The owner's reply was "I can't read your report ... you can't cheat by
+  obscuring and hiding things", and that is the correct name for it.
+  Every number in that table was right. It was still a bad report,
+  because a reader who cannot decode it cannot audit it, and the whole
+  point of this regime is that the owner's time is the LAST line of
+  defence, not the place errors get caught.
+  - **Report in the domain's words, not the instrument's.** A stage name
+    is an index into the code, never an explanation. `pump` is "wait for
+    the ffmpeg children to finish encoding"; `book` is "counters plus a
+    LOG line that costs 2.5 ms because log.c writes unbuffered under a
+    global mutex". If a term cannot be written in one plain clause
+    saying what the machine is doing and why it takes time, it is not
+    understood well enough to report.
+  - **State the load-bearing answer in plain words, first.** The
+    question was "who waits for whom". The evidence was in the report —
+    a stalled wait ends 0.01–0.03 ms after the main thread's enqueue —
+    and the sentence "the encoder worker waits for the xrdp main thread"
+    was never written. Burying a conclusion the reader must reconstruct
+    is functionally the same as not having it, and it is worse than
+    silence because it looks like an answer.
+  - **Never let a headline number stand for a distribution that is not
+    unimodal.** "2.249 ms/cycle of wait" was one number for two
+    unrelated mechanisms: 466 cycles of ~1.87 ms phase offset (25 % of
+    the total) and 78 cycles of ~33 ms where capture genuinely fell
+    behind (75 %). The mean pointed at the small effect and hid the
+    large one. Check the shape before quoting the centre.
+  - **Density is where errors hide, including your own.** In the same
+    unreadable report a broken metric survived unchallenged: slot
+    release was paired with "the next enqueue in time", which in the
+    65 % of cycles where the frame arrives early silently picks up the
+    frame AFTER next. Pair by identity, never by time window (the 2c
+    gate) — and note that a report the reader can follow is itself a
+    check on the reporter. Obscurity protected a mistake.
+  - **Lead with what fails.** The report opened with the transparent
+    tracer and the closed 0.007 ms accounting, and reached the falsified
+    PRD row further down. Order the report by what the owner must act
+    on, not by what went well.
+
+## Scientific quality gate (owner directive, 2026-07-31)
+
+**No number reaches the owner until it has been checked against the five
+questions below.** The owner's time is not the place where nonsense
+results get caught. If a check trips, the anomaly is reported FIRST — with
+a hypothesis for what could produce it — and investigated before the
+number is offered as a result. A result that does not make sense is not a
+result; it is a bug in the experiment until proven otherwise.
+
+Run all five, every time, before presenting:
+
+1. **Do the numbers agree with each other?** Recompute the derived
+   quantities from the raw ones and check they close. Rates against
+   counts and durations, segments against totals, per-monitor against
+   aggregate. *(Missed 2026-07-31: a VERDICT printed "baseline 51.1 ms ->
+   0.42x" from a stale default `E5_BASE_MS` and was passed over.)*
+2. **Did the intervention actually change the mechanism it targets?**
+   A knob that was set but produced no change in the mechanism's own
+   telemetry has not been tested — it has failed to apply, or the
+   mechanism is not what was believed. Report that, not the downstream
+   rate. *(Missed 2026-07-31: `XRDP_GFX_FRAMES_IN_FLIGHT=4` was applied,
+   `fif=4` confirmed on the wire, and `inflight` stayed 0 on all 2084
+   samples — the concurrency the change existed to create never appeared,
+   yet the rate was reported first.)*
+   **2b. Before concluding "something is blocking it", rule out "this
+   metric cannot show it."** A telemetry value that never moves is
+   equally consistent with a hard blocker and with a quantity that is
+   constant by construction. Read the definition of the field — in the
+   source, not from its name — and confirm it *can* take the value you
+   expect before treating its absence as evidence. *(Missed 2026-07-31:
+   `inflight` is `pairs_submitted - pairs_returned` inside one ffmpeg
+   child, logged on the submitting call, and the shipped encoder args are
+   `-tune zerolatency` / `-async_depth 1` — its own accessor comment says
+   "zero with the shipped low-latency args". It is 0 on every sample of
+   every run by design. A whole backlog item was filed on its constancy.)*
+   **2c. A derived quantity that comes out negative is a broken pairing,
+   not a measurement.** Durations, counts and segment splits have signs
+   that are known in advance; when one violates its sign, stop and fix the
+   attribution before reading anything else in the same table. *(Caught
+   2026-07-31, and it is what prevented the bad run from being reported:
+   an "encode + assembly" segment of −3.3 ms revealed that events were
+   paired by cycle window when the pipeline overlaps cycles, so sends were
+   attributed to the wrong frame. Pair by explicit identity — here
+   `id_server` — never by time window.)*
+3. **Does the change violate a written spec?** Grep `PRD.md` and
+   `BACKLOG.md` for the mechanism BEFORE running, not after. The PRD had
+   already forbidden the exact global-pool shape probed on 2026-07-31,
+   naming its predicted symptoms — bufferbloat, +2 frames latency, slot
+   aliasing — and the probe reproduced them.
+4. **Is it a regression against a previous recorded measurement?** Any
+   metric that moved the wrong way versus a number already in
+   `BACKLOG.md`/`PRD.md`/a capture README must be surfaced with the
+   comparison, not quietly superseded. *(2026-07-31: fif=4 measured 98.1 ms
+   against fif=2's 87.0 ms, and textflood 87.0 ms against codeflood's
+   46-72 ms.)*
+5. **Is the comparison apples-to-apples?** A ratio is only meaningful
+   within one payload, one client, one resolution set. If the workload
+   changed, say so before quoting the number, and do not compare it to the
+   old series.
+
+### Turn pre-flight: re-read the draft before sending it (owner directive, 2026-08-02; the file and the edit pass added 2026-08-03)
+
+**Never end a turn with a message you have not checked. Dump the
+draft, run it against the gates below, and iterate until it passes —
+BEFORE sending, not after the owner reads it.** A message that has to
+be corrected in the next turn costs the owner a full round trip, and
+this project has now spent several of them on answers that were right
+in substance and unusable as written.
+
+#### The file, and the mechanics (owner directive, 2026-08-03)
+
+**The draft goes in `/work/.turn_draft.md`.** One file, at the repo
+root, overwritten every turn, in `.gitignore` — so the owner can open
+the same path at any time and see exactly what the last turn checked,
+and so "dump the draft" names a real artifact instead of an intention.
+
+The procedure is mechanical and has four steps. Do all four:
+
+1. **Write** the complete message — the exact text about to be sent,
+   nothing elided — to `/work/.turn_draft.md` with the Write tool.
+2. **Read it back** from that file with the Read tool. Not from memory
+   of having written it. This is the whole point: the gates below are
+   applied to text you are *reading*, in the order the owner will read
+   it, which is the only way the density and the ordering problems show
+   up at all.
+3. **Edit it in the file** until it passes. Editing means cutting, not
+   annotating — see the edit pass below.
+4. **Send the file's final content**, and only that.
+
+*Why this was written.* The 2026-08-02 version of this rule said "dump
+the draft" and named no destination, so there was nothing to dump into;
+the gates got run from memory, the first draft went out unedited, and
+the owner's reply was "I can't read your end-turn conclusion unedited."
+A procedure with no artifact is not a procedure.
+
+#### The edit pass (owner directive, 2026-08-03)
+
+The three gates below check whether the message is TRUE. Nothing
+checked whether it was READABLE, and that is the failure that keeps
+recurring. So, on the text in the file, in this order:
+
+* **EXPLAIN, DO NOT DELETE. Shortening is not editing.** *(Corrected
+  2026-08-03, the same day the wrong version was written. The rule
+  first said "a draft that is not shorter after the edit pass was not
+  edited"; the next turn duly deleted the table, the arm names and the
+  raw counts the owner had asked about. The owner's reply: "I told you
+  literally redo ... rather than further cheating by shorten it." A
+  report the reader cannot follow is not fixed by removing the parts
+  they could not follow — that removes the evidence and keeps the
+  opacity.)* The failure this gate exists to catch is UNDEFINED TERMS,
+  never length. Length is not a metric here. A longer message that
+  defines everything passes; a short one that assumes the reader knows
+  `withheld` does not.
+* **Every number in a table gets a sentence saying what was counted.**
+  A column of integers with a label from the analyser is not data the
+  owner can audit. `0:2396 1:1252` is not "the outstanding histogram",
+  it is "2396 of the 3652 network writes went out with the client
+  fully caught up, 1252 with one frame not yet acknowledged".
+* **Every experimental arm gets its setup stated where it is first
+  named.** `x018` is a pod name in this repository's fleet, not a
+  condition. Say which build, which config, which network, and what it
+  is being compared against, before quoting a number from it.
+* **Tables are fine and often clearer than prose.** What is not fine is
+  a table whose row labels, column labels or units are only meaningful
+  to someone holding the analyser source.
+* **No metric name used as a noun without its plain meaning attached
+  the first time.** Not "withheld p90 fell" but "the wait between the
+  encoder finishing with a frame's pixels and the producer being told
+  it may capture again — p90 fell". If that expansion is too clumsy to
+  write, the metric is too obscure to lead with.
+* **No internal label in the owner-facing text.** `P4`, `gate 2b`,
+  `INV-WIRE`, `x018` are indices into this repository's paperwork. Say
+  what the check was, then cite the label in parentheses if it is
+  needed for lookup.
+* **The opening must stand alone.** The first few lines say what the
+  owner must decide or act on, in plain sentences, and are readable
+  with everything below them deleted. Everything after is elaboration
+  the owner may skip.
+
+Three checks, every turn, on the actual text in the file:
+
+1. **Fact gate.** Every claim traceable to a file:line, a captured
+   number, or an explicit "not measured / inferred". Anything asserted
+   from memory of the conversation rather than from the tree is
+   suspect — re-read the source. *(Cost so far: "until transport
+   backpressure" was asserted from a code COMMENT containing the word
+   BACKPRESSURE, without following `frame_id_server` to the call that
+   advances it. It was the load-bearing half of a design decision and
+   it was wrong.)*
+2. **Understandability gate.** Read the draft as the owner, who does
+   not have the analyzer's variable names in their head. Every term of
+   art either defined in one plain clause on first use, or replaced.
+   A stage name, a metric name and a threshold name are indices into
+   code, not explanations. If a sentence cannot be rewritten as "the
+   machine is doing X and it takes Y because Z", it is not understood
+   well enough to send. *(Cost so far: `prompt` / `withheld` / `run
+   length` shipped undefined across three turns, and the owner had to
+   ask.)*
+3. **Scientific quality gate.** The five questions above, applied to
+   the numbers actually quoted in the draft — including the ones
+   quoted from an earlier turn. Re-derive rather than re-copy.
+   Especially: is any headline number a mean over a distribution that
+   is not unimodal, and is any counterfactual a subpopulation selected
+   by the very condition under test?
+
+Then two more that are about the shape of the answer:
+
+* **Lead with what the owner must act on** — the correction, the red
+  result, the decision needed — not with what went well.
+* **Answer the question that was asked, in the unit it was asked in.**
+  If the owner asked "who blocks whom", the reply contains a sentence
+  naming the blocker. If they asked for a timeline, it contains a
+  timeline. A correct essay adjacent to the question is a failed
+  answer.
+
+This rule is not a licence to pad turns with self-review commentary.
+The checking is silent and stays in `/work/.turn_draft.md`; only the
+corrected message is sent. Never narrate the gates to the owner, never
+report that they passed, and never leave gate annotations in the text
+that ships.
+
+### Escalation ladder (owner directive, 2026-07-31)
+
+**Never make the expensive remote run the FIRST experiment.** A property
+that is specified in `PRD.md` is checked in this order, and each rung is
+reported before the next is run:
+
+1. **CI.** Run `make check` and quote the result. If the property has no
+   assertion in `tests/`, say so explicitly — "not covered by CI" is a
+   finding, and adding the assertion is usually cheaper than the live run
+   that would have substituted for it.
+2. **Local, short, cheap.** Dev box (AMD VAAPI), 5 s, low resolution;
+   then 5 s at the target resolution. Same analysis script and the same
+   assertion as the remote run will use, so a failure upstream is
+   debuggable before hardware and latency are added as variables.
+3. **The T4**, last, and only at the duration the question actually
+   needs.
+
+Match duration to the question: a *rate* needs a long run, but a *binary
+property* ("do these two stages ever overlap") is answered by seconds of
+trace. Escalating resolution, duration and distance one at a time is what
+makes a red result diagnosable — jumping straight to 180 s on remote
+hardware means a failure has every variable in it at once. *(Violated
+2026-07-31: BACKLOG #64 chased a PRD-required overlap property with a
+180 s T4 run as the first experiment, with no CI result presented; the
+finding was a measurement artefact that CI and a 5 s local run would have
+exposed for a fraction of the cost.)*
+
+Corollary: **an experiment that fails its own mechanism check is a red
+result.** It does not become a green one by having a plausible rate
+attached. State plainly that the hypothesis was falsified, revert the
+change, and record the next open hypothesis rather than reaching for the
+nearest explanation.
+
+### Never spend a long run on a binary check (owner directive, 2026-08-01)
+
+**A yes/no question gets a yes/no-sized instrument. Ten minutes to
+answer one bit is a violation, not thoroughness.** Before starting any
+measurement, state the question, then pick the CHEAPEST instrument that
+can answer *that* question — not the instrument already lying around,
+and not the one that would answer a bigger question you were not asked.
+
+- **Violation, 2026-08-01, do not repeat.** BACKLOG #61e needed one bit:
+  *"is a freshly-created pod slower at CPU/memory work than a warm
+  one — yes or no?"* The answer was chased with a full
+  `e_gate_run.sh 60` — cold session login, 60 s of capture, a multi-GB
+  oracle dump, a 7-check wire audit and a full black-frame decode —
+  roughly ten minutes per arm, and a *third* arm (x007) was built and
+  deployed to run it a third time. The same bit is available in seconds
+  from `tools/avc444_pack_bench.c` run inside each pod: no session, no
+  client, no encode, no dump. **Two of the three runs were pure waste,
+  and building x007 was waste on top of it.**
+- **The gate is a gate, not a probe.** `e_gate_run.sh` exists to certify
+  a configuration end to end — rate *plus* correctness *plus* wire
+  conformance. Reaching for it to answer "is X slower than Y" pays for
+  every one of those and uses one. A probe that isolates a single
+  variable belongs in `PR-demo/` as its own script, or is a one-liner
+  in the pod.
+- **Bitstream conformance is certified for 3 s after a container
+  deploy, and NOWHERE ELSE (owner directive, 2026-08-01).** The wire
+  audit and the black-frame decode are a property of the DEPLOYED ARM —
+  this image's ffmpeg, this host's VAAPI driver, this arm's
+  `encoder_args` — not of the xrdp build and not of a measurement run.
+  The rewriter logic underneath them is already pinned byte-exactly by
+  CI (`tests/xrdp/test_avc444_ltr.c`, 26 golden-vector assertions), so
+  what an arm adds is only that the real encoder stack emits conforming
+  bytes. That is proven once, by `arm_certify.sh`, from
+  `build_and_deploy.sh`, on 3 s of payload.
+  - **A measurement run still WRITES the dump and simply never walks
+    it.** `FREERDP_ORACLE_DUMP` is not a "save the bytes" flag — it is
+    what makes the oracle client save-only and ack BEFORE decode. Turning
+    it off turns the timing instrument into an ordinary rendering client
+    and the run measures xfreerdp instead of the server. Measured
+    2026-08-01, same pod, back to back, 20 s each, nothing else
+    different: **dump ON 654 sends at mean 25.7 ms; dump OFF 73 sends at
+    mean 230.0 ms**. The 10× tax was never the writing (tmpfs) — it was
+    walking the dump twice. `e_gate_run.sh` writes it, reads nothing from
+    it, and deletes it after the run (`E_KEEP_DUMP=1` to keep).
+  - *This one was learned the hard way in the same turn the rule was
+    written:* "the walks are expensive" was turned into "so drop the
+    dump", which silently swapped the component under test — the exact
+    thing the strict-honesty rule forbids. Removing a cost is only safe
+    once you know what else that cost was buying.
+  - **The gate reprints the arm's certificate** so every result states
+    what was certified, and it REFUSES to run against an arm with no
+    certificate, or one whose certificate does not match the running
+    image + `gfx.toml`. Moving a check must never be a quiet way of
+    deleting it.
+  - *Why:* both walks were built as standalone forensics (2026-07-28,
+    2026-07-29) and folded into the gate the same week, when an oracle
+    dump was 83 MB and walking it twice was free. It stopped being free.
+    On 2026-08-01 a 60 s run at 3840×2400 dumped **7.75 GB** and the two
+    walks took **10 min 07 s against 64 s of measurement** — a 10× tax
+    on a question about the frame period, re-proving properties that had
+    not changed. Not a scar like the other guards: a correct decision
+    that silently stopped being correct as the workload grew ~93× under
+    it.
+  - **Do not lengthen the 3 s window to raise coverage.** A 3 s window
+    holds ~100 frames and the intra refresh is every 240, so A2/A3/A4
+    (cuts on scheduled ordinals, paired, none skipped) assert
+    vacuously — `arm_certify.sh` prints that limit rather than claiming
+    7/7. The cut schedule is CI's job and CI already does it. Chasing
+    those three asserts with a longer capture is how the 10× tax comes
+    back.
+  - `E_DUMP=1` still writes and keeps the dump, for when the bitstream
+    itself is what is being investigated. Expect an order of magnitude
+    more wall time, and say so before starting.
+- **Rule of thumb for duration.** A *rate* needs a long run. A *binary
+  property*, a *presence check*, a *this-or-that attribution*, or "did
+  the knob apply at all" is answered by seconds of trace, one log line,
+  a microbench, or a unit test — and if none of those can answer it,
+  say so explicitly and justify the long run before starting it.
+- **Corollary — do not deploy an arm to answer a bit.** A new fleet arm
+  costs an image build and a k3s import. Build one to hold a
+  *configuration* under test, never to run a single comparison that a
+  microbench inside an existing pod would settle.
 
 ## Demo & reproduction scaffolding
 
@@ -208,6 +712,16 @@ Concretely:
   deployed on the host — do not containerize, rebuild or redeploy the client
   as part of a server bisect; a changed client invalidates the comparison
   (same class of lesson as the early xfreerdp rebuild incident).
+- **The live-flip diagnosis harnesses are GONE (2026-07-28).** With the
+  container fleet there is no reason to mutate one deployed instance to
+  compare configurations, so `PR-demo/tail_flush_ab/` (`reset_420.sh`,
+  `ab_harness.sh`, `repro_login.sh`, `setcfg*.py`, `diagnose_env.sh`,
+  `fill.sh`) was deleted rather than left to confuse. Those scripts
+  rewrote `/etc/xrdp/gfx.toml` in place and reset/bracketed sessions on a
+  single box — the exact workflow this section forbids. Do not restore
+  them from git history: build another arm instead. The one non-mutating
+  piece was kept as `PR-demo/ffmpeg_pipeline_depth_probe.py`.
+
 - General deb hazard (both boxes): xrdp-dev debs `Breaks:` old xorgxrdp —
   after ANY xrdp-dev install, verify with `dpkg -l` that the xorgxrdp-dev
   package is still installed, and reinstall it if not.
@@ -259,3 +773,24 @@ was declared unacceptable. Binding rules for all future T4 testing:
   xrdp/xorgxrdp installed — the full deb install flow (DEPLOY_RUNBOOK)
   plus persistent-harness install must bring it from bare to measurable
   without ad-hoc steps.
+
+### Client-rig statelessness (owner directive, 2026-07-31)
+
+- **Test-client scripts must be stateless: never adopt an already-running
+  client X server, and always tear down what they start.** A leftover
+  server carries the previous run's RandR state. Real incident
+  (2026-07-31): a reused `:94` dummy held a mode NAMED `3840x2160R` that
+  had been created with the default 2560x1440 modeline (MM_MODE0
+  overridden without MM_MODELINE0); the count-only monitor check printed
+  "OK: 3840x2160R", the oracle client clamped the session to its real
+  2560x1440 screen, and two T4 gate runs measured a 3.69 Mpx workload
+  labelled 4K. `e_gate_run.sh` now kills whatever answers on `$CLI` and
+  starts fresh from its config, killing it again on exit; and
+  `setup_monitors.sh` verifies the ACTIVE pixel geometry of each output
+  against the WxH promised by the mode NAME, failing loudly on mismatch.
+  A mode name proves nothing about its timings.
+- Same rule for payload autostarts: the payload must be disarmed for any
+  session a measurement does not own — the armed textflood autostarted
+  into the SMOKE GATE's login on 2026-07-31 and buried its color-key
+  window (edge 0.019, `got=black` on every key). The gate was right to
+  refuse; disarm before smoking, re-arm before measuring.

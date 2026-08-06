@@ -59,6 +59,8 @@ int main (void)
     srunner_add_suite(sr, make_suite_test_guid());
     srunner_add_suite(sr, make_suite_test_scancode());
     srunner_add_suite(sr, make_suite_test_timers());
+    srunner_add_suite(sr, make_suite_test_log());
+    srunner_add_suite(sr, make_suite_test_perf_trace());
 
     srunner_set_tap(sr, "-");
     /*

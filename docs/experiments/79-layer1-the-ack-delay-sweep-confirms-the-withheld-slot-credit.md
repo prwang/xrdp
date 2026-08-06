@@ -1,0 +1,939 @@
+<!--
+Experiment record. BACKLOG.md is the OPEN work list; this file is the
+record it points at. Kept verbatim, wrong claims included.
+-->
+
+# #79 layer 1 — the ack-delay sweep: the mechanism is confirmed by intervention, and the tail turns out to be a period-3 limit cycle
+
+2026-08-02. Capture:
+`PR-demo/mac_bisect_matrix/captures/i79_x017_ackdelay_20260802_s20`
+(plus the discarded first attempt, `..._s5`). Harness:
+`PR-demo/mac_bisect_matrix/{ack_delay_proxy.c, ack_delay_proxy_selftest.py,
+ack_delay_sweep.sh, i79_ack_delay_analyze.py}`.
+
+## Lead with the answer
+
+**#78's attribution is validated.** Delaying only the client's acks, on
+the unmodified deployed build, moves the withheld slot credit ~1:1
+(Δwithheld/ΔD = 1.10) and the frame period at 0.44 ms per ms of delay —
+and the added period lands **entirely** in the cycles whose credit was
+withheld. Cycles whose credit was prompt run at 16.3–16.9 ms in every
+leg, unmoved by a 40 ms ack delay; `pump` (encode) is 15.2–15.4 ms
+everywhere. The rival explanation — that egress is ack-gated and the
+whole pipeline is simply later — is excluded by measurement: at D = 40
+exactly two thirds of sends go out with 1 or 2 frames unacked.
+
+**And the tail is not a race.** At D ≥ 20 the system locks into a
+deterministic period-3 cycle, `SS.SS.SS.` — two captures withheld, one
+prompt — with zero exceptions in 480 and 391 cycles. The 31 % tail #76
+was filed on is the same motif, intermittent. This changes what layer 2
+has to assert and makes the CI target concrete rather than statistical.
+
+**Two of my four predictions were wrong**, both because they were
+written as if the loop were open. Stated below before the numbers that
+falsified them, because the point of writing them down was to be able
+to be wrong in public.
+
+## Design
+
+Legs (the whole experiment; the arm count was not changed): `direct`
+(no proxy), then D = 0, 10, 20, 40 ms through the proxy. Arm x017 — the
+deployed HEAD build, fif = 1, the arm #78 measured — one monitor
+3840×2400, textflood, oracle client, cold session per leg, fleet idle,
+host DVFS pinned (GPU `high` / SCLK 2900, CPU `performance`, owner-set
+earlier the same day). Nothing differs between legs except when the
+client's bytes arrive.
+
+Predictions, written before the run:
+
+* **P0** the delay applies, measured *inside* the server: `egress →
+  cliack` rises by ~D. (Not the proxy's own telemetry — quality gate 2.)
+* **P1** withheld p50 ≈ D.
+* **P2** the stall fraction (withheld > 10 ms) goes 31 % → ~100 % for
+  D ≥ 10.
+* **P3** the period rises with D.
+* **CONTROL** D = 0 through the proxy reproduces `direct`, or nothing
+  downstream counts.
+
+Falsifiers, equally explicit: withheld flat while the period rises would
+mean #78 named the wrong mechanism; withheld rising while the period
+does not would mean the withholding is real but off the critical path,
+and the fix pointless.
+
+## The instrument, and the two things it had to prove first
+
+`ack_delay_proxy.c` forwards server→client immediately and releases each
+client→server read D ms after arrival. It cannot parse RDP (TLS), so it
+delays the whole direction — legitimate here because an oracle session's
+client→server traffic is one small ack PDU per frame and nothing else:
+**775 chunks of ~70 B for 751 frames** at D = 0. It terminates both TCP
+connections, so transport-level flow control between proxy and server is
+untouched; only application bytes are held.
+
+Self-test before any session time (`ack_delay_proxy_selftest.py`):
+applied delay matches the knob to ±0.2 ms, D = 0 costs 0.037 ms of RTT,
+server→client sustains ≥ 3.3 GB/s against the session's 153 MB/s.
+
+*The self-test lied on its first run and had to be fixed first*: it
+packed the ping counter as `'<Q'`, so ping 66 serialised its low byte as
+0x42 = `'B'`, the bulk-transfer trigger — the client then read 200 MB of
+zeros eight bytes at a time and reported 0.011 ms RTT for a 10 ms delay
+line that was working perfectly. Recorded because it is the same class
+of error as everything else in this file: a measurement that measured
+itself.
+
+## The sample-size correction (a deviation from the item's "5 s per leg")
+
+The first sweep ran the specified 5 s per leg and its **control leg
+failed**: `direct` and D = 0 came out 18.5 % apart, with `egress →
+cliack` 7 ms *lower* through the proxy — which no delay line can cause.
+Cause: the gate spends most of a 5 s window on the cold login, so 5 s
+yields 1.9 s of frames, 45–51 usable cycles. A distribution whose signal
+is a 31 % tail cannot be compared at n = 45.
+
+Rerun at 20 s/leg: 391–746 cycles, control closes to 4.3 %. This is a
+sample-size change to the same five legs, not an added arm, condition or
+payload — but it is a deviation from what the item described and is
+recorded as one. The 5 s figure came from "a mechanism check, not a
+rate", which was right in principle and wrong in arithmetic: it counted
+wall time instead of frames. The underpowered run is kept at
+`captures/i79_x017_ackdelay_20260802_s5`.
+
+## Result
+
+| leg | D | cycles | egress→cliack p50 | withheld p50 / p90 | withheld > 10 ms | period mean / p50 / p90 | wait mean |
+|---|---|---|---|---|---|---|---|
+| direct | — | 746 | 7.6 | 0.03 / 35.3 | 29.7 % | 21.5 / 17.1 / 42.7 | 4.9 |
+| d0 | 0 | 714 | 10.1 | 0.04 / 35.4 | 36.9 % | 22.5 / 17.1 / 43.6 | 5.9 |
+| d10 | 10 | 569 | 17.1 | 24.10 / 43.3 | 58.0 % | 27.9 / 18.1 / 52.4 | 11.4 |
+| d20 | 20 | 480 | 27.8 | 35.99 / 54.7 | 66.7 % | 33.1 / 18.4 / 63.8 | 16.4 |
+| d40 | 40 | 391 | 48.1 | 56.96 / 77.1 | 66.8 % | 40.1 / 18.8 / 85.6 | 23.2 |
+
+`withheld` = credit emission − `absorb(k−2)`: the interval between the
+in-tree safety condition (the children have absorbed frame k−2's input,
+so its capture slot is reusable) and the credit actually reaching
+xorgxrdp. Zero negatives in every leg (gate 2c). Both control legs
+reproduce #78 Run A (22.6 ms period, 31.1 % stalls, withheld p90 36.4),
+measured 60 s at 03:08 the same day — gate 4, no regression against the
+recorded number.
+
+* **CONTROL: OK.** period 21.5 vs 22.5 ms (4.3 %), withheld p90 35.3 vs
+  35.4.
+* **P0: OK.** `egress → cliack` p50 +7.0 / +17.8 / +38.0 ms for
+  D = 10 / 20 / 40, from the server's own ring.
+* **P1: FALSIFIED.** withheld p50 24.1 / 36.0 / 57.0 against a predicted
+  10 / 20 / 40. The slope is right (1.10 between D = 10 and 40); there is
+  a ~13 ms offset. The prediction assumed only the ack moved. In a closed
+  loop the rate drops too, so the ack that opens the window is itself
+  emitted later, and the p50 additionally jumps discontinuously once the
+  median frame changes class from unstalled to stalled. The prediction
+  should have been about the stalled subpopulation.
+* **P2: FALSIFIED, and this is the finding.** The stall fraction
+  saturates at exactly 2/3 — see below.
+* **P3: CONFIRMED.** 22.5 → 27.9 → 33.1 → 40.1 ms: 0.44 ms of frame
+  period per ms of ack delay.
+
+## Why P2 was wrong: it is a limit cycle, not a race
+
+Per-capture credit classes in order (`S` = withheld > 10 ms,
+`.` = prompt):
+
+```
+d0    SS....................S............SS.SS..SS...SS.S..SS.S...SS.SS.S..SS..SS
+d10   SS..SS.S..SS..SS.SS.S...SS..SS.SS.SS..SS.SS..SS..SS.SS.SS..SS..SS.SS.SS..SS
+d20   SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.
+d40   SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.SS.
+```
+
+Run-length census: D = 20 — 160 runs of `SS`, 160 singleton `.`, nothing
+else. D = 40 — 131 and 130, nothing else. D = 10 — 160 `SS`, 10 `S`,
+gaps of 1–3. D = 0 — the same motif, intermittent: 115 `SS`, 33 `S`,
+gaps up to 22.
+
+So the stall fraction *cannot* reach 100 %: every third capture finds
+its credit already emitted, because the credit target
+`min(consumed, server + 1)` covers a frame ahead, and one opening of the
+window releases the pair. **The "31 % heisenbug" is a deterministic
+period-3 cycle whose duty the ack race modulates.** Under injected delay
+the modulation disappears and the cycle stands alone.
+
+*Why period 3 exactly* is not proven here — it is the question layer 2's
+3-frame interleaving enumeration answers by construction, which is a
+lucky coincidence of scope, not a plan.
+
+## The discriminator: the slot credit, not the send path
+
+Delaying acks would also slow the server if egress were gated by the
+same window — a rival that predicts the same period curve. Excluded:
+
+| leg | sends by (id_server − id_client) at send time | period, credit withheld | period, credit prompt |
+|---|---|---|---|
+| direct | 0:2223 1:933 2:4 | 32.7 (n=221) | 16.8 (n=524) |
+| d0 | 0:1884 1:1116 2:4 | 31.9 (n=263) | 16.9 (n=450) |
+| d10 | 0:1001 1:1395 2:4 | 36.1 (n=329) | 16.6 (n=239) |
+| d20 | 0:676 1:975 2:373 | 41.5 (n=320) | 16.3 (n=159) |
+| d40 | 0:556 1:552 2:552 | 52.0 (n=260) | 16.4 (n=130) |
+
+1. The send path never waits: at D = 40, one third of sends carry 2
+   unacked frames and another third carry 1. (#78's static finding, now
+   confirmed under stress.)
+2. All of the added period is in the gated cycles. The prompt-credit
+   class is **flat at 16.3–16.9 ms under a 40 ms ack delay**. If any
+   other stage — encode, assembly, send, client — were on the path, that
+   class would have moved.
+3. The split closes against the mean: ⅔·52.0 + ⅓·16.4 = 40.1 =
+   measured (D = 40); 41.5·320/479 + 16.3·159/479 = 33.1 = measured
+   (D = 20). Gate 1.
+
+## One stalled capture, in the domain's words (D = 40, capture 76)
+
+```
+  -27.56 ms  absorb  73     the children absorbed frame 73's input
+  -27.50 ms  ackslot 73     ...and its slot credit went out at once
+  -18.26 ms  egress  73
+  -17.46 ms  msgin   74
+   -8.30 ms  msgin   75
+   +0.00 ms  absorb  74     frame 74's capture slot is SAFE to reuse
+   +8.88 ms  egress  74     no credit: the ack window is closed
+  +16.14 ms  absorb  75
+  +24.78 ms  egress  75     the server sends on, 2 frames unacked
+  +31.91 ms  cliack  73     73+1 > 75 false — window stays closed
+  +61.98 ms  cliack  74     74+1 > 75 false — still closed
+  +79.59 ms  credit for frame 74 emitted        withheld 79.59 ms
+  +88.21 ms  msgin   76     the capture itself took 8.62 ms
+```
+
+The slot was safe at +0.00 and the producer was told at +79.59. None of
+that interval is encode, send or capture: it is a wait for a round trip
+the safety condition does not require.
+
+## What is settled, and what is not
+
+Settled: the client's frame ack is on the critical path of capture-slot
+release at fif = 1; the effect is deterministic; the send path and the
+encoder are not involved; the fix targets the right code.
+
+Not settled: that ungating is safe — the blocking pre-step in #79
+(xorgxrdp's SLOT_ONLY handler must not consume region-retirement state)
+is untouched by this run and remains blocking. Nor is the fix's effect
+measured: the prediction for the fixed build is withheld ≈ 0 and a
+period **flat in D**, and this same sweep is what will separate the two
+builds.
+
+## What the sweep implies for the fix — and a correction to #79
+
+Reading the emission code to write those predictions turned up an error
+in #79's own description, recorded here because it changes what the fix
+has to be judged on.
+
+**#79 called the window gate on the slot ack "an implementation artifact
+of where the emission code lives". It is not.** `xrdp_mm.c:1692` states
+the intent in the code: *"the client's own ack window stays the OUTER
+gate in both modes: a client that stops acking still stops the
+producer."* The gate has a second job, and only one of its two jobs is
+the defect.
+
+So the honest form of "does ungating address the phenomenon" is: **yes
+for the phenomenon measured, and it removes something else at the same
+time.**
+
+* *Addresses it.* Every millisecond this sweep injected reached the
+  period through the withheld credit and through nothing else — the
+  prompt-credit class never moved. Emitting the slot credit at the
+  absorb frontier removes exactly that interval. Predicted: withheld
+  ≈ 0 at every D, no `S` runs, period 16.5–17.5 ms flat in D, and
+  therefore fif = 1 at or below fif = 2's 18.1 ms, which is what
+  FR-ACK-3 actually asks for.
+* *Removes something else.* What bounded client-outstanding at fif = 1
+  was the starvation itself: capture stopped, so nothing new could be
+  sent. Measured here — HEAD holds outstanding at ≤ 2 even at D = 40.
+  Ungated, outstanding becomes rate × client-ack-latency and grows with
+  a slow client until the transport stops draining, `frame_id_server`
+  stops advancing and the slot target's own cap
+  (`min(consumed, server + 1)`, whose comment calls it "what keeps this
+  BACKPRESSURE rather than a queue") bites. That is a bound, but a
+  socket buffer's worth of frames rather than one — and PRD FR-ACK-3
+  says the window is there to bound precisely what the client has
+  outstanding.
+
+Hence the validation gate now sitting at #79 step 3, between CI and the
+fleet A/B: the same five legs against the fixed deb (the win *and* its
+cost measured in one run, since `id_server − id_client` must RISE if the
+fix really ungated anything), plus a **frozen-client leg** —
+`ack_delay_proxy -F <secs>` stops client→server mid-session while the
+video direction keeps flowing — which asks the question the gate's own
+comment cares about: with the client no longer acking, how many frames
+does the server keep producing? HEAD should stop within 1–2. The fixed
+build's number is the new bound it introduces, and it must be recorded
+rather than assumed. If it is bad, the targeted change is not "ungate"
+but "gate on the right thing": `client + H > server` with H taken from
+the two-slot capture budget instead of `fif` — the pathology being that
+fif = 1 is a tighter bound than the pipeline it is gating needs.
+
+## Correction, 2026-08-02 (same day): there is no transport backpressure to fall back on
+
+The paragraph above says a slow client widens `id_server − id_client`
+"until the transport stops draining, `frame_id_server` stops advancing
+and `min(consumed, server + 1)` bites", and calls the result "a socket
+buffer's worth of frames". **That is wrong.** It was written from the
+`xrdp_mm.c:1648` comment ("what keeps this BACKPRESSURE rather than a
+queue") without following `frame_id_server` to the call that advances
+it. Kept, per the records rule, and corrected here rather than edited.
+
+`frame_id_server` advances on `enc_done` (`xrdp_mm.c:4320`), i.e. when
+the frame has been handed to `trans_write_copy_s()`. That function
+**cannot fail for want of a wire**: after one non-blocking attempt,
+whatever the socket did not take is `malloc`ed into a new stream,
+appended to the singly-linked `self->wait_s` list, and 0 is returned
+(`common/trans.c:644-676`). The list has no length or byte limit. So
+the cap bounds frames between absorb and *handoff to xrdp's own heap* —
+never frames on the wire.
+
+The transport does have one byte-level throttle,
+`si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` defined as **0**
+(`trans.c:35, 219, 376`): while a source's bytes sit queued, that
+source's input transport is dropped from the `select()` read set. It
+does not reach GFX frames. Bytes are charged only when
+`si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`); `cur_source` is
+set to a transport's own source only inside `trans_check_wait_objs()`
+(`trans.c:396`) and restored on exit; and enc_done is delivered on a
+**wait object**, not a transport (`xrdp_mm.c:4061, 4538`). At the
+instant a frame is written, `cur_source` is NONE, the bytes are charged
+to nobody, and nothing is throttled.
+
+**So the client ack window is today the only rate control anywhere
+between the encoder and the link.** That does not change anything the
+sweep measured — every leg ran on loopback with ack latency as the sole
+variable, and the client always drained — but it changes what step 3's
+frozen-client leg is testing. It is not "does another bound take over";
+it is "is there one at all". The leg must record buffered bytes and
+process RSS, not only frames produced.
+
+It also sharpens the fix's shape. On a link that cannot carry the
+encoder's output, ungated production does not settle at
+`rate x ack-latency`; the backlog grows in the server's heap until the
+client catches up. `fif` is currently doing two jobs — setting the
+latency target and bounding client-outstanding — and FR-ACK-3 requires
+the first to hold at fif = 1, which drags the second down to 1 with it.
+Removing the gate removes the second job outright; the horizon variant
+`client + H > server`, H from the pipeline's own depth, separates them.
+Only the second of those is a candidate for ever being the default.
+
+## Reassessment: is the stall a bug, or the only honest thing to do on a WAN?
+
+Asked by the owner once the unbounded-`wait_s` finding landed, and it is
+the right question: if the ack window is the only rate control in the
+path, then starving the producer *is* rate-matching, and the "34 % of
+throughput" #76 filed might be the price of not overrunning the link.
+
+**It is not one answer. The crossover is ack latency against frame
+period, and this sweep measured both sides of it.**
+
+*Ack latency < period.* The client's ack for frame N arrives before
+frame N+1 could possibly be ready, so releasing the slot at absorb(N)
+causes nothing to be held: capture N+1 and encode N+1 overlap the round
+trip, and when the ack lands the frame is sent immediately.
+Client-outstanding stays ≤ 1 — the fif = 1 contract is honoured — and
+the period is the pipeline's, not the network's. **In this regime the
+stall buys nothing at all.** The measurement says so directly: cycles
+whose credit arrived promptly ran at **16.3–16.9 ms in every leg**,
+including the 40 ms leg, while `pump` sat at 15.2–15.4 ms. Those cycles
+are the counterfactual — the same machine, same payload, same instant,
+with the gate not binding — and they are 5–6 ms per frame faster than
+the mean. Nothing was traded for that; it is loss.
+
+*Ack latency > period.* Now the pipeline can complete frames faster than
+the client retires them, and every mechanism that keeps it busy
+accumulates finished frames somewhere. Holding them is a queue in front
+of the display — exactly what FR-ACK-3 objects to about fif = 2, just
+relocated from the wire into the server. Throttling production is the
+correct behaviour, and it is what the current code achieves. **In this
+regime the stall is not a bug; it is the design, arrived at by
+accident.**
+
+So the honest verdict on #76's 34 %: **a bug, in the regime where it was
+measured** — loopback, ack latency 7.6–10 ms against a ~16.4 ms period,
+which is the LAN case the fleet and every customer on a local network
+runs in. And **not a bug** in a regime this project has never measured.
+The defect is not that the server throttles; it is that the throttle's
+threshold is `fif`, a latency knob, so the server throttles at *one*
+frame regardless of which regime it is in.
+
+A finite horizon H makes the two regimes one mechanism. H never binds
+while ack latency < period (LAN: full speed, nothing held, outstanding
+≤ 1); H binds at H frames when ack latency > period (WAN: bounded queue,
+at most H periods of staleness, producer throttled to the link).
+Numerically, H = 2 covers this sweep's LAN legs (ack latency 7.6–10 ms,
+period 16.4) and H = 3 covers ~33 ms; at D = 40 the predicted
+ack latency of ~48 ms against a ~16.4 ms period gives ~3, so H = 3 is
+expected to *bind* in that leg and the period to rise there. That
+prediction is written into BACKLOG #79 step 4 before the run.
+
+One more thing this reframing kills: the word **race**. #76 filed this
+as a 31 % intermittent tail and #78 called it an ack race. The sweep
+shows a period-3 limit cycle with zero exceptions in 871 cycles at
+D ≥ 20 — the signature of a control loop at a fixed point, not of a
+race. What varies at D = 0 is only whether the loop's own delay lands
+inside a frame period. Calling it a race suggested the fix was
+synchronisation; it is not, it is the loop's threshold.
+
+## Was the LAN counterfactual sound? Checked, and it holds (2026-08-02)
+
+The reassessment above leans on one number: prompt-credit cycles ran
+16.3–16.9 ms in every leg, so removing the gate on a LAN costs nothing.
+**That number has a selection problem, and it was quoted before the
+problem was faced.** The prompt class is conditioned on the ack having
+arrived in time — a statement about a cycle's history, not only its
+mechanism. In the period-3 limit cycle a prompt cycle *always* follows
+two stalled ones, and a stall gives the producer ~35 ms of idle time in
+which capture can run ahead. So 16.4 ms might be the period of a cycle
+that started from a pre-loaded pipeline, which the fixed build — where
+every cycle is prompt and none follows a stall — would not inherit.
+
+Discriminator, run on the committed captures at no session cost
+(`PR-demo/mac_bisect_matrix/i79_lan_counterfactual.py`): condition the
+prompt-cycle period on its **position within a run of consecutive prompt
+cycles**. Position 1 may be pre-loaded by the stall before it; position
+≥ 2 has no stall behind it and is the steady state the fixed build would
+run in.
+
+| leg | D | prompt-run lengths | pos 1 | pos ≥ 2 | Δ |
+|---|---|---|---|---|---|
+| direct | — | 127 runs, max **28**, 31 of length ≥ 6 | 16.6 (n=127) | 16.9 (n=397) | +0.3 |
+| d0 | 0 | 149 runs, max **22**, 20 of length ≥ 6 | 17.0 (n=149) | 16.9 (n=301) | −0.1 |
+| d10 | 10 | 170 runs, max 3 | 16.9 (n=170) | 15.9 (n=69) | −1.0 |
+| d20 | 20 | 159 runs, **all length 1** | 16.3 (n=159) | — | n/a |
+| d40 | 40 | 130 runs, **all length 1** | 16.4 (n=130) | — | n/a |
+
+**The counterfactual holds, and it is stronger than an inference.** In
+the LAN legs the period is flat across run position (d0: 17.0 / 17.0 /
+16.7 / 17.0 for positions 1 / 2 / 3 / 4+), and the unmodified server has
+already been observed running **28 consecutive frames with the gate not
+binding, at 16.9 ms**. That is the fixed build's LAN steady state,
+measured on HEAD. Pre-loading is dead as an explanation: a 28-cycle run
+cannot be living off one stall's worth of lookahead, and there is no
+drift with position.
+
+Honest limit: this settles the LAN regime for runs up to ~28 cycles
+(~0.5 s). A permanently prompt pipeline is what #79 step 4 measures, and
+only that can show effects with a longer time constant.
+
+The d20/d40 rows are not a gap in the check — they are the period-3 lock
+restated: at D ≥ 20 a prompt cycle is *never* followed by another one,
+so those legs contain no steady state to sample. The question they raise
+was already answered in the legs that do.
+
+## The `max()` model does not fit, and the reason matters
+
+Owner's proposed shape, in period form (`fps = min(...)` over times is a
+`max()` over periods): `period = max(ack_latency / K, compute_serial)`,
+with K = fif = 1. Checked against the same captures:
+
+| leg | D | ack latency p50 | compute (prompt p50) | predicted | measured | residual |
+|---|---|---|---|---|---|---|
+| direct | — | 7.5 | 16.6 | 16.6 | 21.5 | **+4.9** |
+| d0 | 0 | 10.1 | 16.5 | 16.5 | 22.5 | **+5.9** |
+| d10 | 10 | 17.1 | 16.1 | 17.1 | 27.9 | **+10.8** |
+| d20 | 20 | 27.8 | 16.1 | 27.8 | 33.1 | **+5.3** |
+| d40 | 40 | 48.1 | 15.9 | 48.1 | 40.1 | **−7.9** |
+
+It misses in **both directions**, which rules out a single wrong
+constant. Two separate causes, both already visible in the data:
+
+* **At low D it under-predicts, because the gated cycle is ADDITIVE, not
+  a maximum.** A withheld cycle waits for the client's ack *and then*
+  still has to capture and encode; the two do not overlap. `max()`
+  assumes the system is rate-limited by whichever ceiling is lower,
+  which would be true if the gate throttled every cycle uniformly. It
+  does not — it throttles a subset.
+* **At D = 40 it over-predicts, because credit arrives in PAIRS.**
+  `min(consumed, server + 1)` releases two frames' worth when the window
+  opens, so the loop delivers more than one frame per round trip:
+  3 frames per 120.4 ms against a 48.1 ms ack latency is 1.2 frames per
+  round trip, not 1.
+
+So the unmodified loop is not "clocked by the slower of two ceilings" at
+all. It **alternates between two states** and the mean is a duty-cycle
+average — which is exactly the closure already recorded above,
+⅔·52.0 + ⅓·16.4 = 40.1. A `max()` model has no way to express a duty
+cycle.
+
+**This is a property of the broken loop, and it yields a model-level
+prediction for the fix.** A horizon H converts the alternation into a
+uniform rate limit: every cycle is treated the same, so the duty cycle
+collapses and the system really does become rate-limited by whichever
+ceiling is lower. **Prediction for #79 step 4: the fixed build IS
+well-fitted by `period = max(ack_latency / H, compute_serial)`, with the
+residual collapsing from +4.9…−7.9 ms to within ~1 ms across all five
+legs.** That is a stronger claim than any single-metric row in the gate,
+because it constrains the whole curve rather than a point, and it is
+falsifiable in the same run at no extra cost. Recorded before the run.
+
+## Terms used above, in the domain's words (added 2026-08-02 on request)
+
+Three words in the tables are the instrument's, not the machine's. What
+they mean:
+
+**Cycle.** One frame's worth of pipeline work — the interval between two
+consecutive frames reaching the transport, `egress(k−1) → egress(k)`.
+That is the frame period. Every row that says "period" is a mean or
+median over these.
+
+**Prompt vs withheld (`.` vs `S`).** For each cycle the analyzer asks
+one yes/no question about the *producer's* side: when the capture slot
+became safe to recycle, did xrdp tell xorgxrdp straight away, or sit on
+the news? The slot in question is frame **k−2**'s — with two capture
+slots, the slot that frame k will use is the one k−2 just vacated, so
+the credit that admits capture k is the credit for k−2. (Paired by that
+identity, never by a time window.)
+
+* **prompt** — the credit went out within 10 ms of the slot becoming
+  safe. In practice ~0.03 ms: the window was already open, nothing was
+  waiting on the client.
+* **withheld / gated / `S`** — the credit sat for more than 10 ms
+  because `client + fif > server` was false. xrdp knew the slot was
+  free and would not say so until the client's ack arrived.
+
+The 10 ms threshold is inherited from #78's ">10 ms" definition so the
+two items' numbers are comparable.
+
+**Run length.** How many prompt cycles happened back to back before a
+withheld one interrupted. A run of 28 means 28 consecutive frames in
+which the gate never bound — the producer was told immediately every
+time. That is why run length is the load-bearing statistic and not a
+curiosity: **a long prompt run is the unmodified server transiently
+behaving exactly as the fixed build would behave permanently**, and its
+period is therefore a measurement of the fix rather than a prediction
+about it.
+
+## So: is there a LAN fix with no tail AND a bounded wire? Yes, and it is not a compromise
+
+The two goals only look like they conflict because one `if` is doing
+both jobs today. Separate them and the LAN case has slack in it:
+
+* **The tail comes from throttling the PRODUCER** (xorgxrdp is not told
+  its slot is free).
+* **The wire bound comes from throttling the CLIENT** (do not get more
+  than N frames ahead of what it has acked).
+
+Different parties. The LAN's short ack latency is what makes them
+independent: bounding the client never requires throttling the producer,
+because on a LAN the client is never far enough behind for the bound to
+be reached.
+
+With `client + H > server` on the slot credit, H = 3:
+
+* **The bound is always present.** Capture k is admitted only while
+  fewer than H frames are unacked, so at most H + 1 are unacked when k
+  is sent — in both regimes, LAN or WAN, slow client or fast. It does
+  not switch off.
+* **On a LAN it never binds.** Measured client-outstanding on these
+  legs is 0 or 1 in 3157 of 3161 sends (2 in four), and the fixed
+  build's predicted value is `1 + ack_latency / period` = 1.6 at p50 and
+  2.1 at #78's ack-latency p90. H = 3 sits above both. The gate is
+  there, and nothing ever touches it.
+* **The 28-frame run is the existence proof.** During it,
+  `client + 1 > server` happened to hold on every frame — the client was
+  never behind at all — and the machine ran at 16.9 ms against the leg's
+  21.5 ms mean. H = 3 turns that from luck into a guarantee, because the
+  gate is looser than what the client actually does.
+
+So on a LAN the answer is: **no tail, bound intact, nothing traded.** On
+a WAN the bound binds and costs up to H periods of staleness — that is
+the real tradeoff, and it is the one worth paying, because the
+alternative the plain ungate offered was no bound at all.
+
+**H = 2 is the tempting answer and it is wrong.** It matches the
+two-slot capture budget, which makes it look principled, but
+client-outstanding at #78's ack-latency p90 (18.9 ms — longer than one
+frame period) is already ~2.1. H = 2 would bind on ordinary client
+jitter and put back a smaller version of the tail this item exists to
+remove. H = 3 binds only past ~2 periods of ack latency (~34 ms), which
+is genuinely the WAN regime.
+
+**What this does NOT fix, stated so it is not assumed away.** #79
+removes the tail whose mechanism layer 1 confirmed. #76 has a second,
+separate open item — the unreproduced 26.7 ms `pump` on arm x015, a
+bracket a client ack window cannot reach — and nothing here touches it.
+If a tail survives the fixed build's LAN legs, that is where to look
+next, not at the horizon.
+
+## The gate, the slot, and who actually blocks whom on a LAN (2026-08-02)
+
+Three words used throughout this record are jargon and were never
+defined. They name real things:
+
+**Slot — the exclusive resource.** xorgxrdp holds exactly two capture
+buffers for AVC444 (`XUP_CAP_AVC444_SLOT_COUNT = 2`). A capture writes a
+frame's pixels into one. That buffer cannot be written again until xrdp
+says so, so at any instant the producer has 0, 1 or 2 slots busy and can
+only start a capture when one is free.
+
+**Credit — the token that frees a slot.** xrdp sends xorgxrdp a frame
+ack naming a frame id; every slot holding a frame at or below that id
+becomes writable. It is the *only* mechanism that admits a new capture —
+there is no timer, no separate flow-control channel. "Credit withheld"
+means xrdp knew a slot was free and did not say so.
+
+**H — how far behind the client may be before xrdp stops issuing
+credit.** The test is `frame_id_client + H > frame_id_server`, i.e.
+`server − client < H`: "the client is fewer than H frames behind what we
+have sent". H is `frames_in_flight` today, so **H = 1 means credit flows
+only while the client has acked EVERYTHING sent.**
+
+### Who blocks whom on a LAN: nobody is slow, and that is the finding
+
+At the instant slot k becomes free (`absorb k`), the gate asks whether
+the client has acked frame k−1 — the frame sent just before. So credit
+is emitted if and only if
+
+    ack round trip of frame k−1   <   absorb(k) − egress(k−1)
+
+Both measured on the `direct` leg (no proxy at all, 745 decision points):
+
+| interval | p10 | p50 | p90 | p99 | max |
+|---|---|---|---|---|---|
+| slot becomes free after the previous send | 6.2 | **7.9** | 33.3 | | |
+| client ack round trip | 5.6 | **7.6** | 17.9 | 20.1 | 27.3 |
+
+**7.6 against 7.9 ms — a 0.3 ms margin, 4 %.** The gate at H = 1 is
+decided by a photo finish between a network round trip and a pipeline
+deadline that have no relationship to each other. Nothing is slow: the
+client answers in 7.6 ms, and xrdp asks for the answer 7.9 ms after
+posing the question. Roughly a third of the time the coin lands wrong.
+
+That is the answer to "on a LAN the client is not the blocker, so who
+is?" — **xrdp is.** It made a local pipeline event wait on a round trip
+of the same duration, then treated losing that race as a reason to stop
+capturing. The client is behind by *one frame*, for 7.6 ms, because it
+is on the other end of a wire.
+
+The `server − client` value the gate actually compares, at every absorb:
+
+| leg | 0 behind | 1 behind | 2 behind |
+|---|---|---|---|
+| direct | 511 (68.6 %) | 233 (31.3 %) | 1 (0.1 %) |
+| d0 | 441 (61.9 %) | 271 (38.0 %) | 1 (0.1 %) |
+
+H = 1 shuts on the middle column: **31.4 % / 38.1 %** of decision
+points. That column *is* #76's "31 % tail", named at last — it is not a
+tail of anything, it is the fraction of frames whose ack was still in
+flight.
+
+### The one instance where H = 2 would have gated is an artifact, and it retracts yesterday's H derivation
+
+Both legs show exactly one absorb with `server − client = 2`. Neither is
+real: the only frame ids never acked in either leg are the **final three
+of the run** (direct 788/789/790, d0 749/750/751), contiguous otherwise
+— the capture ended before those acks arrived. **H = 2 would have gated
+zero times in 745 and 713 genuine decision points.**
+
+That **retracts the H derivation written earlier the same day**, which
+argued from #78's ack-latency p90 of 18.9 ms that client-outstanding
+reaches ~2.1 and therefore "H = 2 has no headroom and would bind on
+ordinary client jitter". It does not. The claim was arithmetic on a p90
+that was never checked against the quantity the gate compares, and the
+quantity was one command away in captures already committed. Kept here
+per the records rule; the corrected reasoning is in BACKLOG #79 step 2.
+
+**H = 3 still stands, on a different and weaker basis.** The data cannot
+separate H = 2 from H = 3 — HEAD stops the producer the moment
+`server − client` reaches 1, so the trajectory is prevented from ever
+reaching 2, and no number taken under H = 1 can estimate how often H = 2
+would bind without it. What is not selection-bound is the interval: at
+the observed **maximum** ack round trip of 27.3 ms against a predicted
+16.9 ms period, `server − client` reaches 1.6 — so H = 2 would gate at
+about the top 1 % of round trips and H = 3 not until ack latency exceeds
+two periods (~33.8 ms), beyond anything observed. H = 3 clears the
+observed maximum with ~1.5× headroom and H = 2 with none. That is a
+margin argument, not a claim that H = 2 is broken.
+
+### The wedge, event by event (direct leg, frames 787–790)
+
+`server` = last frame handed to the transport; `client` = last frame
+acked; `slots busy` = which frame occupies each capture buffer.
+
+```
+   t (ms)  event      id   server client  slots busy       gate
+  -59.265  absorb    787     786    786   s1=f787          H1 open
+  -59.238  CREDIT    787     786    786   -                <- both slots free, 27 us after absorb
+  -50.384  egress    787     787    786   -                H1 SHUT   (we sent 787; its ack is in flight)
+  -49.666  msgin     788     787    786   s0=f788
+  -42.930  msgin     789     787    786   s0=f788,s1=f789  <- both slots busy; no capture can start
+  -39.276  cliack    787     787    787   s0=f788,s1=f789  H1 open   (ack arrived 11.1 ms after send)
+  -32.925  absorb    788     787    787   s0=f788,s1=f789  H1 open
+  -32.884  CREDIT    788     787    787   s1=f789          <- slot 0 released, 41 us after absorb
+  -23.595  egress    788     788    787   s1=f789          H1 SHUT   (we sent 788)
+  -22.888  msgin     790     788    787   s0=f790,s1=f789  <- both slots busy again
+  -16.361  absorb    789     788    787   s0=f790,s1=f789  H1 SHUT   <- slot 1 IS FREE. Not said.
+  -12.175  egress    789     789    787   s0=f790,s1=f789  H1 SHUT
+   +0.000  absorb    790     789    787   s0=f790,s1=f789  H1 SHUT   <- slot 0 IS FREE. Not said.
+  +36.667  egress    790     790    787   s0=f790,s1=f789
+```
+
+Read the two marked lines. At **−16.361** the encoder children had
+finished reading frame 789's pixels — slot 1 was provably reusable — and
+xrdp did not tell xorgxrdp, because `server − client` was 788 − 787 = 1.
+Frame 788 had been sent 7.2 ms earlier and its ack was somewhere on the
+wire; at this leg's median round trip it was due at about −16.0 ms,
+**0.4 ms after the credit was needed.** With both slots held and no
+credit, the producer cannot start a capture. The pipeline is idle,
+holding a free buffer it has not been given permission to use.
+
+The same thing repeats at **+0.000** for slot 0, and the consequence is
+in the last line: frame 790's egress lands **36.7 ms** after that
+absorb, against a 16.9 ms period when credit is prompt.
+
+Under H = 3 every gate column in that trace reads open, the two CREDIT
+lines that are missing get emitted 27–41 µs after their absorb (the
+measured latency when the gate is open), and both captures start
+immediately. Under H = 2, likewise — the trajectory never reaches 2.
+
+## Where the gate came from, and the mechanism mismatch it encodes (2026-08-03)
+
+Owner asked who designed the gate, when, what for, and whether the
+lossless/lossy layering is right. Answered from `git log` and the source,
+not from this project's own summaries of it.
+
+### Provenance
+
+* **2015-03-28, `33167a7c`, Jay Sorg — "add frame acks and h264 codec
+  mode basics".** The frame-ack machinery arrives.
+* **2016-12-29, `1f930f25`, speidy — "can handle zero unacked frames
+  now ... Parallels Client always want zero unacked frames on the
+  wire".** Note what the window is being made to do here: satisfy a
+  *client's* stated requirement.
+* **2017-02-11, `fde04e80`, Jay Sorg — "rfx fixes for large tile sets,
+  performance change, Xorg will start next frame earlier".** This is the
+  commit that put a window test around the producer ack:
+
+```c
+ex = self->wm->client_info->max_unacknowledged_frame_count;
+if (self->encoder->frame_id_client + ex >= self->encoder->frame_id_server)
+{
+    ... self->mod->mod_frame_ack(self->mod, 0, frame_id_server);
+}
+```
+
+Two things follow directly from that source line, and they answer "what
+for":
+
+1. **The window's parameter was the CLIENT's own advertised limit.**
+   `max_unacknowledged_frame_count` is parsed out of the Frame
+   Acknowledge capability set the client sends
+   (`libxrdp/xrdp_caps.c:743-749`). The gate existed to honour a
+   protocol obligation — do not leave more frames unacknowledged than
+   the client said it can hold. **Yes, the goal was bounding end-to-end
+   frames in flight**, and the bound was the client's number.
+2. **The gate was the safety condition on a performance change, not the
+   point of it.** The commit subject is "Xorg will start next frame
+   earlier": it *added* an earlier producer ack, and attached the window
+   as the condition under which the early ack was allowed. Nobody
+   designed a producer flow-control mechanism here; a protocol check was
+   placed on the producer's admission path because that is where the new
+   ack happened to be.
+
+### The tether was cut for GFX, and that is not recorded anywhere
+
+`xrdp/xrdp_encoder.c:427-476`:
+
+```c
+if (client_info->gfx)
+{
+    self->frames_in_flight = DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT;   /* 2 */
+    ... XRDP_GFX_FRAMES_IN_FLIGHT env override ...
+}
+else
+{
+    self->frames_in_flight = client_info->max_unacknowledged_frame_count;
+}
+```
+
+**In the GFX path — the only path this project runs — the client's
+advertised value is never consulted.** `frames_in_flight` is a hardcoded
+2 with an environment override. So the number that gates the producer
+today has no protocol meaning: it is not the client's limit, it is not
+derived from the pipeline's depth, and nothing re-derived what it ought
+to bound when the tether was cut. Every conclusion in #76/#78/#79 about
+"fif = 1 vs fif = 2" is a conclusion about that untethered constant.
+
+### How `frames_in_flight` is actually enforced: one site, and not on the wire
+
+Exactly one enforcement site exists: `xrdp_mm.c:1697`, around the two
+producer acks. The only other mention, `xrdp_mm.c:4234`, is a field in a
+`PERF_TRACE6("send", ...)` record. **`fif` is never consulted before a
+frame is sent.**
+
+So `frames_in_flight` does not bound frames in flight. It gates *telling
+the producer it may capture*, and the client-facing bound is emergent:
+starve the producer long enough and it stops making frames. Measured
+consequence — at fif = 1, which forbids *any* unacknowledged frame, two
+thirds of sends went out with 1 or 2 unacknowledged.
+
+### The layer map, and where backpressure actually exists
+
+| edge | queue depth | backpressure signal |
+|---|---|---|
+| xorgxrdp capture → xup | 2 slots | **the credit ack — the only one** |
+| xup → encoder fifo | measured **1** at all 3088 enqueues (#61e) | none needed: never queues |
+| fifo → ffmpeg children | provably 1 (`pump_pairs` waits for the set it just submitted) | none needed |
+| children → LTR rewrite → assembler | 1 | none |
+| assembler → transport | **unbounded** (`trans wait_s`, `common/trans.c:644-676`) | **none** |
+| transport → client | network | none |
+
+**There is exactly one backpressure edge in the entire pipeline, and it
+is cross-layer**: it connects the farthest consumer (the remote client)
+to the nearest producer (capture), skipping every stage between. The
+intermediate stages need no backpressure because they are depth-1 by
+construction — except the last one, which has none and is unbounded.
+
+### The mismatch, stated precisely
+
+The credit signal carries two facts on one wire:
+
+* **"a capture slot is free"** — a *lossless, immediate, nearest-
+  neighbour* handshake. Its only correct input is whether the encoder
+  children have finished reading those pixels. Saying so costs nothing
+  and loses nothing.
+* **"the client may receive another frame"** — a *lossy, end-to-end*
+  admission control. Its correct input is the client's ack position, and
+  its correct response when it binds is to **drop** (coalesce damage),
+  not to stall.
+
+Today the second is implemented by suppressing the first. The
+consequence is visible in the trace: **at the withheld instants the slot
+IS free.** The gate reports "no capacity" to the producer at a moment
+when the pipeline demonstrably has capacity, because the signal is being
+used to express a fact about the network instead.
+
+### Is the drop guard "farthest end gates, nearest end drops"? The topology is right; the trigger is wrong
+
+The drop mechanism exists and is in the correct place. PRD FR-CAPTURE-8
+clause 4: with both slots outstanding, damage accumulates only in the
+dirty region (union + extents collapse) — "frames are dropped before
+they exist, the only legal drop point, since the single H.264 reference
+chain forbids dropping later". The region accounting around it is
+careful: `XUP_ACK_FLAGS_SLOT_ONLY` frees the slot while the region stays
+held, and `XUP_ACK_FLAGS_NOT_DISPLAYED` returns the region to the dirty
+region (`common/xup_client_info.h:30-70`, Invariant III).
+
+So the shape the owner describes is what the design intends. What is
+wrong is what *fires* it. The near-end drop is supposed to mean "the
+pipeline is full". Today it fires when an ack has not come back, and at
+that instant the pipeline is not full. The stall's duration is therefore
+set by the round-trip time rather than by consumer readiness, and both
+producer and consumer sit idle inside it — frame 790's egress landed
+36.7 ms after its slot was free, against a 16.9 ms period when credit is
+prompt.
+
+### What this implies for the fix — and the planned sequencing may be backwards
+
+Put each signal on its own layer:
+
+* **Slot credit (nearest neighbour):** emit at absorb, unconditionally.
+  The only fact it should consult is whether the children are done with
+  the pixels.
+* **Client window (farthest end):** enforce at **egress** — do not
+  *send* past the window. That is #80.
+
+The interesting consequence is what happens when they are combined. With
+egress gated, a client that falls behind stops `frame_id_server`
+advancing; the **existing** cap `min(frame_id_consumed,
+frame_id_server + 1)` then stops the slot credit within one frame; both
+slots fill; and xorgxrdp coalesces and drops. **The near-end drop now
+fires because the pipeline is genuinely full — which is what the drop
+guard was always meant to mean — and no new constant is required.**
+
+So #80 does not merely add a bound; it may make **H unnecessary**. And
+the rejection of the plain ungate was conditional on egress being
+ungated: with #80 in place, "ungate the slot ack and let the existing
+cap bound it" is bounded, and is simpler than a horizon.
+
+**This reverses the sequencing currently in BACKLOG** (#79 first, #80
+"blocked on #79 landing"). It is filed as an open design question for
+the owner rather than acted on, because #80's hold-vs-drop decision is
+unresolved and holding a completed frame at egress is new machinery in
+the main thread. On a LAN the hold is ~0.4 ms (7.6 ms round trip against
+a 7.9 ms slot-free deadline), so the cost is negligible there; on a WAN
+it is bounded by the same cap.
+
+## The change surface under the two axioms (2026-08-03)
+
+Owner stated the design as axioms and asked what it costs to conform:
+*backpressure is nearest-neighbour; drop is end-to-end* — and observed
+that under full enforcement #80's hold-vs-drop question should not
+exist, because a frame that cannot be sent should never be captured.
+
+**The observation is correct, and provable.** Admit capture k only
+while `k ≤ frame_id_client + C_eff`. The client frontier only rises and
+frames are sent in id order, so when k reaches egress,
+`k − client ≤ C_eff` — every frame that exists is inside the window at
+send time. An egress gate can never fire; nothing intermediate holds.
+The precision the induction demands: **count the window from the
+CAPTURE frontier, not the egress frontier.** #79's horizon
+(`client + H > server`) counts from egress, which leaves pipeline
+inventory able to arrive at egress after the window moved — the exact
+frames an egress gate would have had to hold. The owner's axiom forces
+the correct frontier choice.
+
+**The drop needs zero new code.** No credit → both slots stay busy →
+xorgxrdp coalesces damage (FR-CAPTURE-8 clause 4: dropped before they
+exist, the only legal drop point given the single H.264 reference
+chain). A slow client gets fewer, fresher frames instead of stale
+queued ones. Little's law caveat, stated so the WAN gate is not
+over-promised: nothing raises frame rate above window/RTT; drop buys
+freshness and bounded memory, not throughput.
+
+### The mechanism: one arithmetic change at one site
+
+    credit = min(frame_id_consumed,      /* slot: children done with pixels */
+                 frame_id_server + 1,    /* pipeline-inventory cap          */
+                 frame_id_client + C)    /* end-to-end wire window          */
+
+emitted unconditionally whenever the frontier advances. Each term
+consults exactly its own layer. The conflation dies not because the two
+facts travel on different wires — a credit frontier is allowed to be a
+min of constraints — but because the wire constraint no longer
+SUPPRESSES the slot constraint's emission: when `client + C` binds the
+producer is dropping, not stalled, and the 0.3 ms photo finish is gone
+because prompt emission no longer depends on winning an ack race.
+
+Capture rides at most 2 slots above the credit, so the resulting hard
+wire bound is **C + 2 unacked frames at send**. C = 2 keeps the wedge's
+f789 credit immediate (replayed from the trace); the exact value is
+pinned by exhaustive enumeration of the pure frontier function, not
+tuned against a run.
+
+### Surface, file by file
+
+| where | change | size |
+|---|---|---|
+| `xrdp/xrdp_mm.c` ~1690–1745 | frontier arithmetic replaces the `xrdp_gfx_ack_window_open()` emission test; both producer acks use it | ~30 lines |
+| `xrdp/xrdp_encoder.h` | frontier as a pure helper (replacing/absorbing `xrdp_gfx_ack_window_open`, which keeps its one remaining semantic for the legacy path) | ~15 lines |
+| `xrdp/xrdp_encoder.c` | C as a named constant; `frames_in_flight` keeps its legacy meaning in the non-GFX branch only | small |
+| `tests/xrdp` | pure-function enumeration of the frontier over all {cliack, egress, absorb} interleavings (the #79 step-3 plan, retargeted); D=40 wedge replay as golden vector | the existing planned CI, re-aimed |
+| `common/trans.c` | O(1) pending-bytes counter (telemetry only — the bound itself is now upstream) | small |
+| xorgxrdp | **none** — wire semantics of the credit are unchanged; only the arithmetic producing the frontier moves. The #79 blocking pre-step (read the SLOT_ONLY handler) stands | 0 |
+| PRD | FR-ACK-3 amendment clause 1 needs its own amendment: "the window belongs on egress" is superseded — with capture-frontier admission an egress gate is dead code by induction | doc |
+| config | everything behind `eager_slot_ack` (default false): rule-2 backward compatibility, and the legacy/non-GFX path untouched | 0 new knobs |
+
+What does NOT change: `min(consumed, server+1)` (it is the pipeline
+term, kept verbatim); egress (no gate — the induction makes it
+unreachable); the drop machinery in xorgxrdp (already correct); the
+EGFX suspend path (`gfx_ack_off` snaps client to server, which
+self-disables the C term for suspend clients); cliack already
+re-invokes the emission function, so the frontier wakes on ack arrival
+with no new plumbing.
+
+### What this supersedes
+
+* #80's egress gate and its hold-vs-drop question: dissolved, not
+  decided. The rewritten #80 is the frontier change plus telemetry.
+* The #79 horizon-H form: superseded by the same change (H counted
+  from the wrong frontier). The validation-gate predictions must be
+  re-derived for drop semantics — notably the D = 40 leg: period stays
+  ~16.9 ms at ALL D (admission drops instead of stalling), with the
+  drop visible as coalesced damage per frame rather than a longer
+  period. `id_server − id_client` at send must never exceed C + 2.
+* The sequencing question (#80 before #79): moot — they are now one
+  change.

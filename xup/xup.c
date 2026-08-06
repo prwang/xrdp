@@ -1237,7 +1237,12 @@ process_server_paint_rect_shmem(struct mod *amod, struct stream *s)
 }
 
 /******************************************************************************/
-/* return error */
+/* PRD FR-ACK-1: frame_id is the ECHOED rect_id of a specific paint msg
+   the consumer received, and flags carries XUP_ACK_FLAGS_NOT_DISPLAYED
+   when that msg reached its terminal state without producing an output
+   frame. The flags word is pre-existing and unknown bits are ignored by
+   old peers, so this is wire-compatible in both directions.
+   return error */
 static int
 send_paint_rect_ex_ack(struct mod *mod, int flags, int frame_id)
 {

@@ -78,9 +78,9 @@ halves we already serialize inside the `LC=0` PDU.
 ### Validation
 Backstop: in-tree serializer unit test (`tests/`). End-to-end: mstsc/UWP must
 still render (no regression), and the decisive check is a macOS Windows App render
-of the reframed stream. Smoke-gate per `PR-demo/tail_flush_ab/smoke.sh` at
+of the reframed stream. Smoke-gate per `PR-demo/smoke_gate/smoke.sh` at
 multiple session sizes before any handoff.
 
 Local (uncommitted) artifacts: `vm/gfxwin_anim`, `vm/gfxwin_scroll` (real-Windows
 dumps), `vm/gfxdump_*` (our dumps), `vm/parse444.py`, `vm/scan444.py`,
-`vm/GROUND_TRUTH_win2022_avc444.md`.
+`PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md`.

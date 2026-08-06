@@ -32,6 +32,8 @@
 #include "scp.h"
 #include <ctype.h>
 #include "xrdp_encoder.h"
+#include "perf_trace.h"
+#include "xup_client_info.h"
 #include "xrdp_avc444_caps.h"
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_sockets.h"
@@ -1186,6 +1188,30 @@ xrdp_mm_egfx_create_surfaces(struct xrdp_mm *self)
 }
 
 /******************************************************************************/
+/* The aux_ltr_chain re-key (BACKLOG #48) rebuilds a monitor's surface
+ * under an alternate id, so the id the client actually holds is not
+ * necessarily the base id this function assumed. Ask the encoder, under
+ * its mutex, which one is live. */
+static int
+xrdp_mm_egfx_live_surface_id(struct xrdp_mm *self, int mon_index,
+                             int base_surface_id)
+{
+    struct xrdp_encoder *encoder = self->encoder;
+    int live = base_surface_id;
+
+    if (encoder != NULL && mon_index >= 0 && mon_index < 16)
+    {
+        tc_mutex_lock(encoder->mutex);
+        if (encoder->avc444_surface_id_live[mon_index] >= 0)
+        {
+            live = encoder->avc444_surface_id_live[mon_index];
+        }
+        tc_mutex_unlock(encoder->mutex);
+    }
+    return live;
+}
+
+/******************************************************************************/
 static int
 xrdp_mm_egfx_delete_surfaces(struct xrdp_mm *self)
 {
@@ -1196,13 +1222,17 @@ xrdp_mm_egfx_delete_surfaces(struct xrdp_mm *self)
               "monitor count %d", count);
     if (count < 1)
     {
-        xrdp_egfx_send_delete_surface(self->egfx, self->egfx->surface_id);
+        xrdp_egfx_send_delete_surface(
+            self->egfx,
+            xrdp_mm_egfx_live_surface_id(self, 0, self->egfx->surface_id));
     }
     else
     {
         for (index = 0; index < count; index++)
         {
-            xrdp_egfx_send_delete_surface(self->egfx, index);
+            xrdp_egfx_send_delete_surface(
+                self->egfx,
+                xrdp_mm_egfx_live_surface_id(self, index, index));
         }
     }
     return 0;
@@ -1377,6 +1407,12 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_fault_aux_delay;
             cfg.fault_strip_mmco =
                 self->wm->gfx_config->avc444_ffmpeg_fault_strip_mmco;
+            cfg.aux_ltr_chain =
+                self->wm->gfx_config->avc444_ffmpeg_aux_ltr_chain;
+            cfg.ltr_rekey_frame_num =
+                self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_frame_num;
+            cfg.intra_refresh_frames =
+                self->wm->gfx_config->avc444_ffmpeg_intra_refresh_frames;
             if (cfg.fault_strip_mmco)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml fault_strip_mmco is ON: "
@@ -1406,6 +1442,60 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_aux_delay;
             self->avc444_fault_strip_mmco =
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.fault_strip_mmco;
+            self->avc444_aux_ltr_chain =
+                (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_ltr_chain;
+            self->avc444_ltr_rekey_frame_num = cfg.ltr_rekey_frame_num;
+            self->avc444_intra_refresh_frames = cfg.intra_refresh_frames;
+            self->avc444_ltr_rekey_surface_reset =
+                self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
+            /* BACKLOG #70: only the batch path publishes an absorb
+             * marker, so the knob is meaningless without aux_ltr_chain
+             * and is refused rather than silently ignored. */
+            self->avc444_eager_slot_ack =
+                self->wm->gfx_config->avc444_ffmpeg_eager_slot_ack &&
+                self->avc444_aux_ltr_chain;
+            /* BACKLOG #80: C is read whether or not the eager path is
+             * armed; the emission code is what decides to consult it,
+             * so the deployed value is always visible in one place. */
+            self->avc444_wire_window =
+                self->wm->gfx_config->avc444_ffmpeg_wire_window;
+            if (self->wm->gfx_config->avc444_ffmpeg_eager_slot_ack &&
+                    !self->avc444_aux_ltr_chain)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml eager_slot_ack is set but "
+                    "aux_ltr_chain is off: there is no absorb marker on "
+                    "this path, so the shipped egress-paced ack stays");
+            }
+            /* BACKLOG #70B: the assembler reads a pair the batch path
+             * collected; without aux_ltr_chain there is no such pair
+             * and the knob is refused rather than silently ignored. */
+            self->avc444_emit_thread =
+                self->wm->gfx_config->avc444_ffmpeg_emit_thread &&
+                self->avc444_aux_ltr_chain;
+            if (self->wm->gfx_config->avc444_ffmpeg_emit_thread &&
+                    !self->avc444_aux_ltr_chain)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml emit_thread is set but "
+                    "aux_ltr_chain is off: the emit pass has no collected "
+                    "pair to assemble on this path, so it stays inline");
+            }
+            if (self->avc444_eager_slot_ack)
+            {
+                LOG(LOG_LEVEL_INFO, "gfx.toml eager_slot_ack is ON "
+                    "(BACKLOG #70): the capture slot is released when the "
+                    "encoder children have absorbed the frame and the "
+                    "previous frame has left for the transport");
+            }
+            if (self->avc444_aux_ltr_chain)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "
+                    "EXPERIMENTAL FR-H264-8 aux-refs-aux via long-term "
+                    "reference slots (leaf architecture bypassed); "
+                    "scheduled paired intra refresh every %d pictures "
+                    "per view, re-key at frame_num %d",
+                    self->avc444_intra_refresh_frames,
+                    self->avc444_ltr_rekey_frame_num);
+            }
             if (pres == XRDP_FFMPEG_PROBE_OK)
             {
                 if (want_420)
@@ -1543,6 +1633,169 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
 }
 
 /*****************************************************************************/
+/* BACKLOG #80: bytes queued in the client transport, in KiB.
+ *
+ * O(1): struct trans keeps the running count, because this is read once
+ * per frame on the egress path and coding rule 5 forbids anything with
+ * a per-frame cost there -- walking the wait_s list would be exactly
+ * that. Returns 0 when there is no session yet. */
+static int
+xrdp_mm_egress_pending_kib(struct xrdp_mm *self)
+{
+    if (self->wm == NULL || self->wm->session == NULL ||
+            self->wm->session->trans == NULL)
+    {
+        return 0;
+    }
+    return (int) (self->wm->session->trans->wait_bytes / 1024);
+}
+
+/*****************************************************************************/
+/* BACKLOG #80 / PRD FR-FLOW-1 -- emit the credit frontier.
+ *
+ * The two acks below are the ONLY flow-control tokens the producer has:
+ * xorgxrdp captures a frame only at an id its budget allows above the
+ * highest id xrdp has acked. So whatever value goes out here is, quite
+ * literally, permission to capture.
+ *
+ *   the region ack (flags 0)  says "every region up to N is disposed of,
+ *                             forget the pixels you were holding". On
+ *                             the producer it moves the slot frontier
+ *                             too, so it is also an admission token.
+ *   the slot ack (SLOT_ONLY)  says only "these capture pages are free";
+ *                             the frame's tail can still fail and owe
+ *                             the producer its pixels back, so it must
+ *                             not retire the held region.
+ *
+ * Both are clamped by the same end-to-end window, because a window
+ * enforced on one token and bypassed on the other is not a window.
+ *
+ * WHAT CHANGED, AND WHY (BACKLOG #79 measured it, #80 fixes it). The
+ * shipped code wraps this whole function in
+ * xrdp_gfx_ack_window_open(client, server, frames_in_flight) -- one
+ * comparison doing two unrelated jobs. When the client falls behind, it
+ * withholds the SLOT credit as well, so the producer stops capturing
+ * because of a fact about the NETWORK, several layers away, while its
+ * own downstream neighbour is idle and its pages are free. Under a 40 ms
+ * injected ack delay that showed up as a period-3 limit cycle: two
+ * stalled frames, one prompt, forever. FR-FLOW-1 clause 1 forbids it --
+ * a lossless stall may consult only the immediate next stage.
+ *
+ * The replacement is not "remove the gate". Removing it would leave
+ * nothing at all between the encoder and the wire: enc_done hands every
+ * frame to trans_write_copy_s(), which cannot refuse and mallocs the
+ * remainder onto an unbounded list. Instead the client's window becomes
+ * a THIRD TERM of the credit itself (FR-FLOW-1 clause 3), applied at
+ * capture admission, which is the one place where refusing a frame is
+ * free: xorgxrdp keeps the damage in its dirty region and the next
+ * admitted capture carries the union. A slow client gets fewer frames,
+ * each of them fresher -- never a queue of stale ones.
+ *
+ * Emission is UNCONDITIONAL: the frontier is computed and sent whenever
+ * it advances. There is no state in which the producer is told nothing.
+ *
+ * See xrdp_gfx_credit_frontier() for the three terms and the resulting
+ * wire bound; xrdp_gfx_region_ack_target() for why clamping the region
+ * ack cannot lose pixels. */
+static int
+xrdp_mm_emit_credit_frontier(struct xrdp_mm *self,
+                             struct xrdp_encoder *encoder)
+{
+    struct xrdp_mod *m;
+    struct xrdp_gfx_ack_state st;
+    struct xrdp_gfx_ack_plan plan;
+
+    m = self->mod;
+    st.frame_id_consumed = encoder->frame_id_consumed;
+    st.frame_id_server = encoder->frame_id_server;
+    st.frame_id_client = encoder->frame_id_client;
+    st.wire_window = encoder->wire_window;
+    st.frame_id_region_sent = encoder->frame_id_region_sent;
+    st.frame_id_server_sent = encoder->frame_id_server_sent;
+    xrdp_gfx_plan_acks(&st, &plan);
+    /* the region ack goes FIRST so a slot ack for the frame behind it
+     * never runs ahead of the region retirement it depends on */
+    if (plan.region >= 0)
+    {
+        encoder->frame_id_region_sent = plan.region;
+        if (plan.region > encoder->frame_id_server_sent)
+        {
+            encoder->frame_id_server_sent = plan.region;
+        }
+        if (m != NULL)
+        {
+            if (xrdp_ack_trace_on())
+            {
+                PERF_TRACE6("ackregion", plan.region,
+                            encoder->frame_id_server,
+                            encoder->frame_id_consumed,
+                            encoder->frame_id_client,
+                            encoder->wire_window, 0);
+            }
+            m->mod_frame_ack(m, 0, plan.region);
+        }
+    }
+    if (plan.slot >= 0)
+    {
+        encoder->frame_id_server_sent = plan.slot;
+        if (m != NULL)
+        {
+            if (xrdp_ack_trace_on())
+            {
+                PERF_TRACE6("ackslot", plan.slot, encoder->frame_id_server,
+                            encoder->frame_id_consumed,
+                            encoder->frame_id_client,
+                            encoder->wire_window, 0);
+            }
+            m->mod_frame_ack(m, XUP_ACK_FLAGS_SLOT_ONLY, plan.slot);
+        }
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+/* the SHIPPED emission, kept verbatim for eager_slot_ack = false.
+ *
+ * Coding rule 2: with the knob off the behaviour must be today's, bit
+ * for bit -- including the cross-layer gate, which on this path is the
+ * only client window there is (the frame reaches the producer's slot
+ * frontier at egress, so the gate and the credit are the same event). */
+static int
+xrdp_mm_emit_legacy_frame_ack(struct xrdp_mm *self,
+                              struct xrdp_encoder *encoder)
+{
+    struct xrdp_mod *m = self->mod;
+    int fif = encoder->frames_in_flight;
+
+    if (xrdp_gfx_ack_window_open(encoder->frame_id_client,
+                                 encoder->frame_id_server, fif))
+    {
+        if (encoder->frame_id_server > encoder->frame_id_region_sent)
+        {
+            LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_update_module_ack: "
+                      "frame_id_server %d", encoder->frame_id_server);
+            encoder->frame_id_region_sent = encoder->frame_id_server;
+            if (encoder->frame_id_server > encoder->frame_id_server_sent)
+            {
+                encoder->frame_id_server_sent = encoder->frame_id_server;
+            }
+            if (m != NULL)
+            {
+                if (xrdp_ack_trace_on())
+                {
+                    PERF_TRACE6("ackregion", encoder->frame_id_server,
+                                encoder->frame_id_server,
+                                encoder->frame_id_consumed,
+                                encoder->frame_id_client, 0, 0);
+                }
+                m->mod_frame_ack(m, 0, encoder->frame_id_server);
+            }
+        }
+    }
+    return 0;
+}
+
+/*****************************************************************************/
 static int
 xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
 {
@@ -1559,26 +1812,48 @@ xrdp_mm_update_module_frame_ack(struct xrdp_mm *self)
             m->mod_frame_ack(m, 0, INT_MAX);
         }
     }
+    else if (encoder->eager_slot_ack)
+    {
+        xrdp_mm_emit_credit_frontier(self, encoder);
+    }
     else
     {
-        int fif = encoder->frames_in_flight;
-        if (encoder->frame_id_client + fif > encoder->frame_id_server)
-        {
-            if (encoder->frame_id_server > encoder->frame_id_server_sent)
-            {
-                LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_update_module_ack: "
-                          "frame_id_server %d", encoder->frame_id_server);
-                encoder->frame_id_server_sent = encoder->frame_id_server;
-                struct xrdp_mod *m = self->mod;
-                if (m != NULL)
-                {
-                    m->mod_frame_ack(m, 0,
-                                     encoder->frame_id_server);
-                }
-            }
-        }
+        xrdp_mm_emit_legacy_frame_ack(self, encoder);
     }
     return 0;
+}
+
+/*****************************************************************************/
+/* BACKLOG #70: the encoder thread reports that frame_id's input has been
+ * absorbed by the children.
+ *
+ * The frontier is CONTIGUOUS on purpose. The module ack is cumulative --
+ * acking N retires every id up to N on the producer -- so advancing over
+ * a gap would release the slot of an id that has NOT been absorbed and
+ * let Xorg overwrite pages a child is still reading. An id that is not
+ * the next one is therefore dropped here; the terminal enc_done of that
+ * frame re-syncs the frontier one full pipeline later (slower, never
+ * wrong), which is also what covers a consumed report that could not be
+ * allocated. */
+static void
+xrdp_mm_note_frame_consumed(struct xrdp_mm *self, int frame_id)
+{
+    struct xrdp_encoder *encoder;
+
+    encoder = self->encoder;
+    if (encoder == NULL || !encoder->eager_slot_ack)
+    {
+        return;
+    }
+    if (frame_id != encoder->frame_id_consumed + 1)
+    {
+        LOG(LOG_LEVEL_DEBUG, "xrdp_mm_note_frame_consumed: id %d is not "
+            "the frontier's successor (%d); waiting for the in-order one",
+            frame_id, encoder->frame_id_consumed);
+        return;
+    }
+    encoder->frame_id_consumed = frame_id;
+    xrdp_mm_update_module_frame_ack(self);
 }
 
 /*****************************************************************************/
@@ -1595,6 +1870,15 @@ gfx_trace_on(void)
     {
         const char *e = g_getenv("XRDP_GFX_TRACE");
         cached = (e != NULL && e[0] == '1') ? 1 : 0;
+        if (cached && !perf_trace_on())
+        {
+            /* see trace_sink_check() in xrdp_encoder.c -- the records
+               this knob selects live in the ring now (BACKLOG #61h) */
+            LOG(LOG_LEVEL_WARNING, "XRDP_GFX_TRACE=1 but XRDP_PERF_TRACE "
+                "is not set: per-frame trace records go to the perf ring, "
+                "not to this log, so this run will record none of them");
+            cached = 0;
+        }
     }
     return cached;
 }
@@ -1642,9 +1926,8 @@ xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
               frame_id, encoder->frame_id_client, encoder->frame_id_server);
     if (gfx_trace_on())
     {
-        LOG(LOG_LEVEL_INFO, "GFX_TRACE ack frame_id=%d queue_depth=%u "
-            "decoded=%d id_server=%d ack_off=%d", frame_id, queue_depth,
-            frames_decoded, encoder->frame_id_server, encoder->gfx_ack_off);
+        PERF_TRACE6("cliack", frame_id, (int)queue_depth, frames_decoded,
+                    encoder->frame_id_server, encoder->gfx_ack_off, 0);
     }
     if (frame_id < 0 || frame_id > encoder->frame_id_server)
     {
@@ -3971,6 +4254,7 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
     int is_gfx;
     int got_frame_id;
     int client_ack;
+    int displayed;
 
     LOG(LOG_LEVEL_TRACE, "xrdp_mm_process_enc_done:");
 
@@ -3984,7 +4268,20 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
         {
             break;
         }
+        if (ENC_IS_BIT_SET(enc_done->flags, ENC_DONE_FLAGS_CONSUMED_BIT))
+        {
+            /* BACKLOG #70: not a frame -- the encoder children have
+             * absorbed this frame's input. It sends nothing and it does
+             * not release the XRDP_ENC_DATA (the emit pass still owns
+             * it); it only advances the absorb frontier and lets the
+             * ack go out early if the previous frame has egressed. */
+            xrdp_mm_note_frame_consumed(self, enc_done->frame_id);
+            g_free(enc_done);
+            continue;
+        }
         is_gfx = ENC_IS_BIT_SET(enc_done->flags, ENC_DONE_FLAGS_GFX_BIT);
+        displayed = !ENC_IS_BIT_SET(enc_done->flags,
+                                    ENC_DONE_FLAGS_NOT_DISPLAYED_BIT);
         if (is_gfx)
         {
             got_frame_id = ENC_IS_BIT_SET(enc_done->flags,
@@ -4008,12 +4305,11 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                                     enc_done->comp_bytes);
                 if (gfx_trace_on())
                 {
-                    LOG(LOG_LEVEL_INFO, "GFX_TRACE send bytes=%d last=%d "
-                        "frame_id=%d id_server=%d id_client=%d fif=%d",
-                        enc_done->comp_bytes, enc_done->last,
-                        enc_done->frame_id, self->encoder->frame_id_server,
-                        self->encoder->frame_id_client,
-                        self->encoder->frames_in_flight);
+                    PERF_TRACE6("send", enc_done->comp_bytes,
+                                enc_done->last, enc_done->frame_id,
+                                self->encoder->frame_id_server,
+                                self->encoder->frame_id_client,
+                                self->encoder->frames_in_flight);
                 }
             }
             else
@@ -4048,7 +4344,81 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
             LOG_DEVEL(LOG_LEVEL_DEBUG, "xrdp_mm_process_enc_done: last set");
             if (got_frame_id)
             {
-                if (client_ack)
+                /* PRD FR-ACK-1: the value acked to the producer is the
+                 * ECHOED id this enc_done carries -- the rect_id copied
+                 * out of the paint msg -- never a count of frames this
+                 * side has sent. Terminal state (b) (consumed, no output
+                 * frame) is acked IMMEDIATELY and ungated: no frame of
+                 * that id reached the client, so no client credit is
+                 * owed for it, and withholding it behind the egfx ack
+                 * window would pin the producer's capture slot until
+                 * some later frame's cumulative ack happened to cover
+                 * it -- and at cap there is no later frame. */
+                /* BACKLOG #70: reaching a msg's terminal enc_done proves
+                 * every earlier msg reached its own (the encoder emits
+                 * them in fifo order and this loop reads them in that
+                 * order), so it is the guaranteed filler of an absorb
+                 * frontier that a dropped or out-of-order consumed
+                 * report left behind. Harmless when the knob is off:
+                 * frame_id_consumed is read nowhere else. */
+                if (enc_done->frame_id > self->encoder->frame_id_consumed)
+                {
+                    self->encoder->frame_id_consumed = enc_done->frame_id;
+                }
+                if (xrdp_ack_trace_on())
+                {
+                    /* the frame's LAST byte is now with the transport.
+                     * Field c is how many KiB the transport has NOT yet
+                     * got rid of -- BACKLOG #80's egress-queue bound
+                     * (PRD FR-FLOW-1 clause 5) is a claim about this
+                     * number, and before the O(1) counter in struct
+                     * trans there was no way to see it that did not
+                     * cost a per-frame walk of a malloc'd list.
+                     * KiB, not bytes, so a broken bound cannot overflow
+                     * the trace field before it is visible. */
+                    PERF_TRACE6("egress", enc_done->frame_id, displayed,
+                                xrdp_mm_egress_pending_kib(self),
+                                self->encoder->frame_id_client, 0, 0);
+                }
+                if (!displayed)
+                {
+                    /* BACKLOG #80, the ONE ack that is not clamped by
+                     * the wire window, stated explicitly because the
+                     * window's bound is quoted elsewhere as if it had no
+                     * exceptions. This frame produced no output: no byte
+                     * of it ever reached the transport, so it occupies
+                     * no wire, and the pixels a capture took out of the
+                     * producer's dirty region are owed straight back
+                     * (FR-ACK-1 Invariant III). Delaying that would hold
+                     * a region in xorgxrdp's cap_sent ring for a client
+                     * that has no reason to ever ack an id it was never
+                     * sent. The cost is that releasing this slot lifts
+                     * the producer's admission ceiling by one frame
+                     * beyond the credit -- so the "at most C + 2*M
+                     * unacked at send" bound is a statement about
+                     * frames that reached the transport, and a run of
+                     * discarded frames relaxes it transiently. */
+                    if (self->mod != NULL)
+                    {
+                        self->mod->mod_frame_ack(self->mod,
+                                                 xup_ack_flags_make(0),
+                                                 enc_done->frame_id);
+                        if (enc_done->frame_id >
+                                self->encoder->frame_id_server_sent)
+                        {
+                            self->encoder->frame_id_server_sent =
+                                enc_done->frame_id;
+                        }
+                        /* this one DID dispose of the region */
+                        if (enc_done->frame_id >
+                                self->encoder->frame_id_region_sent)
+                        {
+                            self->encoder->frame_id_region_sent =
+                                enc_done->frame_id;
+                        }
+                    }
+                }
+                else if (client_ack)
                 {
                     self->encoder->frame_id_server = enc_done->frame_id;
                     xrdp_mm_update_module_frame_ack(self);
@@ -4726,7 +5096,9 @@ server_egfx_cmd(struct xrdp_mod *mod,
     XRDP_ENC_DATA *enc;
     struct xrdp_wm *wm;
     struct xrdp_mm *mm;
+    int enq_depth;
 
+    enq_depth = 0;
     wm = (struct xrdp_wm *)(mod->wm);
     mm = wm->mm;
     if (mm->encoder == NULL)
@@ -4761,6 +5133,14 @@ server_egfx_cmd(struct xrdp_mod *mod,
     }
     g_memcpy(enc->u.gfx.cmd, cmd, cmd_bytes);
     enc->u.gfx.cmd_bytes = cmd_bytes;
+    if (xrdp_ack_trace_on())
+    {
+        /* the producer's frame has arrived at xrdp: the head of the leg
+         * chain the #70 A/B is read on */
+        PERF_TRACE6("msgin",
+                    gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
+                    data_bytes, 0, 0, 0, 0);
+    }
     enc->u.gfx.data = data;
     enc->u.gfx.data_bytes = data_bytes;
     enc->shmem_ptr = data;
@@ -4769,17 +5149,49 @@ server_egfx_cmd(struct xrdp_mod *mod,
     tc_mutex_lock(mm->encoder->mutex);
     fifo_add_item(mm->encoder->fifo_to_proc, enc);
     mm->encoder->fifo_to_proc_depth++;
+    enq_depth = mm->encoder->fifo_to_proc_depth;
     /* FR-CAPTURE-8: the two-slot producer gate bounds the queue to the
        outstanding-rect budget; more means a leaked ack or a broken
-       gate on the xorgxrdp side (loud, mandated local assertion) */
-    if (mm->encoder->avc444_ffmpeg &&
-            mm->encoder->fifo_to_proc_depth > 2)
+       gate on the xorgxrdp side (loud, mandated local assertion).
+       The budget is PER MONITOR (#45 D13, step 6b): each monitor caps
+       itself at 2 outstanding frames and there is never a global pool,
+       so the aggregate legal depth here is 2 * monitorCount. The 2m is a
+       CONSEQUENCE of m independent caps, never a drawable quantity -- a
+       pool would let one damaged monitor take all of it (bufferbloat and
+       slot aliasing). Hard-coding 2 instead would be a permanent false
+       ERROR on every dual-monitor frame once step 6 deploys, and E2's
+       "zero errors in the server log" would be unreachable. */
     {
-        LOG(LOG_LEVEL_ERROR, "server_egfx_cmd: encoder input fifo depth "
-            "%d exceeds the two-slot outstanding budget",
-            mm->encoder->fifo_to_proc_depth);
+        int mon_count = (int)wm->client_info->display_sizes.monitorCount;
+        if (mon_count < 1)
+        {
+            mon_count = 1;
+        }
+        if (mon_count > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+        {
+            mon_count = CLIENT_MONITOR_DATA_MAXIMUM_MONITORS;
+        }
+        if (mm->encoder->avc444_ffmpeg &&
+                mm->encoder->fifo_to_proc_depth > 2 * mon_count)
+        {
+            LOG(LOG_LEVEL_ERROR, "server_egfx_cmd: encoder input fifo depth "
+                "%d exceeds the per-monitor two-slot outstanding budget "
+                "(2 x %d monitors)", mm->encoder->fifo_to_proc_depth,
+                mon_count);
+        }
     }
     tc_mutex_unlock(mm->encoder->mutex);
+    /* #61e -- the moment this frame became available to the encoder,
+     * keyed by the producer's echoed frame id. The encoder writes a
+     * matching "take" when it lifts the same id off the fifo; enq ->
+     * take is fifo RESIDENCY, and a residency that is consistently
+     * POSITIVE is the direct evidence that the encoder could not have
+     * started on this frame any sooner -- the data was already in hand
+     * and the worker was busy with the previous one. Stamped OUTSIDE
+     * the encoder mutex: the worker's drain takes the same lock, and an
+     * instrument must not add contention to the thing it measures. */
+    PERF_TRACE("enq", gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
+               enq_depth);
     /* signal xrdp_encoder thread */
     g_set_wait_obj(mm->encoder->xrdp_encoder_event_to_proc);
     return 0;

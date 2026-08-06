@@ -92,6 +92,46 @@ struct xrdp_ffmpeg_avc444_config
     /* 0 only for single-view (AVC420)       */
     /* runners and, internally, for the leaf */
     /* child itself                          */
+    int aux_ltr_chain;              /* EXPERIMENTAL (PRD FR-H264-8):        */
+    /* aux-refs-aux via Windows-style long-  */
+    /* term reference slots. The second      */
+    /* child encodes a normal refs=1 P chain */
+    /* (no forced IDR) and BOTH views' slice */
+    /* headers are rewritten into one shared */
+    /* frame_num chain with constant mmco6   */
+    /* self-marking (LT0 = main, LT1 = aux)  */
+    /* and per-view LTR list modification    */
+    /* (xrdp_h264_ltr_rewrite_*). Takes      */
+    /* precedence over aux_intra_leaf.       */
+    /* Default 0: FR-H264-7 leaves remain    */
+    /* the shipped architecture until the    */
+    /* FR-H264-8 acceptance gate passes.     */
+    int ltr_rekey_frame_num;        /* aux_ltr_chain: shared frame_num      */
+    /* value at which a re-key is requested   */
+    /* (gfx.toml ltr_rekey_frame_num).        */
+    /* Clamped to                             */
+    /* [XRDP_H264_LTR_FRAME_NUM_REKEY_MIN,    */
+    /*  XRDP_H264_LTR_FRAME_NUM_REKEY_MAX];   */
+    /* the MAX default is a ceiling that      */
+    /* keeps the wrap out of decoder sight.   */
+    /* Lower it to exercise the boundary in a */
+    /* test arm (BACKLOG #48).                */
+    int intra_refresh_frames;       /* aux_ltr_chain: scheduled paired      */
+    /* intra refresh interval in pictures     */
+    /* per view (gfx.toml                     */
+    /* intra_refresh_frames, PRD FR-H264-6).  */
+    /* Clamped by the runner to               */
+    /* [XRDP_H264_INTRA_REFRESH_FRAMES_MIN,   */
+    /*  ..._MAX]. No off value (#45 D6).      */
+    int intra_refresh_schedule;     /* RUNNER-INTERNAL: the interval to     */
+    /* actually put on both children's argv   */
+    /* (-force_key_frames + -g), or 0 for no  */
+    /* schedule. Separate from the knob above */
+    /* because the aux child's config has     */
+    /* aux_ltr_chain cleared, so build_argv   */
+    /* cannot key the schedule off that flag  */
+    /* -- and a schedule on the main child    */
+    /* only would de-phase the pair.          */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
@@ -120,6 +160,7 @@ struct xrdp_ffmpeg_avc444_config
     size_t max_encoded_picture_bytes;
     size_t max_encoded_pair_bytes;
 };
+
 
 /** Populate cfg with the MVP defaults (path left empty). */
 void
@@ -247,6 +288,47 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
 
 int
 xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
+
+/**
+ * #45 step 5 -- the submit / pump / collect construction behind
+ * xrdp_ffmpeg_avc444_encode_pair(), exposed so the caller can drive
+ * SEVERAL monitors' children as ONE poll set (E4: one thread, four
+ * views). aux_ltr_chain only; every other architecture keeps the
+ * synchronous per-pair call.
+ *
+ * Usage per worker cycle:
+ *   for each damaged monitor: xrdp_ffmpeg_avc444_submit_pair(...)
+ *   xrdp_ffmpeg_avc444_pump_pairs(handles, n, &bad_handle, &kids_armed)
+ *   for each monitor: xrdp_ffmpeg_avc444_collect_pair(...)
+ *
+ * The NV12 pointers are BORROWED (FR-PROC-6) and must stay valid from
+ * submit until that handle's collect returns. On a non-zero return from
+ * pump_pairs, *bad_handle is the index of the handle whose child failed
+ * -- tear THAT one down, not an arbitrary one. *kids_armed is the number
+ * of children armed in the set (2 per handle), which is the quantity E4
+ * asserts.
+ */
+int
+xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
+                               const unsigned char *main_nv12,
+                               const unsigned char *aux_nv12,
+                               int nv12_size,
+                               unsigned long long desktop_sequence);
+int
+xrdp_ffmpeg_avc444_pump_pairs(struct xrdp_ffmpeg_avc444 **handles,
+                              int n_handles, int *bad_handle,
+                              int *kids_armed);
+int
+xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
+                                unsigned long long desktop_sequence,
+                                struct xrdp_avc444_encoded_pair *result);
+
+/* aux_ltr_chain (FR-H264-8): nonzero when the shared frame_num counter
+ * is near its wrap; the caller must delete + recreate the encoder
+ * AFTER shipping the current pair (a per-view decoder cannot survive
+ * a frame_num wrap -- see xrdp_h264_annexb.h) */
+int
+xrdp_ffmpeg_avc444_rekey_pending(struct xrdp_ffmpeg_avc444 *self);
 
 /**
  * Frames submitted but not yet returned = frames still held in the encoder's

@@ -65,6 +65,8 @@ libcommon_la_SOURCES = \
   os_calls.h \
   parse.c \
   parse.h \
+  perf_trace.c \
+  perf_trace.h \
   rail.h \
   scancode.c \
   scancode.h \

@@ -1,0 +1,6 @@
+qdisc netem 8081: root refcnt 33 limit 25000 delay 20ms seed 14362728063910304338
+ Sent 976233086 bytes 666908 pkt (dropped 0, overlimits 0 requeues 0) 
+ backlog 0b 0p requeues 0
+qdisc tbf 8082: parent 8081: rate 400Mbit burst 256Kb lat 100ms 
+ Sent 976233086 bytes 666908 pkt (dropped 0, overlimits 146729 requeues 0) 
+ backlog 0b 0p requeues 0

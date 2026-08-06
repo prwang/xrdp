@@ -135,7 +135,7 @@ WITHDRAWN — it is the previously rejected thread (BACKLOG ~line 171,
 PRD §6.5): two frame_num chains + duplicate SPS into the client's
 single decoder = desync garbage on Windows/xfreerdp clients.
 
-Ground truth (vm/GROUND_TRUTH_win2022_avc444.md, measured 2026-07-27):
+Ground truth (PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md, measured 2026-07-27):
 the real Win2022 wire is ONE chain (all frames nri=3 reference Ps,
 continuous frame_num, max_num_ref_frames=3) yet REFERENCE-PARTITIONED:
 decoding gfxwin_anim with all 9 aux AUs dropped leaves 348/348 main
@@ -177,3 +177,18 @@ RED on BOTH pre-fix wires —
 
 Both encoders therefore REQUIRE the partitioned architecture; no
 encoder is grandfathered on accidental immunity.
+
+### Correction (2026-07-28, later the same day)
+
+The 4b rejection referenced above is SUPERSEDED. Ground-truth trace of
+the Win2022 reference machinery (PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md,
+LTR addendum) shows Windows itself ships aux-refs-previous-aux — via
+constant long-term-reference slots (mmco6 self-mark, per-slice LTR
+list modification), with no PicNum arithmetic and no sliding-window
+dependence. The earlier risk framing ("per-frame arithmetic, silent
+wrong-pixel failure modes, forfeits structural invariance") was
+exaggerated: it priced a short-term-reference design Windows does not
+use, and the LTR shape is exercised daily by every RDP client,
+VideoToolbox included. The design is now specified as EXPERIMENTAL
+FR-H264-8 (PRD); the leaf architecture remains the shipped default
+and FR-H264-7 remains the requirement for it.

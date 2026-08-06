@@ -129,7 +129,7 @@ that is ~1.5% of a single core at 60 fps. The pipe is not the bottleneck.
 
 The subprocess boundary does **not** inherently add a frame of latency. Whether
 the child holds a frame is a property of the encoder's **pipeline depth**, not
-the pipe: measured on-box (`tail_flush_ab/ffmpeg_pipeline_depth_probe.py`),
+the pipe: measured on-box (`ffmpeg_pipeline_depth_probe.py`),
 `libx264 -tune zerolatency` emits every input picture in ~3–9 ms with **zero**
 frames withheld — one-in, one-out — and on the dev box `h264_vaapi
 -async_depth 1` does too under an **xfreerdp** end-to-end test. **Open gap:** a

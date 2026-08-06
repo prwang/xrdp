@@ -1,0 +1,59 @@
+target=pod server=xrdp-x017-5cc89b487-dj4xw arm=x017 port=41079 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i79_x017_ackdelay_20260802_s20/leg_d40
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 764 lines, xrdp.log 647 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 402: 809984 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 1446966704 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 662 lines, mark was 764); taking it whole
+perf_trace_lines: 5263 records rendered, 54582 stage brackets left in the ring file, 24070 outside the run window
+trace span: 19s for a 20s run
+=== #45 gate run: x017, oracle client, 20s ===
+image:    localhost/xrdp-bisect:661ff5fc64fa.xx10fa3aa-tf
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260802030326.661ff5fc64fa
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 416 over 16.6 s
+send-to-send gap: mean 40.0 ms  p50 19 ms  p90 84 ms  p99 92 ms
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 416 damage records
+25.04 sends/s = 25.04 pairs/s per monitor (1 monitor)
+surface 0 own period: n=416 mean 40.0 ms  p50 19.0 ms
+damage coverage: surface 0: 416
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 416   kids_armed: 2:416 (100%)
+
+E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 40.0 ms  ->  0.56x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    416 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x017
+image:  localhost/xrdp-bisect:661ff5fc64fa.xx10fa3aa-tf
+gfx:    sha256:313d5f80d0aaa406
+key:    localhost/xrdp-bisect:661ff5fc64fa.xx10fa3aa-tf|313d5f80d0aaa406
+when:   2026-08-02T03:07:11Z
+window: 3s at 1920x1080, 82519224 bytes
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x017.cert
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i79_x017_ackdelay_20260802_s20/leg_d40

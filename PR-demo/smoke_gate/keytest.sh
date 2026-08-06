@@ -16,13 +16,42 @@
 # screenshot the CLIENT framebuffer and assert the screen centre shows
 # that key's colour ("LAG" otherwise) -> colour-EDGE fidelity after
 # settle (FR-PROC-7 §8).
+#
+# TARGET (added 2026-07-29). SMOKE_TARGET=t4 (default) is the flow above.
+# SMOKE_TARGET=pod runs the SAME gate against a bisect-fleet pod instead,
+# reached on its host loopback port with no tunnel, session-side commands
+# issued through kubectl exec, and the log read with kubectl logs. That
+# exists because the gate must run against whatever pair is actually
+# deployed (BACKLOG #45 E1) and the T4 is not always up; it is the same
+# assertions against a package-installed xrdp + gfx.toml, which is what
+# E1 asks for. Say which target produced a result -- a pod pass is not a
+# T4 pass, and the T4 is the representative old-CPU box.
 set -u
+TARGET=${SMOKE_TARGET:-t4}
 T4=${T4:-$(cat /root/.t4_host 2>/dev/null)}
 T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
-[ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
-SU=${KEYTEST_USER:-ubuntu}
-CRED_FILE=${KEYTEST_PASS_FILE:-/root/.ubuntu_cred}
-LPORT=${KEYTEST_TUNNEL_PORT:-33890}
+NS=${SMOKE_NS:-bisect-matrix}
+ARM=${SMOKE_ARM:-arm-r}
+if [ "$TARGET" = pod ]; then
+    SU=${KEYTEST_USER:-probe444}
+    CRED_FILE=${KEYTEST_PASS_FILE:-/root/.oracle_cred}
+    POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
+          -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+    [ -z "$POD" ] && { echo "ABORT: no running pod for $ARM"; exit 1; }
+    # The port MUST follow the arm. It used to default to 40017 (arm-r):
+    # SMOKE_ARM=arm-s then read arm-s's pod name and its log for encoder
+    # errors while the client connected to arm-r — a gate result about the
+    # wrong binary, the same class of mistake as a copy-pasted image tag
+    # (2026-07-30). Read the hostPort off the running pod instead.
+    LPORT=${SMOKE_PORT:-$(kubectl -n "$NS" get pod "$POD" -o \
+        jsonpath='{.spec.containers[0].ports[0].hostPort}' 2>/dev/null)}
+    [ -z "$LPORT" ] && { echo "ABORT: no hostPort on pod $POD"; exit 1; }
+else
+    [ -z "$T4" ] && { echo "ABORT: set T4=user@host or /root/.t4_host"; exit 1; }
+    SU=${KEYTEST_USER:-ubuntu}
+    CRED_FILE=${KEYTEST_PASS_FILE:-/root/.ubuntu_cred}
+    LPORT=${KEYTEST_TUNNEL_PORT:-33890}
+fi
 # :98, NOT :99 — :99 belongs to the dual-monitor layout rig's Xorg+dummy
 # (offscreen_owner_layout.sh). Sharing it broke the gate (2026-07-26):
 # Xvfb silently failed to bind the busy display, the client mapped at the
@@ -40,20 +69,31 @@ D=$(cd "$(dirname "$0")" && pwd)
 OUT=/tmp/ab
 mkdir -p "$OUT"
 
-t4() { ssh -i "$T4_KEY" "$T4" "$@"; }
-
-# ssh tunnel to the T4's loopback RDP socket
-if ! ss -tln 2>/dev/null | grep -q ":$LPORT "; then
-    ssh -i "$T4_KEY" -f -N -o ExitOnForwardFailure=yes \
-        -L "$LPORT:127.0.0.1:3389" "$T4"
+if [ "$TARGET" = pod ]; then
+    t4() { kubectl -n "$NS" exec "$POD" -- bash -lc "$*"; }
+    TGT_NAME="$ARM/$POD"
+else
+    t4() { ssh -i "$T4_KEY" "$T4" "$@"; }
+    TGT_NAME="$T4"
+    # ssh tunnel to the T4's loopback RDP socket (pod mode needs none:
+    # the arm's port is already bound on the host's loopback)
+    if ! ss -tln 2>/dev/null | grep -q ":$LPORT "; then
+        ssh -i "$T4_KEY" -f -N -o ExitOnForwardFailure=yes \
+            -L "$LPORT:127.0.0.1:3389" "$T4"
+    fi
 fi
 
 # persistent session-side colour-key app (checksum-gated install)
 LSUM=$(md5sum "$D/colorkey.sh" | cut -d' ' -f1)
 RSUM=$(t4 "md5sum /usr/local/bin/colorkey.sh 2>/dev/null | cut -d' ' -f1")
 if [ "$LSUM" != "$RSUM" ]; then
-    scp -q -i "$T4_KEY" "$D/colorkey.sh" "$T4:/tmp/colorkey.sh"
-    t4 "sudo install -m 755 /tmp/colorkey.sh /usr/local/bin/colorkey.sh"
+    if [ "$TARGET" = pod ]; then
+        kubectl -n "$NS" cp "$D/colorkey.sh" "$POD:/usr/local/bin/colorkey.sh"
+        t4 "chmod 755 /usr/local/bin/colorkey.sh"
+    else
+        scp -q -i "$T4_KEY" "$D/colorkey.sh" "$T4:/tmp/colorkey.sh"
+        t4 "sudo install -m 755 /tmp/colorkey.sh /usr/local/bin/colorkey.sh"
+    fi
 fi
 
 # client-side X server for xfreerdp (local); geometry VERIFIED after
@@ -71,13 +111,27 @@ fi
 
 # end any existing session + client so this is a cold login
 pkill -9 -x xfreerdp3 2>/dev/null
-t4 "pkill -TERM -u $SU xfce4-session" 2>/dev/null; sleep 2
-t4 'for i in $(seq 1 25); do pgrep -u $(id -u) -x Xorg >/dev/null || break; sleep 1; done'
+if [ "$TARGET" = pod ]; then
+    # a disposable fleet session, never the owner's: end it so this is a
+    # cold login, then wait for its Xorg to go
+    t4 "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" 2>/dev/null
+    t4 "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null || break; \
+        sleep 1; done" 2>/dev/null
+else
+    t4 "pkill -TERM -u $SU xfce4-session" 2>/dev/null; sleep 2
+    t4 'for i in $(seq 1 25); do pgrep -u $(id -u) -x Xorg >/dev/null || break; sleep 1; done'
+fi
 sleep 2
 
 # credential: root-owned file on the T4 -> env var -> /args-from (never in
 # any process list, log or local file); one argument per line
-PW=$(t4 "sudo cat $CRED_FILE")
+if [ "$TARGET" = pod ]; then
+    # the pod's probe credential lives on the HOST, root-only, and is
+    # never copied into the pod or printed
+    PW=$(cat "$CRED_FILE")
+else
+    PW=$(t4 "sudo cat $CRED_FILE")
+fi
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$LPORT" "/u:$SU" "/p:$PW" \
                         "/size:$SIZE" "/gfx:AVC444" "/cert:ignore" \
                         "/log-level:WARN")
@@ -97,10 +151,23 @@ sleep 6
 fw=$(DISPLAY=$CLI xdotool search --name FreeRDP 2>/dev/null | head -1)
 [ -z "$fw" ] && { echo "FAIL: no FreeRDP window (login failed)"; exit 1; }
 
-SD=$(t4 'pgrep -a -u $(id -u) -x Xorg' | grep -oE ' :[0-9]+ ' | head -1 | tr -d ' ')
+if [ "$TARGET" = pod ]; then
+    SD=$(t4 "ls /tmp/.X11-unix/ | head -1 | sed 's/^X/:/'")
+else
+    SD=$(t4 'pgrep -a -u $(id -u) -x Xorg' | grep -oE ' :[0-9]+ ' \
+         | head -1 | tr -d ' ')
+fi
 [ -z "$SD" ] && { echo "FAIL: no fresh Xorg session"; exit 1; }
-echo "session display=$SD client=$CLI target=$T4 via :$LPORT"
-sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
+echo "session display=$SD client=$CLI target=$TGT_NAME via :$LPORT"
+if [ "$TARGET" = pod ]; then
+    # three levels of quoting (kubectl exec -> bash -lc -> su -c), so the
+    # inner payload is wrapped in DOUBLE quotes: callers pass single
+    # quotes of their own (pkill -f 'xterm.*colorkey') and redirections.
+    sess() { t4 "su -s /bin/bash $SU -c \"DISPLAY=$SD \
+XAUTHORITY=/home/$SU/.Xauthority $*\""; }
+else
+    sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
+fi
 
 # fullscreen terminal running the colour-key app. xterm, launched
 # OVERSIZED at +0+0 instead of resized afterwards: xfwm's compositor on

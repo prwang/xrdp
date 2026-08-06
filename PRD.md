@@ -168,6 +168,22 @@ the actual color conversion.
 
 xrdp demuxes NUT and inspects/normalizes H.264 NAL units. It does not decode the H.264 pictures. The RDP client is the decoder.
 
+### NG-9: FR-ACK-1 as filed — the rect_id "ghost" fix (withdrawn 2026-07-31)
+
+Specified and implemented in one day as the #64 correctness BLOCKER,
+then refuted by static analysis the same day: the ack value is an echo
+(`frame_id_server = enc_done->frame_id`, sole assignment; zero drift
+over 494 live frames) and the filed ghost does not exist. Not a
+requirement. The surviving machinery (echoed identity, ack totality,
+displayed flag, region return) is specified under **BACKLOG #70**,
+the eager slot-release ack, whose rationale is concurrency — the
+2026-07-31 T4 measurement attributed the whole 113.6 ms m=1 cycle and
+located the serializer at the ack's emission point. History:
+implementation checkpoint `wip/fr_ack_1_checkpoint` (xrdp
+`8bd989c0`/`0b295631`, xorgxrdp `59210b2`, CI green 380/380);
+withdrawal `e8d00594`; reconciliation `0040e603`; measured resolution
+`0db74f6e` (the FR's full former text lives at that commit).
+
 ---
 
 ## 5. Terminology
@@ -579,6 +595,17 @@ Contract, when implemented:
    (`rect_id > rect_id_ack + 1`), **conditioned on the AVC444 capture
    code** — the deferred-update callback is shared by all capture
    modes, and modes with single-slot layouts keep today's gate.
+   **Single-monitor wording (flagged 2026-07-29).** The budget is global
+   while the slots are per-monitor, so at m monitors this allows only one
+   frame in flight per monitor and pins each monitor to a single slot at
+   even m. It becomes **≤ 2 outstanding PER MONITOR — never a global pool
+   of `2m`** (a pool lets one damaged monitor run 4-deep on 2 slots:
+   bufferbloat, +2 frames latency, slot aliasing), with a per-monitor slot
+   index replacing global `rect_id` parity; clause 4's "no third capture"
+   and the loud budget assertion are then stated per monitor — otherwise
+   the assertion fires on every legal multimon frame. Beyond a monitor's
+   cap the policy stays drop-and-coalesce via the dirty region, never a
+   deeper queue. BACKLOG #45 step 6 (D13–D17).
 4. **No third capture.** With both slots outstanding, damage
    accumulates only in the dirty region (union + extents collapse), as
    today. Frames are dropped before they exist — the only legal drop
@@ -763,6 +790,850 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
 5. Page-aligned segments take the kernel's reference path (true zero-copy);
    unaligned tails fall back to an in-kernel copy — still never a
    user-space copy.
+6. **Why the feed is lazy (rationale, recorded 2026-07-29).** Queueing and
+   transferring are deliberately separate: `in_iov_push()` only declares
+   intent, and `feed_vmsplice()` runs solely inside `pump()`. This is
+   forced, not stylistic. The pipe holds ~1 MB against a ~15 MB 4K frame,
+   so one frame needs many rounds of splice-then-wait, with
+   `SPLICE_F_NONBLOCK` returning partial counts and `EAGAIN`; feeding must
+   therefore be readiness-driven, i.e. inside the `poll()` loop. Eager
+   feeding would have to block on the input direction while the child's
+   stdout/stderr go unread — the documented deadlock (§"A blocking 'write
+   two frames, then read two packets' implementation can deadlock"). Any
+   future `submit_single()` must respect this: it pumps until
+   `!in_iov_pending()`, and the "drive all directions concurrently" rule
+   is what a `main‖aux` union poll extends from one child to the pair.
+
+### Concurrency state of the encode pipeline (measured 2026-07-28; the baseline FR-PROC-7 builds on)
+
+Verified in code, not assumed. Keep this table current — it is the map every performance decision starts from.
+
+| Stage pair | Concurrent? | Evidence |
+|---|---|---|
+| capture ‖ encode | **CONDITIONAL for m = 1** — true only while the encoder is slower than the capture path (see the 2026-08-01 correction at the end of this cell); **partial and accidental for m ≥ 2** | `XUP_CAP_AVC444_SLOT_COUNT = 2`; `rdpClientConCapSlotIndex()` alternates on `rect_id`; `MaxOutstandingRects() = 2` for `CC_GFX_AVC444`. Measured **at one monitor** (1600×912, 2026-07-29): frame period equalled encode duration at p50 27.9 ms with `cap->enc_entry` adding a further 23.8 ms that never reached the period — **but that run also had the per-frame trace on `log.c`, so the durations are unverified (see #61h below)**; capture appearing fully hidden is the claim #61e has to re-establish. Cost: up to one frame of added latency. **Multimon was never in this FR's scope** (clause 3 relaxes the gate to two outstanding rects globally, with no `monitorCount` term) and behaves differently: the per-item ack (`xrdp_mm.c:4088`) frees monitor 0's slot when monitor 0's encode ends, so the overlap that occurs is *cross-monitor* interleaving, while the two-slot mechanism itself is inert — `rect_id` advances by m between a monitor's consecutive sends, so at even m the `(rect_id + 1) & 1` parity is constant per monitor and each monitor is pinned to one slot. **Measured 2026-07-29** (BACKLOG #45 recon gate R1; arm-q, 2 × 1024×768, 1100 sends): same slot on **1079/1079** full-pass consecutive sends, one monitor never left its first slot at all, and a monitor held two outstanding frames in two slots **once in 1100 sends (0.09 %)** — the two-slot mechanism is inert per monitor at m = 2, while the global budget saturates (543/1100 sends at depth 2). **FIXED 2026-07-29 by BACKLOG #45 step 6** (xorgxrdp `d77d054` + xrdp `6f80b0fe`): the budget is now m INDEPENDENT caps of 2 (never a pool — D13), the slot is a per-monitor counter advanced once per that monitor's send (D17, no layout or contract change), the completed-scan clear is replaced by an explicit coverage intersect (D16), and the accounting is pure logic in `common/xup_client_info.h` (`struct xup_cap_budget`) so it is unit-tested in xrdp's `make check` — xorgxrdp has no C test harness. **Consequence measured into every subsequent number:** with the slot alternating again, each capture must re-pack the previous frame's damage for that monitor (FR-CAPTURE-8 clause 9), which was INERT while parity pinned the slot. That union is also what goes on the wire as the frame's dirty rects, so the E5 baseline (51.1 ms, taken before step 6) never paid it and the FR-H264-8 bandwidth gate now measures a different capture region. **ALL 2026-08-01 TIMING IN THIS CELL IS VOID (BACKLOG #61h).** A correction dated that day reported the row FAILING with the emit split on — worker `wait` 2.249 ms/cycle over a 36.764 ms period, 544 of 1543 cycles stalling, a capture/encode margin falling from 15.8 ms to 1.9 ms, and a further root-cause putting an 8.0 ms capture trigger and a 16.2 ms xup transit behind a 17 ms egress window. Every one of those runs carried ~12 unbuffered `log.c` writes per frame, nine on the xrdp main thread, INSIDE the period being attributed — and the 17 ms window was the interval between two of those writes. The numbers are withdrawn; the runs are deleted from the tree and in git history only. **SETTLED 2026-08-01 on the ring-traced build (arm x013, one monitor at 3840×2400 = 9.22 Mpx, textflood, eager ack + emit split, 2227 sends, 0 trace drops): the row HOLDS at m = 1.** The worker's `wait` bracket — time spent holding nothing to encode — is **0.0019 ms mean with 0 of 2226 cycles above 1 ms**; **100 %** of frames were already on the fifo when the worker asked for one; and `fifo_to_proc_depth` was **0 at all 2227 takes**. Gate 2b was run before this was believed, because the worker skips the wait entirely when it carries items and an empty bracket could have been empty by construction: `wait_beg` fired in all 2227 cycles holding `n_items = 0` in every one, so the worker entered a real blocking wait each cycle and it returned in ~2 µs. **The CONDITIONAL in this row's verdict is the whole content of the result** — capture is hidden *because encode is slow*: the period is 25.474 ms and 100 % of it is encoder-worker serial work (16.654 ms waiting for the two ffmpeg children, 8.802 ms popping NALs and rewriting both views' LTR references, 0.018 ms everything else, per-cycle closure residual max |0.000000| ms, confirmed independently by the 25.46 ms send-to-send interval). A materially faster encoder makes this a live question again, and the 9.22 Mpx capture cost that would decide it is NOT measured here. Record: `docs/experiments/61e-the-period-is-encode-and-rewrite.md`. Two things survive because they are orderings and counts rather than durations: `fifo_to_proc_depth` is **1 at all 3088 enqueues** (the queue never holds more than one frame, so capture can hide behind encode only while encode is the slower of the two), and the xorgxrdp frontier reads `ack = N−2, shown = N−3` at **1524/1533** captures — the two-slot budget is permanently at cap and re-opens once per encoded frame, so FR-CAPTURE-8 buys no lookahead at m = 1. Also surviving, as method: pair by frame IDENTITY, never by time window — an earlier draft of this cell called capture "demand-clocked by the pipeline" on a metric paired by time window, which in the majority of cycles picks up the frame AFTER next. Record: `docs/experiments/61h-the-logger-was-in-the-measurement.md`; follow-ups BACKLOG #61e, #61f. **RE-OPENING PREDICTED AND ARRIVED, SAME DAY (2026-08-01, BACKLOG #75, arm x014).** The cell above says a materially faster encoder makes this a live question again. It did: #75 took the LTR rewrite from 8.802 to 1.362 ms/frame and the period from 25.474 to 18.476 ms, and the row is now **MARGINAL at m = 1, 3840x2400, textflood** — not falsified. 97.85 % of cycles still have an empty `wait` (p50 0.0015 ms) so capture is still hidden for the large majority of frames, but **66 of 3074 cycles (2.15 %) now stall on the producer**, those 66 carry 99.7 % of all wait time, frames-already-enqueued fell from 100 % to 97.8 %, and the p99 send interval REGRESSED from 31 to 46.5 ms while the mean improved by 7 ms. Read `wait`'s SHAPE, never its 0.515 ms mean. **The binding constraint is now the benchmark payload, not the pipeline**: textflood's own interval is 16.91 ms against an 18.476 ms period, an FR-BENCH-1 margin of **1.09x**, with the producer's p90 (19.01 ms) overlapping the pipeline's p50 (17.96 ms). What this row asserts about a REAL desktop workload is therefore untested below ~19 ms and cannot be tested until the faster producer (design B) exists. Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`. |
+| monitor₁ ‖ monitor₂ | **NO** — multimon the FEATURE ships; multimon CONCURRENCY does not | Do not conflate the two. Shipped: per-monitor encoder handles (`avc444_ffmpeg_handle[16]`), geometry (`avc444_actual_w/h[16]`), capture plane-split offsets, and per-monitor LTR state (`ltr` lives inside each `xrdp_ffmpeg_avc444`) — two monitors work. NOT shipped: any parallelism between them. `xrdp_encoder_create()` spawns exactly ONE worker (`tc_thread_create(proc_enc_msg, self)`, `xrdp_encoder.c:468` — the only such call in the encoder) draining ONE FIFO; monitor 2's damage arrives as a separate EGFX command carrying `mon_index` in `flags >> 28` and is encoded strictly after monitor 1's. The per-monitor arrays are what would make threading here SAFE (state is already fully partitioned, no locking on encoder state) — that is why this is the natural threading axis, not a claim that it is done. **Concretely with m monitors: 2m ffmpeg processes are alive and exactly ONE is fed or awaited at any instant**, in the order main₁ → aux₁ → main₂ → aux₂ (`proc_enc_msg` → `process_enc_egfx` command loop → `gfx_wiretosurface1_avc444` → the SYNCHRONOUS `encode_pair`), so the pair cost is `2m(w+e)` where a set-pump over all children would give `w+e`. Multimon is therefore where serialization hurts MOST, and it needs no new mechanism — the children simply join the same poll set (FR-PROC-7's BREADTH policy is this, not threads). |
+| encode_main ‖ encode_aux | **YES since 2026-07-29** (was NO) | **Superseded, kept for the record:** `encode_pair()` used to run `encode_single(main)` to completion, then `encode_single(aux)` — each a synchronous submit-then-block-for-packet round trip. BACKLOG #45 step 5 (`3ceed31d`) replaced that with `submit_pair` / `pump_pairs` / `collect_pair`: both children are armed in ONE `pump_set` poll set with one shared deadline, so the two views encode concurrently on the one worker thread. **Measured 2026-08-02** with the deployed arm's own ffmpeg, VAAPI device and `encoder_args`, inside its pod, at 3840×2400: one poll set **9.7 ms**, strictly one child at a time **19.0 ms** — **2.0×**. Probe: `PR-demo/mac_bisect_matrix/pump_split_probe.c`. |
+
+**FR-ACK-3: the pipeline's concurrency must not depend on more than one
+frame in flight (owner directive, 2026-08-02).**
+
+Every stage pair in the table above is expected to hold at
+`frames_in_flight = 1`. The client ack window exists to bound what the
+*client* has outstanding; it is not a mechanism this server may lean on
+to obtain concurrency, and a second in-flight frame is a queue in front
+of the display that costs a frame of latency. The design target is
+therefore: **all the concurrency we need, at the cost of fif = 1.**
+
+> **NARROWED 2026-08-03 (owner directive), after the provenance trace
+> and FR-FLOW-1 below.** `frames_in_flight` is RETIRED as a concept:
+> the constant is untethered in GFX (no protocol meaning, see
+> provenance) and was doing two jobs at once. They separate:
+> (a) The CONCURRENCY requirement stays, restated wire-free — every
+> stage pair in the table must hold with the end-to-end wire window at
+> its TIGHTEST setting. Pipeline concurrency comes from pipeline
+> structure, never from wire-window slack.
+> (b) The WINDOW is end-to-end and its correct value depends on the
+> deployment's RTT, so it is USER CONFIGURATION, not a PRD constant.
+> This document requires that it exist, that it be enforced at capture
+> admission (FR-FLOW-1), that it have one documented meaning and a
+> stated default — and it no longer requires or names fif = 1.
+> (c) The corollary below is NARROWED to short-RTT networks
+> (ack latency < frame period): there a tighter window must cost no
+> throughput and a regression stays a BUG. On long RTT,
+> frame rate ≤ window/RTT is physics (Little's law), not a defect.
+
+The corollary, and it is why this clause was written rather than assumed:
+**a throughput regression from fif = 2 to fif = 1 is a BUG in this
+pipeline, not a property of the workload.** Measured 2026-08-02 (arms
+x014/x015, identical image and `gfx.toml` body, one environment variable
+apart, mechanism confirmed on 8056 `send` records): fif = 1 cost **34 %
+of throughput** (18.5 → 28.2 ms period) *and* made end-to-end latency
+worse (49.2 → 61.5 ms capture to client ack). It cannot be a flow-control
+effect: the encoder's own depth is provably one frame — `pump_pairs`
+waits for the just-submitted set and `collect_pair` verifies
+`desktop_sequence`, so no second frame is ever inside a child — and the
+worker's `wait` bracket is 0.002 ms/cycle under fif = 1, meaning it is
+never starved. **So the second credit was hiding a stall, and finding
+that stall is the top open item (BACKLOG #76).** Until it is found, the
+`capture ‖ encode` row above is qualified: what it asserts is measured at
+fif = 2, and fif = 2 is not the configuration this requirement targets.
+
+**FR-ACK-3 PROVENANCE (traced 2026-08-03, and it changes what the clause
+is claiming).** The window is not this project's design. It arrives with
+`fde04e80` (2017-02-11, Jay Sorg, "rfx fixes for large tile sets,
+performance change, **Xorg will start next frame earlier**"), whose
+parameter was `client_info->max_unacknowledged_frame_count` — the value
+the CLIENT advertises in the Frame Acknowledge capability set
+(`libxrdp/xrdp_caps.c:743-749`). So the original intent WAS bounding
+end-to-end frames in flight, at the client's own stated limit, and the
+window was the safety condition attached to a performance change rather
+than a flow-control mechanism anyone designed.
+**That tether is cut in the GFX path** (`xrdp/xrdp_encoder.c:427-476`):
+when `client_info->gfx` is set, `frames_in_flight` is
+`DEFAULT_XRDP_GFX_FRAMES_IN_FLIGHT` = 2 plus an environment override,
+and the client's advertised value is consulted only in the legacy
+`else` branch. In GFX the number therefore has **no protocol meaning**:
+not the client's limit, not the pipeline's depth, and nothing re-derived
+what it should bound when the tether was cut. Every fif = 1 vs fif = 2
+result in BACKLOG #76/#78/#79 is a result about that untethered
+constant.
+
+**FR-ACK-3 AMENDMENT — the bound must count the WIRE, not only the
+pipeline (owner directive, 2026-08-02).** The clause above says the
+window "exists to bound what the *client* has outstanding". Read in code
+on 2026-08-02, while designing BACKLOG #79's fix, **it does not do that,
+and this document never said what does.** Three facts, none of them
+measured — all read from the source, and the last two confirmed by the
+#79 layer-1 sweep:
+
+* **Egress is not gated by the window at all.** `enc_done` hands the
+  frame to `trans_write_copy_s()` unconditionally (`xrdp_mm.c:4320`).
+  Under a 40 ms injected ack delay at fif = 1 — where `client + 1 >
+  server` forbids *any* outstanding frame — sends split 556 / 552 / 552
+  across 0 / 1 / 2 frames outstanding. Two thirds of all sends violated
+  the bound this clause claims the window enforces.
+* **The window is applied to the PRODUCER's slot credit instead**
+  (`xrdp_mm.c:1697`). So what `frames_in_flight` actually bounds is
+  capture admission. Client-outstanding is bounded only *emergently* —
+  by starving the producer until the pipeline drains — which is
+  approximate (it settled at 2, not 1) and is the entire cost measured
+  in BACKLOG #76/#78/#79.
+* **There is no other rate control on this path.**
+  `trans_write_copy_s()` cannot fail for want of a wire: the remainder
+  is `malloc`ed onto the unbounded `self->wait_s` list and 0 is returned
+  (`common/trans.c:644-676`). The one byte throttle,
+  `si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` = 0
+  (`trans.c:35, 219, 376`), charges bytes only when
+  `si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), and `cur_source`
+  is set only inside a *transport's* `trans_check_wait_objs()`
+  (`trans.c:396`) — enc_done arrives on a **wait object**
+  (`xrdp_mm.c:4061, 4538`), so a GFX frame's bytes are charged to nobody
+  and throttle nothing.
+
+Four requirements follow. They are binding on any change to the ack
+path, #79 included.
+
+1. **The gate is on the wrong stage, and one gate may not do both
+   jobs.** *(placement SUPERSEDED 2026-08-03 by
+   FR-FLOW-1.3 — with capture-frontier admission the egress gate is
+   dead code by induction; the two-quantities analysis stands.)* The client ack window bounds what the CLIENT holds, so it
+   belongs on **egress**. The producer's slot credit bounds what the
+   PIPELINE holds, so it must be gated on the pipeline's own depth. Any
+   design in which a single comparison serves both is rejected: the two
+   quantities have different correct values, and conflating them is what
+   made fif = 1 — a *latency* target — silently impose a *concurrency*
+   limit of 1.
+2. **"Bufferbloat" in this document covers the wire, not only the inner
+   pipeline.** Until today the prohibition (§FR-CAPTURE-8 clause 3,
+   "never a global pool of 2m ... bufferbloat, +2 frames latency, slot
+   aliasing") was written entirely about capture slots. An unbounded
+   `wait_s` is the same defect one stage further out, and worse: it
+   grows in the server's heap, it is invisible to every metric this
+   project has built, and the frames in it are stale by construction.
+   **Every queue in this path carries a stated bound, in frames, and a
+   test that the bound holds.**
+3. **No design may remove a bound without replacing it.** Specifically:
+   ungating the eager SLOT ack from the ack window *without* a
+   replacement horizon is **REJECTED, unconditionally** — not as a
+   default, not as an opt-in, not behind `eager_slot_ack`, not "for
+   evaluation". It would leave the encoder with no rate control of any
+   kind against a link slower than its output, which is every WAN. A
+   configuration flag does not make an unbounded queue acceptable; it
+   only decides who discovers it.
+4. **The horizon H, and the two regimes it distinguishes.** *(mechanism SUPERSEDED
+   2026-08-03 by FR-FLOW-1.3 — H counted from the egress frontier,
+   which is what would have needed an egress hold; the two-regime
+   analysis stands.)* The
+   replacement is a finite horizon on the slot credit —
+   `client + H > server` with H taken from the pipeline's depth (two
+   capture slots; three stages) rather than from `fif`. What H buys is
+   regime-dependent, and the crossover is **ack latency versus frame
+   period**:
+   * *Ack latency < period* (LAN): the client's ack arrives before the
+     next frame is ready, so H never binds and nothing is ever held.
+     Full pipeline speed at fif = 1, with client-outstanding still ≤ 1.
+     There is no tradeoff to make here — the stall in this regime is
+     pure loss.
+   * *Ack latency > period* (WAN): completed frames would accumulate,
+     and H is what bounds the accumulation to H frames of buffered
+     video and at most H periods of added staleness. Beyond H the
+     producer throttles to the link, which is the correct behaviour and
+     is what the current code accidentally achieves.
+
+   Measured support for both rows, same sweep: cycles whose credit
+   arrived promptly ran at **16.3–16.9 ms in every leg, flat under a
+   40 ms ack delay**, while gated cycles went 31.9 → 52.0 ms. H = 2
+   covers the measured LAN ack latency (7.6–10 ms against a ~16.4 ms
+   period); H = 3 covers ~33 ms. Record:
+   `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`.
+
+**FR-FLOW-1: backpressure is nearest-neighbour; drop is end-to-end at
+the source (owner directive, 2026-08-03).** Binding on every queue and
+signal in the frame path, and the test every flow-control change is
+reviewed against.
+
+1. **A lossless stall consults only the immediate downstream
+   neighbour.** A stage may wait only on "my neighbour has no capacity"
+   (capture slot busy, depth-1 stage buffer full) — never on state
+   further down the pipe, and never on the network. The 2017 gate
+   (provenance above) is the precedent violation: a capture-admission
+   signal was made to wait on a client round trip, and the measured
+   cost is BACKLOG #76/#78/#79.
+2. **The lossy guard runs farthest end → nearest end, and its only
+   response is drop-by-coalesce at the source.** The client's ack
+   frontier reaches exactly one decision point: capture ADMISSION.
+   Denied admission = damage coalesces in the dirty region
+   (FR-CAPTURE-8 clause 4) — the frame is dropped before it exists,
+   the only legal drop point. No intermediate stage may hold or drop a
+   completed frame for wire reasons.
+3. **The window counts from the CAPTURE frontier, so egress needs no
+   gate.** Admit capture k only while `k ≤ frame_id_client + C`. The
+   client frontier only rises and sends are in id order, so
+   `k − client ≤ C` at send — by induction every frame that exists is
+   inside the window at egress, and an egress gate is dead code.
+   Enforcement point: the credit frontier
+   `credit = min(frame_id_consumed, frame_id_server + 1,
+   frame_id_client + C)`, emitted unconditionally whenever it advances.
+4. **C is user configuration, not a PRD constant.** Its correct value
+   depends on the deployment's RTT (frame rate ≤ (C + 2)/RTT). This
+   document requires only: it exists; it is enforced at admission; it
+   has exactly one documented meaning (at most C + 2 frames unacked at
+   send — capture rides ≤ 2 slots above the credit); it has a stated
+   default, chosen with BACKLOG #81's RTT-harness data, that preserves
+   short-RTT behaviour; and its bound has a test. The RTT → suggested
+   value guidance belongs with the config docs, fed by #81.
+5. **Every queue carries a stated bound in frames and a test**
+   (restating amendment clause 2). The egress queue's bound follows
+   from 3: ≤ C + 2 frames on `wait_s`.
+
+**IMPLEMENTED 2026-08-03 (BACKLOG #80, behind `eager_slot_ack`).**
+Where each clause now lives, so a reviewer can check the code against
+the requirement rather than against a description of it:
+
+| clause | code | test |
+|---|---|---|
+| 3, the credit itself | `xrdp_gfx_credit_frontier()`, `xrdp/xrdp_encoder.h` | `test_credit_frontier_each_term_binds` |
+| 3, emitted unconditionally | `xrdp_gfx_plan_acks()` — the whole decision, pure, no branch that can emit nothing while the frontier advanced; called from `xrdp_mm_emit_credit_frontier()`, `xrdp/xrdp_mm.c` | `test_planner_never_withholds_an_earned_credit`, and INV-LIVE in `test_joint_machine_enumeration` |
+| 2, one decision point | the region-disposing ack is clamped by the same window (`xrdp_gfx_region_ack_target()`), because it is not `SLOT_ONLY` and therefore also moves the producer's slot frontier | `test_region_ack_obeys_the_same_window` |
+| 4, C is user config | `gfx.toml [avc444_ffmpeg] wire_window`, range 1–64, out-of-range REFUSED; documented in `gfx.toml(5)` | `test_tconfig_gfx_avc444_wire_window{,_out_of_range_refused}` |
+| the wire bound | — | INV-WIRE in `test_joint_machine_enumeration`, over an exhaustive enumeration of the joint xrdp/xorgxrdp state space; asserted TIGHT (the bound is attained) so it is not a vacuous inequality |
+| 5, egress queue observable | `struct trans::wait_bytes`, an O(1) counter; surfaced per frame in the `egress` perf-trace field c, in KiB | live only — the counter is what makes the frozen-client leg of #80 step 4 readable |
+
+Two things the implementation states that the requirement did not, both
+recorded because quoting "≤ C + 2" without them would be wrong:
+
+* **The bound is per monitor.** xorgxrdp's capture budget is
+  `XUP_CAP_AVC444_SLOT_COUNT` per monitor, never a global pool, so the
+  bound is `C + 2·M` frame ids with M monitors.
+* **One ack is deliberately not clamped**: the `NOT_DISPLAYED`
+  region-return for a frame that produced no output (`xrdp_mm.c`, the
+  `!displayed` branch of the `enc_done` handler). That frame never
+  reached the transport, so it occupies no wire, and its pixels are
+  owed straight back to the producer under FR-ACK-1 Invariant III.
+  Releasing its slot does lift the admission ceiling by one frame, so
+  "≤ C + 2·M unacked at send" is a statement about frames that reached
+  the transport, and a run of discarded frames relaxes it transiently.
+
+**Shipped default C = 2 is a PLACEHOLDER, not a measured value**
+(`XRDP_GFX_WIRE_WINDOW_DEFAULT`). It matches the legacy
+`frames_in_flight` so short-RTT behaviour is preserved, and clause 4's
+"stated default, chosen with BACKLOG #81's RTT-harness data" is NOT yet
+satisfied. Do not quote 2 as a recommendation.
+
+**What C costs, measured 2026-08-03 (BACKLOG #80 step 4; LAN leg in
+`i80_wanpair_20260803_125816_s20`, corrected 40 ms leg in
+`i80_wan40_fixedlimit_20260803_221910_s20` — the first 40 ms leg was
+VOIDED: its netem carried an undeclared 73 MB/s bottleneck; see
+`docs/experiments/80-the-credit-frontier.md` §"Step 4, corrected").**
+
+* **A 4K AVC444 frame is 3 386 KiB on the wire** at 3840×2400
+  textflood. The window is denominated in FRAMES, so **each unit of C
+  buys up to ~3.3 MB of transport queue per monitor** — the FR-ACK-3
+  "queue in front of the display", in bytes. At 40 ms RTT with C = 1
+  the measured standing queue was 6.7 MB mean.
+* **The wire bound holds live.** `id_server − id_client` at send never
+  exceeded 2 on any leg, against the C + 2 = 3 the enumeration in
+  `tests/xrdp/test_avc444_credit_frontier.c` asserts.
+* **On a WAN at 4K the binding constraint is BYTES through one TCP
+  flow, not frames in the window.** A burst-then-wait flow never keeps
+  the pipe full, so Linux congestion-window validation pins the
+  congestion window far below the bandwidth-delay product (measured:
+  ~600 KB in a shape-replica probe; ~1.6 MB effective on the live leg),
+  and a 3.4 MB frame takes multiple RTTs to deliver — send-to-ack
+  203.7 ms on a 40.45 ms link, 11.5 fps at C = 1. Raising C deepens the
+  queue; it cannot buy frame rate past the TCP byte ceiling. **The
+  clause-4 C table must hold the TCP environment fixed and declared, or
+  it measures TCP, not C.**
+
+Two RTT points at one C are not enough for the clause-4 table; it is
+still owed, and it now has a prerequisite: a declared TCP environment.
+
+**The headroom is real and measured.** Under a 3840×2400 session the NVENC engine runs 25–28 % (peak 43), shader core 4–5 %, clocks 585 MHz of 1590, ffmpeg children ~6 % CPU each, load 0.22 on 4 vCPU — nothing is saturated while a pair costs 67.5 ms. Isolated on the same box: one 4K stream 51 fps (~19.6 ms/frame), the same through a pipe 52 fps (the pipe costs nothing), and **two 4K streams in parallel 53 fps each — concurrency is free**. The 4K ceiling is therefore serialisation, not silicon: ~14 fps at 4K versus ~34 fps at 1600×912 is arithmetic on 6.3× the pixels.
+
+`encode_single()` is already **submit-then-collect** internally (it pushes to the vmsplice iov queue, then blocks in `pump()`), so the call sites split cleanly — but **the split alone buys nothing unless `submit` transfers** (corrected 2026-07-28, refined 2026-07-29). `in_iov_push()` performs no I/O; it appends to an iov array, and `feed_vmsplice()` has exactly one caller, inside `pump()`. A split whose `submit_single()` is only the push half sends nothing to the aux child until `collect_aux()` pumps it, so "submit both, then collect both" stays serial. `submit_single()` must pump until `!in_iov_pending()` without waiting for output; with that, the two children — independent processes with independent fds — genuinely encode concurrently, and sequential writes already yield `2w + e` in place of `2(w + e)` (4K: `e` = 19.6 ms measured, `w` = a ~15 MB vmsplice ⇒ ~43 ms → ~24 ms). A **union-poll pump across all children** under one shared deadline is **REQUIRED, not an optional robustness upgrade** (decision 2026-07-29, BACKLOG #45 D2/D3 — the earlier "measure the simple form first and add the union poll only if the measurement demands it" wording left the design half-specified and is withdrawn). It is not needed to avoid deadlock (the parent is never blocked on the child it is not draining), but `F_SETPIPE_SZ` is applied only to the INPUT pipe (1 MB), leaving the output pipe at the 64 KB default — several times smaller than a 4K intra packet — so an undrained child stalls mid-write and erodes the overlap precisely when packets are largest. The target shape is `n = 4`: main₁, aux₁, main₂, aux₂ armed in ONE `pump_set` call from the ONE existing worker thread.
+
+**What actually couples main and aux (enumerated 2026-07-29).** Very little, and none of it is data. `self->leaf` is a full `struct xrdp_ffmpeg_avc444`: the aux child owns its own `in_fd`/`out_fd`/`err_fd`, `pid`, NUT demuxer, `in_iov` queue, packet FIFO, sequence FIFO and output buffer. The data plane is fully decoupled. What remains is (1) **the single thread of control** — one `proc_enc_msg` worker, and `pump()` polls ONE child's fds, so with a lazy feed the two children are serialized by the *scheduler*, not by any dependency; (2) **`struct xrdp_h264_ltr_state ltr`** — the shared frame_num counter and `started`/`aux_seeded`, order-dependent (main takes N, aux takes N+1) but applied AFTER both packets are collected and costing microseconds, so it constrains collection ORDER only, never encode concurrency; (3) lifecycle/pair state (`rekey_pending`, `ltr_aux_fresh`, leaf caches, ship-the-pair-or-nothing). Consequence for #45 step 5: the fix is not threads. A union poll is the minimal change that lets the ONE existing thread drive TWO independent feed schedules — it adds no ownership and no locking, whereas a thread-per-child would force locking around `ltr` and the pair contract to buy nothing (the work is kernel-side page-reference movement, not CPU). Sequential submit overlaps the ENCODES but still serializes the FEEDS (`2w + e`); the union poll interleaves the feeds too (`w + e`).
+
+**The transport must be set-shaped, not pair-shaped (design decision 2026-07-29).** A `pump2(main, aux)` helper would hard-wire "two issue, two retire" into the transport, which breaks under FR-PROC-7: with preemptive aux the shape is variable (LC=1 main-only, or LC=2 main+aux). The transport therefore takes a SET — `pump_set(kids[], n, deadline)`: arm each child's three fds into one pollfd array, poll once, service each — and the CALLER owns the completion predicate, so shape lives with policy. `n = 1` is LC=1, `n = 2` the pair, and `pump()` degenerates to `pump_set(&self, 1, ...)` leaving existing callers untouched.
+
+**Threads: not on the main/aux axis.** Main and aux share `ltr` (order-dependent: main N, aux N+1) and the ship-the-pair-or-nothing contract, so threading them adds locking around precisely the state that must stay ordered, and buys nothing — the work is kernel-side page-reference movement, not CPU — while fragmenting FR-PROC-6's "drive all directions from one loop" invariant. **Nor on the monitor axis (corrected 2026-07-29, BACKLOG #45 D1).** An earlier revision of this paragraph read "main/aux is a poll-set problem; multi-monitor is a threading problem" — the per-monitor state IS fully partitioned (separate `avc444_ffmpeg_handle[mon_index]`, encoder pair and LTR state), so threading monitors would be *safe*. It is nonetheless **not what we are building**, and "safe but unnecessary" is not a specification anyone can approve. Multi-monitor is a poll-set problem too: with each monitor's damage arriving as its own `fifo_to_proc` item, batching the queued items and arming all `2m` children in ONE `pump_set` gets the same concurrency from the ONE existing thread, with no ownership transfer, no locking around `ltr` or the pair contract, and no fragmentation of FR-PROC-6's "drive all directions from one loop" invariant. **The encoder has exactly one worker thread before and after this work.** A future threading proposal must first demonstrate a measurement that a set-pump cannot reach. **Landed 2026-07-29** (`3ceed31d`, BACKLOG #45 step 5): `pump()` is now the n = 1 case of `pump_set(kids[], n, deadline)` — arm all, poll once, service all, ONE shared deadline (a per-child deadline costs `n x pair_timeout_ms` when one child stalls), and the failing child is identified so the right handle is torn down. The pair path became `xrdp_ffmpeg_avc444_submit_pair` / `_pump_pairs` / `_collect_pair`, the submit/collect construction FR-PROC-7 also needs; `encode_pair()` is submit + pump(1 handle) + collect, so every existing caller keeps the synchronous contract. `pump_pairs` reports the armed child count (2 per handle), which is what E4 asserts — `test_ffmpeg_pump_set_four_views_one_thread` drives four real ffmpeg children through one poll set. Deliberately NOT done: pumping to `!in_iov_pending()` inside submit (BACKLOG 5.3's literal wording). At 4K a frame is far larger than the 1 MB input pipe, so a flush loop there would block on child 1 and re-serialise exactly what the set exists to overlap; the collect loop pumps the whole set instead, which meets the requirement behind that clause.
+
+**FR-PROC-7 corollary — never submit aux and discard it.** The preempt decision must precede aux SUBMISSION, not sit between main-collect and aux-submit. Submitting aux and dropping the packet would advance the aux child's DPB (it coded a P referencing its previous picture) while the decoder never received that picture, so the next aux P would reference a picture that does not exist client-side — chain broken. "Preempted" must therefore mean aux N is never encoded at all; the aux child simply does not receive frame N and its chain stays continuous in its own terms (sparse aux cadence is already modelled by `test_ltr_dpb_sparse_aux_cadence`). This moves the fifo peek AHEAD of submission — a shape the set-pump expresses naturally and a pair-pump cannot.
+
+**Concurrency scaling measured locally (dev box AMD gfx1151 / Mesa VAAPI, 2026-07-29, `PR-demo/vaapi_concurrency_bench.sh`).** Taken BEFORE re-provisioning a cloud GPU, to decide whether #45 step 5 is worth paying for. N concurrent `h264_vaapi` encoders, shipped child argv (rawvideo NV12 in, NUT + `h264_mp4toannexb` out, `-async_depth 1 -bf 0 -refs 1`), file input so ENCODE is isolated from the vmsplice feed:
+
+| N | 1920×1088 ms/frame | 3840×2400 ms/frame | per-stream cost vs N=1 |
+|---|---|---|---|
+| 1 (one view) | 2.14 | 6.97 | baseline |
+| 2 (main+aux, one monitor) | 1.92 | 6.53 | **0.90× / 0.94× — free** |
+| 4 (two monitors × two views) | 2.97 | 11.40 | 1.39× / 1.64× |
+
+N=2 is free at both resolutions (marginally FASTER per stream — concurrent submission hides per-frame submission latency). N=4 costs well under the 4× that saturation would imply. So at 4K the pair goes `2 × 6.97 = 13.9 ms` serial → `6.5 ms` concurrent (**2.1×**), and two monitors `27.9 ms` → `11.4 ms` (**2.4×**).
+
+**These are AMD VAAPI numbers, NOT nvenc/T4 numbers** (this box does 4K in 6.97 ms against the T4's 19.6 ms — roughly 3× faster), and per the stand-in rule they may generate hypotheses but cannot convict or exonerate the T4 path. What transfers is the RATIO, and there the two agree independently: local N=2 = 0.94×, T4 N=2 = 53 vs 51 fps = 0.96×. The conclusion "two concurrent encodes are free" now rests on two different vendors' hardware.
+
+**What `main‖aux` can and cannot buy (gain model — measure, do not assume).** The end-to-end quantity is the **frame period**, not encoder milliseconds, and parallelising the pair only removes the smaller of the two per-child encode terms:
+
+| term | 3840×2400 measured | changed by `main‖aux`? |
+|---|---|---|
+| pair cost in `encode_pair()` | 67.5 ms | partly |
+| one isolated 4K encode | 19.6 ms (51 fps) | — |
+| two isolated 4K encodes in parallel | ~19 ms each (53 fps each) | — |
+| unattributed remainder (67.5 − 2 × 19.6 ≈ 28 ms) | **not yet attributed** | **no, if it is per-pair rather than per-child** |
+
+**MEASURED OUTCOME of the multimon batching (2026-07-29, REASSESSED
+2026-07-30 — BACKLOG #45 GATE RESULTS and #52; arm-r, 2560×1440 +
+3840×2400, oracle client, 1688 pairs per view).** The oracle frame
+interval went from 51.1 ms to **52.5 ms mean (0.97×)** — a null result
+that turned out to measure the payload, not the server; the real
+outcome, **2.13×**, is recorded two paragraphs down. The batching
+mechanism works — the worker demonstrably armed four children in one
+poll set — but under this payload it fired in only **21 of 3346 worker
+cycles (0.6 %)**.
+The first attribution blamed the capture side; the timestamp-repaired
+reanalysis moved it one level upstream: **the gate's payload
+(`SESSION_KIND=code`, a `sleep 0.1` scroll loop) clocked the entire
+experiment**. Measured on repaired stamps: per-monitor period p50
+102 ms with the monitors 26 ms apart in phase, every steady-state long
+gap exactly one skipped payload beat, service per pair **11.8 ms**
+(encode collect 4.2 + rewrite/emit 7.6 — the earlier "~26 ms
+encode-and-emit" was an artifact of the log-clock bug below), oracle
+ack 2.1 ms, worker busy **22 %**. Both the baseline and the measurement
+ran the same 10 Hz payload, so the 0.97× ratio compares metronome to
+metronome: it could not show an encoder-side gain and neither convicts
+nor exonerates the capture path. The saturated re-benchmark (unclocked
+`codeflood` payload, flood-vs-flood baseline) is **BACKLOG #52
+(E5-2)**. Corroboration unchanged: with a slower consumer (the
+rendering client) the batch fired in 11 % of cycles, and the
+end-to-end rate was unchanged at 2.96 pairs/s per monitor against 2.97
+before the work. **Instrument caveat for every ms-level number derived
+from xrdp logs to date: upstream bug `common/log.c:1159` prints the
+leading digits of `tv_usec` as the millisecond field (`tv.tv_usec +
+500 / 1000`), so ~10 % of log lines are stamped up to ~0.9 s late.
+Means over long windows are robust; percentiles and two-line deltas
+are not. Fixed by #52 step 0.**
+
+**THE MULTIMON BATCHING IS WORTH 2.13× — measured 2026-07-30 under a
+saturating payload (BACKLOG #52 / E5-2; evidence
+`PR-demo/mac_bisect_matrix/captures/e52_flood2_arm-s_20260730/`).** Two
+arms differing ONLY in the xrdp-side steps 5+7 (same xorgxrdp, same
+encoder block, same geometry, same `SESSION_KIND=codeflood` payload,
+180 s each, oracle client, log clock fixed on both): the baseline
+(steps 0–4) delivers **63.6 ms mean per send** (15.72 sends/s,
+per-monitor period 127.4 ms) and the batching build **29.9 ms**
+(33.40 sends/s, per-monitor period 59.9 ms) — **2.13×**, over the 2.0×
+gate. Pictures pushed in the same window went from 4 938 MiB to
+10 434 MiB (234 → 495 Mbit/s). `kids_armed=4` in **52 % of 3889
+cycles** against 0.6 % at 10 Hz, so step 7's premise is exercised, and
+the E2 wire assertions hold under the flood (7/7, zero black frames,
+~0.93 MB per picture).
+
+**On the T4 the same code is worth 1.5×–2.3× (2026-07-30, BACKLOG #55/#60;
+evidence `PR-demo/mac_bisect_matrix/captures/e52_t4_*_20260730/`).** Same
+A/B, run on the representative low-to-average old-CPU target (Tesla T4 /
+NVENC, 4-vCPU Xeon 8259CL): the 180 s pair gave baseline **77.3 ms** →
+batched **46.3 ms** (per-monitor period 155 → 92 ms, `kids_armed=4` in
+**93 %** of cycles) = 1.67×; repeats found the box **bimodal**, and two
+further pairings gave 1.51× and 2.26×. Every pairing clears 1.5×, so the
+conclusion holds while the single number does not — **quote the band**. The
+bimodality is not root-caused (#60); a pairing is only trustworthy when
+both arms report the same mean bytes per picture, which the 180 s pair does
+(602.7 vs 594.0 KB).
+
+AMBER, and attributed rather than re-tuned: the session **Xorg is a single
+thread at ~92 % of one core**, and the profile says where it goes (#59) —
+payload glyph+scroll+fill rendering **44.9 %**, the X **Present** extension
+running in software emulation **18.8 %**, and xorgxrdp's **entire capture
+just 13.8 %** (~12 ms of a 92 ms period, matching `avc444_pack_bench`'s
+12.6 ms prediction to 5 %). The four NVENC children cost ~7 % of a core
+each, the worker idles 55 % of the time, and flow control never binds. So
+the capture is *not* the dominant term even on the box where the pipeline
+is capture-bound: the X server is, and 12 ms of the capture's cost is
+merely stuck on the same single thread — which is why #54's remedy is to
+move the pack off that thread rather than to make it faster.
+
+**Quote the ratio with its box**: 2.13× is a VAAPI/32-core number and
+~1.7× is what a 4-vCPU NVENC box gets, and the second is the one a reader
+with old hardware should expect.
+
+Three durable qualifications on that number:
+
+1. **A payload that damages both monitors is part of the measurement.**
+   The first flood attempt scored 0.91× because a 27-column corpus line
+   in a 6400 px xterm left the second monitor blank (167 MB of pictures
+   on monitor 1 against 0.75 MB on monitor 2) while it still took
+   full-monitor damage every cycle. A parallel set has nothing to
+   overlap when one member encodes an all-skip frame.
+2. **Idle-monitor coupling is a real regression of ~9 %.** That first
+   pair is the measurement of the common "one active monitor, one idle"
+   desktop: the shared deadline ties the active monitor to the idle
+   one's full-area capture and upload, and the batch loses to the
+   serialized path. Arming a monitor only when its pixels changed is
+   the open fix.
+3. **The remaining headroom is capture-side.** At 2.13× the worker is
+   still 32 % busy: per-pair service 14.7 ms (encode collected 2.8 +
+   rewrite/emit 12.3) against a 59.9 ms per-monitor period, with the
+   wait sitting on the next damage handoff (41 ms p50). Flow control
+   never binds (un-acked p50 0 / max 4 of fif = 2, client
+   `queue_depth` 0) and it is not bandwidth (495 Mbit/s over loopback).
+
+So the honest bound is: best case ≈ 48 ms (one encode term removed) ⇒ ~21 fps; the advertised "~20 ms ⇒ ~40 fps" only follows if the 28 ms remainder is itself per-child work. **Attributing that 28 ms with `PR-demo/t4_profile/frame_accounting.sh` is a prerequisite to quoting any speed-up**, not a follow-up. Two further ceilings sit above it: the frame period is `max(capture, encode_pair)` under FR-CAPTURE-8, so a capture stage that is currently hidden can become the new bottleneck and absorb the whole win; and the *client* can be the binding constraint entirely — xfreerdp's software 4:4:4 reconstruction measured ~65 ms/frame at the owner layout, capping end-to-end at ~15 fps regardless of server speed (§FR-PROC-7 clause 9). **Confirmed at dual-monitor 2560×1440 + 3840×2400 on 2026-07-29** (BACKLOG #45; one arm, 60 s each, back to back): the rendering client delivered 5.94 sends/s (2.97 pairs/s per monitor, send-gap mean 169 ms) against the oracle client's 19.57 sends/s (9.79 pairs/s per monitor, mean **51.1 ms**) — **client-bound by 3.29×**, the client costing ~117 ms per surface frame on top of the server's 51 ms. Consequence: a server-side speed-up is chased and gated on the **oracle frame interval** (the send-to-send interval with a client that acks before decode/present); the rendering client's rate is reported beside it as the end-to-end figure but cannot show a server gain until the client side moves. Report the T4 gain per client (mstsc / macOS / xfreerdp), each as a frame period, and say which of the two instruments produced each number.
+
+### FR-BENCH-1: The saturating-producer contract (owner directive, 2026-07-31 — PASSING as measured; the per-run verification below is what caught its own filing being wrong)
+
+The benchmark producer (`PR-demo/textflood/`) exists to make the
+pipeline the bottleneck. Its design intent is three requirements, in
+priority order:
+
+1. **Strictly faster than the pipeline under test**, at every geometry
+   it gates. Not "fast", not "faster than xterm" as an end in itself:
+   the producer must keep damage pending at every pipeline completion,
+   because every property this benchmark judges is undefined when the
+   producer is the limit — the E5 ratio measures the producer's cadence,
+   capture ‖ encode cannot be observed (no second frame exists to
+   capture), and FR-PROC-7's preemption signal ("successor physically
+   present in the fifo at pop time") never fires. Clause 2 of FR-PROC-7
+   below warns that a starved fifo degenerates its design into an idle
+   timer; a slow producer realizes that degeneration by another route.
+2. **Representative pixels**: CPU-rendered, subpixel-antialiased,
+   colored text — the real desktop workload and the maximal AVC444
+   chroma stressor.
+3. **Minimal X-side and system footprint**: the X server's cost is one
+   blit, and the producer must not perturb the measurement by competing
+   for the cores the pipeline needs (the reference box has 4 vCPUs).
+
+**Saturation is verified per run, never assumed.** A gate run is valid
+only if BOTH hold, and the harness VERDICT must print both:
+
+- **Producer telemetry**: the producer logs its own frame timestamps;
+  its standalone rate (`--selftest`, no RDP session) is ≥ 2× the
+  pipeline's measured sends/s at the same geometry on the same box.
+- **In-run observable**: damage is pending at pipeline completions —
+  operationally, the frame-identity-paired overlap gap
+  (`e52_period_decompose.py`) goes negative in a nonzero fraction of
+  frames, or an xorgxrdp-side trace shows capture N+1 starting during
+  encode N.
+
+A run that fails either check is **producer-limited: it is not an E5
+result and can neither confirm nor falsify any pipeline property.** It
+is reported as VOID with the producer's own rate beside the pipeline's.
+
+**Status: PASSING as measured (#65 step 0 — chain since renumbered, now #71, 2026-07-31, T4 m=1
+3840×2160).** With `--stamps` telemetry (default-on): the producer runs
+at **27.66 fps** against the pipeline's 8.21 sends/s — 1.7× over the
+floor, p50 2 fresh damage frames pending during every encode. Both
+verification checks green. The section's original FAILING status was
+filed on "textflood delivered 8.19 fps", which conflated the PIPELINE's
+send rate with the producer's frame rate — exactly the unverifiable
+inference this FR's verify-per-run rule exists to forbid, and its own
+step-0 instrumentation is what caught it. The serializer is the
+pipeline's ack-paced capture (BACKLOG #70; measured to 0.0 ms
+unattributed, commit `0db74f6e`): the capture arm is
+phase-locked to the previous frame's ack (stdev 11.8 ms) and
+uncorrelated with damage arrival (stdev 30.7 ms), while the per-monitor
+budget's second slot is never used.
+
+**Compute is NOT the constraint (recon 2026-07-31,
+`PR-demo/textflood/ring_recon.c`, run ON the T4, offline).** An earlier
+revision of this paragraph asserted "~100 ms cairo render, a single
+render thread cannot exceed 10 fps" — that number was an unmeasured
+inference and the recon falsifies it:
+
+| producer design | T4 ms/frame | fps | vs 16.4 fps floor |
+|---|---|---|---|
+| A full-frame live render (shipped loop, verbatim) | 24.1 | 41.4 | 2.5× |
+| B memmove scroll + strip render (live text kept) | 7.1 | 141 | 8.6× |
+| C pre-rendered ring (steady state = 1 memcpy) | 6.8 | 147 | 9.0× |
+
+Two concurrent frame-sized copies sustain 8.8 GB/s aggregate (near-2×
+single-thread) — memory bandwidth is not the wall at this depth either.
+So the producer computes 41 fps offline yet delivers 8.19 fps deployed:
+a **5× gap that no bench above explains**. The open hypothesis is the
+serialized `render → XShmPutImage → XSync` loop paying the X thread's
+own per-frame work (blit copy, damage, the ~20 ms capture pack) inside
+every `XSync`, plus possible phase effects with the deferred-update
+timer. Since decomposed: the i55 uprobe redo (commit `0db74f6e`)
+located the pacer in the pipeline's ack emission, not the producer —
+see BACKLOG #70. Design consequence:
+the fix is **decoupling** (render the next frame during the previous
+frame's sync; bound outstanding blits at 2), and design B is preferred
+over the ring because it keeps live per-frame CPU text rendering
+(requirement 2 in its strictest reading) at an 8.6× compute margin and
+~18 % of one core at a 25 fps target (requirement 3). The ring remains
+the fallback if in-session measurement shows even B producer-limited.
+Consequences until fixed: the 2026-07-31 m=2 textflood A/B (1.41×) is
+annotated as producer-confounded — both arms may have been paced by the
+same producer and the batch's true gain understated; the m=1 "0/205
+overlap" T4 run convicts the producer, not the pipeline; and the PRD's
+`capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
+holding, which its 1600×912 evidence satisfied and 4K does not.
+Tracked under the linear chain **BACKLOG #70 → #70B → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
+
+### FR-TRACE-1: The perf tracer must not be able to perturb what it measures (owner directive, 2026-08-01)
+
+**An instrument that serializes the threads it observes produces
+fiction, and it produces it in the shape of a plausible result.** The
+perf-trace sink is not a logger and is not held to a logger's
+standards: it is a measuring device inside the hot path, and the
+following are hard requirements, not preferences.
+
+1. **The SOURCE must never block.** The call site — the `PERF_TRACE`
+   macro, invoked from the encoder worker, the EGFX assembler and the
+   main thread — must not execute any syscall, must not perform I/O,
+   must not allocate, and must not acquire any lock that a slow path
+   can hold. Reading a coarse monotonic clock through the vDSO is
+   permitted because it is not a syscall. Nothing else is.
+2. **SOURCE and SINK must live on different threads, joined by a ring
+   buffer.** The source appends a fixed-size record to the ring and
+   returns. A dedicated sink thread — and only that thread — drains the
+   ring, formats, and writes to disk. The sink is *allowed* to block,
+   serialize and be slow, because nothing measured is waiting on it.
+3. **Overflow drops, and drops are COUNTED and REPORTED.** When the
+   ring is full the source discards the record and increments a
+   counter; it must never block, never spin and never grow the ring in
+   the hot path. The drop count must be emitted into the trace so that
+   an analysis can tell a complete trace from a truncated one. A
+   silently truncated trace is worse than no trace (the "no silent
+   caps" rule).
+4. **No shared `FILE*`, ever.** More than one thread using stdio on one
+   stream is the defect this requirement exists to forbid.
+
+**Why this is a requirement and not a nicety — the measurement it
+destroyed (2026-08-01, BACKLOG #61e).** The original sink was a
+`fprintf` onto a shared `FILE*`. `fprintf` takes `flockfile`, so every
+event serialized against every other event *in whatever thread issued
+it*, and the wait landed inside whichever stage bracket happened to be
+open. While that sink was written to by ONE thread it was invisible.
+Adding a single `enq` record on the **main** thread — one event per
+frame, ~140 events/second total — put a second thread on the stream for
+the first time and the measured frame period went **40.4 ms → 135.3 ms,
+a 3.3× regression that existed only while the instrument was armed**.
+The stages that inflated were exactly the CPU-side ones (`subm`
+3.53 → 16.60, `emit` 5.89 → 30.06, and a `book` bracket containing three
+integer increments and one log write measured at **12.55 ms**), while
+the child-blocking `pump` was untouched — the signature of serialization,
+not of work. Two hypotheses were floated and killed by measurement
+before the real cause was found: log VOLUME (identical at 14.1
+lines/frame, and 3.3× *fewer* per second on the slow arm) and pod
+CPU/memory (`avc444_pack_bench` identical at 3.32 vs 3.23 ms/frame).
+**The instrument was the bug.**
+
+**Implementation decision (2026-08-01): an in-tree, per-thread SPSC ring
+in C. `spdlog` was considered and REJECTED.**
+
+spdlog was the obvious off-the-shelf answer — Debian ships it
+(`libspdlog-dev`, trixie 1:1.15.2), it is MIT, and its async mode has
+the right shape (a `circular_q` drained by a dedicated backend thread).
+It was rejected on two counts, both recorded so the decision is not
+re-litigated from scratch:
+
+- **It would put `libstdc++` into the shipped `xrdp` binary**, which
+  links no C++ runtime today — only the optional `vrplayer/` Qt tool is
+  C++. Paying a permanent runtime dependency in the RDP server for a
+  diagnostic that is disarmed in production is the wrong trade, and it
+  is a dependency the upstream `devel` PR would rightly refuse.
+- **It is not lock-free anyway.** `mpmc_blocking_q` is a `std::mutex`
+  plus condition variables around the ring, so the source still takes a
+  shared lock — a weaker guarantee than clause 1 deserves, for a
+  library whose whole appeal was not having to think about this.
+
+The in-tree design gives a **stronger** guarantee than spdlog would:
+
+- **One ring per producer thread**, claimed from a fixed pool at first
+  use, so producers never contend with each other at all — there is no
+  shared lock on the source path, not merely a short one. Each ring is
+  single-producer / single-consumer, so `head` is written only by its
+  producer and `tail` only by the sink.
+- **The pool is allocated when the sink is ARMED**, never on the source
+  path, so clause 1's "must not allocate" holds literally. A thread that
+  finds the pool exhausted drops and counts, and never blocks.
+- **`tag` is stored as a pointer, not copied** — every call site passes
+  a string literal, which is a documented precondition of the API, and
+  it keeps the source path free of any formatting work.
+- **Only the sink thread ever touches the `FILE*`**, satisfying clause 4
+  by construction rather than by convention.
+
+The ring's push/pop/overflow behaviour is pure logic and is unit-tested
+in `tests/common/` against the SPSC specification (capacity `N` yields
+`N-1` usable slots; FIFO order; the `N`th push drops and increments the
+counter) — the expected values come from the ring specification, never
+from running the implementation.
+
+### FR-ACK-1: WITHDRAWN 2026-07-31 — see NG-9 and BACKLOG #70
+
+The filing (ack-on-consume as the fix for a rect_id "ghost") was
+refuted the same day it was specified: the ack value is an echo and
+never drifted. Its machinery — echoed identity, ack totality, the
+displayed flag, region return on non-display — survives verbatim in
+**BACKLOG #70** (eager slot-release ack) with the corrected rationale
+(concurrency, not correctness) and an earlier emission point
+(max(absorb N, egress N−1)). The eager ack is only half the change:
+see **FR-ACK-2**, which makes the assembly split of BACKLOG #70B a
+requirement rather than a follow-up, with the measurements showing why
+the ack alone only relocates the wait. Full former text of this FR, with the
+invariant proofs, is preserved at commit `0db74f6e`; history pointers
+in NG-9.
+
+### FR-ACK-2: the eager slot-release ack is incomplete without the emit split (2026-08-01, measured)
+
+> **SUPERSEDED IN PART, 2026-08-01 (same day), by measurement.** The
+> split was built and measured twice.
+>
+> Under the `codeflood` payload it came out at **0.96x** (33.3 ->
+> 34.7 ms) — but that measurement is VOID as a throughput number: #61c
+> showed the session Xorg was at **96.4 % of one core** and at 98.9 %
+> with no client attached at all, so the producer set the period and the
+> worker had 28 % slack before the split was applied. Re-run under
+> `textflood` at 3840x2400, with the producer at 25.3 % and FR-BENCH-1
+> passing at a **2.61x** margin, the same knob measures **1.12x**
+> (40.1 -> 35.9 ms).
+>
+> **The acceptance criterion below is still not met**, and the
+> 1.22x-1.44x projection stays withdrawn — now for a reason that
+> survives the payload fix. It was computed at 2560x1440, where `emit`
+> was 6.39 ms of a 24.02 ms serial chain (27 %). `pump` and `coll` scale
+> with pixel count and `emit` does not, so at 3840x2400 `emit` is 17 %
+> of a 35.04 ms chain and the most the split could buy is smaller.
+> **The size of the gain is resolution-dependent; the mechanism is
+> not.** What the textflood run confirms is that the mechanism does what
+> this FR specifies: 5.97 ms of serial work removed, 4.30 ms of period
+> recovered (72 % conversion), wire audit 7/7, zero black frames.
+>
+> The correctness content below — the join point, the thread shape, the
+> shared-state rules — held on every run and is NOT superseded.
+> Evidence:
+> `captures/i70b_x001_ab_20260801 (DELETED by #61h, git history only)`
+> (codeflood, void) and `i61b_x004_ab_20260801 (DELETED by #61h)`
+> (textflood, 1.12x). Text below kept verbatim, wrong projection
+> included.
+
+**The eager slot-release ack (BACKLOG #70) MUST NOT be shipped without
+the assembly (`emit`) split of BACKLOG #70B.** On its own it converts a
+producer-side wait into a worker-side queue and stops there.
+
+Measured, m=1 at 2560×1440 under a saturated payload (arm-u/arm-v/arm-w,
+1290–1730 frames each):
+
+| | shipped ack | eager ack |
+|---|---|---|
+| `absorb(N) → msgin(N+1)` (p50) | 18.0 ms | **−1.9 ms** |
+| `msgin(N+1) → submit(N+1)` (p50) | 2.4 ms | **10.3 ms** |
+
+The eager ack does exactly what it claims — the next frame is *already
+in the fifo* before the current one is absorbed on 61 % of frames — and
+the wait simply moves in front of the encoder worker. Period improves
+1.11×, and no further.
+
+#### Why a ready capture does not stop the children starving
+
+The two FFmpeg children are fed by `submit` and driven by `pump`, and
+**both run on the encoder worker thread**. Input readiness is therefore
+necessary but not sufficient: any worker-thread time not spent feeding
+the children is time they are idle *with work available*. Per 32.56 ms
+cycle, measured:
+
+```
+pump           10.78 ms   children have work
+pump_end -> coll_beg 2.60
+coll                 3.22   NUT pop + LTR rewrite
+coll_end -> emit_beg 2.25
+emit                 5.96   <-- assembly: pure CPU, touches no child
+emit_end -> drain    4.04
+drain + subm         3.70
+               -------
+               21.77 ms   children have NOTHING, and a frame is queued
+```
+
+**The children are idle 67 % of wall time** while the stage they are
+waiting behind is not encoding at all. `emit` is the largest such stage
+and is provably independent of them — it reads the *already collected*
+bitstream and touches no child, no capture page, and (FR-PROC-6) no
+borrowed shmem. That is what makes it separable.
+
+#### The join point is a correctness requirement, not a tuning choice
+
+With `emit` on its own thread, the worker MUST join the previous frame's
+assembly **before `collect(N+1)`**, and MUST NOT join it before
+`submit(N+1)`:
+
+- **Before `collect(N+1)` — required for correctness.**
+  `xrdp_ffmpeg_avc444_collect_pair` returns a pair whose `main_data` /
+  `aux_data` point into that handle's own `main_buf` / `aux_buf`, which
+  the *next* collect on the handle overwrites in place. Joining any
+  later — for instance before the next ack, the intuitive choice — lets
+  `collect(N+1)` overwrite buffers the assembler is still reading.
+
+  *Correction, 2026-08-01:* this FR first gave the failure mode as
+  "silent wrong pixels, not a crash". That understates it.
+  `collect_pair` calls `grow(&self->main_buf, &self->main_cap, ...)`
+  before each rewrite, and `grow` **reallocs** — so `collect(N+1)` can
+  free the very allocation `pair.main_data` points at. The failure mode
+  is a use-after-free that presents as wrong pixels *most* of the time.
+  The consequence for the design is that the stated alternative —
+  "double-buffer those two buffers per handle" — is not sufficient on
+  its own: alternating two buffers still reallocs the one being written.
+  Either the join stays where it is, or the handoff takes an owned copy
+  of the two byte ranges.
+- **Not before `submit(N+1)` — required for the gain to exist.**
+  Joining at the top of the loop leaves the children idle for the whole
+  of `emit`, which is the starvation this FR exists to remove: the work
+  would have moved to another thread and bought nothing.
+- **Between them it is free.** `emit` (5.96 ms) fits entirely inside
+  `submit(N+1) + pump(N+1)` (14.5 ms), so the join is not expected to
+  block the worker at all at this geometry. A bounded depth-1 handoff
+  expresses the join, keeps PDU order trivially (one assembler thread),
+  and requires no change to either ack.
+
+#### The assembler is ONE permanent thread, not a thread per frame
+
+**Required shape.** Exactly one assembler thread, created in
+`xrdp_encoder_create` alongside `proc_enc_msg` and living for the
+encoder's lifetime. Spawning a thread per emit is forbidden, for three
+independent reasons:
+
+1. **Order.** `fifo_processed` carries the PDU stream in wire order, and
+   for a given `XRDP_ENC_DATA` the `last=1` enc_done must be its last —
+   that is what releases it (`gfx_close_egfx_msg`, FR-ACK-1 rule 2).
+   Two concurrent assemblers give no defined order for either property.
+2. **The frame budget below is only provable at assembly depth 1.** N
+   concurrent assemblers put N frames in assembly and the resident set
+   is no longer `{capture N+2, children N+1, assembly N}`.
+3. **Cost.** `clone` + stack + first-touch is tens of µs against a
+   5.96 ms body, paid every frame, to buy nothing the permanent thread
+   does not already give.
+
+**Handoff.** A depth-1 slot in `struct xrdp_encoder`, guarded by two
+counting semaphores (`tc_sem_create`/`_dec`/`_inc`, already in
+`common/thread_calls.h`; no new primitive):
+
+```
+emit_req   init 0   worker -> assembler: a set is in the slot
+emit_idle  init 1   assembler -> worker: the slot is free
+```
+
+```
+worker                                   assembler
+  drain / group                            for (;;)
+  submit(N+1)                                tc_sem_dec(emit_req)
+  pump(N+1)                                  if (slot.quit) break
+  tc_sem_dec(emit_idle)   <-- THE JOIN       for each item: process_enc
+  collect(N+1)                               tc_sem_inc(emit_idle)
+  release_slots(N+1)  [eager ack]
+  fill slot with set(N+1)
+  tc_sem_inc(emit_req)
+```
+
+The join is one line, and **its position is the specification**: the
+`tc_sem_dec(emit_idle)` sits after `pump` returns and before the first
+`gfx_batch_collect_one`. Moving it earlier or later is the correctness
+question above, not a tuning knob.
+
+This also settles the enc_done ordering that the split would otherwise
+put at risk. `fifo_processed` gains a second producer — the worker still
+emits the #70 CONSUMED ack from `gfx_batch_release_slots`, while every
+PDU and the terminal ack now come from the assembler. The fifo itself is
+already safe (`fifo_add_item` under `self->mutex`). What makes the
+*order* safe is the join: `release_slots(N+1)` runs after
+`tc_sem_dec(emit_idle)`, so CONSUMED(N+1) cannot overtake the terminal
+ack of frame N. A deeper queue would break this; depth 1 is what buys
+it.
+
+**Teardown.** The worker owns the assembler and joins it: on leaving its
+loop the worker sets `slot.quit`, posts `emit_req`, waits for the
+assembler to exit, and *only then* sets `xrdp_encoder_term_done`.
+`xrdp_encoder_delete`'s contract is therefore unchanged — one wait
+object, one 5 s timeout, one `g_free(self)`. This matters because that
+delete does **not** join: it times out and frees `self` regardless, so a
+wedged worker is already a use-after-free today. The split must not
+widen that window, which is why the assembler never signals
+`term_done` itself and is never visible to `xrdp_mm`.
+
+#### Blast radius: what `emit` must stop touching first
+
+`emit` is separable because it needs no child and no capture page — but
+it is not yet *isolated*. Every `self->` field the AVC444 emit path
+touches, classified:
+
+| field | emit | worker | verdict |
+|---|---|---|---|
+| `avc444_batch_pair[m]`, `_seq[m]`, `_have[m]` | R | W | safe under the join |
+| `avc444_surface_id_live[m]` | R/W | — (main thread W) | already `self->mutex`-guarded |
+| `avc444_chroma_align`, `_v2`, `eager_slot_ack`, `_ltr_rekey_surface_reset` | R | — | config, written once at create |
+| `avc444_seq` | W | W | dead in the batched path (`enc_rv` is forced READY); assert it |
+| **`avc444_ffmpeg_handle[m]`** | **W** | **W** | **UNSAFE — blocks the join point** |
+| **`avc444_surface_reset_pending[m]`** | **W** | R | **UNSAFE — same fix** |
+
+**The handle array is the blocker.** `emit` writes
+`avc444_ffmpeg_handle[m] = NULL` at three sites — the geometry-change
+teardown inside `gfx_avc444_handle_for`, the encode-error path, and the
+post-ship `rekey_pending` teardown — while `submit(N+1)` reads and
+creates through the same array for the same monitor. Joining *after*
+`submit(N+1)` therefore races a `xrdp_ffmpeg_avc444_delete` against a
+`xrdp_ffmpeg_avc444_submit_pair` on the freed handle. This is rare (a
+resize, or one frame in ~65 000) and it is a use-after-free, which is
+the worst combination to ship.
+
+**Required before the split, as its own change:** make `emit` read-only
+with respect to the child. The worker evaluates
+`xrdp_ffmpeg_avc444_rekey_pending(ff)` immediately after
+`gfx_batch_collect_one` — it has the handle in hand there — and applies
+the teardown at the **top of the next cycle, before `submit`**. Cost:
+the re-key is deferred by exactly one frame. The margin covers it with
+room to spare: `XRDP_H264_LTR_FRAME_NUM_REKEY` is 2^16−512 and the hard
+stop is 2^16−8, so one frame spends 1 of 504.
+
+**Also required:** `avc444_debug_dump` takes `main_view` / `aux_view`,
+which point into capture shmem the eager ack may already have released.
+The GFX_TRACE `centerY` read is already skipped for exactly this reason;
+the dump is not, and moving it to the assembler widens the window from
+µs to ms. Under the split the dump either loses its NV12 arguments
+(bitstream only) or runs in the worker before the join. A forensic
+capture that silently records the *next* frame's pixels under this
+frame's sequence number is worse than no capture.
+
+**Out of scope.** The split is confined to the batched branch
+(`batching = avc444_ffmpeg && avc444_aux_ltr_chain`). The item-at-a-time
+branch — jpg, rfx, h264, non-LTR egfx — keeps calling `process_enc`
+inline on the worker and is not to be touched. Like #70, it ships behind
+a config knob, default off, until measured.
+
+#### Frame budget
+
+The split does **not** cost a frame of latency and does not alter
+FR-BP-2's bound. During `pump(N+1)` the previous frame is *already*
+alive on the main thread being egressed; an assembler thread does not
+raise the number of resident frames, it relocates work already in
+flight. The resident set stays {capture N+2, children N+1, assembly N},
+which is what the two-slot capture budget and the `slots + 1` held-region
+map (`XUP_CAP_SENT_SLOTS`) already size for.
+
+#### Acceptance
+
+Projected period 22.6–26.6 ms from 32.56 ms — **1.22×–1.44×**; the range
+is the 4.04 ms inter-cycle gap, which this change does not determine.
+Quote the range, not its optimistic end. The transport is not the
+constraint at either figure: the main thread is at ≤39 % occupancy and
+binds only near a 12.6 ms period (~79 fps).
 
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 
@@ -1299,15 +2170,43 @@ For the immediately following auxiliary packet require at least one valid VCL NA
 
 Do not require AUD NAL units. This is not a full H.264 parser: split bounded Annex-B start codes and inspect only the one-byte NAL header's `nal_unit_type` field. Do not parse slice syntax, reference-picture semantics, or decode pixels.
 
-### FR-H264-6: Timeout rather than runtime keyframe control
+### FR-H264-6: Scheduled intra refresh + bounded deadlines (REVISED 2026-07-28)
 
-MVP has no fine-grained child control channel and no runtime force-IDR request. A new child is expected to begin with a keyframe. Apply bounded deadlines:
+**Superseded rationale.** The original FR-H264-6 ("Timeout rather than runtime keyframe control") stated that the MVP has no child control channel and no force-IDR request, so a *new child* is the only way to obtain a keyframe, backed by bounded deadlines. That was a scope decision, and downstream work (including FR-H264-8's aux respawn) hardened it into an assumed prohibition. Two 2026-07-28 measurements make it untenable:
+
+1. **Respawn is expensive.** A fresh ffmpeg+NVENC child needs **~630 ms** before its first packet (T4: 650 / 634 / 1099 ms for 1 / 2 / 30 frames ⇒ ~630 ms fixed init, ~16.6 ms/frame after). It sits inline in `encode_pair()`, so any configuration with a finite GOP stalls ~0.65 s per IDR — a ~7–8 s hitch cadence at `-g 240`.
+2. **The stock ffmpeg binary DOES accept a keyframe schedule**, on both backends. Measured with `-force_key_frames`, `-g 30000`, 30 fps:
+
+| encoder | option | result |
+|---|---|---|
+| `h264_nvenc` | `expr:gte(t,n_forced*0.5)` or `expr:eq(mod(n,15),0)` | intra at **exactly** frames 0,15,30,45 |
+| `h264_nvenc` | *without* `-forced-idr` | **non-IDR I** (nal type 1), `frame_num` CONTINUES — DPB not reset |
+| `h264_nvenc` | *with* `-forced-idr 1` | real IDR (nal 5), `frame_num` resets |
+| `h264_vaapi` | same expressions | intra at exactly 0,15,30,45; always a real **IDR** (nal 5) regardless of `-forced-idr` |
+
+Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed vs 55 / 51 / 58 fps at every 240 / 60 / 15 frames — all within noise); only bitstream size moves (294 KB → 294 / 367 / 734 KB). On real desktop content the added cost of a **paired** refresh is ≈ `((I_main−P_main)+(I_aux−P_aux))/N` per frame ⇒ **≈ +4 % at N=240**, +17 % at N=60. **MEASURED 2026-07-29 on the shipped path** (arm-r, VAAPI CQP 444, the code-scroll corpus at 2560×1440 + 3840×2400, 1688 pairs per view with 8 paired cuts): a P pair is 47 614 B (main 18 593 + aux 29 021) and a paired cut adds (140 206 − 18 593) + (117 716 − 29 021) = 210 308 B, i.e. **876 B/pair = +1.84 % at N = 240** — under half the predicted figure on this corpus.
+
+**Requirement (replaces the prohibition).** The runner MUST drive intra refresh by schedule, not by respawn:
+
+- Both children are spawned with an **identical frame-indexed** `-force_key_frames` schedule, so the refresh indices are deterministic and known before submission (this also makes the future `main‖aux` parallel submit race-free — see FR-PROC-7). **This assumes 1:1 main/aux pairing**: both children see the same frame indices. FR-PROC-7's sparse aux cadence breaks that assumption and must re-derive the aux schedule from the aux child's own frame index — so it may not land first (BACKLOG #45 D12, #40).
+- **The interval is `intra_refresh_frames`** (gfx.toml key; C field `avc444_ffmpeg_intra_refresh_frames`), **default 240**, accepted range **[24, 4096]** — refused by the loader and clamped by the runner outside it — effective only when `aux_ltr_chain = true`. There is deliberately **no 0/off value**: an off switch would keep the deleted aux-respawn path alive as a shadow fallback, and a silent degradation path is exactly what the strict-honesty rule forbids. **`-g` is set EQUAL to `intra_refresh_frames`** in the child argv, retiring the `-g 30000` interim: GOP boundaries then coincide with scheduled indices, so every intra picture is a scheduled one whatever shape the backend gives it, and "unscheduled mid-stream IDR" ceases to be a reachable state rather than merely a rare one.
+- The rewriter converts the scheduled intra picture of **both** views into a **paired cut**: main → non-IDR I self-marking LT0, aux → non-IDR I self-marking LT1, **no IDR and no DPB flush anywhere**. Either child shape is acceptable input (nvenc's non-IDR I or VAAPI's IDR) because the rewriter relabels the header; what matters is only that the picture is intra-coded. *Parameter sets are NOT repeated at a cut* (revised 2026-07-28; **implemented and made unambiguous 2026-07-29, BACKLOG #45 D18**): a non-IDR I is not a decoder entry point, an RDP stream never seeks, and EGFX is reliable, so a repeated SPS/PPS costs bytes at every refresh and buys nothing — **measured: 206 B per cut on the VAAPI shape** (SPS 29 + PPS 4 + SEI 173, arm-o capture). An earlier wording of this clause said child-emitted parameter sets still pass through on the main view, which cannot both hold on VAAPI, whose cut IS a child IDR carrying them. Resolved: at a CONVERTED cut the child's SPS/PPS/SEI are DROPPED; at a real epoch entry they pass through unchanged. Guarded — only a set proven BYTE-IDENTICAL to the one already on the wire may be dropped, and a CHANGED set fails the packet, because swallowing a changed SPS is silent whole-picture corruption. The AUD is not a parameter set and still ships on every frame (Windows shape).
+- **IMPLEMENTED 2026-07-29** (xrdp `9653bd1f` + `a0d9e773`; BACKLOG #45 steps 1-4). Both shapes are accepted, in both views, and the mid-stream main IDR is converted instead of flushing. Three things worth carrying forward from the implementation: (a) the EMITTER needed no change at all — the existing non-IDR arm of `slice_ltr_rewrite()` already produces the exact required bytes for both new shapes and is view-agnostic, so the work was input-parse and walker state only; (b) the reject at `:2128` was the SMALL half — three walker-level gates keyed on `ntype == 5` rather than on the picture being intra, so fixing only the slice-level reject would still have refused an nvenc aux cut and would not have seeded LT1 from one; (c) `convert_intra` is decided ONCE per picture (in a bounded pre-scan, because the parameter-set decision must be made before the first NAL is emitted) and every slice of a multi-slice picture must agree with it or the packet fails. **Original survey (2026-07-28), for the record:** a non-IDR I fell into the `B/SP/SI or non-IDR I` reject at `:2128`, and a mid-stream IDR on the main view was accepted but reset the shared counter to 0 and cleared `aux_seeded` (`:2447`, `:2527`) — precisely the flush this FR abolishes. Supporting both is the substance of the work, not a detail: the two backends genuinely differ, so a build that handles only nvenc's shape is broken on VAAPI and vice versa. The conversion mechanism itself already exists and is proven in production — `to_seed_i` performs exactly this IDR → self-marking non-IDR I relabel for the aux seed; it must be generalised to the main view.
+- The session's **first** picture remains a real IDR (the decoder's entry point and the origin of LT0).
+- **Verify, never assume:** at a scheduled index the slice MUST parse as `slice_type == I`. A P where intra was expected is a loud failure of the same class as an aux P with LT1 unseeded — never a silent emit. Four verification layers, in the order they run — only the last is onscreen: (1) the pure-C DPB simulator (`tests/xrdp/test_avc444_ltr.c`) replays the cut sequence in 1-context and 2-context modes and reports `missing_ref`/`overflow`/range violations without any decoder; (2) byte-exact goldens from `ltr_splice_ref.py`; (3) a **runtime** observed-vs-scheduled check in the rewriter, which is the only layer that runs before the client sees the picture, and fails the pair rather than shipping it; (4) wire captures from the fleet/T4 audited by `tools/avc444_ltr_wire_audit.py`. These structural checks are the WHOLE verification of I3 — the invariant is invisible onscreen in the success case (bounded and unbounded depth decode to identical pixels over a lossless pipe), so no amount of watching a healthy screen confirms it. Client-side risk must be stated precisely (corrected 2026-07-28 after conflating two boundaries): the bitstream fully determines reference structure, so a client cannot read a dependency across a cut that the server did not emit. The cut's only NOVEL wire element is a mid-stream non-IDR I slice — nri=3, the mmco6 self-mark/slot-replacement, the explicit rplm and the per-view frame_num stride already ship on every picture today and render correctly on mstsc/macOS/xfreerdp. A decoder that mishandled it would corrupt or wedge AT THE CUT CADENCE — a distinctive, immediately visible signature covered by the ordinary smoke gate. The separate, owner-blocked onscreen observation belongs to the **re-key boundary** (real IDR + epoch restart at the frame_num-wrap re-key): whether a 2-context client re-initialises its aux decoder at the epoch change is decoder-lifecycle behaviour, unprovable from the bitstream. Finally, containment CAN be made observable by injecting the divergence in the client harness: an oracle-client run that corrupts/drops exactly one P and measures pixel re-convergence — heals within **≤ `intra_refresh_frames` + 1 pairs** (241 at the default) measured from the injected corruption, and persists indefinitely on a `-g 30000` control — turns I3 into a measured recovery time with a discriminating control.
+- The aux-child respawn path is then dead code for this purpose and MUST be removed; a mid-stream main IDR ceases to exist by construction. **Removed 2026-07-29** (`a0d9e773`), together with `ltr_aux_fresh`. If LT1 were ever unseeded mid-chain the aux rewrite refuses the packet and the pair fails loudly — the correct mechanism, in the right place. Respawning would restart that child's frame index while the main child keeps counting, de-phasing the shared schedule: one fault made permanent. **Consequence to keep in view:** with the reset gone, the frame_num-wrap re-key is now the ONLY wrap protection (it used to be masked by the GOP IDR resetting the shared counter). `xrdp_ffmpeg_avc444_ltr_counter_cap()` and its "re-key unreachable" warning modelled that reset and became FALSE exactly at the D7 target of `-g 240`; both were deleted rather than adjusted, and the guard now lives where the mechanism is, as `test_ltr_cut_midstream_idr_keeps_chain`.
+
+**Invariant this exists to enforce (I3).** Direct reference age in the LTR topology is always exactly one picture, so "staleness" is *transitive dependency depth*: the distance back to the last picture in that view coded without a reference. A pure P chain leaves it unbounded, meaning any encoder/decoder divergence (client decoder bug, a rewrite bug, a frame the client skips under load) persists until reconnect. The refresh interval N is precisely the bound, and it must be bounded in **both** views — a main-only refresh does not bound aux. Note this is about *divergence containment*, not loss recovery and not seeking: an RDP stream is live and never seeks, and a fresh connection always builds a new encoder that opens with a real IDR.
+
+**Retained from the original FR.** Bounded deadlines remain the safety net, unchanged:
 
 - child spawn and NUT stream-ready default: 2 seconds;
 - first main packet default: 2 seconds after full main input transfer;
 - auxiliary/pair completion default: 2 seconds after full auxiliary transfer.
 
 Timeout or failed NAL checks kill/reap the child and fail the generation. Values are configurable with hard upper bounds.
+
+**Still absent (honest limit).** A stock ffmpeg binary offers no *on-demand* keyframe request: its interactive stdin commands address filters only, and our stdin carries the raw frame stream. On-demand refresh (e.g. honouring a client `KEY_FRAME_REQUESTED`, which the AVC444 path does not wire up today — it is handled only in the RFX path) therefore still requires either a child restart or a patched encoder, and is out of scope. A sufficiently dense schedule bounds staleness without it.
 
 ### FR-H264-7: Decode-topology invariance (reference partitioning) — REQUIRED, not configurable (owner directive 2026-07-28)
 
@@ -1321,11 +2220,69 @@ Equivalently: no picture may ever use a cross-view reference. The main chain ref
 
 **Mandatory architecture.** The external backend implements this with two FFmpeg children per surface: the main child encodes only main frames (its chain self-references), and the auxiliary child encodes all-IDR; each aux packet is rewritten by `xrdp_h264_aux_to_leaf()` into non-reference, non-IDR I leaves on the main chain (aux SPS/PPS/SEI/AUD dropped; `frame_num` = main + 1 per the non-reference rule; CABAC payload byte-verbatim; loud failure on any stream shape outside the compat guard). This is NOT a configuration option: the former `aux_intra_leaf` gfx.toml knob is removed and the pair path always partitions. Rationale (measured, 2026-07-27/28): the single-child cross-view interleave corrupts any client that deviates from topology 1 (Mac chroma bleed, root cause cross-view inter prediction); VAAPI's clean result was accidental immunity (a Mesa all-intra mode-decision quirk), not a property to build on; partitioning also collapses main P-frame sizes (nvenc: 25–76 KB → 0.6–2.5 KB) because same-view references make inter prediction effective.
 
-**Rejected alternative (recorded 2026-07-28).** “Aux references previous aux” (two partitioned prediction chains merged into one stream) is rejected as low-ROI: with FR-PROC-7 shipping sparse aux, its bandwidth win over all-intra leaves shrinks toward zero, while it requires per-slice `ref_pic_list_modification` / MMCO-or-LTR splicing with per-frame PicNum arithmetic — silent wrong-pixel failure modes — and forfeits *structural* topology invariance (correctness would again depend on each client’s DPB/gap handling).
+**Alternative “aux references previous aux” — status CORRECTED (2026-07-28).** An earlier revision of this paragraph rejected the two-prediction-chain design with an exaggerated risk rationale (“per-frame PicNum arithmetic, silent wrong-pixel failure modes, forfeits structural topology invariance”). That rationale priced a short-term-reference construction the real Windows server does not use, and it is withdrawn: ground-truth measurement (PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md, LTR addendum) shows Win2022 ships exactly this design via constant long-term-reference slots — no per-frame arithmetic, no eviction pinning — and every RDP client, VideoToolbox included, renders it daily. The design is now specified as EXPERIMENTAL FR-H264-8 below; the leaf architecture in this section remains the shipped default, and this FR’s three-topology invariance remains the requirement for the default path.
 
 **Regression test (macOS-emulating two-decoder check).** `tools/avc444_topology_check.sh` takes a captured interleaved wire stream and verifies, via `ffmpeg` framemd5, that topologies 1, 2 and 3 above produce bit-identical frames (main rows of the interleaved decode == the main-only decode; leaf rows == the aux-only decode through a second, separate decoder instance). It must be run — and pass — on a fresh wire capture for every change touching the encoder/conversion/rewrite path, alongside the existing smoke gate; a mismatch is a red result (strict honesty rule: no fallback, no cadence tweak to mask it).
 
 **Validation scope note (FR-H264-5 unchanged).** Startup/reset validation remains NAL-header-only. The reference-partitioning rewriter is a separate bounded slice-header splice in `xrdp/xrdp_h264_annexb.c` with its own fail-loud contract; it does not relax FR-H264-5’s “no slice parsing” rule for the validator.
+
+### FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows-style long-term reference slots
+
+**Status: EXPERIMENTAL** — specified 2026-07-28 from ground-truth measurement of the Win2022 server (PR-demo/win2022_ground_truth/GROUND_TRUTH_win2022_avc444.md, LTR addendum); not implemented, not shipped. FR-H264-7 (all-intra leaves) remains the default and the shipped architecture. Changing the default requires the full acceptance gate below plus owner sign-off.
+
+**Purpose.** Close the all-intra aux cost of FR-H264-7 (~33 KB/leaf at 1600×900; ~8 Mbps on static content at the current 1:1 cadence, shrinking but not vanishing once FR-PROC-7 ships sparse aux) by letting the aux view predict from its own previous frame — using the exact reference topology the Windows server ships, which is the strongest possible client-compatibility pedigree and the easiest upstream story.
+
+**Measured recipe (Win2022, gfxwin_anim, 357 AUs / 9 aux / 3 slices per AU).**
+
+1. One `frame_num` chain across both views; ALL pictures `nal_ref_idc = 3`; `max_num_ref_frames = 3`; `gaps_in_frame_num_allowed = 0`.
+2. IDR: `long_term_reference_flag = 1` (seeds LT slot 0).
+3. EVERY P slice, `dec_ref_pic_marking`: adaptive mode, `mmco 6` marking the CURRENT picture long-term into its view’s slot — `long_term_frame_idx` 0 = main, 1 = aux — then `mmco 0`. Slot reassignment replaces the previous occupant: no sliding-window dependence, no eviction management.
+4. EVERY P slice, `ref_pic_list_modification_flag_l0 = 1`: `modification_of_pic_nums_idc = 2` selecting `long_term_pic_num` of the slice’s OWN view (main → 0, aux → 1), then idc 3. All marking/modification syntax is CONSTANT per view — no PicNum arithmetic anywhere.
+5. Measured quirk: the first aux after the IDR selects `long_term_pic_num = 0` (references the main IDR); subsequent aux frames reference LT1 (counts: 1044 = 348×3 vs 24 = 8×3).
+
+**Topology-3 epoch rule (added 2026-07-28, measured during implementation).** The aux-only feed structurally cannot carry an IDR (an IDR in the shared wire would empty the one-context DPB and kill LT0), so a STATEFUL aux-only decoder has no reset signal at chain-restart events (mid-stream main IDR, pre-wrap re-key). MEASURED: ffmpeg’s aux-only decode is bit-identical within an IDR epoch but silently stalls at an epoch boundary (backward frame_num jump without IDR: a 4-GOP VAAPI run decoded 122/400 aux-only frames continuously, yet per-epoch — aux decoder context recreated at each boundary — all 400/400 decode bit-identical; the 1-context and drop-aux feeds are continuous-proven across the same boundaries, 800/800 and 400/400). Topology-3 pixel identity is therefore required PER EPOCH; the assumption that a two-context client re-initializes its aux decoder when the stream re-keys is a client-model assumption that the macOS gate item must verify across a re-key boundary (real Windows has the same property — one IDR per session, aux feed never independently decodable at all — so this is still strictly stronger than the Windows shape). Consequence for configuration: `aux_ltr_chain` arms should run a LONG GOP (e.g. `-g 30000`; VAAPI defaults to gop 120 = an epoch every ~12 s) so epochs coincide with the ~hourly re-keys; periodic IDRs buy nothing on a reliable transport.
+
+**Invariance contract (UPGRADED 2026-07-28 from the earlier “relaxed, topology-3 expected-RED” wording — owner review).** Windows fails strict topology 3 for two reasons: its first aux references LT0 (the main IDR — a cross-view reach into the main context), and the aux-only feed observes frame_num gaps. The first is a Windows quirk we do NOT copy: our first aux is a self-contained non-IDR I slice that self-marks LT1 without referencing anything (the FR-H264-7 leaf conversion with `nal_ref_idc > 0` plus mmco6, instead of `nri = 0`), so every aux prediction resolves inside the aux chain. The second is unavoidable syntax-level (the shared frame_num counter increments on main frames the aux-only decoder never sees) but does not affect prediction, which flows exclusively through the LT slots. Required, therefore, in BOTH decode modes: (a) 1-context (MSTSC/xfreerdp shape) — interleaved decode bit-identical to each child’s own decode; (b) 2-context (macOS shape) — main-only decode bit-identical (topology 2) AND aux-only decode PIXEL-identical by framemd5 (topology 3), with decoder frame_num-gap warnings tolerated and recorded (pixel identity, not warning-free logs, is the criterion). Both modes must PASS against the childrens’ ground-truth decodes; a topology-3 pixel mismatch is a RED result, no longer an accepted expectation.
+
+**Implementation sketch.** Same two children as FR-H264-7; the aux child encodes a normal `refs=1` P chain instead of all-IDR. The splicer rewrites both views’ slice headers (pre-CABAC, existing machinery): shared frame_num counter, constant mmco6 self-mark, constant LTR list-modification; both children’s CABAC payloads stay byte-verbatim (each child’s `ref_idx 0` remaps to its LT slot via the modification list). SPS splice: raise `max_num_ref_frames` (and, when a VUI bitstream_restriction is present, `max_dec_frame_buffering` — decoders that size the DPB from the VUI would otherwise evict LT1) to 3, re-check level DPB limits. Fail-loud on any slice shape outside the guard, as today.
+
+**frame_num width + wrap re-key (added 2026-07-28, measured during implementation).** The rewrite WIDENS the frame_num field to 16 bits (`log2_max_frame_num_minus4 = 12`, the legal maximum) regardless of the child’s width — x264 emits a 4-bit field (sized from DPB+1, no knob; keyint does not change it, correcting an assumption in the earlier unit-test spec wording), and narrow fields alias per-view under sparse aux cadences. MEASURED wrap hazard (ffmpeg 7.1.5): a per-view feed whose frame_num steps by 2 (the 2-context shape) SILENTLY STOPS DECODING at the frame_num wrap — 300 aux pictures through an 8-bit field produced 129/300 output frames with zero warnings; the 1-context and drop-aux feeds survive the same wrap bit-identically. Note Windows itself wraps at 256 (gfxwin_anim AU 311 carries frame_num 55) and relies on decoder leniency; our upgraded topology-3 contract cannot. Therefore the wire must never let ANY decoder see a frame_num wrap: the runner **re-keys** when the shared counter reaches the configured threshold. The re-key is **bitstream-only** — the encoder pair is destroyed, so the replacement child opens with a real IDR, the shared counter resets, and that frame declares the WHOLE surface as its damage region (the capture is a full frame and the picture is a fresh IDR, so the claim is accurate rather than a widened guess). It MUST NOT emit any EGFX surface lifecycle event. Tearing down and recreating the surface is a protocol-defined decoder reset and was specified as belt-and-braces on top of the IDR, but it is not what the re-key is FOR — the wrap protection comes entirely from the encoder restart — and clients that repaint the output when a mapped surface is replaced show a **black flash at every boundary**. MEASURED 2026-07-29 on macOS, in BOTH emission orders (`DELETE→CREATE→MAP→pixels`, which maps a zero-filled surface, and `CREATE→pixels→MAP→DELETE`, which never does): black at every boundary, gone once the churn is masked. The oracle capture of the second order decodes 4122/4122 pictures with ZERO black frames and both surfaces are created identically (1024×768 at 0,0), so the fault is not in the H.264 and not a mis-sized replacement: the client blanks on surface CHURN itself. The threshold is the settable `ltr_rekey_frame_num`, default `XRDP_H264_LTR_FRAME_NUM_REKEY` (2^16 − 512), accepted range [64, 65024] — refused by the loader and clamped by the runner outside it, so a boundary is exercisable in seconds instead of ~18 min. `ltr_rekey_surface_reset` re-enables the surface teardown, default **false**; it exists only to reproduce the known-bad behaviour deliberately. The boundary is exercised by fleet arm **arm-p** (`PR-demo/mac_bisect_matrix/gfx/arm-p.toml`, port 40015) at threshold 536, and audited offline by `rekey_boundary_audit.py` (wire order, including the invariant that a surface is never mapped before it has pixels) and `oracle_black_frame_check.py` (every picture decodes, no mid-stream black frame). Cost of a boundary: one full-frame update plus the encoder-pair respawn (~1 s, owner-observed, not instrumented). At the default threshold that is ~18 min of continuous 30 fps animation; frames encode only on damage, so an idle session may never re-key. Wrap correctness is structural, not timing-dependent. A mid-stream main IDR (finite GOP) likewise empties the DPB including LT1. The ORIGINAL mitigation — respawn the aux child so its next packet is IDR-shaped and re-seeds LT1 — is SUPERSEDED by the revised FR-H264-6 (2026-07-28): the respawn costs ~630 ms inline in the encode path, and stock ffmpeg accepts a deterministic `-force_key_frames` schedule on both nvenc and VAAPI. The runner MUST instead schedule a PAIRED intra refresh in both views (main-I self-marking LT0, aux-I self-marking LT1, no IDR, nothing flushed), which bounds transitive dependency depth in BOTH chains (invariant I3) and removes mid-stream main IDRs by construction. Until that lands, `aux_ltr_chain` arms run a long GOP (`-g 30000`) so the respawn is never triggered in practice, and an aux P while LT1 is unseeded remains a loud rewrite failure, never a silent emit.
+
+**Unit-test specification (required BEFORE the spike is called done; same golden-byte-vector style as the FR-H264-7 leaf tests in `tests/xrdp/test_avc444_h264.c`).** The change surface is pure bit-level logic plus reference semantics, all unit-testable in CI without ffmpeg or hardware:
+
+1. *Emitter vectors (bit-exact golden bytes, both views).* (a) mmco6 self-mark: P slice in → `adaptive_ref_pic_marking_mode_flag=1`, `mmco 6` with the view’s `long_term_frame_idx` (0 main / 1 aux), `mmco 0` terminator; CABAC payload byte-verbatim after header re-alignment. (b) LTR selection: `ref_pic_list_modification_flag_l0=1`, `modification_of_pic_nums_idc=2`, `long_term_pic_num` of the OWN view, idc 3 end. (c) Main IDR: `long_term_reference_flag=1`. (d) First-aux conversion: aux child IDR → non-IDR type-1 I slice with `nal_ref_idc>0` self-marking LT1, referencing nothing (the two-context enabler; a golden vector must pin the exact byte diff vs the FR-H264-7 leaf, whose only deltas are nri and the marking syntax). (e) Ground-truth cross-check: a real Win2022 aux slice header from the committed capture (`PR-demo/win2022_ground_truth`, via `assemble_annexb.py`) parsed field-by-field; our emitter must produce the identical syntax-element sequence for items (a)–(b) — the measured recipe, not our reconstruction of it, is the reference.
+2. *frame_num slots.* Shared-counter rewrite over a synthetic `M A M A …` interleave: golden per-AU frame_num sequence; wrap vectors for the counter arithmetic (the DPB-simulator model exercises the wrap at `log2_max_frame_num=8`; the SHIPPED chain uses the widened 16-bit field and re-keys before the counter can wrap, so no decoder ever sees a wrap — see the wrap re-key paragraph below); guard vectors for aux cadences ≠ 1:1 (sparse aux must not desynchronize the counter).
+3. *Reference-resolution / long-term-pinning model (the core new semantics — a small pure-C DPB simulator implementing §8.2.5 marking: sliding window, mmco6, IDR `long_term_reference_flag`).* Feed the synthesized AU sequence in BOTH modes — 1-context wire order, and 2-context per-view (main-only and aux-only) — and assert: every P slice’s ref-list position 0 resolves to the intended SAME-VIEW frame in both modes (bit-identical resolution — the no-ambiguity claim as a machine-checked invariant); sliding-window operations NEVER evict LT0/LT1 across ≥ 512 frames including the frame_num wrap (long-term pinning; long-term frames are exempt from the sliding window and the test proves our streams rely on nothing else); mmco6 reassignment REPLACES the slot occupant (measured Windows semantics); `max_num_ref_frames` accounting stays within the SPS bound at every step.
+4. *Negative/fail-loud vectors.* Slice/SPS shapes outside the guard must hard-reject, never silently emit: unexpected slice_type (B/SP/SI, non-IDR I from a child), a pre-existing ref-pic-list modification, an mmco5 (full reference reset — its state change cannot survive the marking replacement) or invalid mmco op, and an SPS whose level/DPB budget cannot hold 3 reference frames (or an unknown level_idc). AMENDED 2026-07-28: benign child marking — sliding window or short-term mmco chains (Mesa VAAPI emits `[mmco1 diff=0, mmco0]` on every P slice, measured from the committed captures) — is parsed and REPLACED by the constant LTR self-mark, not rejected; rejecting it would reject every VAAPI child. Only state-bearing ops (mmco5) and malformed chains hard-reject.
+
+Pixel-level decode equivalence across the three topologies remains the integration backstop (`tools/avc444_topology_check.sh`, gap warnings tolerated per the invariance contract) — it complements, not replaces, the unit matrix above.
+
+**Semantic roundtrip PSNR harness (planned with the spike; catches decoder-state corruption offline, before onscreen hunting).** The identity checks above are decoder-vs-decoder: they cannot flag a corruption that affects both decode modes identically, and when a divergence exists they cannot say whether it is one LSB or a chroma cast. A new offline tool (`tools/avc444_roundtrip_psnr.sh`, portable, software encoder by default, VAAPI on the box) closes that gap:
+
+1. *Roundtrip vs SOURCE.* Generate a deterministic synthetic sequence (moving luma+chroma structure, per-frame markers), run it through the REAL pipeline — 444 packing into main/aux views, the two child encoders, the FR-H264-8 splice — then decode in BOTH modes (1-context interleaved; 2-context per-view) and reconstruct RGB. Report per-frame, per-plane (Y/U/V after 444 reconstruction) PSNR against the source. Pass requires: absolute PSNR within the encoder’s expected band for the configured QP in both modes; per-frame |PSNR₁ctx − PSNR₂ctx| within a small epsilon; and NO monotonic decay across the sequence (DPB drift accumulates — the Mac corruption grew frame over frame until IDR; a trend check catches slow drift that still sits above an absolute floor). Chroma planes are the sensitive channel and get the tightest scrutiny.
+2. *State-machine stressors.* Dedicated sequences crossing the events where reference state can corrupt: IDR restart mid-stream, frame_num wrap (≥ 512 frames), sparse/changing aux cadence (Lever-2 shape), slot reassignment timing, resize/reset re-keying. PSNR must stay in band across every event in both modes.
+3. *Harness sensitivity validation (a checker proven unable to fail is worthless — same rule as the topology checker, which was validated RED on the pre-fix wire before use).* (a) Fault-injection vectors: deliberately drop one aux AU, swap two frame_nums, retarget one LTR index — each injected fault must turn the harness RED; (b) Tier-B mode on wire captures (no source available): inter-mode PSNR between the 1-context and 2-context decodes of the same capture — run against the pre-fix nvenc capture (`t4_ps0`), where it must reproduce the known chroma-collapse signature, and against the FR-H264-7 leaf wire, where it must be clean.
+4. *Baseline first.* The harness runs against the FR-H264-7 leaf arm before the FR-H264-8 arm exists; the leaf PSNR band on identical content is the reference FR-H264-8 must match (bandwidth may improve; fidelity may not regress).
+
+Gate wiring: item (1) of the acceptance gate additionally requires the roundtrip harness green in both modes, including the stressor sequences, with the sensitivity validation recorded — before any live-arm deployment.
+
+**Correctness invariants (state them when touching this path).**
+
+- **I1 — one reference, always the immediately preceding same-view picture.** Enforced by `-refs 1` plus the guard `num_ref_idx_l0_default == 0`. This is load-bearing: the whole LTR relabeling is sound *only* because a child can never reach further back than one picture. A child with `refs > 1` would emit silently wrong pixels through a rewrite that parses as perfectly correct.
+- **I2 — the wire relabels that reference to the view's long-term slot**, and the slot always holds the immediately preceding same-view picture (mmco6 self-mark on every picture + list-modification idc = 2). Enforced by construction; an aux P with LT1 unseeded is a loud failure.
+- **I3 — bounded transitive dependency depth.** Direct reference age is always exactly one picture, so "staleness" is not about the slot; it is the distance back to the last picture in that view coded without a reference. Only the paired scheduled refresh of the revised FR-H264-6 bounds it, and it must be bounded in **both** views — a main-only refresh does not bound aux.
+
+**Gate status (2026-07-28).** Machine-side items are CLOSED:
+
+1. Unit matrix green under `make check` (322/322, incl. 116 in the xrdp suite); C rewriter and the independent Python reference splicer produce byte-identical output; roundtrip PSNR harness green in both decode modes with fault-injection sensitivity recorded.
+2. Drop-aux bit-identity verified on live captures; wire bit-identical in both modes.
+3. Both backends verified from real captures — VAAPI (fleet arm-n) and **NVENC (T4)**. T4 structure at three geometries (1024×768 / 1600×912 / 3840×2400): every P slice in both views retargets its own slot, zero cross-view references, and **zero frame_num gaps across 3–7 mid-stream IDR epochs**. A control run on the leaf arm through the same parser shows the opposite shape (aux 166/166 intra, 164 chain gaps), so the check discriminates topologies rather than confirming the expectation.
+4. Bandwidth gate PASSED. VAAPI line-scroll baselines (the gating workloads): aux 70.13 → 17.12 KB/frame (−76 %) on `code`, 326.29 → 101.85 (−69 %) on `scroll`, at equal delivered pairs/s. NVENC A/B on identical content, per picture: 1600×912 aux 66177 → 463 B (−99.3 %), pair −98.0 %; 3840×2400 aux 83231 → 2730 B (−96.7 %), pair −84.5 %; `queue_depth = 0` on every frame. Non-gating record: tick −98.6 %, gray −83 %, codefast −21 %, scrollfast −29 %, and an honest adversarial regression on flat saturated `chroma` bands (+224 %).
+5. Onscreen: owner reports the T4 renders correctly on **both Windows (incl. multimon) and macOS** (2026-07-28).
+
+Open before the default can change: the scheduled-paired-refresh work of the revised FR-H264-6 (until it lands, arms run `-g 30000`, which trades away the I3 bound — acceptable only as an interim), the **frame_num-wrap re-key** (specified in the wrap re-key paragraph above — **DONE 2026-07-29**: the re-key is bitstream-only, the threshold is settable, and the EGFX surface teardown that an earlier revision of this clause mandated is REMOVED, having been falsified onscreen — it made macOS flash black at every boundary while contributing nothing to wrap protection. Owner-confirmed both ways: black at every boundary with the teardown, gone without it. This RETIRES the "watch macOS across a re-key" observation: it was performed, it failed, and the design changed to match), and owner sign-off. Timing correction: the counter hits the re-key threshold after ≈ 18 min of continuous 30 fps animation (32 512 pairs), not "once an hour"; idle sessions may never re-key.
+
+**Acceptance gate (to leave EXPERIMENTAL).** (1) The unit-test matrix above green under `make check`; the offline synthesized stream decodes bit-identical (framemd5) to each child’s own decode; and the semantic roundtrip PSNR harness green in BOTH decode modes including the stressor sequences, with its sensitivity validation (fault injection + pre-fix-capture RED) recorded; (2) drop-aux bit-identity on a live capture; (3) fleet arm (VAAPI) + T4 (nvenc) wire captures verified in BOTH decode modes per the invariance contract (topology 3 pixel-identity required, gap warnings recorded); (4) macOS onscreen verdict by owner; (5) **bandwidth gate (owner directive 2026-07-28): `PR-demo/mac_bisect_matrix/bandwidth_bench.sh` is the benchmark harness for this optimization, and its result GATES acceptance.** The line-by-line scroll baselines (`code` and `scroll` workloads, 1 line/0.1 s — the classes where main is properly inter-compressed and the leaf aux dominates the pair, measured 2026-07-28: code aux 70.1 KB/frame = 85% of an 82.3 KB pair on the leaf arm) must be run in MODE=frames against the FR-H264-8 arm and the leaf arm on identical content; acceptance requires a material reduction of the steady aux KB/frame versus the leaf baseline with delivered pairs/s equal between arms, recorded as absolute per-view KB/frame in `BACKLOG.md`. A result that does not beat the leaf baseline on these workloads FAILS the gate regardless of other criteria. The ME-defeating stress variants (`codefast`, `scrollfast`) and the flat-band `chroma` bound are recorded alongside but do not gate; (6) owner sign-off recorded in BACKLOG before any default change.
 
 ---
 
@@ -2178,6 +3135,153 @@ The MVP is complete when all of the following are true:
 
 ---
 
+### Clean-room upstream port — locked decisions and slice plan
+
+*Moved from BACKLOG 2026-07-28 (persistent decisions belong here). The task itself stays in BACKLOG as an open item.*
+
+Transition from the dev branch to a reviewable upstream PR against `devel`.
+The dev branch stays as-is (history + scaffold); the PR is rebuilt clean.
+
+#### Owner decisions (locked)
+- **Strip `XRDP_GFX_TRACE` diagnostics from the PR.** All three layers:
+  the send/ack trace in `xrdp_mm.c` (`gfx_trace_on`, the send/ack log lines)
+  and the damage-bbox + enc `submitted_seq/returned_seq/inflight/centerY`
+  trace in `xrdp_encoder.c` (`gfx_enc_trace_on`, `gfx_trace_rects`). Safe
+  because the invariant it revealed is already asserted deterministically at
+  the API: `test_avc444_ffmpeg.c` requires every encode call to return
+  `READY` with `desktop_sequence == submitted` and `flush_next` → `DONE`
+  (commit 4eb72b0c), and the fail-loud `sequence mismatch` / `restarting
+  encoder` ERROR path is exercised by the smoke gate. Stripping the trace
+  removes a debugging aid, **zero** regression coverage.
+- **Strip `tail_flush` from the PR.** It was only ever a workaround for the
+  runner desync that the synchronous encode fixed; it is now a structural
+  no-op (nothing is ever in flight). Remove the ini knob and both arming
+  sites: `xrdp_tconfig.{c,h}` (`avc444_ffmpeg_tail_flush` field + parse),
+  `xrdp_encoder.h` (`avc444_flush_enabled`), the arming blocks in
+  `xrdp_encoder.c`, and the `tail_flush` docs in `gfx.toml` / `gfx.toml.5`.
+  Keep `flush_next` — that is the teardown/resize drain, unrelated to the
+  spammer.
+
+#### Base the clean-room branch on `origin/devel`, not local `devel`
+Cut the clean branch from `origin/devel` (currently 8812646d, 2026-07-16;
+remote cache is synced — do not run `git fetch`, this env has no push/fetch
+creds). Against that ref our branch is **41 ours-only / 3 origin-only**,
+merge-base `3af31df3` (Jul 2). Do NOT use the local `devel` ref (21d38d0c,
+Jun 17) as the base or comparison — it is ~a month stale, and that staleness
+is why `git diff devel..HEAD` shows a set of changes that are **upstream, not
+ours**, and must NOT appear in the PR:
+- `libxrdp/xrdp_caps.c`, `xrdp_rdp.c`, `xrdp_sec.c` — upstream CVE fixes
+  (CVE-2026-55639 GCC OOB read, and merged fork hardening).
+- `vnc/vnc.c`, `vnc/vnc.h` — CVE-2026-41252 heap overflow + desktop-size
+  symbols.
+- `sesman/sesexec/session.c` — CVE-2026-55626 (Xvnc UDS TCP disable).
+- `librfxcodec` submodule pointer bump.
+Rebasing the AVC444 layers onto a freshly fetched `origin/devel` drops all of
+these automatically (they are already upstream). After fetch, sanity-check:
+the only non-AVC444 file the PR touches should be `common/xrdp_client_info.h`
+(`CC_GFX_AVC444 = 6`).
+
+#### Excluded from the PR (dev-branch scaffold, keep in dev branch only)
+`PR-demo/**`, `tests/xrdp/avc444/repro_mbparity/**`,
+`tests/xrdp/avc444/FINDINGS_*.md`, `repro_*.py`, `tools/gen_isoluma.py`,
+`PRD.md`, `BACKLOG.md`, `CLAUDE.md`, `*_config.md`, `scripts/build_dev_deb.sh`,
+`dist/` debs, and all untracked scratch (burr/partialGreen PNGs, `tester_key`,
+`xrdp-PR.tar`, `iptables.rules`, `*.Po`, …). Add a `.gitignore` hygiene pass.
+**Keep** `tests/xrdp/avc444/PROVENANCE.md` (the NUT independent-implementation
+/ licensing attestation) — fold it into the NUT slice and the PR cover letter;
+maintainers will ask.
+
+#### Divergence risk: none textual, one semantic touchpoint to verify
+The only commits on `origin/devel` past our merge-base (3af31df3..8812646d)
+are the 3-commit DYNVC multi-chunk reassembly fix (#3829), touching a single
+file, `libxrdp/xrdp_channel.c` — which our branch never touches. Zero conflict
+surface, so **do not rebase the dev branch to "derisk"**: there is nothing to
+resolve, and the clean-room slices apply onto `origin/devel` (which already
+has the fix) as a clean textual apply. One semantic note: large full-screen
+AVC444 frames are chunked over drdynvc, and #3829 corrects multi-chunk
+reassembly — a correctness fix we *inherit* by basing on `origin/devel`.
+Confirm during clean-room smoke that large AVC444 frames reassemble cleanly on
+the new base (expected: fine / better; not a risk, just a checkpoint).
+
+#### Acceptance
+- PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
+  AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
+- Every slice builds and `make check` passes on its own (bisectable).
+  Re-verified 2026-07-22 after the dump_extra rewrite for the four
+  rewritten commits (`04e43ee2` → tip `c74a09e7`): per-slice `make` +
+  `make check` green, plus the gated real-ffmpeg suite (64/64) against
+  ffmpeg 7.1 and 8.1 at every slice. Slices 1–6 are untouched by the
+  rewrite (identical hashes).
+- No `XRDP_GFX_TRACE`, no `tail_flush` anywhere in the diff.
+- astyle (pinned 3.4.14) + cppcheck clean; `/* */` comments only.
+
+### Commit reorganization plan (clean-room slices) — DRAFT (2026-07-17)
+
+Rebuild the feature as ~10 modular commits, each one subfeature, bottom-up so
+every commit compiles and tests green (leaf utilities first, wire integration
+last). Each slice carries its own `Makefile.am` / test-registration hunk so it
+is self-contained. Suggested order:
+
+1. **caps enum plumbing.** `common/xrdp_client_info.h` (`CC_GFX_AVC444`),
+   `xrdp/xrdp_types.h`. No behavior change; the capture-capability constant
+   everything else references.
+2. **RGB→NV12 dual-plane converter + 16/32 chroma alignment.**
+   `xrdp_avc444_convert.{c,h}` + `test_avc444_convert.c`. Pure/deterministic;
+   includes the mstsc chroma-split (“burr”) fix via `chroma_align` and its
+   `test_avc444_width_align` / `odd_dims` guards. Self-contained leaf.
+3. **H.264 Annex-B validator.** `xrdp_h264_annexb.{c,h}` +
+   `test_avc444_h264.c`. Pure leaf (NAL header / SPS-PPS-IDR checks).
+4. **NUT demuxer.** `xrdp_nut.{c,h}` + `test_avc444_nut.c` +
+   `fixture_4frame.nut` + `PROVENANCE.md`. Pure leaf; independent-impl note
+   ships with it.
+5. **AVC420/AVC444 metablock emission.** The `out_RFX_AVC420_METABLOCK` +
+   region-rect serialization in `xrdp_encoder.c` + `test_avc444_metablock.c`.
+   (If not cleanly separable from dispatch, fold into slice 8.)
+6. **AVC444/AVC420 caps negotiation.** `xrdp_avc444_caps.{c,h}` +
+   `test_avc444_caps.c`. Pure logic: pick v2 / 420 from the client capset.
+7. **External stock-ffmpeg runner (synchronous encode).**
+   `xrdp_encoder_ffmpeg.{c,h}` + `test_avc444_ffmpeg.c`. Spawn/argv incl.
+   one-frame `-probesize` and the `dump_extra,h264_mp4toannexb` bsf chain
+   (global-header muxer vs encoders with no in-band SPS/PPS repeat —
+   h264_nvenc; folded in 2026-07-22 after the T4 finding, branch rewritten,
+   slice now `04e43ee2`), NUT read loop, **synchronous** encode + sequence
+   verification, resize lifecycle. Built correct from the start (no desync/
+   deadlock to “fix later”); the test carries both regression guards plus
+   the global-header-encoder probe regression. Depends
+   on 2–4. **No tail_flush, no trace.**
+8. **Encoder integration / dispatch.** `xrdp_encoder.{c,h}`: select the ffmpeg
+   backend, feed converter output, emit metablock + bitstream. Depends on
+   2–7. **No trace.**
+9. **eGFX caps advertise + wire-to-surface send.** `xrdp_mm.c`: advertise the
+   AVC444 capset, connect-time encoder probe, send path. Depends on 6/8.
+   **No send/ack trace.**
+10. **Config + docs.** `xrdp_tconfig.{c,h}` (`[avc444_ffmpeg]` path/avc_mode/
+    encoder_args parse) + `test_tconfig.c` + `tests/xrdp/gfx/*.toml`,
+    `gfx.toml`, `xrdp.ini.in`, `docs/man/gfx.toml.5.in`. **No tail_flush.**
+
+Notes: build glue travels with its slice (do not defer Makefile edits to a
+trailing commit, or intermediate commits won’t build). The synchronous-encode
++ probesize design is baked into slice 7 as the *initial* implementation — the
+dev branch’s desync/deadlock/fix archaeology is intentionally not replayed;
+its rationale belongs in the PR description, with `PRD.md` §25 as the
+long-form reference.
+
+#### Slice-order amendment: latent upstream multimon fix FIRST (2026-07-25, owner directive)
+
+BOTH repos' clean-room slicing must put the **GFX H.264 multimon shmem-split
+fix first** (the per-monitor shmem offset fix for the latent UPSTREAM
+cross-monitor plane-overwrite bug — see "dual-monitor drag burr" item), and
+**rebase the real AVC444 feature work on top of it**, so the merged history
+attributes scope and ownership cleanly: the bugfix slice touches only
+upstream-reachable code paths (`CC_GFX_A2`/NV12 + the msg-62 offset field +
+`XUP_CLIENT_INFO_CURRENT_VERSION` bump) and stands alone as an upstreamable
+fix for the pre-existing AVC420-x264 GFX multimon hazard; the AVC444 slices
+then inherit the corrected layout instead of appearing to introduce/fix the
+bug themselves. Applies to xrdp (slices above renumber after it) AND
+xorgxrdp (`feat/avc444-yuv444-capture` rebases onto its fix slice). Keep the
+fix slice scoped to the real blast radius (GFX H.264 family), not narrowed
+to AVC444. Status: TODO, after the fix lands + owner onscreen PASS.
+
 ## 18. Review path used for this PRD
 
 ### Review pass 1: Architecture consistency
@@ -2593,7 +3697,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   an earlier fftools-scheduler hypothesis): the withhold is a property of the
   **encoder pipeline DEPTH**, not the pipe or the scheduler. Feeding an encoder
   frames with stdin held open and counting emitted vs. withheld pictures
-  (`PR-demo/tail_flush_ab/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
+  (`PR-demo/ffmpeg_pipeline_depth_probe.py`): `h264_vaapi
   -async_depth N` withholds **N−1** frames on the tested GPU, and `libx264`
   frame-threading withholds its whole thread window. End-to-end A/B through real
   xrdp→FreeRDP with a *fresh login* (not just reconnect — config binds at login;
@@ -2629,7 +3733,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   normally a no-op (nothing left in flight). Diagnostics kept, all gated by
   `XRDP_GFX_TRACE=1`: per-frame send/ack, damage bbox, seq/luma enc trace
   (`xrdp_mm.c`, `xrdp_encoder.c`); keystroke harness in
-  `PR-demo/tail_flush_ab/` (`colorkey.sh`, `MSTSC_TRACE.md`).
+  `PR-demo/smoke_gate/` (`colorkey.sh`); the tail_flush A/B harness was removed 2026-07-28.
 
   **ADDENDUM (2026-07-17, same day) — second root cause: ffmpeg
   stream-analysis hold; fix: `-probesize` = one frame.** The synchronous
@@ -2723,7 +3827,7 @@ Detailed root-cause writeups live under `tests/xrdp/avc444/`.
   muxer, never a stand-in; (2) codec A/B on a live client requires
   fresh-login brackets — a persistent Xorg session survives xrdp
   restart and a black baseline voids everything measured after it
-  (`PR-demo/tail_flush_ab/reset_420.sh`). **Clean-branch caveat:** the
+  (a `reset_420.sh` bracketing harness, REMOVED 2026-07-28 — superseded by one fresh container per arm). **Clean-branch caveat:** the
   clean branch still carries the *blanket* dump_extra (slice 7,
   `c74a09e7`); the slice-7 fold must be re-done with the adaptive form
   before any upstream push — tracked in `BACKLOG.md`.

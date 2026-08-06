@@ -56,6 +56,7 @@
 #include "xrdp_encoder_ffmpeg.h"
 #include "xrdp_nut.h"
 #include "xrdp_h264_annexb.h"
+#include "perf_trace.h"
 #include "log.h"
 #include "os_calls.h"
 #include "string_calls.h"
@@ -67,6 +68,9 @@
 #define FF_READ_CHUNK 65536
 #define FF_MAX_INFLIGHT_PAIRS 8
 /* borrowed input segments queued for the vmsplice feeder */
+/* poll-set bound: 2 views x CLIENT_MONITOR_DATA_MAXIMUM_MONITORS
+ * children can be armed in one set (#45 step 5) */
+#define FF_PUMP_MAX_KIDS 32
 #define FF_IN_IOV_MAX 32
 
 struct ff_pkt
@@ -103,6 +107,10 @@ struct xrdp_ffmpeg_avc444
     int in_iov_count;
     int in_iov_head;
     size_t in_iov_off;
+
+    /* BACKLOG #78: cleared at submit so drain_stdout can stamp the
+     * FIRST output byte of the submitted picture exactly once */
+    int trace_out_seen;
 
     /* completed-packet FIFO (in coded-picture order) */
     struct ff_pkt *pk;
@@ -142,11 +150,20 @@ struct xrdp_ffmpeg_avc444
     struct xrdp_h264_param_cache leaf_main_cache;
     struct xrdp_h264_param_cache leaf_aux_cache;
 
+    /* aux_ltr_chain (EXPERIMENTAL, FR-H264-8): shared-chain rewrite
+     * state, including the scheduled-refresh period and per-view
+     * picture ordinals */
+    struct xrdp_h264_ltr_state ltr;
+    int rekey_pending;
+
     char errline[512];
     int errline_len;
 
     struct xrdp_ffmpeg_avc444_metrics metrics;
 };
+
+static int
+spawn_second_child(struct xrdp_ffmpeg_avc444 *self);
 
 /*****************************************************************************/
 void
@@ -212,6 +229,9 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->sanitize_hrd = 0;
     cfg->strip_pic_struct = 0;
     cfg->aux_intra_leaf = 0;
+    cfg->aux_ltr_chain = 0;
+    cfg->ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+    cfg->intra_refresh_frames = XRDP_H264_INTRA_REFRESH_FRAMES;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -369,6 +389,29 @@ build_argv(const struct xrdp_ffmpeg_avc444_config *cfg,
             ADD(cfg->encoder_args.arg[i]);
         }
     }
+    /* Scheduled paired intra refresh (PRD FR-H264-6, #45 steps 2 and 4):
+     * an identical FRAME-INDEXED schedule on both children, so a cut
+     * lands on the same picture ordinal in each view and the rewriter
+     * can check observed against requested. -g is pinned to the same
+     * value (D7) so every GOP boundary coincides with a scheduled index
+     * and an "unscheduled IDR" is unreachable by construction; it comes
+     * AFTER the admin encoder block deliberately, because ffmpeg takes
+     * the last occurrence and D7 is not negotiable while the chain is
+     * on. -forced-idr is NOT set: nvenc's non-IDR I at a forced key
+     * frame is exactly the shape this refresh wants. */
+    if (cfg->intra_refresh_schedule > 0)
+    {
+        ADD("-force_key_frames");
+        /* NO backslash before the comma: the argv reaches execve
+         * directly, and ffmpeg hands everything after "expr:" to
+         * av_expr_parse, which rejects "mod(n\,240)" outright
+         * (verified 2026-07-29: the escaped form fails with "Missing
+         * ')' or too many args", the plain form keys correctly at
+         * n = 0, N, 2N). The escape is a SHELL convention. */
+        ADDNUM("expr:not(mod(n,%d))", cfg->intra_refresh_schedule);
+        ADD("-g");
+        ADDNUM("%d", cfg->intra_refresh_schedule);
+    }
     /* NUT is a global-header muxer: encoders with no in-band repeat knob
      * (h264_nvenc and others) put SPS/PPS in extradata only, which fails
      * the probe's reset-keyframe check and would ship an undecodable
@@ -440,7 +483,7 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     int errpipe[2];
     int pid;
     char *argv[FF_MAX_ARGV];
-    char num_store[128];
+    char num_store[192];
 
     if (build_argv(cfg, cw, ch, argv, num_store, sizeof(num_store)) < 0)
     {
@@ -642,6 +685,22 @@ pk_available(struct xrdp_ffmpeg_avc444 *self)
 }
 
 /*****************************************************************************/
+/* BACKLOG #78: echoed identity for the feedend/outfirst records -- the
+ * desktop sequence of the picture this child is currently working on
+ * (the seq FIFO front), truncated to the record's int payload. -1 when
+ * no picture is in flight (records so tagged are discarded by the
+ * reader rather than mis-paired -- 2c gate). */
+static int
+trace_seq_front(const struct xrdp_ffmpeg_avc444 *self)
+{
+    if (self->seq_count - self->seq_head < 1)
+    {
+        return -1;
+    }
+    return (int)(self->seq[self->seq_head] & 0x3fffffff);
+}
+
+/*****************************************************************************/
 /* read stdout, feed NUT, append completed packets to the FIFO.            */
 /* returns bytes read (>=0), -1 error, -2 child EOF                        */
 static int
@@ -675,6 +734,15 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
             return -1;
         }
         total += n;
+        if (!self->trace_out_seen)
+        {
+            /* BACKLOG #78: first output byte since submit == the child
+             * has finished encoding and started writing the picture
+             * (input is consumed strictly before output exists) */
+            self->trace_out_seen = 1;
+            PERF_TRACE6("outfirst", trace_seq_front(self),
+                        self->leaf == NULL, n, 0, 0, 0);
+        }
         if (xrdp_nut_feed(self->nut, (unsigned char *)tmp, n) != 0)
         {
             self->metrics.parser_errors++;
@@ -767,6 +835,12 @@ feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
             {
                 self->in_iov_head = 0;
                 self->in_iov_count = 0;
+                /* BACKLOG #78: the picture is now fully in the pipe.
+                 * The child may still hold up to one pipe window
+                 * unread; FEED here means "input no longer paces the
+                 * worker", not "child copied the last byte". */
+                PERF_TRACE6("feedend", trace_seq_front(self),
+                            self->leaf == NULL, 0, 0, 0, 0);
             }
         }
         return 0;
@@ -779,86 +853,200 @@ feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
 }
 
 /*****************************************************************************/
+/* One child's slots in a poll set (#45 step 5). pump() is the n = 1 case
+ * of pump_set(): arm every child, poll ONCE, service every child. One
+ * thread, N children, ONE shared deadline (D3) -- a per-child deadline
+ * would cost n x pair_timeout_ms when a single child stalls. */
+struct ff_pump_slot
+{
+    int in_slot;        /* index into the shared pollfd array, or -1 */
+    int out_slot;
+    int err_slot;
+    int want_write;
+};
+
+/*****************************************************************************/
+/* fill pfd[base..] for this child; returns the number of slots used */
+static int
+pump_arm(struct xrdp_ffmpeg_avc444 *self, struct pollfd *pfd, int base,
+         struct ff_pump_slot *sl)
+{
+    int n = base;
+
+    sl->in_slot = -1;
+    sl->out_slot = -1;
+    sl->err_slot = -1;
+    sl->want_write = (self->in_fd >= 0 && in_iov_pending(self));
+    if (sl->want_write)
+    {
+        pfd[n].fd = self->in_fd;
+        pfd[n].events = POLLOUT;
+        sl->in_slot = n;
+        n++;
+    }
+    pfd[n].fd = self->out_fd;
+    pfd[n].events = POLLIN;
+    sl->out_slot = n;
+    n++;
+    if (self->err_fd >= 0)
+    {
+        pfd[n].fd = self->err_fd;
+        pfd[n].events = POLLIN;
+        sl->err_slot = n;
+        n++;
+    }
+    return n - base;
+}
+
+/*****************************************************************************/
+/* dispatch one child's revents: feed its input, drain its stderr and
+ * stdout. Returns 0 ok, 1 error, 2 child EOF. *quiet is set when this
+ * child has nothing left to write and produced no output this round --
+ * exactly the condition pump() used to return 0 on. */
+static int
+pump_service(struct xrdp_ffmpeg_avc444 *self, struct pollfd *pfd,
+             const struct ff_pump_slot *sl, int *quiet)
+{
+    int dr;
+
+    *quiet = 0;
+    if (sl->in_slot >= 0 &&
+            (pfd[sl->in_slot].revents & (POLLOUT | POLLERR | POLLHUP)))
+    {
+        if (pfd[sl->in_slot].revents & (POLLERR | POLLHUP))
+        {
+            return 1;
+        }
+        if (feed_vmsplice(self) != 0)
+        {
+            return 1;
+        }
+    }
+    drain_stderr(self);
+    dr = drain_stdout(self);
+    if (dr == -1)
+    {
+        return 1;
+    }
+    if (dr == -2)
+    {
+        return 2;
+    }
+    if (!sl->want_write && dr == 0)
+    {
+        *quiet = 1;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+/* arm all n children, poll ONCE, service all n. Returns 0 ok, 1 error,
+ * 2 child EOF; on a non-zero return *bad_kid is the index of the child
+ * that failed, because the caller has to tear down THAT child's handle
+ * and encoding another monitor with a dead child is silent corruption.
+ * *all_quiet is set when every child was quiet. The CALLER owns the
+ * completion predicate: n = 1 for one child, 2 for a pair, 4 for two
+ * monitors (E4). Never pump2(): a pair-shaped helper hard-wires "two
+ * issue, two retire" and breaks under FR-PROC-7's variable set shape. */
+static int
+pump_set(struct xrdp_ffmpeg_avc444 **kids, int n, long long deadline,
+         int *all_quiet, int *bad_kid)
+{
+    struct pollfd pfd[3 * FF_PUMP_MAX_KIDS];
+    struct ff_pump_slot sl[FF_PUMP_MAX_KIDS];
+    int nfds;
+    int want_write_any;
+    int quiet_all;
+    int timeout;
+    int rv;
+    int st;
+    int quiet;
+    int i;
+
+    *all_quiet = 0;
+    *bad_kid = -1;
+    if (n < 1 || n > FF_PUMP_MAX_KIDS)
+    {
+        return 1;
+    }
+    nfds = 0;
+    want_write_any = 0;
+    for (i = 0; i < n; i++)
+    {
+        if (kids[i] == NULL)
+        {
+            *bad_kid = i;
+            return 1;
+        }
+        nfds += pump_arm(kids[i], pfd, nfds, &sl[i]);
+        want_write_any = want_write_any || sl[i].want_write;
+    }
+    timeout = want_write_any ? (int)(deadline - now_ms()) : 10;
+    if (timeout < 0)
+    {
+        timeout = 0;
+    }
+    rv = poll(pfd, nfds, timeout);
+    if (rv < 0)
+    {
+        if (errno == EINTR)
+        {
+            return 0;         /* the caller re-checks its deadline */
+        }
+        return 1;
+    }
+    if (rv == 0)
+    {
+        /* nothing ready: quiet only if no child is waiting to write */
+        *all_quiet = !want_write_any;
+        return 0;
+    }
+    quiet_all = 1;
+    for (i = 0; i < n; i++)
+    {
+        st = pump_service(kids[i], pfd, &sl[i], &quiet);
+        if (st != 0)
+        {
+            *bad_kid = i;
+            return st;
+        }
+        quiet_all = quiet_all && quiet;
+    }
+    *all_quiet = quiet_all;
+    return 0;
+}
+
+/*****************************************************************************/
+/* Pump the child: write pending input and drain output/stderr. When
+ * drain_to_eof is 0, returns as soon as the input is written and no more
+ * output is immediately available (used while streaming). When 1, keeps
+ * polling until child EOF or the deadline (used to flush after closing
+ * input). Returns 0 ok, 1 error, 2 child EOF.
+ * This is pump_set() with n = 1; the semantics are unchanged from the
+ * single-child loop it replaces, path for path. */
 static int
 pump(struct xrdp_ffmpeg_avc444 *self, long long deadline, int drain_to_eof)
 {
+    struct xrdp_ffmpeg_avc444 *kids[1];
+    int bad_kid;
+    int quiet;
+    int st;
+
+    kids[0] = self;
     for (;;)
     {
-        struct pollfd pfd[3];
-        int nfds = 0;
-        int in_slot = -1;
-        int want_write;
-        int timeout;
-        int rv;
-        int dr;
-
         if (now_ms() >= deadline)
         {
             return 0;
         }
-        want_write = (self->in_fd >= 0 && in_iov_pending(self));
-        if (want_write)
+        st = pump_set(kids, 1, deadline, &quiet, &bad_kid);
+        if (st != 0)
         {
-            pfd[nfds].fd = self->in_fd;
-            pfd[nfds].events = POLLOUT;
-            in_slot = nfds;
-            nfds++;
+            return st;
         }
-        pfd[nfds].fd = self->out_fd;
-        pfd[nfds].events = POLLIN;
-        nfds++;
-        if (self->err_fd >= 0)
+        if (quiet && !drain_to_eof)
         {
-            pfd[nfds].fd = self->err_fd;
-            pfd[nfds].events = POLLIN;
-            nfds++;
-        }
-        timeout = want_write ? (int)(deadline - now_ms()) : 10;
-        if (timeout < 0)
-        {
-            timeout = 0;
-        }
-        rv = poll(pfd, nfds, timeout);
-        if (rv < 0)
-        {
-            if (errno == EINTR)
-            {
-                continue;
-            }
-            return 1;
-        }
-        if (rv == 0)
-        {
-            if (want_write || drain_to_eof)
-            {
-                continue; /* keep waiting (for write slot or flushed output) */
-            }
-            return 0; /* nothing more to read right now */
-        }
-        if (in_slot >= 0 && (pfd[in_slot].revents & (POLLOUT | POLLERR | POLLHUP)))
-        {
-            if (pfd[in_slot].revents & (POLLERR | POLLHUP))
-            {
-                return 1;
-            }
-            if (feed_vmsplice(self) != 0)
-            {
-                return 1;
-            }
-        }
-        drain_stderr(self);
-        dr = drain_stdout(self);
-        if (dr == -1)
-        {
-            return 1;
-        }
-        if (dr == -2)
-        {
-            return 2;
-        }
-        if (!want_write && dr == 0 && !drain_to_eof)
-        {
-            return 0; /* input flushed and output drained */
+            return 0;         /* input flushed and output drained */
         }
     }
 }
@@ -1128,6 +1316,35 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
+    if (self->cfg.aux_ltr_chain)
+    {
+        /* EXPERIMENTAL FR-H264-8 + #45 step 5: both children encode
+         * normal refs=1 chains and are driven as ONE poll set, so the
+         * two views of a pair are encoded concurrently by this single
+         * thread; both views' slice headers are then rewritten into ONE
+         * shared frame_num chain with per-view long-term slots.
+         * The synchronous per-pair API is kept for every existing
+         * caller: it is submit + pump(set of 1 handle) + collect. */
+        struct xrdp_ffmpeg_avc444 *handles[1];
+        int bad_handle;
+        int kids_armed;
+
+        st = xrdp_ffmpeg_avc444_submit_pair(self, main_nv12, aux_nv12,
+                                            nv12_size, desktop_sequence);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            return st;
+        }
+        handles[0] = self;
+        st = xrdp_ffmpeg_avc444_pump_pairs(handles, 1, &bad_handle,
+                                           &kids_armed);
+        if (st != XRDP_FFMPEG_PAIR_READY)
+        {
+            return st;
+        }
+        return xrdp_ffmpeg_avc444_collect_pair(self, desktop_sequence,
+                                               result);
+    }
     if (self->cfg.aux_intra_leaf)
     {
         /* reference partitioning: the main child sees ONLY main frames
@@ -1243,6 +1460,260 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
 }
 
 /*****************************************************************************/
+/* #45 step 5 -- SUBMIT half of the aux_ltr_chain pair: queue this pair's
+ * two pictures into the two children's input iovecs. Nothing is written
+ * to a pipe here; the write happens inside the shared poll set, which is
+ * what lets 2m children be fed concurrently by one thread. The pointers
+ * are BORROWED (capture shmem, FR-PROC-6) and must stay valid until the
+ * matching collect returns. */
+int
+xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
+                               const unsigned char *main_nv12,
+                               const unsigned char *aux_nv12,
+                               int nv12_size,
+                               unsigned long long desktop_sequence)
+{
+    if (self == NULL || main_nv12 == NULL || aux_nv12 == NULL ||
+            nv12_size != self->nv12_size || self->flushing ||
+            !self->cfg.aux_ltr_chain || self->leaf == NULL)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (self->ltr.started && self->ltr.frame_num >= (1 << 16) - 8)
+    {
+        /* backstop only: the caller must have re-keyed on
+         * rekey_pending long before the counter can reach the wrap a
+         * per-view decoder cannot survive (measured, see
+         * xrdp_h264_annexb.h) */
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain frame_num "
+            "%d at wrap backstop; forcing encoder restart",
+            self->ltr.frame_num);
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (in_iov_push(self, main_nv12, nv12_size) != 0 ||
+            seq_push(self, desktop_sequence) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    self->pairs_submitted++;
+    self->trace_out_seen = 0;
+    if (in_iov_push(self->leaf, aux_nv12, nv12_size) != 0 ||
+            seq_push(self->leaf, desktop_sequence) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    self->leaf->pairs_submitted++;
+    self->leaf->trace_out_seen = 0;
+    return XRDP_FFMPEG_PAIR_READY;
+}
+
+/*****************************************************************************/
+/* #45 step 5 -- drive every submitted handle's children as ONE poll set
+ * until each handle has both of its pictures, or the ONE shared deadline
+ * expires (D3). n_handles is 1 for a single monitor and m for a batched
+ * set, so the armed child count is 2m -- the E4 quantity, reported in
+ * *kids_armed for the caller to assert and log.
+ * On failure *bad_handle names the handle whose child failed: tearing
+ * down the wrong one would leave a monitor encoding into a dead child. */
+int
+xrdp_ffmpeg_avc444_pump_pairs(struct xrdp_ffmpeg_avc444 **handles,
+                              int n_handles, int *bad_handle,
+                              int *kids_armed)
+{
+    struct xrdp_ffmpeg_avc444 *kids[FF_PUMP_MAX_KIDS];
+    int owner[FF_PUMP_MAX_KIDS];
+    long long deadline;
+    int nkids;
+    int ready;
+    int quiet;
+    int bad_kid;
+    int st;
+    int i;
+
+    if (handles == NULL || n_handles < 1 || bad_handle == NULL ||
+            kids_armed == NULL)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    *bad_handle = -1;
+    *kids_armed = 0;
+    nkids = 0;
+    for (i = 0; i < n_handles; i++)
+    {
+        if (handles[i] == NULL || handles[i]->leaf == NULL ||
+                !handles[i]->cfg.aux_ltr_chain)
+        {
+            *bad_handle = i;
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        if (nkids + 2 > FF_PUMP_MAX_KIDS)
+        {
+            *bad_handle = i;
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        owner[nkids] = i;
+        kids[nkids++] = handles[i];
+        owner[nkids] = i;
+        kids[nkids++] = handles[i]->leaf;
+    }
+    *kids_armed = nkids;
+    /* ONE deadline for the whole set (D3): a per-child budget would cost
+     * n x pair_timeout_ms whenever one child stalls */
+    deadline = now_ms() + handles[0]->cfg.pair_timeout_ms;
+    for (;;)
+    {
+        ready = 1;
+        for (i = 0; i < n_handles; i++)
+        {
+            if (pk_available(handles[i]) < 1 ||
+                    pk_available(handles[i]->leaf) < 1)
+            {
+                ready = 0;
+            }
+        }
+        if (ready)
+        {
+            return XRDP_FFMPEG_PAIR_READY;
+        }
+        if (now_ms() >= deadline)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: submitted set of %d "
+                "children not returned within %d ms (encoder pipeline "
+                "too deep? use -async_depth 1 / -tune zerolatency); "
+                "restarting encoder", nkids,
+                handles[0]->cfg.pair_timeout_ms);
+            handles[0]->metrics.timeouts++;
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        st = pump_set(kids, nkids, deadline, &quiet, &bad_kid);
+        if (st != 0)
+        {
+            if (bad_kid >= 0 && bad_kid < nkids)
+            {
+                *bad_handle = owner[bad_kid];
+            }
+            else
+            {
+                *bad_handle = 0;
+            }
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+    }
+}
+
+/*****************************************************************************/
+/* #45 step 5 -- COLLECT half: pop this handle's two pictures, rewrite
+ * both views into the shared LTR chain and hand back the pair. The
+ * borrowed-pointer contract (FR-PROC-6) is re-checked per child here,
+ * which is the point at which the caller may release the capture slot. */
+int
+xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
+                                unsigned long long desktop_sequence,
+                                struct xrdp_avc444_encoded_pair *result)
+{
+    struct xrdp_avc444_encoded_pair ltr_result;
+    int budget;
+
+    if (self == NULL || result == NULL || self->leaf == NULL ||
+            !self->cfg.aux_ltr_chain)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (in_iov_pending(self) || in_iov_pending(self->leaf))
+    {
+        /* output implies the child consumed its input; borrowed
+         * segments must never outlive this call (FR-PROC-6) */
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: input not fully spliced at "
+            "pair return; restarting encoder");
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (pk_available(self) < 1 || pk_available(self->leaf) < 1)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (pop_single(self, result) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (result->desktop_sequence != desktop_sequence)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: pair sequence mismatch "
+            "(got %llu want %llu); restarting encoder",
+            (unsigned long long)result->desktop_sequence,
+            (unsigned long long)desktop_sequence);
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    budget = xrdp_h264_ltr_growth_budget(self->main_buf, self->main_len);
+    if (grow(&self->main_buf, &self->main_cap,
+             self->main_len + budget) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (xrdp_h264_ltr_rewrite_main(self->main_buf, &self->main_len,
+                                   self->main_cap, &self->ltr) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain main "
+            "rewrite failed; refusing to ship the pair");
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    result->main_data = self->main_buf;
+    result->main_len = self->main_len;
+    /* #45 step 4: there is no aux respawn here any more. A main-view cut
+     * no longer empties the DPB, so LT1 cannot go missing mid-chain; if
+     * it ever does, the aux rewrite below refuses the packet ("aux P
+     * with LT1 unseeded") and the pair fails loudly. Respawning the aux
+     * child instead would restart that child's frame index while the
+     * main child keeps counting, de-phasing the shared schedule -- one
+     * fault made permanent. */
+    if (pop_single(self->leaf, &ltr_result) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    if (ltr_result.desktop_sequence != desktop_sequence)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux picture sequence "
+            "mismatch (got %llu want %llu); restarting encoder",
+            (unsigned long long)ltr_result.desktop_sequence,
+            (unsigned long long)desktop_sequence);
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    budget = xrdp_h264_ltr_growth_budget(ltr_result.main_data,
+                                         ltr_result.main_len);
+    if (grow(&self->aux_buf, &self->aux_cap,
+             ltr_result.main_len + budget) != 0)
+    {
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    memcpy(self->aux_buf, ltr_result.main_data, ltr_result.main_len);
+    self->aux_len = ltr_result.main_len;
+    if (xrdp_h264_ltr_rewrite_aux(self->aux_buf, &self->aux_len,
+                                  self->aux_cap, &self->ltr) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain aux "
+            "rewrite failed; refusing to ship the pair");
+        return XRDP_FFMPEG_PAIR_ERROR;
+    }
+    result->aux_data = self->aux_buf;
+    result->aux_len = self->aux_len;
+    if (self->ltr.frame_num >= self->cfg.ltr_rekey_frame_num &&
+            !self->rekey_pending)
+    {
+        /* re-key BEFORE the shared counter can wrap (a per-view
+         * decoder silently stops at a frame_num wrap -- measured,
+         * xrdp_h264_annexb.h). The CURRENT pair still ships (its
+         * damage must not be lost); the caller polls
+         * xrdp_ffmpeg_avc444_rekey_pending() after shipping and
+         * rebuilds the encoder, so the NEXT frame is a fresh IDR.
+         * Roughly once an hour of continuous encoding. */
+        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_ltr_chain frame_num "
+            "%d reached the re-key threshold %d; re-key requested",
+            self->ltr.frame_num, self->cfg.ltr_rekey_frame_num);
+        self->rekey_pending = 1;
+    }
+    return XRDP_FFMPEG_PAIR_READY;
+}
+
+/*****************************************************************************/
 int
 xrdp_ffmpeg_avc444_encode_single(struct xrdp_ffmpeg_avc444 *self,
                                  const unsigned char *nv12,
@@ -1343,7 +1814,9 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
         }
         self->flushing = 1;
     }
-    if (pk_available(self) < (self->cfg.aux_intra_leaf ? 1 : 2))
+    if (pk_available(self) <
+            ((self->cfg.aux_intra_leaf || self->cfg.aux_ltr_chain)
+             ? 1 : 2))
     {
         st = pump(self, now_ms() + self->cfg.pair_timeout_ms, 1);
         if (st == 1)
@@ -1351,15 +1824,35 @@ xrdp_ffmpeg_avc444_flush_next(struct xrdp_ffmpeg_avc444 *self,
             return XRDP_FFMPEG_PAIR_ERROR;
         }
     }
-    if (self->cfg.aux_intra_leaf)
+    if (self->cfg.aux_intra_leaf || self->cfg.aux_ltr_chain)
     {
-        /* the main child holds single pictures in leaf mode; the leaf
-         * child is synchronous per call and never has a tail */
+        /* the main child holds single pictures in leaf/LTR mode; the
+         * aux child is synchronous per call and never has a tail */
         if (pk_available(self) >= 1)
         {
             if (pop_single(self, result) != 0)
             {
                 return XRDP_FFMPEG_PAIR_ERROR;
+            }
+            if (self->cfg.aux_ltr_chain)
+            {
+                /* a tail main picture must still join the shared
+                 * chain -- never ship an unrewritten frame_num */
+                int budget;
+
+                budget = xrdp_h264_ltr_growth_budget(self->main_buf,
+                                                     self->main_len);
+                if (grow(&self->main_buf, &self->main_cap,
+                         self->main_len + budget) != 0 ||
+                        xrdp_h264_ltr_rewrite_main(self->main_buf,
+                                                   &self->main_len,
+                                                   self->main_cap,
+                                                   &self->ltr) != 0)
+                {
+                    return XRDP_FFMPEG_PAIR_ERROR;
+                }
+                result->main_data = self->main_buf;
+                result->main_len = self->main_len;
             }
             return XRDP_FFMPEG_PAIR_READY;
         }
@@ -1389,12 +1882,71 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     {
         return NULL;
     }
+    if (cfg->aux_ltr_chain &&
+            (cfg->fault_aux_delay || cfg->fault_strip_mmco))
+    {
+        /* the LTR path never runs pop_pair (fault_aux_delay) and
+         * replaces all marking (fault_strip_mmco): the diagnostics
+         * would be silently inert, and a bisect arm run with them
+         * would report a green result that means nothing */
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain is not "
+            "compatible with fault_aux_delay/fault_strip_mmco "
+            "(diagnostic would be silently inert); refusing to start");
+        return NULL;
+    }
     self = (struct xrdp_ffmpeg_avc444 *)g_malloc(sizeof(*self), 1);
     if (self == NULL)
     {
         return NULL;
     }
     self->cfg = *cfg;
+    if (self->cfg.ltr_rekey_frame_num < XRDP_H264_LTR_FRAME_NUM_REKEY_MIN ||
+            self->cfg.ltr_rekey_frame_num >
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MAX)
+    {
+        /* out of range is CLAMPED, never honoured: above the max a
+         * decoder would meet the frame_num wrap the re-key exists to
+         * prevent (BACKLOG #48) */
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: ltr_rekey_frame_num %d out "
+            "of range [%d,%d]; clamped", self->cfg.ltr_rekey_frame_num,
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MIN,
+            XRDP_H264_LTR_FRAME_NUM_REKEY_MAX);
+        self->cfg.ltr_rekey_frame_num =
+            self->cfg.ltr_rekey_frame_num < XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
+            ? XRDP_H264_LTR_FRAME_NUM_REKEY_MIN
+            : XRDP_H264_LTR_FRAME_NUM_REKEY_MAX;
+    }
+    if (self->cfg.intra_refresh_frames <
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+            self->cfg.intra_refresh_frames >
+            XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: intra_refresh_frames %d out "
+            "of range [%d,%d]; clamped", self->cfg.intra_refresh_frames,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MAX);
+        self->cfg.intra_refresh_frames =
+            self->cfg.intra_refresh_frames <
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            ? XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            : XRDP_H264_INTRA_REFRESH_FRAMES_MAX;
+    }
+    /* the schedule reaches BOTH children through this runner-internal
+     * field: the aux child's config has aux_ltr_chain cleared, so
+     * build_argv cannot key off that flag, and a schedule on the main
+     * child alone would de-phase the pair. spawn_second_child copies it
+     * verbatim. */
+    if (self->cfg.aux_ltr_chain)
+    {
+        self->cfg.intra_refresh_schedule = self->cfg.intra_refresh_frames;
+    }
+    /* else: keep whatever the caller set. The aux child is created with
+     * aux_ltr_chain cleared and the schedule already filled in by
+     * spawn_second_child; recomputing it here would silently unschedule
+     * exactly one of the two children. */
+    /* the rewriter checks OBSERVED against REQUESTED with the same
+     * number the children were spawned with -- one source of truth */
+    self->ltr.refresh_period = self->cfg.intra_refresh_schedule;
     self->in_fd = -1;
     self->out_fd = -1;
     self->err_fd = -1;
@@ -1416,7 +1968,9 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
         g_free(self);
         return NULL;
     }
-    if (spawn_child(cfg, self->coded_width, self->coded_height,
+    /* &self->cfg, not cfg: the clamps above and the schedule field are
+     * what must reach the argv */
+    if (spawn_child(&self->cfg, self->coded_width, self->coded_height,
                     &self->in_fd, &self->out_fd, &self->err_fd,
                     &self->pid) != 0)
     {
@@ -1427,31 +1981,53 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: spawned ffmpeg pid %d coded %dx%d "
         "generation %llu", self->pid, self->coded_width, self->coded_height,
         (unsigned long long)self->generation);
-    if (cfg->aux_intra_leaf)
+    if (cfg->aux_intra_leaf || cfg->aux_ltr_chain)
     {
-        /* second child for the aux view: same encoder block, every frame
-         * forced IDR; its packets are rewritten into non-reference I
-         * leaves by encode_pair. Diagnostic/rewrite knobs are cleared --
-         * the leaf rewrite drops the aux SPS/PPS/SEI itself. */
-        struct xrdp_ffmpeg_avc444_config leaf_cfg = *cfg;
-        static const char *const extra[] =
+        if (spawn_second_child(self) != 0)
         {
-            "-forced-idr", "1", "-force_key_frames", "expr:gte(t,0)"
-        };
-        int i;
+            xrdp_ffmpeg_avc444_delete(self);
+            return NULL;
+        }
+    }
+    return self;
+}
 
-        leaf_cfg.aux_intra_leaf = 0;
-        leaf_cfg.fault_aux_delay = 0;
-        leaf_cfg.fault_strip_mmco = 0;
-        leaf_cfg.sanitize_hrd = 0;
-        leaf_cfg.strip_pic_struct = 0;
-        leaf_cfg.strip_sei = 0;
+/*****************************************************************************/
+/* spawn the second (aux-view) child: all-IDR for the leaf architecture
+ * (FR-H264-7), a normal refs chain with the SAME scheduled paired
+ * refresh as the main child for the LTR aux-chain (FR-H264-8). Called
+ * exactly once per encoder, at create: there is no aux respawn any more
+ * (#45 step 4 -- a scheduled refresh no longer empties the DPB, so LT1
+ * never needs re-seeding mid-stream).
+ * Diagnostic/rewrite knobs are cleared -- the rewrites drop the aux
+ * SPS/PPS/SEI themselves. */
+static int
+spawn_second_child(struct xrdp_ffmpeg_avc444 *self)
+{
+    struct xrdp_ffmpeg_avc444_config leaf_cfg = self->cfg;
+    static const char *const extra[] =
+    {
+        "-forced-idr", "1", "-force_key_frames", "expr:gte(t,0)"
+    };
+    int i;
+
+    leaf_cfg.aux_intra_leaf = 0;
+    leaf_cfg.aux_ltr_chain = 0;
+    leaf_cfg.fault_aux_delay = 0;
+    leaf_cfg.fault_strip_mmco = 0;
+    leaf_cfg.sanitize_hrd = 0;
+    leaf_cfg.strip_pic_struct = 0;
+    leaf_cfg.strip_sei = 0;
+    /* the identical frame-indexed schedule (step 2): 1:1 pairing means
+     * a cut must land on the same picture ordinal in both views */
+    leaf_cfg.intra_refresh_schedule = self->cfg.intra_refresh_schedule;
+    if (!self->cfg.aux_ltr_chain)
+    {
         if (leaf_cfg.encoder_args.count + 4 > XRDP_AVC444_MAX_ENC_ARGS)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: no room to append the "
                 "aux_intra_leaf forced-IDR args");
-            xrdp_ffmpeg_avc444_delete(self);
-            return NULL;
+            return 1;
         }
         for (i = 0; i < 4; i++)
         {
@@ -1460,19 +2036,29 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
                       extra[i], XRDP_AVC444_ENC_ARG_LEN - 1);
         }
         leaf_cfg.encoder_args.count += 4;
-        self->leaf = xrdp_ffmpeg_avc444_create(&leaf_cfg, actual_width,
-                                               actual_height);
-        if (self->leaf == NULL)
-        {
-            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf child "
-                "failed to start");
-            xrdp_ffmpeg_avc444_delete(self);
-            return NULL;
-        }
-        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: aux_intra_leaf active (aux "
-            "child pid %d)", self->leaf->pid);
     }
-    return self;
+    self->leaf = xrdp_ffmpeg_avc444_create(&leaf_cfg, self->actual_width,
+                                           self->actual_height);
+    if (self->leaf == NULL)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux child failed to start");
+        return 1;
+    }
+    LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: %s active (aux child pid %d)",
+        self->cfg.aux_ltr_chain ? "aux_ltr_chain (EXPERIMENTAL)"
+        : "aux_intra_leaf", self->leaf->pid);
+    return 0;
+}
+
+/*****************************************************************************/
+/* aux_ltr_chain: the shared frame_num counter is near its wrap; the
+ * caller must delete and recreate the encoder AFTER shipping the
+ * current pair (never before -- the triggering frame's damage would
+ * be lost, the stuck-last-frame class) */
+int
+xrdp_ffmpeg_avc444_rekey_pending(struct xrdp_ffmpeg_avc444 *self)
+{
+    return self != NULL ? self->rekey_pending : 0;
 }
 
 /*****************************************************************************/
@@ -1526,6 +2112,7 @@ xrdp_ffmpeg_avc444_delete(struct xrdp_ffmpeg_avc444 *self)
     }
     xrdp_ffmpeg_avc444_delete(self->leaf);
     self->leaf = NULL;
+    xrdp_h264_ltr_state_free(&self->ltr);
     if (self->in_fd >= 0)
     {
         close(self->in_fd);
@@ -1672,6 +2259,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     long long last_pts = -1;
     enum xrdp_ffmpeg_probe_result res = XRDP_FFMPEG_PROBE_OK;
     const char *why = "";
+    struct xrdp_h264_ltr_state ltr_m;
+    struct xrdp_h264_ltr_state ltr_a;
     char errline[FF_PROBE_ERRLINE];
     int errline_len = 0;
     int child_status = -1;
@@ -1684,6 +2273,8 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
             "absolute or coded size below 16");
         return XRDP_FFMPEG_PROBE_BAD_CONFIG;
     }
+    memset(&ltr_m, 0, sizeof(ltr_m));
+    memset(&ltr_a, 0, sizeof(ltr_a));
     nv12_size = coded_width * coded_height + coded_width * (coded_height / 2);
     total = 4 * nv12_size;
     blob = (unsigned char *)malloc(total);
@@ -1867,6 +2458,57 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
                     why = "follow-up packet lacks a VCL NAL";
                     fail = 1;
                     break;
+                }
+                if (cfg->aux_ltr_chain)
+                {
+                    /* FR-H264-8: exercise BOTH LTR rewriters on the
+                     * probe packets. The LTR guard is strictly harder
+                     * than the leaf checks (CABAC, poc_type 2, no
+                     * weighted pred, level DPB budget...); a shape it
+                     * rejects must fail HERE, at the probe, never as
+                     * a per-frame encoder respawn loop live. */
+                    int blen = pkt.len;
+                    int bcap = pkt.len +
+                               xrdp_h264_ltr_growth_budget(pkt.data,
+                                                           pkt.len);
+                    unsigned char *scratch =
+                        (unsigned char *)malloc(bcap);
+
+                    if (scratch == NULL)
+                    {
+                        res = XRDP_FFMPEG_PROBE_STREAM_ERROR;
+                        why = "out of memory";
+                        fail = 1;
+                        break;
+                    }
+                    memcpy(scratch, pkt.data, pkt.len);
+                    if (xrdp_h264_ltr_rewrite_main(scratch, &blen,
+                                                   bcap, &ltr_m) != 0)
+                    {
+                        free(scratch);
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "aux_ltr_chain guard rejects this "
+                              "encoder's stream shape (needs CABAC, "
+                              "poc_type 2, refs=1, no weighted pred, "
+                              "level with a 3-frame DPB budget)";
+                        fail = 1;
+                        break;
+                    }
+                    ltr_a.main_cache = ltr_m.main_cache;
+                    blen = pkt.len;
+                    memcpy(scratch, pkt.data, pkt.len);
+                    if (xrdp_h264_ltr_rewrite_aux(scratch, &blen,
+                                                  bcap, &ltr_a) != 0)
+                    {
+                        free(scratch);
+                        res = XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+                        why = "aux_ltr_chain guard rejects this "
+                              "encoder's stream shape on the aux "
+                              "rewrite path";
+                        fail = 1;
+                        break;
+                    }
+                    free(scratch);
                 }
                 got++;
                 if (got >= 4)

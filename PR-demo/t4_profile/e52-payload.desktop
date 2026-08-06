@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=E5-2 benchmark payload
+Comment=Starts the BACKLOG #52 frame-interval payload when /etc/xrdp-e52-payload is armed; exits immediately otherwise
+Exec=/usr/local/bin/e52_payload.sh
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

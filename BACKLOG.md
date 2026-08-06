@@ -1,2198 +1,1902 @@
 # BACKLOG
 
-Transparent, in-tree task backlog. One item per reviewable unit of work.
-Status values: `TODO` / `IN PROGRESS` / `BLOCKED` / `DONE`.
+**What this file is:** the open work list. Nothing else.
 
-Only **upcoming** work lives here. Completed work is recorded in `PRD.md` §25
-("Delivered"), with detailed root-cause writeups under `tests/xrdp/avc444/`.
+**What it is not:** a lab notebook. Persistent decisions, contracts,
+invariants, measured performance baselines and acceptance evidence live in
+`PRD.md`; operational procedure lives in `DEPLOY_RUNBOOK.md`; working rules
+live in `CLAUDE.md`. Incident narratives and campaign logs live in **git
+history** — that is what it is for. If an entry here is still true after the
+task closes, it belonged in the PRD; move it and delete it from here.
 
-See `CLAUDE.md` for the rules; `build_config.md` / `dev_config.md` /
-`normal_config.md` for the build, package and test-env procedures.
+Rewritten 2026-07-28 (3268 lines) and again **2026-08-01 (1923 lines)** —
+it drifts back into a lab notebook every time, so the rule is restated
+plainly: **an entry here is an OPEN question, its justification, and a
+pointer.** Conditions, tables, anomalies and retractions from finished
+work belong in `docs/experiments/`; durable contracts and baselines in
+`PRD.md`; procedure in `DEPLOY_RUNBOOK.md`; narrative in git history.
+Capture evidence stays with its capture, under
+`PR-demo/mac_bisect_matrix/captures/<run>/README.md`.
+
+If you are about to paste a results table into this file, it goes in
+`docs/experiments/` and you leave a line here saying what it decided.
 
 ---
 
-## AVC444 splicable capture: wire-format views from xorgxrdp + vmsplice-only feed — DEPLOYED to T4 (2026-07-26), awaiting owner onscreen perf verdict
+## Deployed state (2026-08-01)
 
-**Perf regression in the first-cut packers — FIXED (2026-07-26, same
-day).** Owner observed Xorg at 50-70% of a core, cost proportional to
-damage size. `tools/avc444_pack_bench.c` (new, checked in; offline, old
-vs scalar vs vectorized verbatim copies) quantified it: the scalar
-first-cut (`75c1928`) cost ~7x the old vectorized planar loop per pixel
-(T4 full-4K 49.4 ms/frame). Root causes: per-sample helper calls with
-clamp branches, U/V double-decode, missing RDP_VECTORIZE. Fixed by the
-row-decode restructure (`e7ecf30`, PRD FR-CAPTURE-7): T4 full-4K 19.2 ms,
-2000x1000 drag rect 4.3 ms, 500x200 0.19 ms. Gates re-run on the dev box
-(burr single+dual NO residual, SMOKE PASS) and deb deployed to T4
-(sha256 4e0563c5…). Damage-proportional cost itself is by design
-(rect-limited packing); the constant was the bug.
-
-**Amdahl checkpoint (2026-07-26, owner-directed profile before further
-loop tuning).** New harness `PR-demo/t4_profile/profile_drag.sh` (real
-T4 AVC444/nvenc session as throwaway `tester`, scripted 2000x1000
-xdotool drag on the 4K screen, perf on the session Xorg). Result: the
-bottleneck HAS shifted — process split during drag: ffmpeg ~21-27%,
-Xorg ~18%, xrdp ~13-15% of a core (none saturated under the scripted
-~50 moves/s load). Inside Xorg: pack loops 36.5% + vectorized
-avc444_decode_row.avx2 17.8% (AVX2 clone confirmed selected) + fbBlt
-window-move blit 12.2% (X core, not ours) + glyph drawing 2.9%.
-Implications: (a) further pack-loop vectorization can reclaim at most
-~1/3 of Xorg's 18% ≈ 6pp of a core — diminishing; (b) the largest
-single consumer is now the ffmpeg child's INPUT side (pipe read =
-27.6 MB/frame kernel-to-user copy + rawvideo framing + nvenc upload) —
-the high-leverage next step is sending FEWER BYTES, i.e. the planned
-LC=1/LC=2 reframe (skip the aux view when chroma is unchanged), which
-halves encoder input AND is the Mac-compat prerequisite; (c) xrdp's
-13-15% is vmsplice page-ref + NUT demux kernel time — structural,
-small. Owner observation of Xorg near a full core likely includes xfce
-compositor damage amplification (tester harness runs WM-less); verify
-against the owner's xfce session when they retest. T4 config changes
-for the harness, both reversible and recorded: `tester` user (cred in
-root-only /root/.tester_cred on the T4), /etc/xrdp/wm1.sh now lets
-non-ubuntu users exec ~/.xsession (backup wm1.sh.bak-profile; ubuntu
-path unchanged).
-
-**Owner-load profile (2026-07-26, Thunar 2500x1800 circular trace in the
-real xfce session, compositing=true, dual-monitor, driven via xdotool in
-the owner's :10).** Process split: Xorg 40-47%, ffmpeg 21-24% (two
-children, one per monitor), xrdp 10-14% — nothing saturated post-e7ecf30.
-Inside Xorg: pack loops 37.9% + avc444_decode_row.avx2 17.2% (conversion
-= 55%, same ratio as the WM-less run), xfwm compositor rendering via
-rdpComposite/pixman 10.3%, window-move blit rdpCopyArea 6.9%. The Xorg
-delta vs the WM-less harness (46% vs 18%) tracks the damage area (2.25x
-window) plus the compositor's own rendering — no new mystery component.
-Priority order that follows: (1) LC=1/LC=2 reframe — during motion it
-skips the aux view end-to-end (aux pack in Xorg, vmsplice, ffmpeg pipe
-read, nvenc input), the single biggest cross-cutting win and the Mac
-prerequisite; (2) pack-loop vectorization (~10pp of a core under the
-real load); (3) optionally disable xfwm compositing on the T4 (~10pp,
-cosmetic tradeoff, owner's call).
-
-**Lever accounting in consistent units (pp of ONE core, under the
-owner reference load above; harness:
-`PR-demo/t4_profile/profile_owner_load.sh`).** Baseline: Xorg ~46
-(pack loops 17.4 / decode.avx2 7.9 / compositor render 4.7 / move blit
-3.2 / rest ~12.8), ffmpeg x2 ~22, xrdp ~13 — pipeline total ~81.
-- Lever 1, vectorize the pack loops: pack is ~69% of conversion (bench:
-  decode 6.9ms vs pack 12.3ms full-4K; perf agrees 37.9 vs 17.2). A
-  proper shuffle implementation cuts it ~60-70% -> SAVES ~10-12pp.
-  Floor: the 7.9pp decode is already vector-optimal.
-- Lever 2, LC=1/LC=2 motion-time aux skip: removes the aux view
-  end-to-end during motion (Xorg aux pack ~9-10pp + chroma decode ~3pp;
-  ffmpeg input/pictures halve ~8-10pp; xrdp splice bytes halve ~3-4pp)
-  -> SAVES ~22-26pp across the pipeline, halves wire bandwidth, and is
-  the macOS prerequisite. Costs: chroma catch-up bursts off the
-  interactive path; 4:2:0 during motion only (Windows-identical).
-- Lever 3, compositing off: 4.7pp direct + ~2-3pp damage-halo ripple ->
-  SAVES ~6-8pp; zero engineering, cosmetic tradeoff, reversible.
-- Interaction: lever 2 removes the aux portion of the work lever 1
-  vectorizes; done after lever 2, lever 1's remaining value is ~5-6pp.
-  Both together: motion-time conversion ~25pp -> ~9pp, pipeline ~81 ->
-  ~45pp (before compositor).
-
-**Owner-decided order (2026-07-26): implement Lever 1 FIRST, then
-Lever 2.** (Recorded: with this order lever 1 realizes its full
-10-12pp immediately; lever 2 then subsumes the aux share.)
-**Order updated (2026-07-26, after the frame accounting + design
-review): Lever 1 DONE -> Lever 4B -> Lever 2 (preemptive-aux form).**
-4B became a hard prerequisite: Lever 2's preemption signal only
-exists once capture overlaps encode (PRD FR-PROC-7 §2).
-
-## Lever 1: vectorize the AVC444 pack loops — DONE (owner-load profile confirms; 2026-07-26)
-
-**Result (xorgxrdp `ee1ec01`).** Clamps hoisted into replicated
-row-buffer tails, aux pack split into single-output-stream flat loops,
-RDP_VECTORIZE on the fused function. Bench: T4 full-4K conversion
-19.24 -> 8.74 ms/frame (pure-decode floor 6.70), 2000x1000 drag rect
-4.27 -> 1.64 ms — beats the 10-12pp estimate (~15pp of a core under
-the owner load, projected). Gates: dev-box burr single+dual NO
-residual (bit-parity oracle), SMOKE PASS; deb sha256 9a7f0b6a…
-installed on T4.
-
-**Acceptance run (2026-07-26, owner attached, Thunar 2500x1800 orbit
-fully on the bottom 4K monitor).** Pack loops **17.4pp -> 3.2pp** of a
-core (~14pp returned, beats estimate); decode.avx2 steady at ~7.7pp
-(untouched, as expected). Xorg total ~44pp but NOT comparable to the
-~46pp baseline: the saved cycles were reinvested as throughput — the
-same 400-move trace that filled the baseline window now drains in
-<15s (~30 moves/s vs ~13, roughly 2x frame rate), and the window sat
-fully on the 4K monitor (baseline orbit straddled both monitors), so
-pixman composite (~11pp) and blt (~13pp) grew with the extra frames.
-Per-second CPU flat, per-frame cost halved, drag visibly smoother.
-Post-lever-1 Xorg profile is now dominated by compositor/blit (~24pp
-combined) — strengthens Lever 3's case after Lever 2.
-
-Restructure the pack half of `a8r8g8b8_to_avc444_box` (xorgxrdp) into
-branchless/SIMD-friendly shuffle loops per PRD FR-CAPTURE-7, targeting
-~60-70% pack-cost reduction (~10-12pp of a core under the owner load;
-T4 full-4K conversion 19.2ms -> ~10ms). Gate with
-`tools/avc444_pack_bench.c` (extend with the new variant) BEFORE
-deploying; then dev-box burr harness (parity) + smoke; then T4 deb +
-`PR-demo/t4_profile/profile_owner_load.sh` re-run for the
-user-acceptance number.
-
-## End-to-end frame accounting — DONE (2026-07-26); fps ceiling root-caused
-
-Owner challenge: drag still feels <10fps post-lever-1; cpu% is the
-wrong unit for delivered-fps accounting, and the "network can't catch
-up" hypothesis needed validation. Built
-`PR-demo/t4_profile/frame_accounting.sh`: uprobes on the DEPLOYED
-binaries (capture entry / encode entry+return / wire send / xup ack /
-client GFX ack with arg values) + per-second `ss -ti` on the RDP
-socket. No restart, no redeploy.
-
-**Result (owner load, dual-mon, nvenc):** 20.1 fps in exact lockstep
-at every stage — zero drops anywhere. Client `queue_depth=0` on every
-ack (decoder idle). Network REFUTED as bottleneck with data: ~8 Mbit/s
-used of ~98 Mbit/s measured delivery rate, Send-Q ~0, rtt 17ms flat,
-0 retrans in-window. Cycle partition (p50):
-5.6ms capture+pack -> **30.1ms synchronous encode_pair** (p90 47.5;
-main+aux = TWO full-4K nvenc encodes serially through one ffmpeg,
-~24MB piped per frame) -> <1ms send -> ~5ms ack-to-next-capture.
-Frame period p50 ~50ms, p90 61ms. The pipeline is fully SERIAL:
-capture cannot overlap encode because the single shmem buffer is
-borrowed by the encoder for the whole synchronous call (FR-PROC-6),
-and the xup ack that frees capture fires only at encode return.
-fif=2 send-time module ack verified working — it is not the limiter.
-"Feels <10fps": p90 period 61ms + 2-3 mouse steps coalesced per frame.
-
-Consequences for lever order (updated after design review — final
-order: 4B then 2):
-- **Lever 2 (preemptive aux) is the fps lever, not just a cpu lever**:
-  skipping the aux encode during motion halves the dominant 30ms term.
-  Its preemptive form (PRD FR-PROC-7, no idle heuristic) requires 4B
-  first — see the dedicated items below.
-- **Lever 4B: two-slot pipelined capture** — design analysis DONE,
-  grounded in code; see the dedicated item below and PRD FR-CAPTURE-8.
-  (Supersedes the earlier loose "lever 4" sketch: no slot-tagged acks,
-  no ack-protocol change, zero xrdp code change.)
-- Also worth a look inside the 30ms: nvenc 2x4K should be ~16ms; the
-  remainder is pipe transport + ffmpeg demux framing. Profile the
-  ffmpeg side before assuming nvenc is saturated.
-- **REJECTED (closed thread, do not re-propose): main||aux in two
-  encoder processes.** PRD §6.5: both sub-streams must come from the
-  SAME encoder and decode as ONE stream ("never ... one FFmpeg process
-  for main and another for auxiliary"). Ground truth
-  (`vm/GROUND_TRUTH_win2022_avc444.md`): one SPS/IDR per session, all
-  views P-slices on a single shared reference chain / frame_num
-  sequence. Two encoders = two chains interleaved into the client's
-  single decoder = P-reference desync garbage, plus duplicate SPS
-  (the Mac-black class the exactly-one-SPS bound exists to prevent).
-
-## Lever 2: preemptive aux (LC=1/LC=2, no idle heuristic) — TODO, ORDERED AFTER Lever 4B (owner decision 2026-07-26)
-
-Contract: PRD FR-PROC-7 (supersedes NG-6's deferral; replaces the
-earlier "aux skip + idle-timer catch-up" sketch — owner rejected any
-baked-in idle heuristic). During motion, frames go out `LC=1`
-(main only); aux chroma is scheduled by **preemption**: after main N,
-the encoder thread's existing fifo pop either finds main N+1 (aux N
-preempted — N+1's aux is fresher) or finds nothing (aux N encodes NOW
-from the already-captured slot, sent as `LC=2`). Aux always eventually
-lands; the only thing that can displace it is a newer main.
-
-**Why after 4B (hard prerequisite, not preference):** the preemption
-signal is "successor present in the fifo at pop time", which only
-exists when capture overlaps encode (two slots). On the serial
-pipeline the producer is ack-gated behind the encoder, the fifo is
-always empty at pop time, and any workaround is an ack-RTT wait — an
-idle timer in disguise (PRD FR-PROC-7 §2 forbids it).
-
-**Scope shrunk to xrdp-only:** capture contract UNCHANGED — xorgxrdp
-keeps packing both views (post-lever-1 aux pack share ~1pp, noise);
-the win is the aux ENCODE (~half the 30ms term) + aux WIRE bytes
-(~half). Plus the 4B interaction: rect N's xup ack defers until aux N
-sent-or-preempted (slot holds aux pixels until the decision).
-
-Effect: with 4B, steady-motion period ~16-18ms (~55-60fps) at half
-the wire bytes; full 4:4:4 converges one encode (~15ms) after any
-damage gap — deterministic, no policy. Recorded tradeoff (FR-PROC-7
-§7): sustained gap-free motion rides at 4:2:0 (= AVC420 quality, =
-Windows' 93% LC=1 cadence); periodic override deliberately excluded.
-Wire framing per `docs/avc444_lc_reframe_design.md` (LC=1/LC=2 PDUs,
-v2); macOS Windows App prerequisite. Acceptance: smoke gate gains a
-color-edge fidelity-after-settle check (FR-PROC-7 §8); Mac validation
-rides this item. Consolidate with the LC reframe / Mac items below
-when picked up.
-
-## Lever 4B: two-slot pipelined capture — IN PROGRESS (implemented 2026-07-26, pending T4 deploy + smoke gate + fps measurement; owner decision 2026-07-26; prerequisite of Lever 2 preemptive aux)
-
-Contract: PRD FR-CAPTURE-8. Capture frame N+1 into the second shmem
-slot while ffmpeg consumes slot N; period drops from the serial sum
-(~50ms) to ~encode duration (~31-36ms, ~28-32fps); composed with
-Lever 2's halved encode -> ~16-18ms, ~55-60fps.
-
-**Implementation note (2026-07-26):** landed as designed with one
-addition the design pass missed — per-slot staleness re-pack (now PRD
-FR-CAPTURE-8 clause 9): the capture packs only damaged rects while
-the encoder consumes the full plane, so each slot tracks the region
-it missed while the other slot was being written (`cap_slot_missing`,
-initialized to full screen on allocation, emptied when the slot is
-captured, grown by fresh damage landing in the other slot) and
-re-packs it on its next capture. Without it, frame N-1's damage would
-visibly regress every other frame. Slot stride rides a new optional
-`slot_bytes[]` out-param of `xup_cap_h264_shmem_layout()`; contract
-v20260727. Unit: 84/84 incl. new `test_cap_layout_two_slot_strides`.
-The ack-leak test runs live on the T4 (kill ffmpeg mid-drag with a
-queued successor, verify acks and capture resume) as part of the
-deploy validation.
-
-**Validation record (2026-07-26, first T4 deploy — partial).** xrdp
-`4932908b` + xorgxrdp `251bc4d` (contract v20260727) deployed on the
-(since-terminated) T4. Results that stand:
-- Smoke gate PASS 8/8 at 1920x1080 AND 1024x768, zero lag, zero
-  encoder errors, with the new colour-edge check (edge fidelity 1.000
-  both sizes — the full-chroma calibration value for FR-PROC-7's
-  floor). Uprobe traces showed capture/encode/wire/ack all healthy and
-  server-vs-client framebuffers pixel-identical.
-- Two REAL bugs found and fixed by the strict offscreen client:
-  1. `f0104284` (xrdp): metablock region rects had even origins but
-     ODD extents — FreeRDP's SSE 4:4:4 reconstruction hard-asserts
-     even widths and aborted; lenient clients (mstsc/Mac) only
-     tolerate it. Pre-existing, not a 4B regression.
-  2. xorgxrdp `251bc4d`: dual-monitor starvation — the monitor-scan
-     rotation used the LIVE rect_id (increments per send); the serial
-     gate used to break the loop after one send, masking it, but with
-     two outstanding the loop revisited the just-sent monitor,
-     skipped the other, and the nothing-changed branch destroyed the
-     skipped monitor's damage (frozen bottom 4K during drags). Fixed
-     by snapshotting the rotation base per pass.
-- NOT captured: the 4B-only fps number. The T4 was terminated before
-  the measurement ran; re-measure on the replacement instance.
-- The FR-PROC-7 (Lever 2) implementation drafted the same day lived
-  only in /tmp during the deb split and was lost to the box restart;
-  re-implement from the committed PRD FR-PROC-7 design when picked up
-  (design + all decisions are fully recorded there).
-
-**Methodology reset (owner directive, 2026-07-26 — the lesson).** The
-first offscreen-rig session was unacceptable: a full day of serial
-environment discovery with no fps number. Concrete failures: client
-stack built ON the T4 (Ubuntu's freerdp3 ships without H264 — had to
-source-build); a special `tester` account whose fresh xfce profile
-behaved differently from the owner's session (compositor repaint
-stalls consumed hours of false-lead debugging against the transport);
-per-run interactive ssh-heredoc measurement scripts; three separate
-self-inflicted `pkill -f` shell suicides; harness assumptions (empty
-password, uid 1000 Xauthority, qterminal) discovered broken one at a
-time. Binding rules now in CLAUDE.md ("T4 test methodology"): test as
-`ubuntu` only (cred in root-owned /root/.ubuntu_cred on the T4), never
-touch the session-policy script, ALL client-side harness on the dev
-box over an ssh -L forward of 127.0.0.1:3389, and on-box measurement
-as a persistent checksum-gated deploy invoked non-interactively.
-Harness reworked accordingly (smoke gate + `t4_measure.sh`).
-
-**Scope (grounded, exact touch points):**
-- xorgxrdp `rdpClientCon.c:909/:946` — double the per-monitor region in
-  the `xup_cap_h264_shmem_layout()` sizing; two slot offsets per monitor.
-- xorgxrdp `rdpClientCon.c:3420` — slot select: `cap_offsets[...]` gains
-  the `rect_id`-parity slot term (offset already rides the existing
-  paint message, `:3107/:3254`).
-- xorgxrdp `rdpDeferredUpdateCallback:3368` + monitor-loop recheck
-  `:3397` — gate `rect_id > rect_id_ack` -> `> rect_id_ack + 1`,
-  **conditioned on the AVC444 capture code** (the callback is shared by
-  all capture modes; others keep 1 slot).
-- `common/xup_client_info.h` — contract version bump (mismatch already
-  refuses loudly).
-- **xrdp: zero code change** (verified: `xup.c:1187` reads per-frame
-  `shmem_offset`, maps whole segment; encoder guards
-  `xrdp_encoder.c:1159/:1371` are offset-relative vs `data_bytes`).
-
-**Properties preserved (per the frame-accounting review):**
-(1) N+1 drains with no successor damage: capture==send in `rdpCapRect`
-(`:3285`), `proc_enc_msg` drains the whole fifo per wakeup
-(`xrdp_encoder.c:2266`), `process_enc_done` sends unconditionally —
-the fif gate withholds only msg 106, never the client send.
-(2) Bounded inventory: worst case 2 raw slots + 2 compressed in flight
-(+1 raw vs today); on client-ack stall msg 106 stops -> source freezes
-after <=2 frames -> damage coalesces in `dirtyRegion` (drop stays
-pre-encode; P-chain forbids post-encode drops anyway).
-
-**Acceptance:**
-- frame_accounting.sh: period ~= encode duration; capture overlaps
-  encode in the event timeline.
-- smoke gate r/g/b/w incl. tail frame; multi-size.
-- NEW ack-leak test: kill ffmpeg mid-encode with a queued successor
-  frame; both rect_ids must still ack and capture must resume (budget
-  leak = silent half-speed at 1, freeze at 2).
-- Loud assertions shipped with the change: outstanding <= 2, encoder
-  fifo queued depth <= 1 (bound is enforced by the remote producer
-  gate — assert it locally so future edits fail noisily).
-- Dual-monitor: budget accounting must not let one monitor's stall
-  starve the other (today's single global rect_id/ack already
-  serializes across monitors — verify, don't regress).
-- Slot count is FIXED at 2 in the versioned contract (anti-ratchet: a
-  third slot is a contract change requiring owner sign-off, not a
-  tuning knob).
-
-**Known tradeoff (recorded):** eager capture means up to one
-encode-time of content age under saturation (~15-30ms) — throughput
-bought with staleness; the r/g/b/w single-event latency path is
-unchanged (slots empty -> capture -> encode -> send, byte-identical).
-
-**Validation record (2026-07-26).** xrdp `52099149` + xorgxrdp `75c1928`
-(xup contract v20260726, both daemons refuse loudly on mismatch). Unit:
-83/83 incl. new page-aligned layout math; the ffmpeg encode tests
-exercise the vmsplice feeder end-to-end. Dev box (vaapi/x264): burr
-harness single 4K NO residual, dual owner-layout NO residual (the
-truth-vs-client compare is the packer parity oracle vs the in-tree
-reference converter), SMOKE PASS both sizes as the last step after
-install. T4: deb pair installed (sha256 b5e22ac2…/3a6ed395…), probe OK
-(dump_extra=1) 1342 ms, AVC444 v2 matched. NOT yet validated: a real
-T4 session (Xorg-side packers + nvenc under drag load — the owner's
-onscreen perf verdict) and the Windows/Mac client matrix.
-
-Owner directive (chat, 2026-07-26): "the shmem from xorgxrdp must be
-directly vmspliced [to ffmpeg] right now ... xrdp must do zero hot path
-work; vmsplice is the only allowed xrdp→ffmpeg interaction." We own the
-AVC444 wire format; an intermediate shmem format that is not splicable
-is a design defect (and an upstream-PR rejection risk).
-
-**Why.** The YUV444 offload left a SECOND full-frame pass inside xrdp:
-`xrdp_avc444_conv_update()` re-walks every pixel per frame with
-per-sample bounds-clamped `sample_yuv()` calls (~25M samples per 4K
-frame; the luma copy re-fetches U/V it discards), then memcpys the two
-views into the runner's staging queue, then write()s 27.6 MB/frame into
-the pipe. Live T4 signature (owner, 2026-07-26): 4K window drag is slow
-and htop shows xrdp burning MORE CPU than Xorg — the process doing the
-actual color conversion. On the T4's weak CPU this is release-blocking.
-
-**Design.**
-- xorgxrdp packs the final wire format per damage rect, fused into the
-  existing capture conversion: per-monitor shmem region becomes
-  `[main NV12][aux NV12]`, both at the FINAL coded size (width aligned
-  to the client-derived chroma_align 16/32, height align16), each view
-  page-aligned (4096) for vmsplice.
-- Aux variant rides the EXISTING `capture_format` contract field using
-  the reserved constants: `XRDP_yuv444_v2_stream_709fr` (ChromaV2 aux),
-  `XRDP_yuv444_v1_stream_709fr` (v1 banded aux), `XRDP_nv12_709fr` +
-  `CC_GFX_AVC444` (main-only, the ffmpeg AVC420 mode). v1 aux may
-  repack the full view per frame (diagnostic mode, perf uncritical).
-- New `avc444_chroma_align` field in the xup client info; layout
-  helpers reworked (page-aligned regions + aux-offset helper);
-  `XUP_CLIENT_INFO_CURRENT_VERSION` bumped 20260725 → 20260726, loud
-  refusal on mismatch as before.
-- xrdp hot path: pointer math + `vmsplice()` only. The runner's inq
-  staging memcpy is replaced by a borrowed-iovec queue; pump() feeds
-  ffmpeg exclusively via vmsplice (probe too). Pipe enlarged via
-  F_SETPIPE_SZ (best effort). SPLICE_F_GIFT is NOT used (pages are
-  xorgxrdp's shmem). Borrowed input never outlives the encode call:
-  if input is not fully spliced when the synchronous wait ends, the
-  call errors and the child restarts (no torn-frame window).
-- `xrdp_avc444_convert.c` leaves the hot path and stays in-tree as the
-  format REFERENCE (unit tests / oracle).
-- Visual gates before deploy: PR-demo/smoke_gate + multimon_burr on the
-  dev box (truth-vs-client compare catches any packing error), then T4
-  deb pair.
-
-**Perf accounting (4K single monitor).** Removed from xrdp per frame:
-~25M clamped samples (the 16ms/frame encoder-thread cost), 27.6 MB
-staging memcpy, 27.6 MB write() kernel copy. Added to xorgxrdp: ~0 —
-the packer replaces the equal-cost planar YUV444 writes inside the
-same per-rect conversion walk, and it is damage-rect-limited where
-xrdp's pass was full-frame.
-
-## AVC444 header policy: static gfx.toml `dump_extra` + verify-once probe — DONE (2026-07-26, deployed to T4)
-
-**Validation record (2026-07-26).** Commit `820f558e`; unit suites all
-green (libcommon 157, libipm 35, libxrdp 13, xrdp 83 — incl. the four
-probe-class tests run against real ffmpeg via `XRDP_TEST_FFMPEG_PATH`).
-Deb `xrdp-dev_0.10.80+git820f558ea79c` (sha256 `9532415...dd4607`)
-installed on T4; `/etc/xrdp/gfx.toml` sets `dump_extra = true` for
-h264_nvenc (backup `gfx.toml.bak-820f558e`). Live daemon connection:
-`verifying ffmpeg AVC444 ... (gfx.toml dump_extra=1)` → `xrdp_ffmpeg:
-probe OK (dump_extra=1) at 1920x1088 in 1124 ms` → `Matched H264/AVC444
-v2`; shim log confirms exactly ONE ffmpeg spawn per verification (the
-double-spawn ladder is gone). Not yet exercised live: the cold-boot
-TIMEOUT classification (needs an instance reboot; the class is
-unit-tested via the hang fixture). Owner onscreen test on T4
-(Windows mstsc + macOS Windows App) still the final gate — see the
-T4 validation-matrix item.
-
-Owner directive (chat, 2026-07-26): remove the adaptive dump_extra probe
-ladder. In-band header policy is per-box administrator configuration (like
-`encoder_args`, which gfx.toml already owns); the probe only VERIFIES it.
-
-**Why (T4 cold-boot heisenbug, 2026-07-26).** First connections after the
-T4 instance boot fell back to RFX: both ladder attempts burned the full 4s
-probe deadline (GPU up 01:07, failures 01:15/01:18; a warm probe at 01:39
-passed in 2.2s, and an offline replay of the same nvenc bytes through the
-real NUT parser + validators passes every check — cold CUDA first-init is
-the failure, not content). Underlying design flaw: the probe returned one
-bit, so the ladder could not distinguish CONTENT REJECT (deterministic
-evidence of extradata-only headers) from TIMEOUT (environmental), and it
-flipped `use_dump_extra` on either. Latent WRONG-BIT hazard: an in-band
-encoder timing out pristine then passing a warm dump_extra retry would put
-duplicated SPS/PPS on the wire — the exact Mac-black bitstream class
-`7927efa7` was built to prevent.
-
-**Scope.**
-- gfx.toml `[avc444_ffmpeg] dump_extra = true|false` (default false);
-  tconfig field + parse; template and man page document it, including the
-  tested NVENC block (Tesla T4, driver 580.159.03, ffmpeg 8.0.1,
-  2026-07-26).
-- The adaptive ladder in `xrdp_mm.c` is deleted; ONE probe run with the
-  configured flag; a timeout (or any environmental failure) must never
-  cascade into a different header policy.
-- Probe observability debt paid: outcome classes (OK / SPAWN_FAIL /
-  TIMEOUT / STREAM_ERROR / CONTENT_REJECT), child stderr logged, child
-  exit status logged, elapsed + packet count logged. (Folds in the
-  "Probe must log child stderr" item below.)
-- Bidirectional contract check: the reset packet must carry EXACTLY ONE
-  SPS. `dump_extra = true` on an in-band encoder is refused at the probe
-  (duplicates) instead of shipping Mac-black bytes; `dump_extra = false`
-  on an extradata-only encoder is refused with a message naming the fix.
-  The runtime first-packet check gains the same duplicate guard.
-- PRD: FR-PROBE-6 (verify-only contract) + §25 addendum.
-
-**Signed-off shipped-behavior change** (strict-honesty rule): the silent
-runtime adaptation is REMOVED. A wrong/missing `dump_extra` now loudly
-removes the AVC candidate for that connection (codec order proceeds, e.g.
-RFX) with an actionable log line. Owner directive in chat, 2026-07-26.
-
-**Acceptance.**
-- Unit: tconfig parses `dump_extra` (absent → false); pristine probe of a
-  global-header encoder returns CONTENT_REJECT (not a generic failure);
-  the same encoder with dump_extra returns OK; dump_extra on an in-band
-  encoder returns CONTENT_REJECT (duplicate SPS); a hanging fake encoder
-  returns TIMEOUT; exactly-one-SPS wire guard passes in both configs.
-- T4: deb built from the committed branch, installed; `/etc/xrdp/gfx.toml`
-  sets `dump_extra = true` for h264_nvenc; a fresh connection logs the
-  verification PASS and matches AVC444; failure classes visible in log.
-
-## AVC444 resize-to-black regression (non-16-aligned surface) — FIX DONE (2026-07-25)
-
-**Symptom (owner, single 4K monitor):** resize from fullscreen to a smaller
-window -> ffmpeg dies, client (UWP mstsc) shows black.
-
-**Root cause (regression from the YUV444 offload above):** cross-component
-stride contract mismatch. xrdp reads the capture's YUV444 planes with a
-16-aligned stride `pstride=(w+15)&~15`, plane size `pstride*align16(h)`, and its
-GFX encoder guard (`xrdp_encoder.c:1360`) requires `3*align16(w)*align16(h) <=
-data_bytes`. But xorgxrdp allocated/strided the buffer at the UNALIGNED surface
-size (`rdpClientCon.c:914` `w*h*3`; `rdpCapture.c` `dst_stride=id->width`,
-plane offset `id->width*id->height`). A 16-aligned surface (3840x2400) gives
-provided==required and works; a non-16-aligned resize (3814x2233) under-runs
-the guard, so xrdp drops every frame silently (return NULL) -> ffmpeg never
-respawns -> permanent black. Live log confirms: xorgxrdp shmem `bytes 25549986`
-(=3814*2233*3) vs guard need `25697280` (=3*3824*2240).
-
-**Repro (offline, deterministic):** `tools/avc444_resize_repro.c` models both
-allocation formulas vs the guard requirement and drives the real
-`xrdp_avc444_conv_update` on a contract-sized buffer. Pre-fix: 4 non-aligned
-sizes report BLACK (provided<required), exit 1. `-DXORGXRDP_ALIGNED`: all OK.
-
-**Fix:** align the capture allocation and plane stride/offset to
-XRDP_H264_ALIGN (xorgxrdp commit aa08c63). Matches xrdp's read contract and the
-size already reported by `rdpSendMemoryAllocationComplete`. Only the visible
-w x h is written; xrdp edge-clamps and never samples the pad.
-
-**Regression test (CI backstop):** `test_avc444_resize_nonaligned_stride_
-contract` (tests/xrdp) drives conv_update at non-16-aligned dims on an
-EXACTLY contract-sized buffer with a sentinel in the pad, asserting the Y/U/V
-planes are read at the correct aligned stride/offset (a skew or short buffer
-reads the sentinel or wrong plane). 74/74 green.
-
-GATE: live xvfb/freerdp exercise of the resize path with the fixed debs, then
-owner onscreen retest.
-
-## AVC444 dual-monitor drag "burr"/ghost residual — DONE (fix verified onscreen 2026-07-25)
-
-**Symptom (owner):** dragging a window on the 4K subscreen in DUAL-monitor
-mode leaves 1-2px residual/burr lines. NOT present in single-monitor mode.
-Screenshot `regression_ghost_edge_2026-07-25 114541.png` (untracked).
-
-**REPRODUCED end-to-end** (owner visually confirmed same failure class):
-`PR-demo/multimon_burr/multimon_burr_repro.sh` — real Xorg(dummy) client at
-the owner's exact layout (canvas 3840x3840, primary 2560x1440 on top at
-+594, 4K below at +0+1440; layout asserted by black-pixel count 1843200),
-xfreerdp3 /multimon /gfx:AVC444, self-driven qterminal drags. Oracle =
-client framebuffer vs session framebuffer after 2.5s settle, baseline-masked
-(pre-drag pair subtracts static codec noise — two earlier heuristic
-detectors false-positived; do not trust colour heuristics here).
-Result on deployed debs (xrdp 2f216a20 + xorgxrdp aa08c63): persistent 1px
-solid, 2px/3px dashed ghost lines along the drag paths, full-height dashed
-columns on the primary (never dragged on), and 2px dashed vertical ghosts
-STRIKING THROUGH both screens at the seam-crossing drag columns
-(x 786/1286/2286). MODE=single: clean. Artifacts: burr2_*.png.
-
-**Retracted hypothesis (for the record):** an earlier "global rect_id gating
-throttles the 4K surface -> drag lag" theory was wrong — residuals persist
-at idle, which latency cannot explain. Retracted before any code change.
-
-**ROOT CAUSE — PROVEN (2026-07-25, per-frame dump forensics):**
-Cross-monitor shared-shmem plane overwrite exposed by the metablock fringe
-blit. The full chain, each link verified with data:
-1. xorgxrdp multimon: ALL monitors write their planar YUV444 planes at
-   OFFSET 0 of the ONE shared capture shmem, each with its own geometry
-   (4K: stride 3840, planes 3840*2400; primary: stride 2560, planes
-   2560*1440). Every primary frame therefore overwrites the 4K monitor's
-   persistent plane bytes (primary's 3 planes span offsets 0..11.06M =
-   rows 0..2879 of the 4K Y plane) and vice versa.
-2. xrdp feeds the full plane extent to ffmpeg each frame, so the encoded
-   picture carries that corruption everywhere outside the freshly captured
-   damage rects.
-3. `out_RFX_AVC420_METABLOCK` (xrdp_encoder.c:822-827) expands each damage
-   rect by 1px — UPSTREAM code (b583a8d5, Jay Sorg, May 2024, x264 GFX
-   path; an earlier note here misattributed it to us — corrected). Our
-   contribution on those lines is only the even-origin rounding (`&= ~1`,
-   the mstsc chroma-parity fix), which can widen the left/top fringe by 1px
-   more but did not create the expansion. The client therefore blits a
-   1-2px fringe BEYOND the freshly captured area —
-   painting the corrupted stale bytes -> 1-2px solid/dashed ghost lines at
-   damage-rect boundaries. Dashes = the periodic visibility pattern of the
-   different-stride overwrite; seam strike-through = both surfaces ghosting
-   at the same client x.
-4. Single monitor: one writer only -> un-recaptured plane bytes always equal
-   current client content -> fringe blit is a no-op -> clean.
-**Proof artifacts** (XRDP_AVC444_DUMP per-frame dumps + instrumented
-xorgxrdp diag/dirty-trace build, both reverted after): drag frame seq23
-(rect 188,490,1842,1256) vs pre-drag full frame seq21 — conv Y planes
-differ in 6,467,271 bytes OUTSIDE the captured rect (all 2400 rows),
-written by the interleaved primary frame seq22; the client ghost lines of
-that run sit EXACTLY on seq23's metablock fringe (col 187 = x1-1, row 489 =
-y1-1, row 1256 = y2), corrupted in the dumped conv input (1654/1024/690
-bytes). Note: an earlier "refuting" causal A/B was an experimental
-artifact — x11grab on the session root provokes an xfwm compositor slab
-repaint (full-region DIRTYADD) = a primary frame, injecting the very
-corruption the variant meant to exclude (caught by the dirty-trace log).
-
-**Harness:** `PR-demo/multimon_burr/` — `multimon_burr_repro.sh` (visual
-repro + oracle), `causal_ab.sh` (variant A/B), `forensic_run.sh` (short
-drag with per-frame dumps). Box restored after forensics: xorgxrdp
-aa08c63 reinstalled, dump env removed, smoke gate PASS (1920x1080 and
-1024x768: ok=8 lag=0 encoder_errors=0).
-
-**Ownership:** BOTH ingredients are upstream — the shared-shmem overlap
-(upstream `rdpCaptureGfxA2` NV12 multimon writes every monitor's planes at
-offset 0 with per-monitor stride, identical hazard) and the metablock 1px
-expansion (b583a8d5, upstream x264 path). The bug is LATENT upstream:
-upstream AVC420 GFX multimon should show the same 1-2px ghost class
-(prediction, not yet demonstrated — our gfx.toml negotiates RFX for
-/gfx:AVC420 clients, so untested here). Our AVC444 work did not create it
-but surfaced it: it is the multimon H.264 mode actually deployed, and
-YUV444 planes are 2x the NV12 footprint (3 vs 1.5 B/px), doubling the
-overlap. Worth an upstream issue/PR note alongside our fix.
-
-**Fix (IN PROGRESS, owner-approved 2026-07-25; per strict-honesty rule the
-real fix, not a mask):** give each monitor a DISJOINT region of the capture
-shmem (per-monitor plane offset). Internal xorgxrdp<->xrdp contract change,
-never visible to RDP clients.
-
-*Scope = the real blast radius (owner directive: do not artificially narrow
-to AVC444).* Affected: the GFX H.264 capture family — `CC_GFX_A2` (NV12,
-upstream AVC420/x264 GFX) and `CC_GFX_AVC444` — both write per-monitor
-planes at offset 0 of the shared shmem AND their encoder consumes the full
-plane every frame (persistence assumption). Verified-NOT-affected, left
-untouched: legacy `CC_SUF_A2` (session-canvas NV12 layout — no per-monitor
-translate, UV plane at session `cap_w*cap_h`, monitors land disjoint by
-construction) and `CC_GFX_PRO`/`CC_SUF_RFX` (every RFX tile the encoder
-reads is fully rewritten within the same capture call — rgnPART fills the
-whole tile first; CRC-skipped tiles are never read — so nothing depends on
-shmem persistence).
-
-*Mechanism:*
-- Shared pure helper in `common/xup_client_info.h` (the file that IS the
-  daemon contract) computes the per-monitor offset table + total allocation
-  from `display_size_description` + capture code; xorgxrdp uses it for
-  allocation and plane placement; unit-tested in `tests/xrdp`.
-- The offset each frame rides the msg-62 WIRETOSURFACE_1 payload as a new
-  trailing field after left/top/width/height (per-command `cmd_bytes`
-  bounds the parse, so the field is cleanly optional); xrdp validates
-  bounds and reads planes at `shmem base + offset`. Field absent -> 0 ->
-  exact current behavior.
-- Mixed-version safety: `XUP_CLIENT_INFO_CURRENT_VERSION` bumped 20250528
-  -> 20260725; both daemons already FatalError/refuse on mismatch at
-  connect, so a mixed pair fails LOUDLY instead of silently corrupting.
-  Deb pair-guard stays; both sides land together upstream (the same
-  lockstep the socket-naming change used).
-
-Sizing: sum of per-monitor regions replaces the session-size formula
-(owner layout: 27.6M + 11.1M = 38.7M vs 44.2M today). NOT chosen: capturing
-the 1px fringe (masks the fringe blit but leaves poisoned planes in every
-encoded frame). Single-monitor: offset stays 0, allocation formula
-unchanged in behavior. Gate = multimon_burr harness clean in MODE=dual +
-MODE=single + `make check` + smoke gate LAST + owner onscreen.
-
-*Validation (2026-07-25, deployed xrdp-dev 0.10.80+git0070ceb514be +
-xorgxrdp-dev 1:0.10.80+gitdd431cc156fd, both from committed branches):*
-- `make check` 81/81 (6 new layout-contract tests).
-- **Mechanism kill PROVEN at byte level:** forensic re-run reproduced the
-  exact pre-fix critical frame pattern (full 4K seq37 -> interleaved full
-  primary seq38 -> 4K drag seq39, same rect 188,490,1842,1256); the 4K
-  conv Y planes now differ in **0 bytes** outside the damage rect
-  (pre-fix: 6,467,271). Cross-monitor plane overwrite is dead.
-- **multimon_burr MODE=dual and MODE=single: NO residual** (all passes,
-  both screens; residual hot px are scattered unstructured codec noise,
-  no lines, no strike-through). The pre-fix signatures (1px trail lines,
-  2px/3px dashed, cross-seam strike-through, multi-position trails) are
-  gone.
-- Two ORACLE false-positive classes were found and fixed in the harness
-  along the way (documented in its README, not masked): (a) the mover
-  window's LIVE lossy edges flag wherever it stands in an after-grab —
-  the pre-fix single-mode "clean" was threshold luck; now the window is
-  parked inside the baseline and returned there before every grab, plus a
-  printed, geometry-scoped parked-window exclusion; (b) end-of-drag
-  PIPELINE LAG: one run showed a full stale window image ~3.5s after the
-  last move that self-corrected before the next pass — the verdict now
-  uses a second settled grab (+8.5s) and first-grab-only findings are
-  reported as LAG, keeping that latency signal visible without conflating
-  it with persistence. The drag trail itself is never excluded.
-- Smoke gate LAST on the deployed pair: 1920x1080 and 1024x768, ok=8
-  lag=0 encoder_errors=0 — SMOKE PASS.
-- **Owner onscreen: PASS (2026-07-25, dual-monitor mstsc drag on the 4K
-  subscreen — burr gone). Item closed.** Follow-ups tracked separately:
-  clean-room slice-order amendment (fix-first, both repos), upstream
-  issue/PR for the latent AVC420 multimon hazard, and the end-of-drag
-  pipeline-lag observation (perf, reported as LAG by the harness).
-
-## AVC444 CPU conversion is the 4K/dual-monitor bottleneck — DONE (2026-07-25)
-
-**IMPLEMENTED + DEPLOYED.** The RGB->YUV matrix moved off xrdp's encoder
-thread to xorgxrdp's capture (autovectorized C, no hand-asm, no new dep).
-- xorgxrdp `feat/avc444-yuv444-capture` (branched clean from upstream 49bf2dd,
-  NOT on the old ARGB commit): `a8r8g8b8_to_yuv444_709fr` emits three planar
-  YUV444 planes; `rdpYuvVectorize.h` gives portable `optimize O3 + tree-
-  vectorize` + x86 `target_clones(default,avx2)` (verified: 16- and 32-byte
-  vectors + ifunc AVX2 clone at -O2). Commit 76d1433.
-- xrdp `dev` (linear): `capture_format = XRDP_yuv444_709fr`; `xrdp_avc444_conv`
-  now reads Y/U/V planes and only subsamples (main) + repacks (aux) - no
-  matrix. Byte-identical output (same 709fr coeffs) - unit tests 73/73 green.
-  Commit 63c37688.
-- **Profiled (tools/avc444_convert_bench.c), 3840x2400 + 2560x1440:** xrdp
-  encoder-thread convert **167 ms -> 15.9 ms (6 -> 62 fps ceiling), 10.5x**;
-  the matrix now runs capture-side at ~2-6 ms on another thread. GPU was
-  already idle, so 4K dual-monitor should hit real-time.
-- Both dev debs built + installed (gfx.toml preserved); smoke gate: 1024x768
-  clean, colours correct on r/g/b/w end-to-end (proves the YUV444 capture ->
-  repack path is colour-correct); 1920x1080 shows only the pre-existing white-
-  frame-lag (encoder_errors=0), unchanged by this work.
-- GATE: owner onscreen dual-monitor 4K perf test (the container guard blocks a
-  live xfreerdp run here). The clean work-PR port is studied later, gated on
-  that perf PASS.
-
-## (historical) AVC444 CPU conversion bottleneck — root cause (2026-07-25)
-
-**Symptom:** dual-monitor GFX (mon0 3840×2400, mon1 2560×1440), AVC444 v2,
-renders <1 fps. **Live capture:** GPU (amdgpu 1002:1586) 0% busy, VAAPI
-starved; ONE xrdp encoder thread pinned on a single core (32 cores idle);
-both ffmpeg children ~1–3%. So the cap is single-threaded CPU, not the GPU
-encode.
-
-**Root cause:** `xrdp_avc444_conv_update` (`fill_main` + `fill_aux` in
-`xrdp/xrdp_avc444_convert.c`) is a scalar per-pixel RGB→YUV709 convert — a
-function call + a 4-byte `memcpy` per pixel — walking the full surface TWICE
-(main, then aux, each re-reading all RGB), for every surface every frame,
-sequentially across monitors on one thread.
-
-**Reproducible offline (no X/GPU/client):** `tools/avc444_convert_bench.c`
-times the convert on a synthetic frame. Measured here: 3840×2400 = 119.8 ms,
-2560×1440 = 47.5 ms, **dual sequential = 167 ms/frame → 6 fps ceiling from
-conversion alone** (before capture/pipe/encode/ACK). Matches the observed
-<1 fps. Not a multimon regression — the same convert runs single-monitor; 4K
-just makes its cost dominate.
-
-**Status quo / scope (why this path alone pays it):** the NATIVE H.264 GFX
-path already sets `capture_format = XRDP_nv12_709fr` — xorgxrdp (the capture
-side) delivers NV12, so xrdp does NO per-pixel convert there. The ffmpeg
-444/420 path is the only one that sets `capture_format = XRDP_a8r8g8b8`
-(full-chroma RGB) and converts in-process, specifically to build the aux
-view. Measured cost split @3840×2400:
-  - AVC420 main-only (RGB→YUV matrix + luma + 2×2 chroma avg) = **87.9 ms**
-  - AVC444 full (main + aux repack)                          = **119.8 ms**
-  - ⇒ the RDP-specific AVC444 aux chroma repack alone        ≈ **~32 ms**
-So ~88 ms of the ~120 ms is the GENERIC colour conversion that libraries
-already do fast; only ~32 ms is the irreducible RDP-specific shuffle.
-
-**ffmpeg already does the generic part fast** (its own maintained SIMD, and
-it is ALREADY our subprocess — no new dep): `swscale` BGRA→NV12 @3840×2400 =
-**~3.6 ms wall (threaded) / ~28 ms single-thread** vs xrdp's 87.9 ms.
-
-**Fix directions — delegate the matrix, keep only the shuffle (NO
-hand-vectorized math to maintain, NO new deps):**
-1. **AVC420-ffmpeg:** feed ffmpeg raw RGB (`-pixel_format bgra`,
-   `-vf format=nv12,hwupload` or `scale_vaapi` on the idle GPU) and dumb-copy
-   the XRGB surface; delete `fill_main`. ~88 ms → ~4 ms. Isolated, low risk.
-2. **AVC444-ffmpeg:** move the RGB→YUV matrix off xrdp too. Preferred:
-   capture a full-chroma YUV from xorgxrdp (mirror the native NV12 capture,
-   e.g. a new `XRDP_ayuv`/`yuv444` `capture_format`) so xrdp receives YUV and
-   only does the cheap integer 4:2:0-average (main) + aux repack — no matrix,
-   no SIMD to maintain. Alt: two ffmpeg inputs (ffmpeg emits main from RGB;
-   xrdp packs aux only). The aux repack stays simple C (it is the one thing
-   no library provides), and can be threaded across the idle cores if needed.
-3. GPU is 0% busy → any remaining convert (or the whole RGB→NV12) can run on
-   VAAPI (`scale_vaapi`), which is already open.
-Add a perf-regression guard around `tools/avc444_convert_bench.c`. Full
-writeup: `vm/perf_capture/ROOT_CAUSE_4k_dualmon_slow.md`.
-
-
-## macOS Windows App AVC444 black screen — H2 CONFIRMED (our stream is malformed), FIX = Windows-like emission (2026-07-24)
-
-**DECISIVE RESULT (owner, onscreen):** the macOS Windows App (iMac) **rendered
-the real Windows host `43.98.187.122` cleanly for 2 min** — a live AVC444v2
-session carrying LC=1 + frequent LC=2 aux chroma (~7%) + rare LC=0. This
-**refutes H1** (the Mac fully supports AVC444v2 aux/`LC=0` reconstruction) and
-**confirms H2**: xrdp's own `LC=0` stream is malformed / non-Windows-like, and
-that is why the Mac blacks *our* stream while rendering Windows'. The client is
-fine; the defect is in xrdp's AVC444 emission.
-
-**FIX DIRECTION (evidence-backed):** make xrdp emit Windows-like AVC444v2 —
-luma-first `LC=1` IDR bootstrap, one shared decode context, aux only as P-slices
-on an established reference chain, `LC=2` deferred chroma catch-up as the normal
-path, disjoint-region `LC=0`, codec `0x000F`. This is the rewrite (implements the
-`LC=1`/`LC=2` deferral PRD NG-6 omits).
-
-**IMPLEMENTED + DEPLOYED + SELF-VERIFIED (branch `dev/avc444_lc1lc2_reframe`,
-commit `aa894917`).** Reframe (owner's design): keep chroma dense, only change
-the semantic dependence — serialize the existing main+aux H.264 pair as an `LC=1`
-luma PDU then an `LC=2` chroma PDU inside ONE gfx frame, instead of one
-same-region `LC=0` PDU. Same H.264 bytes, same traffic; only the wire framing
-changes. `out_RFX_AVC444_BITMAP_STREAM_view` serializes one view; the live path
-queues the `LC=1` PDU inline (non-last enc_done) and returns the `LC=2` PDU, so
-both land between the surrounding STARTFRAME/ENDFRAME (atomic — avoids the
-luma-only-intermediate that killed the earlier two-GFX-frame split). Wire capture
-of the DEPLOYED binary (`avc_mode=444`) confirms: `seq0 LC=1
-[AUD,SPS,PPS,SEI,IDR]` (luma-first IDR bootstrap) → `LC=2 [AUD,P]` (deferred
-chroma) → `LC=1 → LC=2`, **zero `LC=0`** — byte-structurally what real Windows
-emits. All 68 xrdp unit tests pass; astyle clean.
-
-**Smoke gate note (honest):** `PR-demo/smoke_gate/smoke.sh` passes clean at
-1024x768 but shows a deterministic 2-keypress "white shows previous frame" lag at
-1920x1080. This is **pre-existing, NOT a regression**: the pre-reframe `LC=0`
-binary fails 1920x1080 with the identical signature (ok=6 lag=2), `encoder_errors=0`
-on both — a keytest/encoder pacing artifact at high res, independent of LC framing.
-
-**OUTCOME (owner onscreen, 2026-07-24): FIXED.** The macOS Windows App renders
-our reframed `LC=1`/`LC=2` stream — no black, no functional regression, no server
-reconfiguration. mstsc/UWP unaffected. Residual: on the macOS HiDPI display the
-isoluminant **1px**-chroma stripes render softened/blended (mstsc/UWP show crisp
-grid+checkerboard = true 4:4:4 on the wire). That softening is a client-side
-artifact of the macOS Windows App's opaque HiDPI/DSP path (likely a 4:2:2
-downscale or Nyquist attenuation at non-1:1 scaling), not reachable from the
-server. Accepted as-is.
-
-**AUD IS A RED HERRING — PROVEN (owner onscreen, 2026-07-24).** To confirm the
-interleave alone is the fix (and to match the aud-less upstream PR), `-aud 1` was
-stripped from `/etc/xrdp/gfx.toml` `[avc444_ffmpeg]` encoder_args. Wire verified
-aud-less: `LC=1 [SPS,PPS,SEI,IDR]` → `LC=2 [P]`, no NAL 9; smoke identical to
-baseline (1024x768 clean; pre-existing 1920x1080 white-lag, `encoder_errors=0`).
-**Both the macOS Windows App AND UWP render clean with NO AUD** — the `LC=1`/`LC=2`
-interleave is the entire fix; AUD is confirmed unnecessary and stays out of the
-upstream PR. Port gate 1 is now GREEN.
-
-**UPSTREAM PORT — PLANNED, GATED (do not execute yet).** Plan:
-`docs/avc444_upstream_port_plan.md`. Owner decisions: FOLD the reframe into clean
-slice `239d8d0e` (serializer born as `LC=1`/`LC=2`, no separate fix commit);
-**AUD excluded** from the PR (upstream default stays `repeat-headers=1`). Port is
-gated on: (1) macOS confirms the aud-less interleave; (2) **NVENC-on-Linux test
-regression** fixed — ties to the clean branch's BLANKET-`dump_extra` slice-7
-regression (the `c74a09e7` cleanroom artifacts are POISONED for macOS; see
-"Re-fold slice 7…"); (3) **multi-monitor** done (see "Multimonitor AVC444…").
-
-### Prior status (kept for history) — ground truth captured
-
-**UNBLOCKED.** Owner provided a real Windows host that emits real `LC=0` AND
-`LC=2`: `43.98.187.122`, **Windows Server 2022** (build 20348), **NVIDIA A10-4Q**
-vGPU (hardware NVENC). GPO set by us: `AVC444ModePreferred=1`,
-`AVCHardwareEncodePreferred=1`. Captured 803 AVC444 frames with the patched
-FreeRDP dumper across two chroma-rich payloads (ChromaAnim isoluminant hue
-rotation; ChromaScroll scrolling saturated bars + colored text). Full analysis:
-`/work/vm/GROUND_TRUTH_win2022_avc444.md`.
-
-**What real Windows actually emits (measured, 803 frames):**
-- codec **`0x000F` (AVC444v2) exclusively** — never v1 `0x000E`.
-- **Bootstraps luma-only:** first frame is **`LC=1` IDR** (`[AUD,SPS,PPS,IDR×3]`),
-  no aux. The chroma/aux view is NOT initialized at connect.
-- **Cadence `LC=1` ~93%**, `LC=2` ~7% (56/803), **`LC=0` ~0.25% (2/803)**.
-- **Aux is ALWAYS `[AUD,P,P,P]`** — 58/58 aux instances; **never** carries its own
-  IDR/SPS. Exactly one IDR/SPS/PPS in the whole session (seq0 luma). One shared
-  H.264 decode context; the aux "view" is temporally interleaved as ordinary
-  P-frames, routed to main-vs-aux by the `LC` field.
-- **`LC=0` streams tile DISJOINT, non-overlapping rects** (main=new-content tile,
-  aux=complementary catch-up tiles). Windows **never** emits a same-region
-  full-surface `LC=0`.
-
-**What xrdp emits (our dumps `gfxdump_444v1`, `gfxdump_aud`):**
-- codec `0x000E` (v1) in 444v1 mode.
-- **First AVC frame = `LC=0` dual-stream**, both streams the **same full surface**,
-  s1=IDR + s2=**bare P-slice** in one PDU.
-- **`LC=0` every frame**, same-region. **Never** emits `LC=1`/`LC=2` (PRD NG-6:
-  deferral not implemented).
-
-**Candidate root cause (H2), now with a concrete mechanism:** xrdp bootstraps
-AVC444 with a **same-region dual-stream `LC=0` whose aux is a P-slice**, and
-repeats `LC=0` every frame — a construction **real Windows never produces**. Real
-Windows bootstraps luma-only (`LC=1` IDR), keeps one shared decode context, sends
-aux **only as P-slices on an established reference chain**, uses **`LC=2`
-deferral** as the normal chroma path, uses **disjoint** regions on the rare
-`LC=0`, and uses **v2**. mstsc/UWP (lenient DXVA) accept xrdp's form; Apple
-VideoToolbox (stricter) evidently rejects it → black.
-
-**H1 vs H2 update:**
-- **H1** (Mac categorically can't do inline `LC=0`): **weakened** — real Windows
-  DOES emit `LC=0`. Refuted outright if the Mac renders this host.
-- **H2** (our `LC=0` is malformed / non-Windows-like): **strongly supported** by
-  the structural deltas above.
-
-**DECISIVE TEST REMAINING (onscreen, owner):** point the **macOS Windows App
-directly at `43.98.187.122`** (ordinary RDP host).
-- renders ⇒ Mac's AVC444v2/`LC=0` path works ⇒ **H2 confirmed** ⇒ fix xrdp to
-  emit Windows-like: **luma-first `LC=1` IDR bootstrap + deferred `LC=2` chroma
-  catch-up, v2 `0x000F`, disjoint-region `LC=0`.** This is the rewrite direction
-  (implements the `LC=1`/`LC=2` deferral PRD NG-6 currently omits).
-- blacks ⇒ problem is broader than stream construction (negotiation / caps /
-  VideoToolbox init); re-open H1.
-
-**INTERIM (workaround, NOT a fix):** `avc_mode = "420"` deployed in
-`/etc/xrdp/gfx.toml`; renders on all clients but is symptom suppression.
-
-Artifacts: real-Windows dumps `/work/vm/gfxwin_anim`, `/work/vm/gfxwin_scroll`
-(raw `.bin` + `manifest.txt`); our dumps `/work/vm/gfxdump{,_desk,_aud,_420,_444v1}/`;
-parsers `/work/vm/parse444.py`, `/work/vm/scan444.py`; instrumented FreeRDP
-`/work/vm/frdbuild` + `/work/vm/pfreerdp.sh` (`RDPGFX_DUMP_DIR`); payload sources
-`/work/vm/ChromaAnim.cs`, `/work/vm/ChromaScroll.cs`. AUD change (harmless
-superset, disproven as the fix but kept — real Windows does emit AUD on every AU)
-in `xrdp/xrdp_encoder_ffmpeg.c` default + gfx.toml `-aud 1`.
-
-### (superseded) AUD fix investigation — kept for history
-
-Ground truth captured by instrumenting a FreeRDP client with a per-frame RDPGFX
-wire dumper (patch in `rdpgfx_recv_wire_to_surface_1_pdu`: raw bitstream + AVC444
-header parse; build under `/work/vm/frdbuild`, runner `/work/vm/pfreerdp.sh`,
-`RDPGFX_DUMP_DIR=<dir>`). Compared stock **Windows Server 2025** (local KVM VM,
-`127.0.0.1:13389`) against **our xrdp** (`127.0.0.1:3389`), both negotiating
-AVC444v2 (`0x000F`). To force the true 444 video path (not the static PLANAR
-`0x000A` fallback) used a self-animating GDI payload / scrolling terminal.
-
-Wire-proven format deltas (ours vs MS), highest-suspicion first for the macOS
-Windows App black screen:
-
-1. **AUD (NAL unit type 9).** MS emits an Access Unit Delimiter on **every**
-   access unit (172/172 frames; keyframe `[9,7,8,6,6,5,5,5]`). Our xrdp emitted
-   **none** (0/77; keyframe `[7,8,6,5]`). Apple VideoToolbox (behind the macOS
-   Windows App) relies on AUDs to delimit access units where ffmpeg/mstsc are
-   lenient — leading candidate for the black screen.
-2. **Profile/level.** MS = Main@3.2 (`0x4d`/`0x20`); ours = High@4.2
-   (`0x64`/`0x2a`). Secondary candidate.
-3. **LC field.** MS sent `LC=1` (luma-only, no chroma aux) for our smooth test
-   content; ours `LC=0` (full dual-stream 444). Under investigation: which
-   payloads make MS emit `LC=0` (background research task; see
-   `/work/vm/LC_payload_findings.md`). Hypothesis: MS may only exercise the
-   dual-stream path on certain content, so the Mac never hits its 444-recon path
-   with MS but does with us.
-
-**AUD fix (this item):** emit an AUD on every access unit, matching MS. AUDs are
-inert to the decoders that already worked (ffmpeg/FreeRDP, mstsc render MS's
-AUD stream), so this is a backward-compatible superset — no functional
-regression (rule #2).
-- Code default (`xrdp/xrdp_encoder_ffmpeg.c` libx264 path): `-x264-params
-  repeat-headers=1:aud=1`.
-- **Active deployed path is `h264_vaapi`** (gfx.toml `[avc444_ffmpeg]`
-  encoder_args), so the live knob is `-aud 1` added there. Verified standalone
-  (`-aud 1` -> NAL 9 present, `-aud 0` -> absent) and on the wire: after restart,
-  **126/126** AVC444 frames carry the AUD; keyframe now `[9,7,8,6,5]`, P-frames
-  `[9,1]`. Stock `xfreerdp3` connects and renders the desktop correctly (no
-  black, no decode error) -> FreeRDP compatibility preserved.
-- STATUS: awaiting on-screen A/B on the real **macOS Windows App + UWP client**
-  (owner-driven). If AUD alone does not fix it, test forcing Main profile and
-  `LC=1` next.
-- FOLLOW-UP (clean PR): AUD is currently per-encoder-backend (vaapi `-aud 1`,
-  libx264 `aud=1`); openh264/native-x264 backends
-  (`xrdp_encoder_openh264.c`/`xrdp_encoder_x264.c`) are not covered. A robust
-  fix guarantees the AUD in xrdp's Annex-B output regardless of encoder (inject
-  the NAL, or an `h264_metadata=aud=insert` output bsf).
-
-## H.265 / HEVC via ffmpeg — OUT OF SCOPE / BLOCKED (2026-07-14)
-
-**Decision: not pursued.** The encode side is nearly free (`-c:v libx265` /
-`hevc_nvenc` in `encoder_args`; the converter and NUT demux are codec-agnostic;
-only a new HEVC Annex-B validator — 2-byte NAL header, VPS/SPS/PPS 32/33/34,
-IDR 19/20 — would be genuinely new). **The wire is the wall.** Research against
-the current MS-RDPEGFX spec (rev 19.0, 2026-05-11): **no HEVC codecId, no HEVC
-caps flag** — the public codecId enum ends at AVC444V2 `0x000F`, all H.264. The
-AVD *feature* is documented (a dedicated **"Configure H.265/HEVC hardware
-encoding"** GPO, but in the **AVD** admin template `terminalserver-avd.admx`,
-not in-box RDS; client shows "Codecs Used: HEVC", event 162 "HevcProfile"), yet
-the *protocol carriage* (codecId, enabling capset, container framing) is
-undocumented. The FreeRDP-labelled "Azure undocumented" capsets `0x000B0101/
-0200/0300` are pinned by the spec as behaviorally == 10.7 with no HEVC
-semantics. FreeRDP has an experimental AV1 custom codec but **no HEVC decoder at
-all**. So a server emitter would need packet-capture reverse-engineering of a
-live AVD↔Windows App session (three unknown values) and would only reach recent
-Microsoft clients with the HEVC Video Extension + capable GPU. Revisit only if
-those values get documented or captured; the spec-grounded, interoperable
-ceiling for xrdp remains AVC444/AVC444v2 (shipped).
-
-*Update 2026-07-23 (revisit-trigger watch):* MS-RDPEGFX v20260511 Appendix A
-note <5> now acknowledges capsets `0x000B0101/0200/0300` — behaving as
-VERSION107 only on builds *without* KB5089573 (24H2/25H2) / KB5089570 (26H1),
-i.e. real v11 features ship behind those KBs; FreeRDP maintainers suspect
-HEVC (FreeRDP#12846, nightly probes Azure hosts). We captured `0x000B0101`/
-`0x000B0300` flags `0x1a2` live from the Android Windows App (gap analysis
-§2a). Still no public codecId/capset semantics — item stays BLOCKED; the
-watch condition is those KB-gated semantics or a FreeRDP decode landing.
-
-## ~~Graceful degradation on persistent encoder failure~~ — WITHDRAWN (2026-07-17)
-
-Withdrawn by explicit owner decision: an automatic RFX fallback would *mask*
-persistent encoder failure instead of surfacing it, and masking is exactly the
-failure mode that prolonged the AVC444 lag investigation (see the honesty rule
-in `CLAUDE.md`). A persistently failing encoder must fail loudly (per-frame
-ERROR lines, visible breakage) so the root cause gets fixed — on this project,
-do not re-add any silent codec fallback without explicit owner sign-off.
-
-## macOS Windows App AVC444 validation — TODO (2026-07-22, highest-value test)
-
-The Mac "Windows App" is the stated blocker that killed the prior
-out-of-tree AVC444 rollout (Nexarian: FreeRDP and MSTSC were fine, "But
-Mac OS is important enough that it blocked the rollout"; no screenshot,
-capture, or root cause exists upstream — see
-`PR-demo/UPSTREAM_GAP_ANALYSIS.md` §2a). Our stream lacks the fork's F1
-(pair split across frames — now unit-guarded by the avc444_wire tests) and
-F2 (no caps gating) defects and is mstsc-verified, so this run is decisive
-whichever way it goes.
-
-**Setup:** Mac + Windows App (record app + macOS versions) over the tunnel
-to `127.0.0.1:3389`; `avc_mode = "auto"`; capture regardless of outcome:
-the `xrdp_mm_egfx_caps_advertise` version/flags lines (the capsets the
-Windows App offers — undocumented anywhere), the negotiated-mode log line,
-and a screenshot. Optional: dev build + `XRDP_GFX_TRACE=1` for send/ack.
-
-**Expected outcome matrix — interpretation and action:**
-
-1. **Caps ≥ v10, AVC444 v2 negotiated, render clean** (incl. colorkey
-   drive and an odd-origin high-contrast edge): historical blocker
-   REMOVED. Strongest PR line. Record evidence; done.
-2. **Clean until resize, garbled after**: generation/reset handling on
-   reconnect-resize. Retest at fixed size via fresh login; if it
-   reproduces, treat as OUR bug candidate (reset keyframe / caps redo),
-   trace before blaming the client.
-3. **Immediate full-frame chroma garble on v2** (Nexarian-symptom):
-   client fault isolated (our stream is spec-conformant + mstsc-clean).
-   Retest `avc_mode = "420"` — expected clean. If a v1 (0x000E) trial is
-   wanted, add a small caps-classifier override knob (config-only,
-   follow-up). Ship policy: per-client negotiate-down documented in
-   gfx.toml docs; PR narrative = "fault isolated, contained by caps
-   gating + config".
-   **2026-07-23: observations VOIDED, rerun required.** v2 black and
-   `444v1` black were observed, but on a contaminated rig: after
-   cycling codecs on one backend session, the known-good AVC420
-   baseline ALSO went black on reconnect — xrdp restart does not reset
-   the Xorg session, so none of those runs count (screenshot kept in
-   `PR-demo/mac_windows_app/` as an observation only). NEW MANDATORY
-   DISCIPLINE for every codec trial: use
-   `PR-demo/tail_flush_ab/reset_420.sh` — fresh login per trial
-   (backend session killed; sesadmin kill is unimplemented, TERM to the
-   sesexec pid == session id works) and every trial bracketed by green
-   AVC420 baselines; a black 420 bracket voids the trial. The `444v1`
-   knob remains available for the disciplined rerun.
-4. **Garbled even on AVC420**: NOT a 444 defect — baseline H.264 issue
-   (our stream or Mac decoder). Capture and root-cause before any claim;
-   do not paper over with RFX (honesty rule).
-   **EXCLUDED 2026-07-23:** AVC420 on the iMac is owner-verified fully
-   functional — first connect and dynamic resize both render correctly.
-   The v2 black-screen defect (outcome 3) is isolated to the 444 layer.
-5. **Client advertises only CAPVERSION_81 or AVC_DISABLED**: classifier
-   already serves AVC420/RFX — confirm session works stock-like; the
-   captured capsets are themselves the deliverable (nobody upstream has
-   them documented). **OBSERVED on the Android Windows App (SM-S936U,
-   2026-07-23):** `AVC_DISABLED` on all v10 capsets, no `AVC420_ENABLED`
-   on 8.1, undocumented `0x000B0101`/`0x000B0300` flags `0x1a2`; session
-   correctly ran RFX (capture in `UPSTREAM_GAP_ANALYSIS.md` §2a).
-   **Counter-observation (Windows desktop Windows App, 2026-07-23):** the
-   desktop variant advertises NO `AVC_DISABLED` (flags 0x0 through 10.7)
-   — so the Mac variant plausibly allows AVC too, making outcomes 1/3
-   more likely than 5. Reminder: run the Mac test SINGLE-monitor, or the
-   multimon gate skips H.264 before any negotiation (as happened in the
-   dual-monitor Windows session).
-6. **No garble but stalls/frozen frames**: pacing/ack issue, not chroma.
-   Dev build + trace; compare `frame_id` ack cadence vs mstsc run.
-7. **Fails before GFX negotiation** (TLS/transport): environment, not
-   codec — fix tunnel/cert first, outcome not attributable to AVC444.
-
-**Acceptance:** verdict + capsets + screenshot recorded in
-`UPSTREAM_GAP_ANALYSIS.md` §2a (required-test #2 closed either way), and
-the PR narrative updated ("blocker removed" or "fault isolated + policy").
-
-## Reconnect after codec switch renders black — suspected real bug, TODO (2026-07-23)
-
-Observed live on the dev box (VAAPI): one backend Xorg session, serial
-reconnects negotiating v2 → 444v1 → 420; the final reconnect on the
-KNOWN-GOOD AVC420 path rendered black. A codec change across
-disconnect/reconnect to a persistent session must work — clients
-legitimately reconnect with different caps (and admins flip gfx.toml).
-Suspects, in order: (1) xorgxrdp capture-mode renegotiation — the session
-was created with full-chroma AVC444 capture (`CC_GFX_AVC444`) and the
-reconnect renegotiates a different capture/codec combination; (2) stale
-per-monitor encoder/converter state in xrdp_encoder across module
-reconnect; (3) egfx surface re-create vs xorgxrdp shmem framing mismatch.
-- Repro recipe is deterministic and cheap on this box (no Mac needed):
-  connect xfreerdp on 420-fresh session (confirm renders), flip avc_mode,
-  reconnect, flip back to 420, reconnect → black?
-- First forensic: XRDP_GFX_TRACE=1 (dev build) on the black reconnect —
-  are frames encoded+acked (client shows black content) or is the
-  encoder/capture idle (no damage delivered)?
-- Out of upstream-PR scope unless the disciplined rerun shows it affects
-  single-codec operation; document as a known limitation if PR#1 ships
-  before the fix.
-
-## Port AVC444 wire-layout serializer + test to clean branch — TODO (2026-07-22)
-
-Delivered on dev: the RFX_AVC444_BITMAP_STREAM body serialization was
-extracted from `gfx_wiretosurface1_avc444` into an exposed
-`out_RFX_AVC444_BITMAP_STREAM()` (`xrdp_encoder.{c,h}`, no behavior change —
-identical byte sequence, placeholder/backfill included) and unit tested in
-`test_avc444_metablock.c` (`avc444_wire` tcase): ONE PDU, LC=0 in info-word
-bits 30..31, cb == metablock+luma length, chroma sub-stream immediately
-after, both metablocks over the same rects, stream ends after chroma. This
-is the direct regression guard against the prior fork's pair-split-across-
-frames defect (luma LC=1 / chroma LC=2 in separate GFX frames).
-
-- Porting rule: NO separate fix commit — fold the serializer extraction
-  into slice 5 (metablock emission, same file/pattern) or slice 8 if 5
-  stays folded into 8; the `avc444_wire` tests travel with it; the
-  `gfx_wiretosurface1_avc444` call-site change lands in slice 8.
-- Re-run the per-slice bisectability walk for rewritten slices after.
-- Acceptance: clean branch `make check` includes the avc444_wire tests;
-  `git diff` dev-vs-clean for these files stays scaffold-only.
-
-## Multimonitor AVC444 (one ffmpeg child per monitor) — IN PROGRESS (2026-07-24)
-
-**GATES the AVC444 upstream port** (owner, 2026-07-24): must be done before the
-`LC=1`/`LC=2` reframe is ported to `avc444-ffmpeg-upstream`. See
-`docs/avc444_upstream_port_plan.md` gate 3.
-
-The single-monitor MVP limit is one eligibility condition, not
-architecture: the encoder data path is per-monitor already
-(`avc444_conv[16]` / `avc444_ffmpeg_handle[16]` keyed by `mon_index`,
-lazy per-surface create at per-surface dims, per-surface resize/teardown),
-and GFX/xorgxrdp already run one surface per monitor (RFX multimon uses
-the same dispatch — observed live 2026-07-23, dual-monitor Windows App).
-
-- DONE — code: dropped `monitorCount <= 1` from the ffmpeg-AVC eligibility
-  gate in `xrdp_mm_egfx_caps_advertise`; the probe coded size now comes from
-  `xrdp_mm_avc444_probe_dims()` = LARGEST single monitor (per-axis max over
-  `minfo_wm`, 16-aligned), NOT the virtual-desktop bounding box (which can
-  exceed a backend's per-session limit — T4 NVENC 4096x4096 — and would
-  wrongly fail the candidate). One ffmpeg child still encodes one monitor's
-  surface, so probing one monitor is representative.
-- DONE — test: `tests/xrdp/test_avc444_multimon.c` unit-tests the
-  probe-dims geometry (no-monitor→screen, dual 1024x768→single 1024x768,
-  per-axis max on mixed sizes, 16-align round-up, NULL guard). `make check`
-  green (73/73).
-- DONE — harness: `PR-demo/multimon_offline/` drives a real 2×1024×768
-  `xfreerdp /multimon` (client X = xf86-video-dummy, 2 outputs) and asserts
-  the server path: `monitorCount 2`, ONE ffmpeg probe at `1024x768` (NOT the
-  2048×768 virtual desktop), `Matched H264/AVC444 (ffmpeg)`, and two mapped
-  surfaces — no encoder fallback.
-- BLOCKED (env) — live run NOT executed in the dev container: its process
-  guard reaps background X servers/clients at tool-call boundaries (dummy
-  `Xorg :95` reaped, exit 144; same guard that killed `chroma_strip_anim`).
-  A persistent client X + `xfreerdp` + xrdp across the handshake can't be
-  held here. HONEST STATUS: multimon geometry is proven by the unit test
-  (deterministic, in CI); the live 2-monitor render is pending a run on an
-  unguarded host (owner rig / dev box directly) — do NOT claim it green
-  until that run passes. Then dual-monitor live matrix (per-monitor resize,
-  layout change, mixed sizes) on the Windows App client; extend smoke gate.
-- DONE — deployed via clean dev deb (2026-07-25): built
-  `dist/xrdp-dev_0.10.80+gitf852e3b3375b_amd64.deb` with
-  `scripts/build_dev_deb.sh` (per the new CLAUDE.md "Deployment" rule — no
-  hand-copied binary), backed up + preserved the box's `avc_mode=444`/VAAPI
-  `gfx.toml` (dpkg confold kept it; sha verified), `apt install`ed,
-  `daemon-reload` + restarted xrdp/sesman. Verified: `/usr/sbin/xrdp` is the
-  multimon build (`xrdp_mm_avc444_probe_dims` present), services active,
-  `:3389` listening, no startup errors. Pre-install binary backed up at
-  `/root/xrdp.premultimon.*.bak`.
-- SMOKE (single-monitor, new binary, 2026-07-25): 1024x768 CLEAN (ok=8
-  lag=0); 1920x1080 RED (ok=6 lag=2) — the WHITE keypress shows the previous
-  (blue) frame, `encoder_errors=0`. This is the DOCUMENTED PRE-EXISTING
-  1920x1080 white-frame-lag artifact (already A/B-proven pre-existing on
-  `ec0598f9`), NOT a multimon regression: the multimon change is
-  behavior-identical for single monitor (monitorCount=1 →
-  `xrdp_mm_avc444_probe_dims` returns `minfo_wm[0]` = the same 1920x1088 the
-  old `screen->width/height` code produced) and touches nothing in the
-  encode/delivery path. Per the strict-honesty rule this handoff is NOT
-  declared "smoke-clean" — the smoke gate is RED at 1920x1080. The
-  multimon-specific validation is the owner's onscreen 2-monitor test +
-  the offline harness on an unguarded host.
-- Docs: per-backend encoder-session limits (consumer GeForce ~8 NVENC
-  sessions; T4/VAAPI effectively unbounded); N children = N sessions.
-- Latency note: encoder thread encodes surfaces sequentially per frame
-  (~3-9 ms each observed); acceptable 2-3 monitors, parallelize only if
-  proven needed.
-- Upstream scope recommendation: keep PR#1 single-monitor as certified;
-  multimon = follow-up PR (changes eligibility surface, own review).
-
-## Isolate the macOS Windows App AVC444 black screen — our-wire vs client-bug — TODO (2026-07-23)
-
-DISCIPLINED RESULT: the macOS Windows App blacks BOTH AVC444 v2 AND v1
-(different aux packing, identical failure → chroma math exonerated) while
-rendering AVC420 + RFX. Common factor = the AVC444 dual-view wrapper
-(RFX_AVC444_BITMAP_STREAM info word + aux sub-stream). Independently
-reproduces Nexarian's 2025 Mac report on our defect-free, unit-tested,
-spec-conformant implementation → strong evidence of a real Mac-client
-AVC444 defect, but NOT yet isolated from an xrdp-shared wire assumption.
-Two cheap discriminators to close it:
-
-- **(a) DONE 2026-07-23 — Windows clients render ours (necessary, NOT
-  sufficient).** Three Microsoft Windows clients (UWP Windows App,
-  mstsc.exe, RDCMan) negotiated AVC444 v2 (0x000F) and rendered clean on
-  the pristine post-fix stream. mstsc = Microsoft's reference decoder →
-  our ChromaV2 wire parses on Windows. But these clients tolerate our
-  stream; they do not prove a *strict* decoder accepts it.
-- **(b) DONE 2026-07-24 — GROUND TRUTH FLIPS THE VERDICT (see item
-  below).** A local stock Windows Server 2025 (own KVM VM, no infringe)
-  emits AVC 4:4:4 that the macOS Windows App **negotiates AND renders**
-  fine. So the Mac 4:4:4 decoder is NOT categorically broken — it works
-  against Microsoft's wire. The Mac blacks ONLY on *our* stream. This
-  isolates the fault to a **real wire-format delta between our AVC444 and
-  Microsoft's** that the Mac's stricter decoder rejects while
-  xfreerdp/mstsc tolerate.
-
-Acceptance: verdict recorded in `UPSTREAM_GAP_ANALYSIS.md` §2a; the wire
-delta hunt gets a concrete byte-diff + `avc444_wire` assertion.
-STATUS: SUPERSEDED. The prior "genuine Mac-client AVC444 defect, our wire
-exonerated" conclusion is WITHDRAWN — it rested on lenient decoders only.
-Ground truth (b) shows the Mac renders Microsoft's 444, so the defect is
-(at least partly) in our stream. New load-bearing item: "Find the AVC444
-wire-format delta vs Microsoft" below.
-
-## Ground-truth capture: stock MS AVC444 vs the macOS Windows App — DONE (2026-07-24, VERDICT FLIPPED)
-
-RESULT (load-bearing, not a nicety): a self-owned stock **Windows Server
-2025 Datacenter Eval** (build 26100) running locally under KVM on this box
-emits AVC 4:4:4 that the **macOS Windows App negotiates AND renders**. The
-Mac's 4:4:4 decode path therefore WORKS against Microsoft's wire — it is
-not categorically broken. Since the same Mac client blacks on our xrdp
-AVC444 (v1 and v2) but renders 420/RFX, the fault is a **real wire-format
-gap in our stream** that the Mac's stricter decoder rejects. This WITHDRAWS
-the earlier "genuine Mac-client defect / our wire spec-conformant"
-conclusion (which rested only on lenient clients: xfreerdp, mstsc, RDCMan).
-
-Confirmed **without tapping TLS** — we own the server, so its own graphics
-stack logs the negotiated profile per connection:
-- Rig: `/work/vm/` — `win2025.raw` (VHDX→raw, unattend.xml injected offline
-  via ntfs-3g for headless OOBE), `run_vm.sh` (q35+OVMF, 8 GiB/4 vCPU, AHCI
-  disk + e1000e NIC, user-net hostfwd 13389→3389 / 12222→22, filter-dump
-  `rdp.pcap`), creds in `/root/.testvm_cred`. GPO `AVC444ModePreferred=1`,
-  `AVCHardwareEncodePreferred=0` (software 444 — GPU-not-required verified).
-- Per-connection proof = RdpCoreTS/Operational **Event 162** at the client's
-  connect time (from `qwinsta`), attributed to the client via **Event 169**
-  `client operating system type`:
-  - macOS Windows App: OS type **(6,0)=OSX**, gfx ver `0xB0101`,
-    **AVC available: 1, Initial profile: 2048 (0x800 = AVC 4:4:4)** — renders.
-  - xfreerdp `/gfx:AVC444`: OS (4,7)=UNIX, `0xA0701`, avail 1, profile 2048.
-  - xfreerdp `/gfx:AVC420`: OS (4,7), `0x80105`, avail 0, profile 2 (control).
-  QEMU NAT rewrites all sources to 10.0.2.2, so IP can't distinguish clients;
-  the OS-type + gfx-version fingerprint does. Client-side corroboration:
-  34 `rdpgfx_read_h264_metablock` H264_METABLOCKs in an 8 s xfreerdp capture.
-- CAVEAT: Event 162 = negotiated/initial profile, not a per-frame chroma
-  guarantee. To prove full 4:4:4 pixels actually land on the Mac, next run a
-  chroma test pattern (fine red/blue edges that only survive 4:4:4) on the
-  server and confirm sharp on the iMac. This is one build (26100).
-
-Historical context (superseded plan) below; we did NOT need TLS MITM
-because owning both endpoints makes FreeRDP the decrypted tap.
-
-We have never compared our AVC444/AVC420 GFX bytes against a genuine
-Microsoft RDP server — all "frame sequence" comparisons to date were (a)
-our own encoder output diffed across ffmpeg versions/encoders/branches and
-(b) reading the Nexarian fork *source*. The MS-RDPEGFX spec is the only
-"reference" we've checked our wire against, by reading. A real capture
-would be ground truth for: the exact RFX_AVC444_BITMAP_STREAM layout a
-Windows client actually expects (LC field, metablock rects, dual-view
-packing), the MS non-standard color-conversion matrix (jsorg71's named
-hard problem), and whether the macOS Windows App's AVC444 black-screen is
-a client bug or something our stream does differently from a real server.
-
-- Setup (NO GPU NEEDED — verified against MS first-party docs 2026-07-23):
-  a **Windows 11 Pro or Enterprise** VM, no GPU/vGPU. AVC444 has a
-  documented SOFTWARE encoder path; a GPU only accelerates it and is
-  mandatory only for HEVC. GPO under Computer Config > Admin Templates >
-  Windows Components > Remote Desktop Services > RD Session Host > Remote
-  Session Environment: ENABLE "Prioritize H.264/AVC 444 graphics mode for
-  Remote Desktop connections"; leave "Configure H.264/AVC hardware
-  encoding" Disabled/Not Configured (forces software encode — desired,
-  there is no GPU). Not Server-only; the two GPOs are independent (444 =
-  codec/mode select, hw-encode = GPU-vs-CPU). Sources: learn.microsoft.com
-  graphics-enable-gpu-acceleration ("enable AVC/H.264 even without GPU
-  acceleration"; "if you disable or don't configure [hw-encode], we will
-  always use software encoding") and graphics-chroma-value-increase-4-4-4
-  ("You don't need to use GPU acceleration to change the chroma value").
-  VERIFY the server is actually emitting 444-in-software before trusting
-  the capture: event log Applications and Services Logs > Microsoft >
-  Windows > RemoteDesktopServices-RdpCoreTs > Operational, **Event ID 162
-  text = Avc444FullScreenProfile** (444 active; HevcProfile = HEVC
-  instead) and **Event ID 170 = AVC hardware encoder 0/absent** (software).
-  Then connect the SAME macOS Windows App. If the Mac renders 444 from a
-  real MS server, the client is exonerated and the fault is our wire
-  (huge — concrete wire-diff bug). If the Mac ALSO blacks from a real MS
-  server, the client is broken for 444-on-Mac and our AVC420-for-Mac
-  policy is vindicated. Cheapest sanity check before any capture work:
-  the ~15-min GPU-less VM + Event-162 read settles the GPU question
-  itself.
-- Interception: install a trusted root CA on the iMac, MITM the RDP TLS
-  (RDP uses TLS/CredSSP; a proxy with the trusted cert can terminate and
-  re-originate) and capture the decrypted GFX PDUs; OR run the MS server
-  in a VM and packet-capture with the server's private key / a patched
-  FreeRDP shim as the recorder. Wireshark's rdpegfx dissector decodes the
-  caps + wire-to-surface PDUs once decrypted.
-- Deliverable: a byte-level diff of a real server's AVC444 keyframe PDU
-  vs ours at the same resolution; feed any delta back into the encoder /
-  wire serializer and the `avc444_wire` unit test.
-- Authorization: owner-run on owner-controlled hosts only; document scope.
-
-## Find the AVC444 wire-format delta vs Microsoft — TODO (2026-07-24, LOAD-BEARING)
-
-Now the highest-value open item. Ground truth (above) proved the macOS
-Windows App renders Microsoft's AVC 4:4:4 but blacks ours → there is a
-concrete difference in our RFX_AVC444_BITMAP_STREAM / H.264 bytes that a
-strict decoder rejects. Goal: capture both wires at the same resolution
-and byte-diff until the rejected element is found; encode the fix as an
-`avc444_wire` unit assertion.
-
-- Capture MS side (decrypted, no TLS MITM needed — we own the server):
-  patch/point a FreeRDP recorder at the local Win2025 VM (build with
-  `WITH_GFX_FRAME_DUMP=ON`, or a small WLog/hook at
-  `rdpgfx_recv_wire_to_surface_1_pdu` to dump `codecId` + raw
-  `bitmapData`). The Debian `xfreerdp3` build has `WITH_DEBUG_RDPGFX=OFF`,
-  so codecId isn't logged — either rebuild FreeRDP with the debug/dump
-  options or add the hook. Capture a keyframe at a fixed size (e.g.
-  1024×768 and 1920×1080).
-- Capture our side: same client, same sizes, against xrdp with
-  `avc_mode=444`; reuse the metablock trace already wired up.
-- Diff candidates to inspect first (most-likely strict-decoder trip
-  points): the AVC444 info word (cbAvc420EncodedBitstream1 length + LC
-  bits 30–31), luma/chroma metablock region-rect coverage and count,
-  regionRect vs surface bounds, quantQualityVals presence/qp, the H.264
-  bitstream framing itself (SPS/PPS in-band vs extradata — our resolved
-  dump_extra history), NAL/annexb vs avcc, and the ChromaV2 aux packing
-  (0x000F) vs Microsoft's.
-- Deliverable: named byte-level delta + a fix in the encoder / wire
-  serializer + an `avc444_wire` assertion that pins it; then re-verify the
-  macOS Windows App renders our stream.
-- Also worth: the chroma test-pattern confirmation (fine red/blue edges)
-  to prove MS 4:4:4 pixels actually reach the Mac, closing the Event-162
-  "negotiated ≠ per-frame" caveat before deep byte-diffing.
-
-## macOS dump_extra branch mis-render (headerless x264) — WON'T CHASE (2026-07-23)
-
-Under bracket discipline, a fresh-login run of libx264-without-repeat-
-headers (ladder correctly engaged: pristine probe fails → dump_extra on,
-single SPS/PPS per keyframe verified) still blacks the macOS Windows App,
-while the SAME dump_extra branch renders from NVENC on the T4. Not a
-regression: this config never worked on any prior build (probe fail →
-RFX), and its only real-world occupant (NVENC) is validated. Decision:
-do not chase — no shipped default/runbook recipe uses a headerless-x264
-encoder, and the probe now logs a WARNING steering toward in-band-header
-encoders. If revisited, the structural suspect is slice count (x264
-`-tune zerolatency` emits 2 IDR slices; NVENC 1) — testable by pinning
-`-x264-params slices=1` and one disciplined Mac run. Cheapest to fold
-into the batched T4 hour alongside the NVENC 444 rerun.
-
-## Re-fold slice 7 on the clean branch with the STATIC dump_extra config — TODO (2026-07-23, reshaped 2026-07-26)
-
-**GATES the AVC444 upstream port** (owner, 2026-07-24: "NVENC Linux test
-regressed"): the NVENC-on-Linux path must be green — the blanket-`dump_extra`
-regression below poisons the cleanroom for macOS — before the `LC=1`/`LC=2`
-reframe is ported. See `docs/avc444_upstream_port_plan.md` gate 2.
-
-The clean branch `avc444-ffmpeg-upstream` @ `c74a09e7` carries the
-BLANKET dump_extra (slice 7 `04e43ee2`), which is the regression fixed on
-dev by `7927efa7`. 2026-07-26 owner directive replaced the adaptive form
-in turn with the STATIC gfx.toml `dump_extra` + verify-once probe (see
-the item at the top; adaptive had a timeout→wrong-policy hazard). The
-slice-7 refold must use the static-config form — do not port the adaptive
-intermediate. Same no-separate-fix-commit rule; re-run the bisectability
-walk after. The `c74a09e7` cleanroom deb and any artifact built from it
-are POISONED for the macOS client — do not hand out.
-
-## Probe must log child stderr — FOLDED (2026-07-26) into "static dump_extra + verify-once probe" (top item)
-
-`xrdp_ffmpeg_avc444_probe()` drains and discards the child's stderr, so a
-probe failure logs only `ffmpeg probe FAILED` with no reason. The T4/NVENC
-global-header failure (PRD §25, 2026-07-22) took a live shim + off-box NUT
-replay to diagnose; child stderr in the log would not have named this
-particular cause (the child was silent) but eliminates the largest suspect
-class (bad args / missing device / missing encoder) in one glance.
-
-- Scope: probe loop only — feed `err_fd` reads through the existing
-  `log_child_line()` (as the runtime path does) instead of discarding.
-- Also log WHICH internal check failed (timeout / EOF / NUT error /
-  non-monotonic pts / reset-keyframe validation) at WARNING.
-- Also log WHY the H264 candidate was skipped when no probe runs at all
-  (client caps refusal vs multimon gate vs config) — the 2026-07-23
-  dual-monitor Windows App session matched RFX with no probe line and
-  the reason was only inferable from code reading.
-- Acceptance: a probe failure line is followed by the child's stderr (if
-  any) and the failing-check name; unit tests unaffected.
-- Lands on the dev branch first; ports to the clean branch only by folding
-  into slice 7 (same rule as the dump_extra fix — no separate fix commits
-  on the clean branch).
-
-## Upstream clean-room preparation — TODO (2026-07-17)
-
-Transition from the dev branch to a reviewable upstream PR against `devel`.
-The dev branch stays as-is (history + scaffold); the PR is rebuilt clean.
-
-### Owner decisions (locked)
-- **Strip `XRDP_GFX_TRACE` diagnostics from the PR.** All three layers:
-  the send/ack trace in `xrdp_mm.c` (`gfx_trace_on`, the send/ack log lines)
-  and the damage-bbox + enc `submitted_seq/returned_seq/inflight/centerY`
-  trace in `xrdp_encoder.c` (`gfx_enc_trace_on`, `gfx_trace_rects`). Safe
-  because the invariant it revealed is already asserted deterministically at
-  the API: `test_avc444_ffmpeg.c` requires every encode call to return
-  `READY` with `desktop_sequence == submitted` and `flush_next` → `DONE`
-  (commit 4eb72b0c), and the fail-loud `sequence mismatch` / `restarting
-  encoder` ERROR path is exercised by the smoke gate. Stripping the trace
-  removes a debugging aid, **zero** regression coverage.
-- **Strip `tail_flush` from the PR.** It was only ever a workaround for the
-  runner desync that the synchronous encode fixed; it is now a structural
-  no-op (nothing is ever in flight). Remove the ini knob and both arming
-  sites: `xrdp_tconfig.{c,h}` (`avc444_ffmpeg_tail_flush` field + parse),
-  `xrdp_encoder.h` (`avc444_flush_enabled`), the arming blocks in
-  `xrdp_encoder.c`, and the `tail_flush` docs in `gfx.toml` / `gfx.toml.5`.
-  Keep `flush_next` — that is the teardown/resize drain, unrelated to the
-  spammer.
-
-### Base the clean-room branch on `origin/devel`, not local `devel`
-Cut the clean branch from `origin/devel` (currently 8812646d, 2026-07-16;
-remote cache is synced — do not run `git fetch`, this env has no push/fetch
-creds). Against that ref our branch is **41 ours-only / 3 origin-only**,
-merge-base `3af31df3` (Jul 2). Do NOT use the local `devel` ref (21d38d0c,
-Jun 17) as the base or comparison — it is ~a month stale, and that staleness
-is why `git diff devel..HEAD` shows a set of changes that are **upstream, not
-ours**, and must NOT appear in the PR:
-- `libxrdp/xrdp_caps.c`, `xrdp_rdp.c`, `xrdp_sec.c` — upstream CVE fixes
-  (CVE-2026-55639 GCC OOB read, and merged fork hardening).
-- `vnc/vnc.c`, `vnc/vnc.h` — CVE-2026-41252 heap overflow + desktop-size
-  symbols.
-- `sesman/sesexec/session.c` — CVE-2026-55626 (Xvnc UDS TCP disable).
-- `librfxcodec` submodule pointer bump.
-Rebasing the AVC444 layers onto a freshly fetched `origin/devel` drops all of
-these automatically (they are already upstream). After fetch, sanity-check:
-the only non-AVC444 file the PR touches should be `common/xrdp_client_info.h`
-(`CC_GFX_AVC444 = 6`).
-
-### Excluded from the PR (dev-branch scaffold, keep in dev branch only)
-`PR-demo/**`, `tests/xrdp/avc444/repro_mbparity/**`,
-`tests/xrdp/avc444/FINDINGS_*.md`, `repro_*.py`, `tools/gen_isoluma.py`,
-`PRD.md`, `BACKLOG.md`, `CLAUDE.md`, `*_config.md`, `scripts/build_dev_deb.sh`,
-`dist/` debs, and all untracked scratch (burr/partialGreen PNGs, `tester_key`,
-`xrdp-PR.tar`, `iptables.rules`, `*.Po`, …). Add a `.gitignore` hygiene pass.
-**Keep** `tests/xrdp/avc444/PROVENANCE.md` (the NUT independent-implementation
-/ licensing attestation) — fold it into the NUT slice and the PR cover letter;
-maintainers will ask.
-
-### Divergence risk: none textual, one semantic touchpoint to verify
-The only commits on `origin/devel` past our merge-base (3af31df3..8812646d)
-are the 3-commit DYNVC multi-chunk reassembly fix (#3829), touching a single
-file, `libxrdp/xrdp_channel.c` — which our branch never touches. Zero conflict
-surface, so **do not rebase the dev branch to "derisk"**: there is nothing to
-resolve, and the clean-room slices apply onto `origin/devel` (which already
-has the fix) as a clean textual apply. One semantic note: large full-screen
-AVC444 frames are chunked over drdynvc, and #3829 corrects multi-chunk
-reassembly — a correctness fix we *inherit* by basing on `origin/devel`.
-Confirm during clean-room smoke that large AVC444 frames reassemble cleanly on
-the new base (expected: fine / better; not a risk, just a checkpoint).
-
-### Acceptance
-- PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
-  AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
-- Every slice builds and `make check` passes on its own (bisectable).
-  Re-verified 2026-07-22 after the dump_extra rewrite for the four
-  rewritten commits (`04e43ee2` → tip `c74a09e7`): per-slice `make` +
-  `make check` green, plus the gated real-ffmpeg suite (64/64) against
-  ffmpeg 7.1 and 8.1 at every slice. Slices 1–6 are untouched by the
-  rewrite (identical hashes).
-- No `XRDP_GFX_TRACE`, no `tail_flush` anywhere in the diff.
-- astyle (pinned 3.4.14) + cppcheck clean; `/* */` comments only.
-
-## Commit reorganization plan (clean-room slices) — DRAFT (2026-07-17)
-
-Rebuild the feature as ~10 modular commits, each one subfeature, bottom-up so
-every commit compiles and tests green (leaf utilities first, wire integration
-last). Each slice carries its own `Makefile.am` / test-registration hunk so it
-is self-contained. Suggested order:
-
-1. **caps enum plumbing.** `common/xrdp_client_info.h` (`CC_GFX_AVC444`),
-   `xrdp/xrdp_types.h`. No behavior change; the capture-capability constant
-   everything else references.
-2. **RGB→NV12 dual-plane converter + 16/32 chroma alignment.**
-   `xrdp_avc444_convert.{c,h}` + `test_avc444_convert.c`. Pure/deterministic;
-   includes the mstsc chroma-split (“burr”) fix via `chroma_align` and its
-   `test_avc444_width_align` / `odd_dims` guards. Self-contained leaf.
-3. **H.264 Annex-B validator.** `xrdp_h264_annexb.{c,h}` +
-   `test_avc444_h264.c`. Pure leaf (NAL header / SPS-PPS-IDR checks).
-4. **NUT demuxer.** `xrdp_nut.{c,h}` + `test_avc444_nut.c` +
-   `fixture_4frame.nut` + `PROVENANCE.md`. Pure leaf; independent-impl note
-   ships with it.
-5. **AVC420/AVC444 metablock emission.** The `out_RFX_AVC420_METABLOCK` +
-   region-rect serialization in `xrdp_encoder.c` + `test_avc444_metablock.c`.
-   (If not cleanly separable from dispatch, fold into slice 8.)
-6. **AVC444/AVC420 caps negotiation.** `xrdp_avc444_caps.{c,h}` +
-   `test_avc444_caps.c`. Pure logic: pick v2 / 420 from the client capset.
-7. **External stock-ffmpeg runner (synchronous encode).**
-   `xrdp_encoder_ffmpeg.{c,h}` + `test_avc444_ffmpeg.c`. Spawn/argv incl.
-   one-frame `-probesize` and the `dump_extra,h264_mp4toannexb` bsf chain
-   (global-header muxer vs encoders with no in-band SPS/PPS repeat —
-   h264_nvenc; folded in 2026-07-22 after the T4 finding, branch rewritten,
-   slice now `04e43ee2`), NUT read loop, **synchronous** encode + sequence
-   verification, resize lifecycle. Built correct from the start (no desync/
-   deadlock to “fix later”); the test carries both regression guards plus
-   the global-header-encoder probe regression. Depends
-   on 2–4. **No tail_flush, no trace.**
-8. **Encoder integration / dispatch.** `xrdp_encoder.{c,h}`: select the ffmpeg
-   backend, feed converter output, emit metablock + bitstream. Depends on
-   2–7. **No trace.**
-9. **eGFX caps advertise + wire-to-surface send.** `xrdp_mm.c`: advertise the
-   AVC444 capset, connect-time encoder probe, send path. Depends on 6/8.
-   **No send/ack trace.**
-10. **Config + docs.** `xrdp_tconfig.{c,h}` (`[avc444_ffmpeg]` path/avc_mode/
-    encoder_args parse) + `test_tconfig.c` + `tests/xrdp/gfx/*.toml`,
-    `gfx.toml`, `xrdp.ini.in`, `docs/man/gfx.toml.5.in`. **No tail_flush.**
-
-Notes: build glue travels with its slice (do not defer Makefile edits to a
-trailing commit, or intermediate commits won’t build). The synchronous-encode
-+ probesize design is baked into slice 7 as the *initial* implementation — the
-dev branch’s desync/deadlock/fix archaeology is intentionally not replayed;
-its rationale belongs in the PR description, with `PRD.md` §25 as the
-long-form reference.
-
-### Slice-order amendment: latent upstream multimon fix FIRST (2026-07-25, owner directive)
-
-BOTH repos' clean-room slicing must put the **GFX H.264 multimon shmem-split
-fix first** (the per-monitor shmem offset fix for the latent UPSTREAM
-cross-monitor plane-overwrite bug — see "dual-monitor drag burr" item), and
-**rebase the real AVC444 feature work on top of it**, so the merged history
-attributes scope and ownership cleanly: the bugfix slice touches only
-upstream-reachable code paths (`CC_GFX_A2`/NV12 + the msg-62 offset field +
-`XUP_CLIENT_INFO_CURRENT_VERSION` bump) and stands alone as an upstreamable
-fix for the pre-existing AVC420-x264 GFX multimon hazard; the AVC444 slices
-then inherit the corrected layout instead of appearing to introduce/fix the
-bug themselves. Applies to xrdp (slices above renumber after it) AND
-xorgxrdp (`feat/avc444-yuv444-capture` rebases onto its fix slice). Keep the
-fix slice scoped to the real blast radius (GFX H.264 family), not narrowed
-to AVC444. Status: TODO, after the fix lands + owner onscreen PASS.
-
-### New-T4 bring-up + fps-methodology findings (2026-07-26 evening) — measurement campaign record
-
-New T4 (3.83.30.88) brought from bare AMI to deployed per DEPLOY_RUNBOOK:
-deps + xrdp `4932908b` + xorgxrdp `251bc4d` debs, nvenc gfx.toml
-(dump_extra=true), Xwrapper. ubuntu cred generated on-box into root-owned
-`/root/.ubuntu_cred` (never printed). Smoke gate PASS 8/8 both sizes,
-edge=1.000, AVC444 v2 probe OK incl. 3840x2400. Owner dual-monitor layout
-session validated (2560x1440+594+0 over 3840x2400+0+1440).
-
-**End-to-end fps on the offscreen rig measures the CLIENT, not the server.**
-Full evidence chain (thunar orbit, owner layout, uprobes + shipped
-XRDP_GFX_TRACE + client stack sampling):
-
-- 4B pair end-to-end: 14.5 fps AVC444; ack-credit window pegged at
-  frames_in_flight (2 or 4 — fps identical, knob not binding);
-  send(N)->ack(N) p50 260 ms; server admission turnaround (ack ->
-  capture+encode+send of freed slot) 18 ms p50; serialized dual-monitor
-  encode pair 24+44 ms (per-monitor ffmpeg processes exist but the single
-  proc_enc_msg thread + synchronous runner never overlaps them —
-  `inflight=0` on every trace line).
-- Eliminated: WAN RTT 25 ms (additive only, not stop-and-wait — credit
-  loop); TCP queues ~0 both ends; X blit 1-3 ms (x11perf); client CPU not
-  saturated (busiest thread 39%).
-- Convicted: xfreerdp software AVC444 post-decode path ~65 ms/frame
-  serial on one channel thread — stack samples: ~66% `yuv444_context_decode`
-  (4:4:4 reconstruction), ~20% `sse41_YUV444ToRGB`, ~14%
-  `av_hwframe_transfer_data`. A/B proofs: client /gfx:AVC420 -> 27.1 fps,
-  send->ack 113 ms (halved with WAN unchanged); VAAPI hw-decode client
-  build (Debian ships `-DWITH_VAAPI=OFF`; rebuilt 3.15.0 WITH_VAAPI=ON,
-  hw engaged — renderD128 open, hwframe transfers in stacks) -> 13.9 fps,
-  UNCHANGED, because H264 decode was never the dominant term.
-- Consequence recorded as PRD FR-PROC-7 clause 9: aux (`LC=2`) send now
-  additionally requires spare egfx ack credit — client-declared flow
-  control, no new tunables; slow clients ride mains-only (measured 27 vs
-  14.5 fps upside), chroma converges on settle (smoke edge check pins it).
-- Environment incident (honesty rule): Ubuntu unattended-upgrades replaced
-  the nvidia userspace under the loaded driver mid-session (18:37); nvenc
-  probe failed -> that login silently matched RFX; caught before use,
-  tainted trace discarded. Counter-measure: unattended-upgrades disabled +
-  apt periodic off on the T4; rebooted to consistent 580.173; AVC444
-  re-verified. T4 rig config MUST NOT change under test.
-
-**Oracle (save-only) client** — `PR-demo/oracle_client/`: FreeRDP 3.15.0
-patched so `FREERDP_ORACLE_DUMP=1` makes the AVC420/AVC444 gdi handlers
-append each encoded surface payload to `/tmp/oracle_avc_s<id>.bin` and
-return success before decode/present: the frame ack then measures
-server+WAN only (client contributes ~0), and the dump is splittable into
-playable .h264/.mp4. Purpose: measure the true server fps ceiling (and make
-Lever-2's encoder-busy condition reachable). Timing-only instrument — the
-distro client remains the fidelity/smoke client; the smoke gate never runs
-against the oracle.
-
-Status: oracle A/B (4B pair vs pre-4B pair `52099149`+`ee1ec01`, server-only
-fps, same rig/orbit) IN PROGRESS; box to be restored to the 4B pair +
-re-smoked as the LAST step. Note the pre-4B arm is only measurable at all
-because the oracle never decodes (old xrdp lacks the metablock even-extent
-fix f0104284 that SIGABRTs strict decoding clients).
-
-### Oracle A/B result: 4B vs pre-4B server-only fps (2026-07-26, T4 3.83.30.88)
-
-Same rig, same orbit (thunar circle, bottom 4K of the owner dual layout),
-oracle save-only client (acks at arrival), quiet-gated (glycin storms —
-see below), as-shipped config (fif=2 default, no trace), nvenc.
-
-| pair | fps (all stages lockstep) | frame period p50 | structure |
+| Box | Packages | Encoder config | Status |
 |---|---|---|---|
-| pre-4B `52099149`+`ee1ec01` | **24.0** | 34.0 ms | serial: encode 25.4 + ack 7.5 + turnaround; capture ack-released (ack->cap 3.4 ms) |
-| 4B `4932908b`+`251bc4d` | **29.1** | 26.5 ms | pipelined: period == ENCODE p50 (26.4 ms); encode-throughput-bound |
+| ~~T4 (EC2, Tesla T4 / NVENC, 4 vCPU)~~ **DECOMMISSIONED 2026-07-31** — kept only so its recorded numbers stay attributable to a config | `xrdp-dev 0.10.80+git20260730013346.52b8798839ad` (#45 steps 0–7 + log clock fix), `xorgxrdp-dev 1:0.10.80+git20260729225933.d77d05463e52` (step 6) | `PR-demo/t4_profile/gfx-t4-nvenc-ltr-g240-gate.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | **#55 E5-2 = 1.67× AMBER**, wire audit 7/7, smoke gate PASS at both sizes. **Box is gone**: #73's re-runs and #60's un-root-caused bimodality need a new reference target, and onscreen (UWP/macOS) was never walked |
+| T4 — previous state (2026-07-28, for reference) | `xrdp-dev 2a0279ef3aa1`, `xorgxrdp-dev 5b9650cafbc3` | `gfx-t4-nvenc-ltr.toml` — `-g 30000` | Rendered correctly onscreen on Windows (incl. multimon) and macOS (owner-tested) |
+| bisect fleet arm-n | image `34795577580b.xx5b9650c-xfce` | `gfx/arm-n.toml` — `aux_ltr_chain = true`, no `-g` (the runner pins it) | good on Windows multimon + macOS |
+| bisect fleet arm-r (2026-07-29) | image `f7acb5979788.xxd77d054` = xrdp #45 steps 0–7 + xorgxrdp step 6 | `gfx/arm-r.toml` — `aux_ltr_chain = true`, `intra_refresh_frames = 240` | #45 gates E1/E2/E3/E6/E7 PASS; its E5 number was payload-clocked (see `docs/experiments/45-intra-refresh-and-pump-set.md`). Kept as the 10 Hz-cadence reference arm |
+| bisect fleet arm-s (2026-07-30) | image `52b8798839ad.xxd77d054` = xrdp #45 steps 0–7 + the log clock fix, xorgxrdp step 6 | `gfx/arm-s.toml` (encoder block identical to arm-r), `SESSION_KIND=codeflood` | **#52 E5-2 arm: 29.9 ms mean per send = 2.13× over arm-t** — the #45 E5 gate, GREEN |
+| bisect fleet arm-t (2026-07-30) | image `5dae11f63adb.xxd77d054` = xrdp #45 steps **0–4** + the log clock fix, xorgxrdp step 6 | `gfx/arm-t.toml` (identical encoder block), `SESSION_KIND=codeflood` | #52 E5-2 **baseline** arm: 63.6 ms mean per send. Same xorgxrdp as arm-s, so the A/B isolates steps 5+7 |
 
-4B removes the ack+turnaround legs from the period entirely (period ==
-encode). The oracle's ack costs only ~7-14 ms, so the serial arm's penalty
-here is small; against a real client whose ack is slower the pre-4B period
-grows by that full amount per frame while 4B stays at encode — i.e. 4B
-makes server fps client-independent. Next ceiling is the serialized
-dual-monitor encode pair itself (24+44 ms in one thread) — exactly what
-FR-PROC-7 (halve via credit-gated aux deferral) and, later, cross-monitor
-submit overlap address. Oracle dump from the 4B arm splits into playable
-streams (277 main + 277 aux 3840x2400 frames / 12 s; aux ~20% of bytes).
+FR-H264-8 remains **EXPERIMENTAL**; `aux_intra_leaf` remains the shipped
+default. Gate status and evidence: `PRD.md` FR-H264-8.
 
-Deploy-record notes: avc444_pack_bench on the new T4: 4K vectorized pack
-7.89 ms/frame (matches old-box record). Two measurement-validity guards
-added after live incidents: (a) quiet gate in t4_measure.sh — fresh logins
-AND thunar launches spawn ~10 sandboxed glycin-svg icon loaders (~50
-CPU-s, all 4 cores pinned ~18 s; owner-spotted mid-run) — recording now
-requires sustained >=85 % idle with no live glycin loaders, checked at
-session start AND immediately pre-record; (b) keytest.sh moved to its own
-client display :98 with verified Xvfb geometry — sharing :99 with the
-layout rig's Xorg produced a false smoke FAIL at 1024x768 (client window
-mapped at the rig's +594+0 monitor origin; fixed sample coords read
-black; screenshots proved the server rendering perfect red/stripes).
-Also: /tmp on the T4 does not survive reboots — staged debs must be
-re-copied (a 4B "reinstall" silently no-oped on missing files; caught by
-dpkg -l verification; also note git-hash deb versions do not sort, always
-pass --allow-downgrades and VERIFY dpkg -l after every swap).
+> **`-g 30000` is a known-risky interim, not the target state.** Corrected
+> 2026-07-29 (arm-o): it does NOT *remove* mid-stream IDRs, it makes them
+> rare — the main child still emits a GOP IDR every 30 000 pairs (~11 min
+> at the measured 43.8 pairs/s), each still paying the ~630 ms aux-child
+> respawn. It also removes the only mechanism bounding invariant **I3**
+> (transitive dependency depth), so an encoder/decoder divergence would
+> persist until reconnect. **And it makes the re-key structurally dead:**
+> a main IDR resets the shared counter (`xrdp_h264_annexb.c:2450`), so at
+> `-g 30000` the counter peaks at 60 000 and can never reach the 65 024
+> threshold. The frame_num wrap is therefore being prevented by the GOP
+> IDR *by accident*, not by the re-key mechanism designed for it — change
+> `-g` and that protection silently changes character. The re-key only
+> fires first if `-g > 32512`. **Revert target is fixed** (#45 D7): `-g` =
+> `intra_refresh_frames` = 240, so GOP boundaries coincide exactly with
+> scheduled refresh indices and an unscheduled IDR ceases to be reachable.
 
-Final state: 4B pair restored and verified (dpkg -l), SMOKE PASS 8/8 at
-both sizes edge=1.000 post-restore. FR-CAPTURE-8 fps deliverable: DONE
-(29.1 vs 24.0 server-only, +21 % on the oracle rig, client-independent by
-construction). Next: FR-PROC-7 with the clause-9 credit gate.
+---
 
-### Lever 2 scope finalized: three policies, one construction (owner directive 2026-07-26)
+---
 
-Task #40 scope per PRD FR-PROC-7 clauses 10-12: implement the shared
-SUBMIT/COLLECT state machine (pending-completion records, event-driven
-collect, ordered completion emission, finalize-as-preempted error paths)
-and all THREE scheduling policies on it — (a) aux PREEMPT (clauses 1-9
-incl. the clause-9 credit gate), (b) multi-monitor BREADTH (concurrent
-per-child submits; cycle = max not sum), (c) DEPTH (outstanding<=2 per
-child; upload/encode overlap). DONE only when all three are functional
-and validated TOGETHER (oracle fps + cycle-partition signatures + full
-smoke gate incl. edge fidelity on the same build); each policy's
-correctness proven individually by deterministic offscreen unit tests
-(mocked ffmpeg seam, no GPU, no timers — see PRD clause 12 for the
-per-policy test matrix). Measured ladder to verify: 29 -> ~38 -> ~55 ->
-toward the 2x11 ms/picture T4 hardware floor.
+# Open work
 
-### macOS Windows App black on nvenc — bisect log (2026-07-26 evening, IN PROGRESS)
+## Execution order (owner directive, 2026-08-03): the backlog is LINEAR
 
-Record correction first: the "Mac rendered NVENC from the old T4" memory
-traces to one ambiguous PRD sentence; the BACKLOG's own T4 Windows/Mac
-client matrix was never completed. Treat Mac x NVENC as a NEVER-VALIDATED
-cell, not a regression. The only Mac-green data points are dev-box VAAPI
-(High, CQP, no HRD) and x264 in-band.
+#80 is the first FR-FLOW-1-conforming design and BLOCKS everything
+below it. Open items are renumbered #82+ into one line. Historical
+numbers stay as "(was #NN)" in each header and body cross-references
+keep the old numbers — this table is the map. DONE items keep their
+numbers.
 
-Evidence chain (all grounded, one Mac reconnect per arm):
-- T4 black on BOTH 444 and 420, immediately at connect, clean 16-aligned
-  single-monitor sessions included; server pipeline healthy; the Mac
-  stops sending egfx frame acks after <=2 frames -> 4B capture gate
-  starves (rect_id vs rect_id_ack frozen) -> permanent black. Server
-  robustness gap noted separately: 2 lost acks must never deadlock us.
-- Arm 2: the exact old-T4 pair (71179f67+e86bff0) on the new T4: BLACK ->
-  the whole xrdp range 71179f67..4932908b exonerated.
-- Offline QuickTime matrix (9 mp4s incl. the REAL black-arm wire bytes):
-  ALL render -> the elementary stream is VideoToolbox-decodable; the
-  failure lives in the Windows App's in-RDP annex-b/H264 feeding path.
-- Traffic diff good(vaapi)/black(nvenc), both AVC420, identical ffmpeg
-  8.0.1: nvenc-only features = per-frame pic_timing+buffering_period SEI,
-  nal_hrd VUI, Main profile, level 5.2, refs/dpb 3. Reshape of
-  profile/refs/dpb via encoder_args: still black -> those three
-  exonerated.
-- M1 (dev box, single-delta on the Mac-good server): baseline VAAPI CQP +
-  "-rc_mode CBR -b:v 20M -sei +timing" (adds HRD VUI + BP/PT SEI, keeps
-  High/5.1/refs1): **BLACK** -> conviction pocket = {HRD VUI in SPS} +
-  {buffering_period/pic_timing SEI NALs}. Reverted to baseline
-  immediately after verdict (owner protocol: revert after every black,
-  keep the live diff single-delta); revert byte-verified via oracle dump
-  (nal_hrd=0, no per-frame SEI).
-- NEXT: M1a = CBR + "-sei identifier" (HRD VUI, NO BP/PT SEI NALs).
-  Renders -> SEI NALs convicted (fix: strip SEI types 0/1 in the runner's
-  bsf chain for extradata-only encoders; offline-verifiable). Black ->
-  HRD VUI convicted (fix: SPS-level, harder; note nvenc emits HRD even at
-  constqp, so rc mode itself is not in the nvenc pocket).
+1. **#80** — credit frontier (absorbs #79; steps inside the item)
+2. ~~**#81** — WAN RTT simulation harness (netem on the fleet netns)~~ **DONE 2026-08-03**
+3. **#82** (was #76) — the unreproduced 26.7 ms x015 pump: reproduce or retire
+4. **#83** (was #77) — a faster producer
+5. **#84** (was #61f) — delivery-loop latency: encoder ack-clocked through a busy main thread
+6. **#85** (was #61c) — is the producer the ceiling (re-run on the ring)
+7. **#86** (was #61b) — textflood numbers re-established
+8. **#87** (was #61d) — codeflood-era ratios under textflood
+9. **#88** (was #61g) — oracle client 50–150 ms pauses
+10. **#89** (was #70B) — does the emit split buy anything
+11. **#90** (was #74) — lever-2 architecture decision
+12. **#91** (was #71) — multimon per-monitor ack window + m≥2 serial cost
+13. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest
+14. **#93** (was #73) — T4 re-runs under restored concurrency
+15. **#94** (was #53) — arm a monitor only when its pixels changed
+16. **#95** (was #54) — capture-side handoff: the remaining 2×
+17. **#96** (was #59) — capture share of the bottleneck thread
+18. **#97** (was #60) — T4 E5-2 bimodality
+19. **#98** — act on the flow-control literature survey (filed 2026-08-04; owner decisions needed on FoM + tier)
 
-Instruments built tonight: oracle save-only client (PR-demo/oracle_client)
-= per-arm byte verification without a Mac; QuickTime offline matrix
-(container path) now understood to exonerate only the codec layer, not
-the App's RDP path.
+## #82 (was #76) — fif = 2 is hiding a bug (owner directive, 2026-08-02) — REFRAMED by #78's runs; the fix moved to #79, since merged into #80
 
-### 2026-07-26 late: bisect methodology change — containerized matrix (owner directive)
+**Status after #78 Runs A/B (see #78, captures
+`i78_x017_pumpsplit_20260802` / `i78_x014_fif2_clocks_20260802`):**
 
-Two more host-breakage incidents from deb-swap iteration (xrdp-dev deb's
-`Breaks: xorgxrdp (<< 1:0.10.80~)` silently removed xorgxrdp-dev and
-deleted /etc/X11/xrdp/xorg.conf; an M1a config leaked into the M1b arm).
-Owner ruling: NEVER iterate a bisect by mutating the single deployed
-instance. New rig (CLAUDE.md "Bisect/diagnosis sessions" + task #42):
+* **The pump inflation this item was filed on did not reproduce.**
+  fif = 1 pump = 16.40 ms = fif = 2's 16.44, same hour, same host,
+  clean fleet, config identical to x015 but for two ring records.
+  x015's 26.7 ms is one unreproduced observation; its record carries a
+  dated supersede note. Open sub-question: what condition produced it
+  (candidates: transient host power/thermal state during the 02:07 run;
+  concurrent activity — the fleet-session state was not recorded then,
+  it is now, `fleet_sessions_after_runA.txt`). Reproduce-or-retire; a
+  rerun of the uninstrumented x015 pod needs owner approval.
+* **The fif = 1 defect that DOES reproduce** is the ack-window-gated
+  slot release chaining capture to the client round trip — mechanism,
+  trace and candidate fix in #78 item 3. That is the remaining
+  substance of this item.
+* Hypotheses 1 (cold capture pages) and 2 (10 ms poll timeout) were
+  refuted from the existing x014/x015 rings before the runs; hypothesis
+  3 (duty-driven clocks) is refuted as the steady-state explanation by
+  the runs themselves (pump equal at different duties, 52.9 vs 58.8 W).
 
-- Host restored to the untouched Mac-good baseline and frozen for the
-  session: xrdp-dev 52099149 + xorgxrdp-dev ee1ec01 + CQP gfx.toml,
-  session creation re-verified (AVC420/ffmpeg matched).
-- k3s single-node on the dev box (nested LXC; /dev/kmsg symlink,
-  KubeletInUserNamespace, conntrack-max-per-core=0, **native
-  snapshotter** — overlayfs pod rootfs breaks credential-changing exec:
-  sgid unix_chkpwd dies in ld.so RELRO mprotect EACCES, so PAM denies
-  every login; plain-dir snapshots restore normal behavior).
-- One pod per arm, each with pinned debs + own gfx.toml (ConfigMaps from
-  committed gfx/arm-*.toml), all live simultaneously on loopback
-  hostPorts; SERVER SIDE ONLY — client harness on the host untouched.
-- PR-demo/mac_bisect_matrix/: Containerfile, entrypoint, banner session,
-  per-arm tomls, k8s manifests, build_and_deploy.sh, verify_matrix.sh
-  (oracle-client byte verification of every arm before human handoff).
-- Matrix v1 (supersedes serial M1a/M1b plan — all arms at once):
-  arm-a :40000 CQP baseline (control-good) | arm-b :40001 CBR+timing SEI
-  (M1 control-black) | arm-c :40002 CBR+timing SEI+strip_sei (SEI NALs
-  stripped, HRD VUI stays; xrdp e96e655416dc) | arm-d :40003 CBR only.
-  Verdict rule: C renders => SEI NALs convicted (strip_sei = nvenc fix
-  candidate); C black => HRD VUI in SPS convicted; D pins whether plain
-  CBR drags in HRD VUI (byte-verify decides).
+**Original framing below, kept for the record.**
 
-### 2026-07-27: matrix verdict — HRD VUI in the SPS convicted
+**The reframing, and it is the whole item.** An earlier draft of this
+entry treated "does fif = 2 buy anything?" as the question and filed the
+34 % throughput loss at fif = 1 as an unexplained curiosity to be
+instrumented later. That is backwards. **If dropping to one frame in
+flight costs 34 % of throughput, the pipeline is leaning on a second
+in-flight frame to cover a stall — and the stall is the bug.** The design
+target is stated in PRD **FR-ACK-3**: *all the concurrency we need, at the
+cost of fif = 1.* The client ack window bounds what the CLIENT has
+outstanding; it is not a mechanism this server may use to obtain
+concurrency for itself.
 
-Owner tested all four arms in one sitting (Mac, Windows App):
-40000/arm-a RENDERS; 40001/arm-b, 40002/arm-c, 40003/arm-d all BLACK.
-- arm-c black with SEI NALs 0/12 (byte-verified) => per-frame BP/PT SEI
-  NALs EXONERATED as the trigger; the poison is in the SPS itself.
-- Field-level SPS diff arm-a(good) vs arm-c(black): the ONLY difference
-  is nal_hrd_parameters_present_flag=1 + nal_hrd_parameters() structure
-  + low_delay_hrd_flag. timing_info_present=1 in BOTH (exonerated);
-  profile/level/bitstream_restriction identical.
-- arm-d finding: Mesa emits HRD VUI + per-frame SEI from CBR alone
-  ("-sei +timing" redundant) — D was a second control-black.
-- CONVICTED: nal_hrd_parameters in the SPS VUI kills the Windows App's
-  in-RDP VideoToolbox path (QuickTime plays the same bytes fine).
-- Fix candidate (encoder-agnostic => covers T4 nvenc): post-encode SPS
-  rewrite clearing nal_hrd (+ strip SEI NALs, which reference HRD).
-  NEXT: sanitize_hrd knob on the diag branch, unit-tested against the
-  captured arm-a/arm-c SPS bytes, deployed as matrix arm-e :40004.
-- arm-e (:40004) added, xrdp-dev c693eeab5ec2 (diag branch): CBR poison
-  input + strip_sei + NEW sanitize_hrd knob — xrdp_h264_sanitize_hrd()
-  bit-exact SPS splice dropping nal_hrd/vcl_hrd + low_delay_hrd_flag,
-  EPB-safe, fail-loud, applied in pop_pair/pop_single (encoder-agnostic
-  => same knob is the T4/nvenc fix path). 4 new unit tests incl. golden:
-  captured arm-c SPS must rewrite to captured arm-a SPS byte-for-byte
-  (87/87 pass). AWAITING: byte-verify arm-e on the wire, owner Mac test.
-- 2026-07-27 VERDICT: arm-e RENDERS on the Mac => sanitize_hrd+strip_sei
-  is the proven fix. Productized: diag commits cherry-picked onto
-  dev/avc444_metablock_checkpoint (88/88 make check), deb versioning
-  fixed to monotonic commit-timestamp (bare git hashes broke dpkg
-  ordering AND tripped xorgxrdp-dev's contract guard Breaks: xrdp-dev
-  << 4932908b8842 against a strictly newer build).
-- T4 deploy (bd1ab35b791e + xorgxrdp 251bc4d, one apt transaction —
-  installing either dev deb alone REMOVES the other via mutual Breaks):
-  conffile protocol held (pre-install snapshot /root/xrdp-conf-backup-*,
-  --force-confold, cert.pem/key.pem silently replaced by dpkg and
-  restored from snapshot, MANIFEST byte-verified afterwards). gfx.toml:
-  exactly two lines added (strip_sei/sanitize_hrd), backup
-  gfx.toml.pre_sanitize_hrd. nvenc wire byte-verified through tunnel:
-  nal_hrd_vui=0, sei 0/33, reset=[SPS,PPS,IDR] then [P] — the SPS parser
-  handled the real nvenc SPS (nvenc emits HRD even at constqp).
-- Pack bench (deploy record, T4 Cascade Lake): 3840x2400 8.90 ms/frame
-  vectorized (48.58 scalar), 2000x1000 2.29, 500x200 0.09 — unchanged
-  from the 4B-era numbers (sanitize path touches only SPS-bearing
-  packets, not the conversion loops).
-- AWAITING: smoke gate result, then owner Mac test against the T4.
-- 2026-07-27 T4 verdict: Mac RENDERS on nvenc AVC420 + sanitize_hrd =>
-  fix proven on both encoders. Upgraded T4 to avc_mode="444" (one-line
-  gfx.toml change, backup gfx.toml.pre_444_upgrade). Wire byte-verified:
-  AVC444 v2 LC=1/LC=2 interleave, single sanitized SPS (nal_hrd=0), SEI
-  0 anywhere, aux P-frames share the main parameter sets per the
-  single-decoder model — the known-good reframe shape. Smoke gate PASS
-  8/8 keys at 1920x1080 AND 1024x768 with color-edge fidelity 1.000
-  (vs 0.67 under 420) — full 4:4:4 chroma confirmed through the
-  deployed binary+config. AWAITING owner Mac 444 test.
-- 2026-07-27 NEW SYMPTOM: Mac renders T4 AVC444 with WRONG COLORS
-  (regional hue casts: whites->cyan, magenta streaks — aux chroma
-  misassembly signature), while the SAME wire is color-correct on
-  xfreerdp (smoke classified 8/8 colors, edge 1.000) and mstsc was fully
-  functional earlier. 420 was color-correct on the Mac. Colour VUI
-  identical VAAPI vs nvenc (709 full range both) — matrix/range
-  declaration exonerated. => Mac's 444 chroma reconstruction vs our aux
-  packing. arm-f :40005 added: build 52099149 (pre even-align/4B) +
-  VAAPI CQP + avc_mode=444. Mac verdict splits: correct colors =>
-  packing regressed in 52099149..bd1ab35b (suspect f0104284 metablock
-  even-align); wrong colors => Mac 444 color fidelity never validated,
-  investigate ChromaV2 interpretation difference.
-- arm-h rework (owner rule: no manual container patching — declarative
-  fix only): build script now pairs xorgxrdp per-arm; arm-h =
-  xrdp bd1ab35b + xorgxrdp 251bc4d (the T4 pair) — the baked-in ee1ec01
-  spoke xup contract 20260726 and sesman rejected logins against
-  bd1ab35b's 20260727. Rebuilt+redeployed; login verified, wire matches
-  T4 shape (nal_hrd=0, sei=0), AVC444 v2.
-- 2026-07-27 G/H verdicts (Mac + Windows UWP): G (old pair 52099149+
-  ee1ec01, CQP) fully clean on BOTH clients. H (T4 pair bd1ab35b+251bc4d,
-  CBR mimic + strip+sanitize) = Mac wrong color LOCALIZED to regions
-  after new damage (clean on connect/resize; block-aligned chroma
-  garbage trailing window drags — see caseH_localized_wrong_color png);
-  UWP on H connects but blurry text (suspect CBR 20M quality starvation,
-  not chroma — UWP wallpaper shows NO wrong-color blocks). T4 (real
-  nvenc, constqp): Mac wrong color at immediate connect, UWP fine.
-  Reading: incremental-damage aux/metablock geometry regression in the
-  new pair; strict Mac blits chroma garbage, xfreerdp/UWP tolerate.
-- arm-i :40008 queued: new pair + G's EXACT CQP config (no CBR/knobs) —
-  single-delta vs G = deb pair only. Mac wrong-after-damage on I =>
-  code pair convicted outright; UWP sharp on I => H blur was CBR config.
-- T4 instance TORN DOWN (owner, 2026-07-27) until caseH is fixed on both
-  UWP and macOS — /root/.t4_host is stale; smoke gate and T4 scripts
-  paused. Re-validation path when fixed: fresh T4 from bare AMI via
-  DEPLOY_RUNBOOK (proven in task #39), deb pair install, smoke gate,
-  owner Mac+UWP test. Bisect proceeds entirely on the local matrix:
-  arm-i :40008 (new pair + G CQP config, single-delta vs G) and arm-j
-  :40009 (xrdp 649b447c = 4B commit, pre f0104284-even-align, paired
-  251bc4d) split the two suspect commits.
-- Hypothesis B CLOSED (2026-07-27): tools/sanitize_hrd_corpus_check.sh —
-  19/19 streams (VAAPI CBR x10 resolutions incl. 3840x2400; x264
-  nvenc-shaped level5.2/refs3, pic_struct, vbr-hrd, x3 resolutions each)
-  pass field-exactness (SPS after == SPS before minus exactly the HRD
-  block; bitstream_restriction/max_dec_frame_buffering untouched),
-  pixel-exact decode (framemd5), idempotency. The rewrite does not
-  corrupt any SPS shape in scope. Hypothesis A (decoder-side main/aux
-  pairing slip) is now the lead: arm-K next = deliberate one-frame aux
-  delay fault injection for visual signature comparison vs the T4.
-- arm-K verdict (owner, 2026-07-27): "40010 didn't wedge, reject" — a
-  steady one-frame aux/main slip does NOT reproduce the T4 signature
-  (and is visually invisible on xfreerdp): hypothesis A in its simple
-  form rejected.
-- HONESTY-RULE VIOLATION recorded (owner, 2026-07-27): arm-H ("VAAPI
-  pretending to be nvenc") was used as a source of wire-level claims
-  about the real nvenc path, and the actual T4 captures were left in
-  /tmp and lost to a container restart. Both are now codified in
-  CLAUDE.md ("Never diagnose the real component through a stand-in";
-  captures archived durably under /work). Corrective action: T4
-  relaunched by owner (52.205.130.199), REAL nvenc wire recaptured.
-- T4 re-bring-up (2026-07-27, restored AMI at 52.205.130.199): found
-  mid-teardown state — xrdp/sesman running from DELETED inodes of old
-  c74a09e7d000, all xrdp packages `rc`, no /root/.ubuntu_cred, gfx.toml
-  pointing at a (benign, argv-logging) /usr/local/bin/xrdp-ffmpeg-shim.
-  Redeployed bd1ab35b791e + xorgxrdp 251bc4d in ONE apt transaction
-  (both verified `ii`), conffile snapshot /root/xrdp-conf-backup-*,
-  path restored to /usr/bin/ffmpeg, knobs = nvenc constqp qp20 +
-  dump_extra + strip_sei + sanitize_hrd + avc_mode 444, ubuntu cred
-  regenerated on-box into root-owned /root/.ubuntu_cred (never
-  printed), stale-session check clean (sesman loaded 0 sessions),
-  xdotool reinstalled (missing on this AMI; smoke harness dependency).
-  Deb pair identical to the already-benched bd1ab35b791e build — the
-  recorded pack-bench numbers stand (no rebuild).
-- REAL nvenc wire facts (2026-07-27, captures archived in
-  PR-demo/mac_bisect_matrix/captures/): at identical 3840x2400,
-  full-SPS field diff real-nvenc vs Mac-clean arm-I (VAAPI CQP):
-  level_idc = 51 on BOTH (earlier "level 5.2" claim was WRONG);
-  max_num_reorder_frames = 0 on BOTH (reorder exonerated);
-  nal_hrd = vcl_hrd = 0, SEI = 0 main+aux, aux carries no SPS
-  (sanitize+strip verified on the real path). The REAL declaration
-  deltas: profile_idc 77 vs 100, max_num_ref_frames 3 vs 1,
-  max_dec_frame_buffering 3 vs 1, pic_struct_present_flag 1 vs 0
-  (+ cosmetic aspect/timing-units/mv-range). Lead hypothesis now
-  GROUNDED: dpb=3 permits a conformant decoder (VideoToolbox) to hold
-  frames before output; delayed output breaks client-side main/aux
-  chroma pairing => wrong color. Clean arms all declare dpb=1.
-- FIX-CANDIDATE ARM deployed on the T4 (config-only, real encoder):
-  encoder_args += "-refs 1 -dpb_size 1" (-refs alone only reached
-  refs/dpb=2). Recaptured wire: refs=1, dpb=1 — buffering declarations
-  now byte-equal to the clean arms; full-SPS diff vs the refs3 capture
-  shows ONLY those two fields moved (single-axis test; profile 77 and
-  pic_struct 1 still differ and remain suspects if the Mac still shows
-  wrong color). Stream decode-verified. gfx.toml backups:
-  .pre_capture_redeploy, .pre_refs1. SMOKE PASS 8/8 keys at 1920x1080
-  AND 1024x768, edge fidelity 1.000, 0 encoder errors. AWAITING owner
-  Mac test on the T4 (expected: wrong-color-at-connect gone if the DPB
-  axis is the cause).
-- DPB axis REJECTED (owner Mac test, 2026-07-27): refs=1/dpb=1 wire
-  still full-screen wrong color at connect. Deeper structural inventory
-  (PR-demo/mac_bisect_matrix/wire_inventory.py, real captures): the
-  interleaved decode-order structure is IDENTICAL between real-nvenc
-  and clean VAAPI wires — same [SPS,PPS,IDR],[auxP],[mainP],[auxP]...
-  LC1/LC2 alternation, continuous frame_num 0..N across main/aux,
-  single slice/frame, POC type 2 both (no reordering possible),
-  gaps_in_frame_num=0 both, PPS equal modulo deblock-present + High-only
-  tail, ref model equivalent (VAAPI explicit MMCO vs nvenc sliding
-  window, both = prev-decode-order-frame reference, which is why both
-  emit near-IDR-sized P frames). arm-I clean wire even carries SEI =>
-  SEI presence/absence is not the axis. Elimination logic: T4 420 with
-  the SAME nvenc VUI rendered clean on the Mac => remaining suspects
-  must be declarations whose effect is OUTPUT TIMING (invisible in 420,
-  fatal to 444 main/aux pairing). Config ladder continued on the REAL
-  encoder: -profile:v high deployed (profile 77->100, chroma fields now
-  match clean arm). Full remaining wire delta vs Mac-clean arm-I:
-  pic_struct_present_flag 1 vs 0 (BEHAVIORAL suspect — output timing),
-  constraint_set4/5, aspect(sq), timing units (same 120fps ratio), mv
-  hints (all informational). Wire re-verified sanitized (hrd 0/0, SEI
-  0). SMOKE PASS 8/8 both sizes edge 1.000. AWAITING owner Mac test on
-  profile-high config. If STILL wrong: next is a one-bit in-place SPS
-  rewrite clearing pic_struct_present_flag (no bit-shifting — flag flip
-  only), then the last resort is slice-data-level (encoder-internal)
-  differences.
-- Profile axis REJECTED too (owner Mac test, 2026-07-27): high-profile
-  nvenc wire still full-screen wrong color. Owner directive: stop
-  one-bit-per-test config permutation; ship a DISCRIMINATING payload.
-  Built PR-demo/mac_bisect_matrix/chroma_probe.py ("chroma-probe",
-  installed on the T4, python3-tk): luma and chroma carry independent
-  readable clocks — numerals/labels are luma-only, timed patches use an
-  equiluminant palette (constant Y under BT.709 full, hue rotating in
-  U/V only), so ANY main/aux desync is readable off one screenshot:
-  fast(1Hz)+slow(1/8Hz) clocks measure chroma lag k in damage-frames;
-  frozen patch = aux stalled; legend+named bars detect channel
-  swaps/casts; 1px red/blue stripes = 4:2:0-vs-4:4:4; static-vs-motion
-  zones split connect-time faults from damage-path faults (caseH).
-  Validated end-to-end via xfreerdp3 against the live T4 (correct
-  decoder control): clocks tick, hues track indices — reference
-  screenshots committed (captures/chroma_probe_reference_xfreerdp*.png).
-  Probe left running in the T4 session; owner Mac connect reads the
-  failure vector directly. T4 config under test: nvenc profile-high +
-  refs1/dpb1 + strip_sei + sanitize_hrd + avc_mode 444.
-- Probe delivery reworked per owner rule (2026-07-27): remote GUI
-  lifecycle = ONLY (1) whole-session logoff or (2) login autostart —
-  codified in CLAUDE.md agent execution rules. chroma-probe is now an
-  XDG autostart entry (~/.config/autostart/chroma-probe.desktop for
-  ubuntu on the T4, versioned as PR-demo/mac_bisect_matrix/
-  chroma-probe.desktop); the stale session was logged off cleanly
-  (sesman: "Session on display X11-10 has finished"). Next owner Mac
-  connect = fresh login at Mac geometry with the probe fullscreen from
-  frame one — the video then captures onset from the very first frames.
-  Probe additions since first version: periodic FULL REPAINT EPOCH
-  (32 s) as accumulation-vs-poisoned-base discriminator; resize
-  adaptation. Also recorded: probe "crash" reports were false — PID
-  artifacts of setsid fork + self-matching pkill (the recurring lesson,
-  now structurally avoided by the two-operation rule).
-- MEASURED VERDICT from owner screen recording (2026-07-27, first-30-
-  frames analysis; evidence frames in captures/mac_video_k1_20260727/):
-  the Mac applies aux chroma exactly ONE damage-frame late on the real
-  nvenc wire. Probe reads: t=15s numeral 1 / in-patch 1 / hue
-  palette[0]; t=17s numeral 2 / in-patch 2 / hue palette[1] => k=1,
-  constant. Corroborating: wallpaper CHROMA visible under probe-black
-  LUMA (BT.709 V~220 at Y=0 renders the observed dark magenta beams) in
-  once-damaged regions, frozen; twice-painted static regions converge
-  correct (one-late chroma of unchanged content is correct content);
-  moving bar leaves trailing bleed (owner's cyan accumulation);
-  arm-K non-wedge consistent (server-side -1 aux delay just deepens
-  stale chroma to 2 on a static desktop, near-invisible). Config axes
-  already equalized when this was measured: profile high, refs=1,
-  dpb=1, hrd=0, sei=0. Surviving wire delta with a plausible
-  VideoToolbox output-timing mechanism: pic_struct_present_flag=1
-  (declared, while pic timing SEI is stripped). NEXT: strip_pic_struct
-  knob — in-place single-bit clear in the SPS VUI (no length change),
-  golden tests, deb, conffile-safe T4 deploy, owner probe re-read
-  (k=0 => fixed; k=1 => pic_struct exonerated, next axes: aspect/
-  timing-units/mv declarations, MMCO-vs-sliding-window).
-- strip_pic_struct knob implemented (2026-07-27): sanitize_walk refactor
-  in xrdp_h264_annexb.c (shared SPS walk; sps_rewrite_nal takes
-  strip_hrd/strip_ps flags; pic_struct_present_flag is the bit at
-  hrd_end, forced to 0 with everything else copied bit-exact),
-  xrdp_h264_strip_pic_struct() public, plumbed gfx.toml
-  [avc444_ffmpeg] strip_pic_struct -> tconfig -> mm (probe-latched) ->
-  encoder -> ffmpeg runner (fail-loud on both pop paths, like
-  sanitize_hrd). Verified against the REAL captured nvenc stream:
-  ffmpeg trace_headers field diff = ONLY pic_struct 1->0, framemd5
-  pixel-exact, idempotent (single byte 0x13->0x11, length unchanged).
-  Unit tests: golden clear (real T4 nvenc SPS vector), zero-flag
-  untouched (arm-a VAAPI vector), truncated fails - 91/91 make check,
-  astyle clean. Purpose: falsify the VT-output-pacing explanation of
-  the MEASURED k=1 aux lag; deploying to the T4 for the owner probe
-  re-read.
-- strip_pic_struct DEPLOYED to T4 (2026-07-27): deb pair
-  57a27245b362 + xorgxrdp 251bc4d one transaction (both ii), conffile
-  protocol: dpkg silently replaced cert.pem/key.pem AGAIN — and
-  comparison against the 19:08 backup shows that install had replaced
-  them too and the miss went uncaught (earlier check was inconclusive;
-  protocol slip recorded). Restored from the immediate pre-install
-  snapshot (the pair the owner's Mac used all evening). Live wire
-  re-verified: profile 100, hrd 0, SEI 0, dpb 1, pic_struct_present_flag
-  now 0 on the real nvenc stream. Smoke gate first run FAILED red
-  (login failure) — root cause a STALE keytest ssh tunnel holding
-  127.0.0.1:33890 from the previous smoke run, keytest's own tunnel
-  could not bind; killed by PID, rerun: SMOKE PASS 8/8 both sizes,
-  edge 1.000, 0 encoder errors. AWAITING owner Mac probe re-read
-  (k=0 and no residue => pic_struct convicted; k=1 persists =>
-  exonerated, next axes aspect/timing-units/MMCO).
-- pic_struct REJECTED (owner live, 2026-07-27 evening): bleed persists
-  with pic_struct_present_flag=0 verified on the live nvenc wire.
-  Owner also observed occasional bleed RESETS mid-epoch, not aligned to
-  the probe's 32s flashes — matching the -g 240 IDR cadence. This
-  CONFIRMS the decoder-state divergence model and exposes a probe
-  design flaw: the EPOCH flash repaints identical content, the encoder
-  skip-codes it, and skip blocks are exactly what propagate the
-  client's poisoned reference — only an IDR replaces every MB
-  unconditionally. Consequences: (1) top remaining axis = reference
-  marking (VAAPI clean wire: explicit MMCO ops per P slice; nvenc
-  broken wire: sliding window) — locally falsifiable by stripping MMCO
-  from the clean VAAPI stream (new diagnostic knob, single-delta arm);
-  (2) probe v3: double-strobe static repaint (second pass with 1-LSB
-  tweak forces a second aux update => k-immune correct baseline zone).
-- fault_strip_mmco knob implemented (2026-07-27): xrdp_h264_strip_mmco
-  in the annexb module — SPS/PPS param cache + non-IDR ref slice
-  header rewrite (adaptive MMCO op list -> sliding-window flag, CABAC
-  alignment re-padded, entropy payload byte-verbatim, whole-NAL
-  unescape/re-escape, fail-loud on any shape our encoders don't emit;
-  never grows the buffer). OFFLINE VALIDATION on the captured clean
-  arm-i wire (shared cache, runner call pattern): main 6 MMCO trace
-  lines -> 0, aux 0 adaptive flags remain, BOTH streams decode
-  pixel-exact (framemd5; aux via spliced parameter sets). Plumbed as
-  DIAGNOSTIC gfx.toml fault_strip_mmco (WARNING at latch), same chain
-  as fault_aux_delay. Unit-test note: no in-tree unit vector (a valid
-  CABAC P slice is impractical to embed); coverage is the ffmpeg-
-  validated capture run recorded here + fail-loud runtime contract.
-  Purpose: arm-l = arm-i's Mac-clean VAAPI CQP config + this knob =
-  single-delta reference-marking arm on 127.0.0.1:40011.
-- arm-K :40010 live (xrdp 8b8d17c2636a + 251bc4d, CQP 444 +
-  fault_aux_delay=true, WARNING-logged). Key datapoint already: the
-  deliberate one-frame chroma slip is INVISIBLE through xfreerdp
-  (screenshots clean at connect burst and on menu damage) — matching
-  the pattern where the T4 wire renders fine on xfreerdp/UWP but wrong
-  on the Mac. A pairing slip is only visible to strict reconstructors;
-  Mac connect to :40010 decides whether its visual signature matches
-  the T4 (wedge + discolor at connect).
-- k3s snapshotter native -> fuse-overlayfs (owner directive 2026-07-27,
-  "20 minutes on new arm deployment must be resolved"): native
-  full-copied the ~100k-file rootfs at first container create per
-  image; fuse-overlayfs (userspace, avoids the kernel-overlayfs sgid
-  bug) unpacks layers once and mounts overlays. Gates after the
-  switch: real RDP PAM login OK (sgid unix_chkpwd regression absent),
-  timed pod re-create 8s (was minutes; new-image first create = one
-  layer unpack, a few minutes worst case). Fleet re-created 12/12.
-  Config comment updated in /etc/rancher/k3s/config.yaml with the
-  rollback tell (PAM login failures -> suspect snapshotter first).
-- MECHANISM PROVEN (2026-07-27, offline, no live arms): cross-view
-  inter prediction in the single-context AVC444 interleave. Full
-  static-analysis proof + reproduction commands in
-  PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md. Summary:
-  our one-encoder interleave makes every frame's previous decode-order
-  frame the OTHER view; nvenc emits ~300 cross-view inter MBs per P
-  frame in flat regions (VAAPI CQP emits ZERO inter MBs — clean arms
-  were immune by accident); a client decoding the views per-view
-  resolves those MBs against same-view references -> wrong prediction
-  base -> chroma-dominant error (luma clips at black) that compounds
-  through the DPB (temporal) and intra prediction (spatial smooth
-  down-right beams), heals only at IDR, skip-coded EPOCH repaints
-  cannot heal. Reproduced deterministically in ffmpeg: per-view decode
-  of the committed T4 main stream diverges from correct-topology
-  decode at P frame 1 (60% pixels off) saturating ~83% / mean |d|~120
-  by frame 10 (background ROI black -> magenta 240,80,247, matching
-  the Mac video beams); arm-L per-view decode is bit-identical
-  (all-intra). The owner's monkeypatching veto was correct: header
-  knobs could never fix a payload/topology defect. arm-H's reported
-  local bleed is NOT explained (its capture is all-intra) and stays
-  quarantined under the stand-in rule.
-- TODO (awaiting owner sign-off): AVC444 per-view encoder contexts —
-  encode main/aux in two independent encoders (own DPB, own frame_num,
-  aux carries SPS/PPS + IDR cadence), removing cross-view references
-  structurally; correct for single-decoder AND per-view clients.
-  Acceptance: per-view ffmpeg decode of BOTH emitted streams is
-  bit-identical to interleaved decode on a probe corpus; in-tree unit
-  test asserts aux independence (SPS/PPS+IDR present, per-view
-  frame_num); T4 perf re-recorded per deploy rule; Mac onscreen
-  validation last.
-- RECONCILIATION with the two-encoder rejection (owner challenge,
-  2026-07-27): the rejected-thread note (this file, ~line 171; PRD
-  §6.5; vm/GROUND_TRUTH_win2022_avc444.md) stands and the "two
-  independent encoder contexts" TODO above is WITHDRAWN — two
-  processes = two frame_num chains + duplicate SPS into the client's
-  single decoder = desync garbage on Windows/xfreerdp, exactly as
-  recorded. New ground-truth measurement closes the apparent
-  contradiction: the real Win2022 wire is ONE chain (every frame,
-  main AND aux, is an nri=3 reference P on one continuous frame_num
-  sequence; SPS max_num_ref_frames=3/dpb=3) yet it is
-  REFERENCE-PARTITIONED: decoding gfxwin_anim with ALL 9 aux AUs
-  dropped leaves every one of 348 main frames BIT-IDENTICAL (mean 0,
-  max 0) to the full interleaved decode. Single chain != cross-view
-  prediction: Microsoft's encoder keeps a 3-deep DPB so same-view
-  references are always available and never predicts main from aux.
-  Our wire copies the chain structure but not the reference
-  discipline (ffmpeg-CLI nvenc picks the cross-view adjacent frame,
-  ~300 MBs/frame in flat regions) — so ours corrupts under ANY client
-  deviation from strict in-order single-decoder feeding (drop, defer,
-  per-view), while Windows' wire is provably robust to all of them.
-  This also means the Mac client's exact behavior (dropper vs
-  per-view) is no longer decidable from our data and no longer
-  matters: the fix target is the Windows property, not a client
-  model.
-- TODO (replaces withdrawn two-context item; needs owner sign-off):
-  AVC444 reference partitioning within the SINGLE encoder chain —
-  main frames must never reference aux frames (and aux never main
-  where avoidable). Candidate mechanisms to evaluate: (a) aux frames
-  as non-reference (nri=0, excluded from DPB; main chain then
-  self-links even at refs=1) — needs deterministic per-frame non-ref
-  control (nvenc enableNonRefP / VAAPI / x264 equivalents; ffmpeg
-  -nonref_p is "automatic", must verify determinism or find a
-  per-frame path); (b) Windows cadence (Lever 2 / FR-PROC-7,
-  LC=1-dominant + rare LC=2 catch-up) shrinks exposure ~14x but alone
-  does not eliminate cross-view refs at insertion points; (c) refs>=2
-  alone is NOT sufficient (original broken T4 wire was refs=3: nvenc
-  still picked cross-view refs in flat regions). ACCEPTANCE = the
-  ground-truth robustness test: decode our wire with all aux AUs
-  dropped and per-view; main frames must be bit-identical to the
-  interleaved decode (same test that passes on gfxwin_anim), run as
-  an offline corpus check before any Mac onscreen validation.
-- OWNER DIRECTIVE (2026-07-27, binding): the reference discipline MUST
-  be fixed by itself — main never references aux — with NO restriction
-  on how many aux frames are produced or when. Aux-cadence measures
-  (Lever 2 / FR-PROC-7) are IRRELEVANT as a correctness mitigation:
-  candidate (b) in the TODO above is struck as a correctness lever
-  (it remains a perf item only). A fix that only holds under a
-  particular aux rate converts a deterministic defect into a
-  load/timing-dependent heisenbug. Acceptance stays: drop-all-aux and
-  per-view decodes bit-identical at full 1:1 alternation.
-- PROBE RESULT (2026-07-27, T4 offscreen, unmodified /usr/bin/ffmpeg
-  8.0.1 + h264_nvenc on Tesla T4): -nonref_p is NOT respected. RED.
-  Synthetic 1:1 alternating input (testsrc2/smptebars interleave,
-  1600x900, 60 frames), 7 variants: shipped args (constqp qp20 bf0
-  delay0 g240 refs1 dpb_size1) with/without -nonref_p 1 -> outputs
-  BYTE-IDENTICAL (option silently ignored); dpb-free, vbr+
-  rc-lookahead 8, p1+ull, p4+ll+cbr, p7 -> all 59 P frames nri!=0 in
-  every variant. ffmpeg sets NVENC enableNonRefP, but that is a
-  permission, not a command — the driver never chose to emit non-ref
-  P in any tested config. Candidate (a) via the stock-ffmpeg CLI
-  contract is dead. Per-frame reference/pict_type control is an
-  API-level feature (AVFrame->pict_type / NVENC per-pic params) that
-  the external stock-ffmpeg pipe architecture (PRD §8.4) cannot
-  reach.
-- Surviving mechanism candidate (feasibility spike BEFORE any deploy,
-  provable offline by the bit-identity acceptance test): merged
-  single chain with rewriter-assisted aux leaves — main view from the
-  encoder as today (its chain then self-references only main frames
-  since aux never enters it); every aux frame coded ALL-INTRA and
-  spliced into the chain by the annexb rewriter as a non-reference,
-  non-IDR I frame (nal type 5->1 with idr_pic_id removed, nri=0,
-  frame_num per non-ref picture rules, single shared SPS/PPS).
-  DPB-inert aux leaves = drop-safe and per-view-safe at ANY aux
-  cadence; single decoder chain preserved for in-order clients.
-  Open feasibility questions: non-IDR all-I emission or IDR->I
-  rewrite correctness (CABAC init deltas between slice types 5/7 vs
-  2/7 contexts), PPS bit-compat across two encoder invocations.
-  NOT implemented; awaiting owner sign-off on the spike.
-- IN PROGRESS: aux_intra_leaf implementation (owner-ordered fix,
-  branch dev/avc444_aux_intra_leaf). Feasibility spike GREEN on real
-  T4 nvenc bytes (offline, aux_leaf_spike.py + ffmpeg framemd5):
-  main child P-chain + aux child all-IDR (-forced-idr 1
-  -force_key_frames expr:gte(t,0), verified to init WITH the shipped
-  -refs 1 -dpb_size 1 args) merged into ONE chain with aux as
-  non-reference non-IDR I leaves -> 30/30 main frames bit-identical
-  to the standalone main decode (leaves DPB-inert), 30/30 leaf frames
-  pixel-identical, zero decoder warnings; non-ref frame_num rule
-  settled empirically = PrevRefFrameNum+1 (fn=PrevRefFrameNum makes
-  ffmpeg fold the pictures). C implementation: xrdp_h264_aux_to_leaf
-  (annexb module; extends param cache with pic_init_qp/transform_8x8/
-  chroma offsets/scaling flags; strict main-vs-aux SPS/PPS compat
-  guard, fail-loud), runner leaf mode (second full runner instance
-  driven via encode_single; main child sees ONLY main frames), knob
-  gfx.toml [avc444_ffmpeg] aux_intra_leaf (default OFF = existing
-  behavior preserved). Unit tests: 4 new (golden vs python-spike
-  output on real libx264 vectors, non-IDR aux rejected, main without
-  ref VCL rejected, truncated aux rejected) -> 95/95 pass. NEXT: deb
-  build, T4 deploy, wire-capture acceptance (drop-aux + per-view
-  bit-identity on the real wire), xfreerdp render check, smoke gate.
-- DEPLOYED + VALIDATED (2026-07-27): aux_intra_leaf on the T4.
-  Deb xrdp-dev 0.10.80+git20260727225731.9539565594e3 installed
-  (dpkg conffile prompt resolved --force-confold; cert.pem/key.pem
-  verified byte-identical to the pre-install snapshot
-  /root/xrdp-conf-backup-20260727225840; xorgxrdp-dev 251bc4d still
-  ii). gfx.toml: aux_intra_leaf = true added, all other knobs
-  unchanged. Stale session Xorg logged off (sesman logged the clean
-  finish) before testing. WIRE (oracle capture, 434 records,
-  captures/t4_leaf_20260727/): main chain [SPS,PPS,IDR]+216 P all
-  nri=3 with per-view-consecutive frame_num; ALL 217 aux records =
-  single type-1 I slice nri=0 fn=main+1; main P frames shrank from
-  25-76KB (cross-view refs useless) to 0.6-2.5KB (real same-view
-  refs). ACCEPTANCE (the ground-truth robustness test, owner-set):
-  drop all 217 aux leaves -> 217/217 main frames BIT-IDENTICAL to
-  the interleaved decode, 0 decoder warnings — our wire now has the
-  Win2022 property (348/348). VISUAL (xfreerdp3 over tunnel, chroma
-  probe): k=0 (FAST/SLOW patch hues match numerals), background
-  black, worst named-bar deviation 4/255, no bleed, no trails
-  (captures/t4_leaf_20260727/t4_leaf_shot{1,2}.png). PERF: pack
-  bench on T4 unchanged (4K vectorized 9.05 ms/frame). SMOKE GATE
-  (last step): PASS both sizes, edge 1.000, encoder_errors=0.
-  REMAINING: Mac onscreen validation by owner (the decisive test);
-  aux leaf bitrate (~60KB/frame all-intra) is the known cost — perf
-  work only after Mac verdict.
-- OWNER VERDICT (2026-07-28): macOS Windows App renders the
-  aux_intra_leaf T4 build CLEAN — no chroma bleed, no wrong color.
-  The Mac wrong-color bisect is CLOSED: root cause cross-view inter
-  prediction in the single-context AVC444 interleave (mechanism proof
-  PR-demo/mac_bisect_matrix/CROSS_VIEW_REFERENCE_PROOF.md), fix =
-  reference-partitioned single chain (aux as non-reference non-IDR I
-  leaves), validated offline (217/217 aux-drop bit-identity), on
-  xfreerdp (k=0, colors exact) and now onscreen on the Mac.
-  Follow-ups (separate items, not started): aux leaf bitrate
-  (all-intra ~60KB/frame) optimization; diagnostic knob retirement
-  (strip_pic_struct/fault_* arms no longer needed); upstream PR
-  clean-room slicing includes this fix.
+**Why it cannot be flow control, which is what makes it a bug.** The
+encoder's own depth is provably one frame: `pump_pairs` waits for the set
+it just submitted and `collect_pair` verifies `desktop_sequence`, so a
+second frame is never inside a child. And the worker is never starved —
+its `wait` bracket is **0.002 ms/cycle** at fif = 1 (0.515 at fif = 2).
+There is no queue for the second credit to fill and no idle worker for it
+to feed. It is covering something else.
 
-## Reference partitioning UNCONDITIONAL + topology-invariance regression (owner directive, 2026-07-28) — DONE
+**Measured** (arms x014/x015, identical image and `gfx.toml` body, one
+environment variable apart; mechanism confirmed — all 8056 `send` records
+read `fif=1`, `id_server − id_client` = 0 on 8052 of them):
 
-- Owner directive (chat, 2026-07-28): (1) option 4b (aux-refs-aux two-chain
-  merge) is REJECTED as low-ROI — Lever 2 / sparse aux diminishes its
-  bandwidth win, and it forfeits structural topology invariance (per-frame
-  PicNum/ref-list-modification arithmetic with silent-wrong-pixels as the
-  failure mode). (2) The main-child + all-IDR-leaf-child architecture is
-  REQUIRED GLOBALLY for the AVC444 ffmpeg backend: remove the
-  aux_intra_leaf gfx.toml knob and hardcode the architecture, VAAPI
-  included — VAAPI's Mac-clean result was accidental immunity (100% intra
-  MBs, a Mesa mode-decision quirk; "building on sand") and it also gains
-  the main-view bandwidth saving (cross-view refs made inter useless).
-  (3) PRD must REQUIRE decode-topology invariance and the regression
-  suite gains a two-decoder (macOS-emulating) bit-identity check.
-  (4) Deploy as the next containerd fleet arm (arm-m, 127.0.0.1:40012).
-- Preflight measurements (dev box, 2026-07-28): h264_vaapi accepts the
-  leaf child's appended args verbatim (-forced-idr 1 -force_key_frames
-  expr:gte(t,0); rc=0, no stderr) and emits 30/30 IDR either way
-  (idr_interval=0 default makes every forced I an IDR). VAAPI SPS/PPS vs
-  the rewriter's compat guard: profile 100, poc_type=2, CABAC,
-  frame_mbs_only=1, no scaling matrices, slice_groups=0,
-  deblock_present=0, redundant=0, pic_init_qp=26, chroma offsets 0,
-  transform_8x8=0, log2_max_frame_num=8 — all in-range. No per-encoder
-  recipe or new knob needed.
-- Scope: remove aux_intra_leaf from tconfig/types/encoder.h/mm plumbing;
-  AVC444 cfg site in xrdp_encoder.c sets the (now internal) cfg flag
-  unconditionally; the cross-view interleave branch in encode_pair stays
-  in-tree but unreachable from xrdp — its removal folds into the
-  diagnostic-knob-retirement item (one reviewed slice). PRD: §6.5
-  design-consequence rewrite (requirement is the WIRE — one chain, one
-  SPS, single-decoder — not process count), FR-PROC-7 items 5/10
-  reworded, new FR-H264-7 decode-topology invariance. New committed
-  regression tool tools/avc444_topology_check.sh (interleaved vs
-  drop-all-aux vs per-view two-decoder framemd5 bit-identity).
-- Acceptance: make check green + astyle clean; arm-m (VAAPI CQP 444,
-  new build) live on :40012; oracle wire capture passes
-  avc444_topology_check.sh; main P-frame sizes on VAAPI recorded
-  (bandwidth saving evidence); results recorded here.
-- DONE (2026-07-28, code+PRD commit 39bb08a48377). Results:
-  - tools/avc444_topology_check.sh validated BOTH directions before
-    use: GREEN on the T4 leaf wire (217/217 main + 217/217 aux
-    bit-identical), RED on the pre-fix nvenc wire t4_ps0 (105/106
-    main, 106/106 aux diverge) AND on the Mac-CLEAN arm-i VAAPI wire
-    (3/3 aux diverge in a per-view decoder) — measured proof that the
-    old VAAPI interleave was never topology-invariant either; its Mac
-    pass was purely the client's feeding pattern (sand confirmed).
-  - arm-m live on 127.0.0.1:40012 (image 39bb08a48377-xfce + xorgxrdp
-    251bc4d, gfx/arm-m.toml = arm-i's Mac-clean VAAPI CQP 444 config,
-    NO leaf knob — the build has none). Pod log: probe OK 185 ms,
-    "aux_intra_leaf active (aux child pid 335)".
-  - Oracle wire captures/armm_leaf_20260728/armm.bin (1600x900):
-    topology check GREEN 3/3 main + 3/3 aux; leaves are type-1 nri=0
-    fn=main+1 (byte-verified); reset shape [SPS,PPS,SEI,IDR].
-  - VAAPI main-bandwidth saving, SAME 1600x900 oracle content as the
-    arm-i capture: main P 27.2/33.4 KB (old interleave, cross-view
-    refs useless) -> 1.16/0.48 KB (partitioned) — the nvenc-class
-    collapse. Aux: 23.7 KB P -> 33.0 KB all-intra leaf (known cost);
-    net per pair still smaller (~51 KB -> ~34 KB) on this content.
-  - T4 NOTE (strict honesty): the T4 still runs the OLD deb
-    (9539565594e3) whose gfx.toml line aux_intra_leaf=true is
-    LOAD-BEARING there — do NOT remove that line until the T4 is
-    redeployed with >= 39bb08a48377 (which ignores the key).
-  - Local astyle is 3.1 (CI pins 3.4.14): scripts/run_astyle.sh
-    reformatted unrelated tracked files and was reverted; only
-    hand-formatted edits shipped. Style verdict rests with CI.
+| | x014 fif=2 | x015 fif=1 |
+|---|---|---|
+| send interval mean / p50 / p99 | 18.5 / 18 / 47 ms | 28.2 / 28 / 32 ms |
+| **`pump`** (feed + encode + drain) | **16.6 ms** | **26.7 ms** |
+| `coll` (LTR rewrite) | 1.363 | 1.498 |
+| `wait` (worker had nothing) | 0.515 | 0.002 |
+| capture → egress | 34.8 ms | 55.6 ms |
+| egress → client ack | 14.4 ms | 6.0 ms |
+| capture → client ack | 49.2 ms | 61.5 ms |
 
+**Where the bug is: 100 % of the regression is inside `pump`** — feed the
+NV12 in, wait for the children, drain the coded bytes out. Nothing about
+a client ack window has a route into that bracket:
+`frames_in_flight` is read in exactly two places, `xrdp_mm.c:1691`
+(gating `mod_frame_ack` to xorgxrdp) and `:4234` (the trace line), and
+neither is on the encode path. Cycle closure residual is 0.004 ms, so it
+is not a mislabelling.
+
+**Ruled out.** Coded bytes per view +0.76 % (1 734 414 → 1 747 572);
+producer unchanged (15.94 → 16.26 ms/frame); host dump I/O *lower*
+(10.67 → 7.04 GB); all five E2 error counters 0; the knob demonstrably
+applied.
+
+**Open hypotheses, in the order to try them.** All concern what changes
+inside `pump` when the frame the worker feeds was captured 17.9 ms ago
+instead of 7.3 ms ago (the measured fifo residency):
+
+1. **The capture pages are colder.** The children read 27.6 MB/frame of
+   borrowed capture shmem by page reference (`vmsplice`, FR-PROC-6). At
+   fif = 1 those pages were written 2.5× longer ago. This predicts FEED
+   grows and ENCODE does not — which #78's instrument distinguishes in
+   one run.
+2. **`pump_set`'s poll loop.** Its timeout becomes a flat 10 ms once
+   nothing is left to write (`xrdp_encoder_ffmpeg.c`, `timeout =
+   want_write_any ? deadline - now : 10`). Worth reading against a
+   cadence change before blaming hardware.
+3. **CPU/GPU clock behaviour under a slower duty cycle** on this
+   shared-memory APU. Last, because it is the least actionable and the
+   easiest to reach for.
+
+**Method note:** #78's instrument is the first step, not another arm.
+Splitting `pump` into FEED and ENCODE+DRAIN discriminates hypothesis 1
+from 2 and 3 immediately, and it is a one-record-per-cycle change.
+
+**Record:** `docs/experiments/76-fif1-costs-throughput-in-a-bracket-it-cannot-reach.md`.
+**Capture:** `PR-demo/mac_bisect_matrix/captures/i76_x015_fif1_20260802`.
+
+## #78 — split the opaque `pump` bracket (DONE, 2026-08-02)
+
+**Decided:** the split (`feedend`/`outfirst`, commit `661ff5fc64fa`)
+measured FEED 2.61 / ENCODE 13.38 / DRAIN 0.41 ms and **falsified its
+own baseline** — fif = 1 pump equals fif = 2's (16.40 vs 16.44 ms), so
+x015's 26.7 ms is unreproduced (→ #76's open sub-question) and the
+reproducing fif = 1 cost is the ack-gated slot release (→ **#79**, the
+fix item). The ~5 ms deployed-vs-probe gap sits inside ENCODE, both fif
+modes equally. Duty-driven DVFS refuted as the steady-state
+explanation (pump equal at 52.9 vs 58.8 W GPU duty).
+**Record:** `docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`
+(includes the metal-host governor-pinning procedure for chasing the
+unreproduced condition).
+**Captures:** `i78_x017_pumpsplit_20260802`, `i78_x014_fif2_clocks_20260802`.
+
+## #79 — MERGED INTO #80 (2026-08-03; was TOP PRIORITY). The horizon form is superseded by the credit frontier; layer-1 evidence (step 1, DONE) and the retargeted steps are carried by #80. Body kept for the record.
+
+> **RESCOPED 2026-08-02 (owner directive), and the item's original title
+> is now a REJECTED design.** This item was "ungate the eager slot ack".
+> Plain ungating — removing the window test from the slot ack with
+> nothing in its place — is **unconditionally rejected**, per the
+> FR-ACK-3 amendment written the same day: it would leave the encoder
+> with no rate control of any kind against a link slower than its
+> output, and `trans_write_copy_s()` absorbs the difference into an
+> unbounded heap list. **`eager_slot_ack`'s default-false status is not
+> a mitigation** — a flag decides who discovers an unbounded queue, not
+> whether it exists — so the rejection does not depend on opt-in status
+> and there is no "evaluation-only" exemption. What #79 builds is the
+> horizon form: `client + H > server` on the SLOT ack, H from the
+> pipeline's depth, with the client ack window moving to where it
+> belongs (egress). Steps 2–4 below are rewritten accordingly; the
+> layer-1 result in step 1 is unaffected.
+
+**The defect** (evidence: `captures/i78_x017_pumpsplit_20260802`,
+analysis in its README and #78; **confirmed causally by the layer-1
+ack-delay sweep, `captures/i79_x017_ackdelay_20260802_s20` —
+step 1 below**). `xrdp_mm_update_module_frame_ack`
+(`xrdp_mm.c:1697`) emits BOTH producer acks — the ordinary/region ack
+and the #70 eager SLOT_ONLY ack — only while
+`xrdp_gfx_ack_window_open(client, server, fif)` is true. PRD #70
+specifies the eager ack's emission point as **max(absorb N,
+egress N−1)**; the client's ack appears nowhere in it, and the in-tree
+safety condition is the absorb frontier alone.
+
+**Correction, 2026-08-02 (this entry previously called the window gate
+"an implementation artifact of where the emission code lives" — that is
+wrong and reading the emission code says so).** The gate is deliberate
+and documented: `xrdp_mm.c:1692` states "the client's own ack window
+stays the OUTER gate in both modes: a client that stops acking still
+stops the producer". So the gate has a JOB, and ungating the slot ack
+removes it. **The throughput defect and the liveness bound are two
+separate things sharing one `if`, and the fix must be judged on both** —
+hence the validation gate at step 3, whose safety leg exists for exactly
+this.
+
+**Second correction, 2026-08-02 (same day): what this entry said would
+replace the gate does not exist.** The paragraph above originally
+continued: with the slot ack ungated the loop "keeps running until the
+transport stops draining, `frame_id_server` stops advancing, and the
+`server + 1` cap bites — a bound, but a socket buffer's worth of frames
+rather than one". **There is no such backstop.** `frame_id_server`
+advances when the frame reaches `trans_write_copy_s()`, which cannot
+fail for want of a wire (`common/trans.c:644-676`), and the transport's
+one byte throttle never charges GFX frames (details in the side-effects
+section below, clauses under "CORRECTION"). So `min(consumed,
+server + 1)` bounds frames between absorb and *handoff to xrdp's own
+heap*, never frames on the wire, and the plain ungate has no bound at
+all. This is what rescoped the item.
+
+**And the gate is on the wrong stage in the first place.** The window is
+applied to the producer's slot credit, while EGRESS is ungated
+(`xrdp_mm.c:4320` writes unconditionally) — measured: at D = 40, 2/3 of
+all sends went out with 1 or 2 frames unacked, under a fif = 1 window
+that forbids any. So `frames_in_flight` has never bounded
+client-outstanding directly; it bounds capture admission, and bounds the
+client only emergently by starving the producer. Recorded as the
+FR-ACK-3 amendment in `PRD.md` (2026-08-02), whose clause 1 is what
+steps 2–4 now implement: the ack window gates egress, a pipeline horizon
+gates the slot credit, and one comparison may not serve both.
+
+**Why fif = 2 masks it, quantified (both #78 runs, same day, same
+harness).** Window-open at the absorb instant needs
+`cliack(server)` already in. At fif = 2 the needed ack is one FULL
+period older (client ≥ N−2, whose egress was ~1.5 periods before
+absorb(N)) — the ack race has a period of headroom and loses only on
+p99 client hiccups. At fif = 1 the needed ack is `cliack(N−1)`, whose
+egress was ~8–10 ms before absorb(N), against an egress→cliack of
+p50 8.5 / p90 18.9 ms — a near-fair race. Measured withheld-credit
+(credit_emit − absorb(k−2)): **fif = 1: p50 0.04 ms, p90 36.4, >10 ms
+in 31.1 %** (782/2513; 336 of 338 worker waits >20 ms id-match these);
+**fif = 2: p50 0.02, p90 0.05, >10 ms in 1.5 %** (46/3141, 23 waits
+>20 ms). The SAME mechanism at fif = 2 is the long-known p99 send tail
+(47 ms in `i75_x014_rewrite_20260801`, 27 ms in Run B; the "66 of 3074
+cycles stall on the producer" note in the PRD concurrency table) —
+one defect explains both arms' tails, scaled by the window depth.
+
+**The fix.** Emit the SLOT_ONLY ack from
+`xrdp_mm_update_module_frame_ack` OUTSIDE the window-open branch
+(target unchanged: `xrdp_mm_frame_slot_ack_target` =
+min(consumed frontier, server+1) — which IS the PRD emission point;
+`target > frame_id_server_sent` monotonicity guard unchanged). The
+ordinary ack stays window-gated. NOT in scope: gating egress by the
+window (today egress is not gated at all — measured send-time
+id_server−id_client reaches 1 in 1566/5030 payload sends and 2 twice
+at fif = 1, up to 3 at fif = 2 — so fif's client-facing bound is
+currently emergent, not enforced; making the window actually gate
+egress, per FR-ACK-3's stated purpose, is a separate decision with its
+own risks, filed here as an open question, not bundled).
+
+**Pre-implementation verification (blocking).** The emission-order
+comment says the slot ack for a frame "never runs ahead of the region
+retirement it depends on". Today's eager design already lets the slot
+target run ONE ahead of `frame_id_region_sent`; ungated it can run
+2+ ahead while the window is closed. Before coding, read xorgxrdp's
+SLOT_ONLY handler (xorgxrdp `10fa3aa23033`, the paired deb — source
+outside this tree) and confirm slot release does not consume region
+retirement state, or emit any DUE region ack (its own guard,
+`server > region_sent`, references egress only) alongside. Whichever
+holds becomes a stated invariant in the commit.
+
+**Blast radius.** Reaches only: GFX + encoder + `eager_slot_ack =
+true` (config default off in the binary; armed per-arm). Non-eager
+configs emit no slot ack — byte-identical behaviour. Non-GFX uses a
+different ack path — untouched. At fif = 2 (shipped default) the fix
+changes the 1.5 % tail cycles only; expected effect is an IMPROVED
+p99, and any change beyond that is a regression to investigate.
+
+**Test method, in ladder order. The defect looks like a heisenbug (a
+31 % race tail) but is not one: the race only decides HOW OFTEN the
+losing state is entered; the emission decision inside that state is a
+pure function of (client, server, consumed, region_sent, server_sent,
+fif, eager). Each layer below removes the nondeterminism instead of
+sampling it — and layer 1 has now shown this is not a hopeful framing:
+under injected ack delay the "tail" resolves into a period-3 cycle with
+ZERO exceptions in 871 cycles.**
+
+1. **Deterministic reproduction on UNMODIFIED code — DONE
+   2026-08-02, mechanism CONFIRMED by intervention.** Record:
+   `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`;
+   capture `captures/i79_x017_ackdelay_20260802_s20`; harness
+   `PR-demo/mac_bisect_matrix/{ack_delay_proxy.c, ack_delay_sweep.sh,
+   i79_ack_delay_analyze.py}` + its self-test. Five legs on arm x017
+   (deployed HEAD, fif = 1): no-proxy, then D ∈ {0, 10, 20, 40} ms of
+   client→server delay, 20 s each. Control OK (proxy at D = 0 within
+   4.3 % of no-proxy; both reproduce #78 Run A). Delay confirmed
+   in-server, not from the proxy: `egress→cliack` +7.0/+17.8/+38.0 ms.
+   **Δwithheld/ΔD = 1.10; period 22.5 → 40.1 ms = 0.44 ms per ms of
+   ack delay; and the added period lands ENTIRELY in the withheld
+   cycles — the prompt-credit class is flat at 16.3–16.9 ms under a
+   40 ms ack delay, `pump` flat at 15.2–15.4.** The rival (egress
+   itself ack-gated) is excluded: at D = 40 exactly ⅓ of sends carry
+   2 unacked frames and ⅓ carry 1.
+   Two predictions were FALSIFIED as written, both from treating a
+   closed loop as open: withheld p50 came out 24.1/36.0/57.0 rather
+   than ≈ D (right slope, ~13 ms offset — the rate drops too, so the
+   opening ack is itself later), and the stall fraction saturates at
+   **exactly 2/3**, not 100 %. The reason is the finding: at D ≥ 20
+   the system locks into a **deterministic period-3 cycle,
+   `SS.SS.SS.`** — two captures withheld, one prompt, zero exceptions
+   in 480 and 391 cycles — because the credit target
+   `min(consumed, server+1)` releases the pair when the window opens.
+   **The 31 % "heisenbug" tail is that same cycle, intermittently
+   modulated by the ack race.** Deviation recorded: the item said 5 s
+   per leg; at 5 s the gate yields 45–51 usable cycles and the control
+   leg failed on noise (kept: `..._s5`), so the legs were rerun at
+   20 s — a sample-size correction to the same five legs.
+   (After the fix exists, the same sweep separates the builds: fixed
+   predicts withheld ≈ 0 and period FLAT in D.)
+   **LAN regime SETTLED from these same captures, 2026-08-02, at no
+   session cost** (`i79_lan_counterfactual.py`). The "prompt cycles run
+   at 16.4 ms" evidence was conditioned on the ack having arrived, so it
+   could have been measuring cycles pre-loaded by the stall in front of
+   them. Conditioning the prompt period on POSITION within a run of
+   consecutive prompt cycles kills that: the `direct` leg contains a run
+   of **28 consecutive ungated frames at 16.9 ms**, d0 a run of 22, and
+   the period is flat across positions (d0: 17.0 / 17.0 / 16.7 / 17.0 at
+   positions 1 / 2 / 3 / 4+). **The unmodified server has therefore
+   already been observed running the fixed build's LAN steady state.**
+   Limit stated: settled for runs to ~28 cycles (~0.5 s); a permanently
+   prompt pipeline is what step 4 measures. The d20/d40 legs contain no
+   runs longer than 1 — that is the period-3 lock restated, not a gap.
+   The owner's `period = max(acklat/K, compute)` model was checked on
+   the same data and does NOT fit at K = 1 (residuals +4.9 / +5.9 /
+   +10.8 / +5.3 / −7.9 ms): it misses in both directions because a
+   gated cycle is ADDITIVE (wait for the ack, then still capture and
+   encode) and because credit arrives in PAIRS at high D
+   (`min(consumed, server+1)` releases two), giving 1.2 frames per round
+   trip rather than 1. The unmodified loop is a duty cycle, which
+   `max()` cannot express — and that is what makes the model a
+   prediction for the fix rather than a dead end: a horizon makes every
+   cycle uniform, so the fixed build SHOULD fit. Added as a row in step
+   4's table.
+2. **THE CHANGE — a pipeline horizon on the slot credit, not an
+   ungate** (rescoped 2026-08-02; the plain ungate is rejected, see the
+   note at the top of this item and PRD FR-ACK-3 amendment clause 3).
+   * The eager SLOT_ONLY ack is gated on `client + H > server` with
+     **H from the pipeline's depth, not from `frames_in_flight`**.
+     **H = 3, decided 2026-08-02.**
+     * **CORRECTION, same day: the derivation committed a few hours
+       earlier was wrong and is retracted.** It said "client-outstanding
+       at #78's ack-latency p90 (18.9 ms) is ~2.1, so H = 2 has no
+       headroom and would bind on ordinary client jitter." That was
+       arithmetic on a p90, never checked against the quantity the gate
+       actually compares. Measured directly
+       (`i79_wedge_timeline.py`, the `server − client` value at every
+       absorb instant): **direct leg 0 in 68.6 %, 1 in 31.3 %, 2 in
+       0.1 %; d0 leg 0 in 61.9 %, 1 in 38.0 %, 2 in 0.1 %** — and the
+       single "2" in each leg is the **last frame of the capture**,
+       whose ack the trace ended before recording (the only ids never
+       acked are the final three of each run, contiguous otherwise). So
+       **H = 2 would have gated ZERO times in 745 and 713 genuine
+       decision points.** "Binds on ordinary jitter" was false.
+     * **What the data can and cannot decide.** It cannot separate
+       H = 2 from H = 3, and the reason is the selection effect this
+       item keeps re-encountering: HEAD stops the producer the moment
+       `server − client` reaches 1, so the trajectory is *prevented*
+       from reaching 2. A number measured under H = 1 cannot estimate
+       how often H = 2 would bind once H = 1 is gone.
+     * **What it can decide, and does.** The intervals are not
+       selection-bound. Ack round trip (direct leg): p50 **7.6**, p90
+       17.9, p99 20.1, **max 27.3 ms**. Predicted fixed-build period
+       ~16.9 ms. `server − client` ≈ ack_latency / period, so the
+       observed MAXIMUM round trip gives 27.3 / 16.9 = **1.6 → reaches
+       2**: H = 2 would gate at roughly the top 1 % of round trips,
+       H = 3 not until ack latency exceeds 2 periods (~33.8 ms), above
+       everything observed. **H = 3 clears the observed maximum with
+       ~1.5x headroom; H = 2 clears it with none.** That is the whole
+       basis for preferring 3, and it is a margin argument, not a
+       claim that 2 is broken.
+     * #61g's documented 50–150 ms oracle-client pauses exceed both.
+       Gating there is correct — the client really did stop.
+     * H is a compile-time constant pinned by CI, not tuned against a
+       run, and H = 1 must reproduce HEAD exactly (see below).
+   * **What this bounds on the wire.** Capture k is admitted only when
+     `client + H > server` held at the credit for k−2, so at most H − 1
+     frames are unacked when a capture starts and at most **H + 1** are
+     unacked when it is sent. That is a hard bound in frames, present in
+     both regimes, and it is what amendment clause 2 requires. It is
+     approximate at the +1 because egress is still ungated; **#80 makes
+     it exact.**
+   * The ordinary/region ack and egress keep the CLIENT's window
+     (`fif`), which is the quantity that window is for. One
+     comparison must not serve both jobs (amendment clause 1).
+   * `min(consumed, server + 1)` stays exactly as it is. It is a
+     pipeline-internal ordering constraint and this item does not
+     touch it; the second correction above is only a statement that it
+     was never a *wire* bound and must not be cited as one.
+   * **Not in scope, and named so it is not done by accident:** moving
+     the ack window onto egress properly (today egress writes
+     unconditionally, `xrdp_mm.c:4320`). Amendment clause 1 requires
+     it; it is a separate behaviour change with its own risk, and it
+     is filed as **#80** rather than folded in here. #79 is complete
+     without it — with H in place, the slot credit no longer depends
+     on the client at all, so #80 changes only what the client holds.
+   * H = 1 must reproduce HEAD's behaviour exactly at fif = 1
+     (`client + 1 > server` is the current test). That is the
+     regression guard and it is a CI assertion, not a claim.
+3. **CI — replay + enumeration of the now-VALIDATED mechanism, and it
+   must be RED on HEAD first.** Extract the emission decision into a
+   pure helper next to `xrdp_gfx_ack_window_open`. Two test shapes:
+   (a) **Replay test**: drive the helper through a captured stall,
+   asserting after EVERY event which acks are due. Expected values
+   from the PRD #70 emission point (max(absorb N, egress N−1)), not
+   from the implementation. **Use the layer-1 D = 40 capture, not the
+   #78 p90 stall**: layer 1 showed the withheld cycles are a fixed
+   3-frame pattern, so the sequence to replay is the one that repeats
+   160 times without exception — absorb 74 → egress 74 → absorb 75 →
+   egress 75 → cliack 73 → cliack 74 → cliack 75 (capture 76's stall,
+   transcribed in the layer-1 record). A test built on a
+   once-observed p90 sample would have been a weaker claim about the
+   same defect.
+   (b) **Exhaustive interleaving enumeration**: all orderings of
+   {cliack, egress, absorb} events over a 3-frame window at fif = 1
+   and fif = 2 — the state space is small enough to enumerate
+   completely, so no "did we pick the right interleaving" residue.
+   **Acceptance criterion for the tests themselves: they FAIL on HEAD
+   at the absorb steps** (the withheld emission) before the fix lands.
+   A detector that cannot fire on the buggy code confirms nothing
+   (2026-07-31 lesson).
+4. **VALIDATION GATE — re-run the layer-1 sweep against the FIXED build
+   and check it against predictions written NOW (owner, 2026-08-02:
+   after implementation and CI, before any performance A/B in the
+   wild).** Same harness, same arm config, same five legs
+   (`ack_delay_sweep.sh`, D ∈ {none, 0, 10, 20, 40}, 20 s each,
+   ~4 min), so HEAD and FIXED differ by the deb and nothing else. The
+   point is not "is it faster" — the fleet A/B answers that — it is
+   **does the change act on the mechanism layer 1 demonstrated, and
+   what does it cost.** Predictions, HEAD measured → FIXED expected:
+
+   | quantity | HEAD (measured) | FIXED (predicted) | falsified if |
+   |---|---|---|---|
+   | withheld p50 | 0.04 → 57.0 ms with D | ≤ 0.1 ms at every D | it rises with D at all |
+   | withheld p90 | 35.4 → 77.1 ms | < 2 ms at every D | > 5 ms in any leg |
+   | stall fraction | 30 → 67 % | < 1 % at every D | > 5 % in any leg |
+   | `SS.` pattern | period-3 lock at D ≥ 20 | no `S` runs at all | any periodic `S` structure survives |
+   | period mean | 22.5 → 40.1 ms | 16.5–17.5 ms, \|Δperiod/ΔD\| < 0.05 | slope > 0.1 (something else consumes cliack) |
+   | period vs fif = 2 | 22.5 vs 18.1 | **≤ 18.1** (FR-ACK-3's actual requirement) | above it — fif = 1 still costs throughput |
+   | pump | 15.2–15.4 flat | unchanged | it moves — the fix touched encode |
+   | model residual, `period = max(acklat/H, compute)` | **+4.9 / +5.9 / +10.8 / +5.3 / −7.9 ms** — misses in both directions | within ~1 ms in all five legs | any leg off by > 3 ms — the horizon did not make the loop uniform |
+   | id_server − id_client | capped at 2 by the stall | **rises to min(H, ≈1 + D/period)** and NEVER exceeds H | it stays ≤ 2 at D = 40 (credit still gated elsewhere — the "win" came from somewhere unaccounted for) **or** it exceeds H in any leg (the horizon does not hold — a RED result, stop) |
+
+   The last row is not a bonus metric, it is the cost side and it must
+   move — and with the rescope it is now **two** assertions in one, a
+   floor and a ceiling. The starvation was *accidentally* enforcing the
+   client-outstanding bound; H is what replaces it, so the run must show
+   both that the accidental bound is gone and that the deliberate one
+   binds. At H = 3 the D = 40 leg is the interesting one: predicted
+   ack latency ≈ 48 ms against a ≈ 16.4 ms period gives ≈ 3, i.e. H is
+   expected to bind exactly there and the period to rise toward
+   ack_latency/H rather than stay flat. **That is not a falsification of
+   the fix** — it is the WAN regime of amendment clause 4 appearing on
+   schedule, and the period row's "flat in D" prediction therefore
+   applies to D ≤ 20 only. Stated before the run, per gate 3.
+
+   **Safety leg (new, and the reason the gate is not just the sweep
+   again): the frozen client.** `ack_delay_proxy -F <secs>` stops
+   forwarding client→server mid-session while the video direction keeps
+   flowing — a client that stops acking but keeps reading, which is what
+   `xrdp_mm.c:1692` says the window is there for. Run it on HEAD and on
+   FIXED and count frames produced after the freeze instant.
+   * HEAD: the producer must stop within ~1–2 frames (window closes,
+     no credit, capture stops). This leg also proves the leg itself
+     works before it is used to judge the fix.
+   * FIXED (rewritten 2026-08-02 by the rescope; **the version of this
+     bullet dated the day before predicted the stop would come "via
+     egress → transport backpressure → `frame_id_server` stalls → the
+     `min(consumed, server + 1)` cap". That path does not exist**, see
+     the second correction above — which is precisely why the plain
+     ungate is now rejected and this leg is judging the horizon form
+     instead.) With H in place the producer must stop **within H frames
+     of the freeze**, by the horizon itself and by nothing else. Record
+     the frame count, the buffered bytes in the transport's `wait_s`
+     chain, and the process RSS — the queue is in the heap, so bytes
+     and RSS are the only things that can show it.
+   * **Acceptance, decided now, before the run: FIXED stops within H
+     frames, and `wait_s` bytes plateau.** More than H frames means the
+     horizon is not being applied on the path that matters and the
+     result is RED — stop and diagnose, do not reach for a larger H.
+     Frames stopping but bytes still growing means something else is
+     queueing and the leg has found a second defect.
+   * Run HEAD's leg too, unchanged: it is the positive control that
+     proves the freeze mechanism works before it is used to judge
+     anything (HEAD must stop within ~1–2 frames).
+
+   **Instrumentation needed before this gate runs — two spare trace
+   fields, no new mechanism (decided 2026-08-02).** The existing ring
+   answers everything else: `send` already carries id_server and
+   id_client (that is where the 556/552/552 histogram came from),
+   `withheld` is derivable from `ackslot` + `absorb`, `pump` is
+   bracketed. Two gaps, both filled by populating fields that are
+   already reserved and already zero:
+   * **`ackslot` field d ← `frame_id_client`** (`xrdp_mm.c:1733` emits
+     `target, server, consumed, 0, 0, 0`). Without it the gate's
+     decision is inferred; with it, every emission is exactly
+     reconstructable, and after the fix it is what distinguishes "H
+     bound" from "the client was slow" — the difference the whole item
+     turns on. Costs nothing: the field is written either way.
+   * **`egress` field c ← the transport's PENDING BYTES**
+     (`xrdp_mm.c:4293` emits `frame_id, displayed, 0, 0, 0, 0`).
+     Required by the frozen-client safety leg and by #80: the queue is
+     in the heap, so bytes are the only thing that can show it. **It
+     must be an O(1) running counter maintained inside `trans` on
+     append and drain — NOT a walk of the `wait_s` chain per frame.**
+     A per-frame list walk is coding rule 5's exact trap: an instrument
+     whose cost grows with the quantity it is measuring, on the path
+     being measured.
+
+   **What this gate can no longer settle, and where it went.** Until the
+   rescope, this gate carried an open design question — "plain ungate
+   versus horizon-H, let the safety leg choose". **It is closed by
+   inspection, not by measurement**: the plain ungate has no bound to
+   measure, so there was never an experiment that could have chosen it.
+   Recorded rather than deleted, because the reasoning that made it look
+   like a live question — trusting the `min(consumed, server + 1)`
+   comment's word "BACKPRESSURE" without following `frame_id_server` to
+   the call that advances it — is the mistake worth remembering. The
+   remaining open question is only the VALUE of H (2 or 3), and that is
+   a design choice pinned by CI, not a knob to tune against a run.
+
+5. **Fleet A/B on the unmodified harness, gated on the mechanism's own
+   telemetry, not the noisy tail.** Owner-sized arms (proposed: fixed
+   deb at fif = 1 vs the committed x017 capture; a fif = 2 arm for
+   non-regression). Acceptance metric is the **withheld distribution**
+   (782/2513 > 10 ms → expect ~0; binomially decisive in one 60 s
+   run), with the period p90/p99 improvement reported as the
+   downstream effect. fif = 2 non-regression: withheld 1.5 % → ~0,
+   p99 improves, mean unchanged. `arm_certify.sh` on deploy; smoke
+   gate before any handoff; capture → cliack latency accounting in
+   the same runs (the recorded eager-ack tradeoff must be measured,
+   not assumed).
+
+**Side effects / regression surface, stated up front.**
+* Capture age at fif = 1 rises: capture runs slot-bounded ahead again,
+  frames queue on the fifo (x015-shaped residency, ~1 pump time), so
+  photon-latency per frame can rise while throughput and tail improve —
+  this is the RECORDED #70 tradeoff ("up to one encode-time"), now
+  exercised every cycle. Measure, don't assume, in step 4.
+* Client-outstanding at fif = 1 no longer has any enforcement. It sat
+  at ≤ 2 only because the starvation stopped the capture loop; ungated,
+  it becomes rate x client-ack-latency, so a SLOW client widens it
+  without limit. Layer 1 measured the proxy analogue of a slow client:
+  HEAD capped at 2 under a 40 ms ack delay. The fixed build must be
+  measured at the same D values (step 3) and the growth reported as the
+  fix's cost. If a hard client-facing bound is wanted, that is either
+  the separate egress-gating decision above or the slot-ack horizon
+  variant in step 3.
+  * **CORRECTION 2026-08-02, read in code, not measured: "until
+    transport backpressure" (written the day before) is WRONG, and it
+    was the load-bearing half of that sentence.** There is no transport
+    backpressure on this path at all.
+    `frame_id_server` advances when the frame is handed to
+    `trans_write_copy_s()` (`xrdp_mm.c:4320` on `enc_done`), and that
+    call **cannot fail for want of a wire**: whatever the socket does
+    not take is `malloc`ed into a fresh stream and appended to the
+    unbounded singly-linked `self->wait_s` list, and it returns 0
+    (`common/trans.c:644-676`). So `min(consumed, server + 1)` bounds
+    frames between absorb and *handoff to xrdp's own heap*, never
+    frames on the wire.
+  * The one byte-level throttle in this transport —
+    `si->source[my_source] > MAX_SBYTES` (= **0**), which stops
+    `select()`ing a source's input while its bytes sit queued
+    (`common/trans.c:219, 376`) — **provably does not apply to GFX
+    frames**. Bytes are charged only when
+    `si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), `cur_source`
+    is set only inside `trans_check_wait_objs()` for a *transport*
+    (`trans.c:396`), and enc_done arrives on a **wait object**, not a
+    transport (`xrdp_mm.c:4061, 4538`). `cur_source` is NONE at that
+    instant, so the frame's bytes are charged to nobody and throttle
+    nothing.
+  * Consequence: **the client ack window is currently the ONLY rate
+    control between the encoder and a slow link.** On a link that
+    cannot carry the encoder's output the backlog does not settle at
+    `rate x ack-latency`; it grows in xrdp's heap until the client
+    catches up or the session dies. That is the bufferbloat shape
+    PRD:603 forbids, one level further in than a socket buffer.
+  * This does not change the layer-1 verdict (LAN, ack latency the only
+    variable) and does not change step 3's predictions. It changes what
+    step 3's **safety leg** is testing: not "does a bound take over"
+    but "is there one at all". Record the frozen-client leg's buffered
+    bytes and RSS, not just its frame count.
+
+**Default vs opt-in — SETTLED 2026-08-02 (owner), same day it was
+filed.** The question as posed ("default the plain ungate, or make it
+opt-in?") has no correct answer, because **neither branch is
+acceptable**: an unbounded egress queue is a defect at any default, and
+a flag only decides who finds it. The plain ungate is rejected outright
+(PRD FR-ACK-3 amendment clause 3) and the question is replaced by: may
+the HORIZON form default? That one is answerable — it keeps a stated
+bound in both regimes — but it is not answered here; it needs step 4's
+numbers and the #80 egress work, and `eager_slot_ack` stays
+default-false until then. The reasoning below is kept as filed, with
+the third bullet's "if the safety leg is bad" now moot.
+* **No new knob, and NOT `xrdp.ini`.** The behaviour already lives
+  behind `gfx.toml` `[avc444] eager_slot_ack`, default **false**
+  (`xrdp_tconfig.c:430, 452`), and the #79 emission is inside
+  `if (encoder->eager_slot_ack)` (`xrdp_mm.c:1724`). #79 is a change to
+  how that feature acks, not a new feature; splitting its configuration
+  across two files buys nothing. GFX/encoder config is gfx.toml's by
+  construction.
+* So #79 ships opt-in **for free** and needs no decision to do so. The
+  only live question is whether `eager_slot_ack` may later become the
+  default, and #79 as specified makes that HARDER: an option whose
+  documented meaning is "faster, and on a WAN queue without bound" is
+  a footgun that benchmarks turn on and WAN operators never turn off.
+* Preferred shape, if the safety leg is bad: **replace the bound, do
+  not remove it** — the horizon variant `client + H > server` with H
+  sized to the pipeline (2 capture slots / 3 stages), not to `fif`.
+  `fif` is doing two jobs today — it sets the latency target AND it
+  bounds client-outstanding — and FR-ACK-3 requires job 1 to hold at
+  fif = 1, which drags job 2's bound down to 1 with it. Separating them
+  is defaultable; plain ungating is not.
+* Sequence: implement the plain ungate (that is what CI pins), run
+  step 3 including the frozen leg, and let the outstanding row and the
+  buffered-bytes number choose. **Do not decide the default before the
+  safety leg has a number.**
+* Slightly more ack messages to xorgxrdp (one SLOT_ONLY per frame even
+  with the window closed) — negligible, noted for completeness.
+* Bookkeeping interplay: both branches write `frame_id_server_sent`;
+  the unit test in step 1 owns this surface.
+
+## #80 — TOP PRIORITY (owner, 2026-08-03): the credit frontier — FR-FLOW-1's first conforming design (steps 1–3 DONE, step 4 PARTLY DONE 2026-08-03; step 5 OPEN; BLOCKS every item from #82 down)
+
+> **Landed 2026-08-03 (steps 1, 2, 3).** The credit frontier is
+> implemented behind `eager_slot_ack`, C is `gfx.toml [avc444_ffmpeg]
+> wire_window` (default 2, a placeholder — #81 has not run), and CI is
+> green at 197/197 in `tests/xrdp` (422 across the tree). The
+> cross-layer gate's absence is asserted, not described:
+> `test_joint_machine_enumeration` walks the entire reachable joint
+> xrdp/xorgxrdp state space for C ∈ {1,2,3} and RED-on-HEAD was
+> **verified** — reinstating the shipped gate inside the planner turns
+> 4 cases red, including the D=40 wedge golden replay. Record and the
+> failure output: `docs/experiments/80-the-credit-frontier.md`.
+>
+> **Two findings from implementing, neither in the approved design:**
+> (a) the region-disposing ack is a SECOND admission token — it is not
+> `SLOT_ONLY`, so `xup_ack_frontier_apply` moves the producer's slot
+> frontier with it — and is now clamped by the same window, safe
+> because the clamped target never lags the credit by more than one id
+> and xorgxrdp's `cap_sent` ring holds slots + 1; (b) the
+> `NOT_DISPLAYED` region-return is deliberately NOT clamped (its frame
+> never reached the wire and owes pixels back), so the bound is a
+> statement about frames that reached the transport. Also: the bound is
+> `C + 2·M` at M monitors, not `C + 2` — the producer's budget is per
+> monitor.
+>
+> **What is still red/unknown:** no live measurement of this code
+> exists, and the shipped default C = 2 does NOT satisfy FR-FLOW-1
+> clause 4's "default chosen with #81's data". Steps 4 and 5 below are
+> the remaining work, and #81 is their prerequisite.
+>
+> **UPDATED 2026-08-03 — the code has now run on a link.** #81's netem
+> harness landed and the owner approved two legs: arms x018 (loopback
+> baseline) and x019 (40 ms true RTT), one monitor, C = 1, perf trace
+> on. Capture `i80_wanpair_20260803_125816_s20`; record:
+> `docs/experiments/80-the-credit-frontier.md` §"Step 4".
+>
+> **LAN head to head against x017 `direct`** (same payload, geometry,
+> monitors, client rig and xorgxrdp; old build at fif = 1; nothing in
+> the network path on either):
+> withheld p90 **35.3 → 10.6 ms**, mean 8.45 → 3.46, stalls 29.7 →
+> 18.2 %; period p90 **42.7 → 25.9**, p99 52.2 → 30.4, p90/p50 2.51 →
+> **1.49**; throughput 46.5 → **54.1 /s**. The wire bound
+> `id_server − id_client ≤ C + 2` held live on both legs.
+>
+> **CORRECTED SAME DAY — the first 40 ms leg was VOID (instrument on
+> the measured path) and its numbers are deleted.** The owner flagged
+> that the wan numbers did not make sense; investigating found netem at
+> its kernel-default `limit 1000` = an undeclared 73 MB/s bottleneck
+> with tail drops (measured 73.5 vs 1614 MB/s unshaped, 64 drops). Leg
+> deleted, harness fixed (`limit 25000`, environment declared, selftest
+> now asserts zero drops), leg re-run:
+> `i80_wan40_fixedlimit_20260803_221910_s20`. Corrected 40 ms numbers,
+> C = 1: **11.5 fps, period 86.7 ms, send-to-ack 203.7 ms on a 40.45 ms
+> link, queue 6.7 MB mean; wire bound held on every send.** The re-run
+> is SLOWER than the voided leg because the accidental bottleneck queue
+> had been keeping the pipe full; on the honest link, TCP's
+> congestion-window validation pins cwnd far below the BDP for xrdp's
+> burst-then-wait shape (~600 KB in a shape-replica probe), so **at 4K
+> the WAN constraint is BYTES through one TCP flow, not frames in the
+> window** — raising C deepens the queue without buying rate. Detail:
+> `docs/experiments/80-the-credit-frontier.md` §"Step 4, corrected".
+>
+> **The two results that are NOT green.** (a) The predicted stall
+> fraction on the LAN leg was ≤ 5 %; it is 18.2 %, and the ack record
+> CANNOT attribute it — all three frontier terms are equal at emission
+> (157/157 ties), a gate-2b situation. One 20 s leg at C = 2 on the LAN
+> arm would settle it (~2 min); not run, not in the approved
+> description. (b) The wan-leg prediction ("queue ≈ 0") was wrong twice
+> — see the corrected block above. A 4K AVC444 frame is **3 386 KiB
+> measured**, so each unit of C is up to ~3.3 MB of standing transport
+> queue per monitor — the FR-ACK-3 "queue in front of the display",
+> measured rather than argued.
+>
+> **Still unchosen: the shipped default C.** Two RTT points at one C do
+> not make FR-FLOW-1 clause 4's RTT → C table — and the table now has a
+> stated prerequisite: the TCP environment (congestion control, buffer
+> sizes, pacing) must be held fixed and DECLARED, or the table measures
+> TCP, not C. Also not run: the freeze leg, and any old-build leg under
+> netem (so there is no A/B at 40 ms — x017's D = 40 used the retired
+> proxy, a different instrument, gate 5).
+>
+> **CAUTION for the return to 2 monitors (owner directive,
+> 2026-08-03).** Finding (c) — the producer's capture budget is
+> **per monitor**, so the wire bound is `C + 2·M`, not `C + 2` — is
+> UNTESTED. Everything measured for #80 so far is single monitor. Do
+> not carry any C, any bound and any queue number from this work over
+> to a 2-monitor configuration by arithmetic: at M = 2 the bound is
+> C + 4 frames and, at the 3.3 MB/frame measured here, the transport
+> queue term roughly doubles with it. Revisit this deliberately —
+> probably as its own A/B — only **after the single-monitor stall work
+> is fully closed**, and re-derive the bound from measurement rather
+> than from the multiplication. (Findings (a) two-token clamp and (b)
+> unclamped `NOT_DISPLAYED` are accepted as-is by the owner until a
+> later test rejects them.)
+
+**The defect, read in code and confirmed by #79's layer-1 sweep.**
+`frames_in_flight` is documented (PRD FR-ACK-3) as the bound on what the
+CLIENT has outstanding. It is not applied there. `enc_done` hands every
+completed frame to `trans_write_copy_s()` unconditionally
+(`xrdp_mm.c:4320`); the window is tested only around the PRODUCER acks
+(`xrdp_mm.c:1697`). Measured consequence, arm x017 at fif = 1 under a
+40 ms injected ack delay — a window that forbids *any* outstanding
+frame — sends split **556 / 552 / 552** across 0 / 1 / 2 frames
+outstanding: two thirds of sends exceeded the bound. Today the excess is
+small only because the producer is starved by the same `if`; #79 removes
+that side effect deliberately, so after #79 this item is the only thing
+standing between the encoder and the wire.
+
+**And the queue behind egress is unbounded.** `trans_write_copy_s()`
+cannot fail for want of a wire — the remainder is `malloc`ed onto the
+singly-linked `self->wait_s` list, no length or byte limit, return 0
+(`common/trans.c:644-676`). The transport's one throttle,
+`si->source[my_source] > MAX_SBYTES` with `MAX_SBYTES` = 0
+(`trans.c:35, 219, 376`), charges bytes only when
+`si->cur_source != XRDP_SOURCE_NONE` (`trans.c:653`), and `cur_source`
+is set only inside a transport's `trans_check_wait_objs()`
+(`trans.c:396`). enc_done arrives on a **wait object**
+(`xrdp_mm.c:4061, 4538`), so `cur_source` is NONE and a GFX frame's
+bytes are charged to nobody. At ~3.4 MB per 4K AVC444 frame this is the
+bufferbloat shape PRD FR-CAPTURE-8 forbids, one stage further out and
+invisible to every metric this project has built.
+
+**Scope.** (a) Gate egress on `xrdp_gfx_ack_window_open(client, server,
+fif)` — the quantity the window is actually for. (b) Decide and state
+what happens to a completed frame that may not yet be sent: held (bounded
+by #79's H, stale by up to H periods) or dropped-and-recaptured (no
+staleness, no concurrency). **This is the real design question and it is
+NOT settled** — FR-ACK-3 objects to fif = 2 precisely because "a second
+in-flight frame is a queue in front of the display", and holding a frame
+server-side is the same queue relocated. (c) A bound on `wait_s` for this
+path, in frames, with a test. Note that (a) plus (b)-as-hold makes (c)
+implied rather than independent — say which is load-bearing.
+
+**Why it is not folded into #79.** #79 is complete without it: with the
+horizon H the slot credit no longer depends on the client at all, so #79
+can be measured and landed on its own. This item changes what the client
+holds, which is a different risk surface (a bug here stalls the display
+rather than the pipeline), and PRD FR-ACK-3 amendment clause 1 requires
+both halves — one item per behaviour change.
+
+**Blocked on:** an owner decision on hold-vs-drop in (b). The FR-ACK-3
+amendment is already written and needs no further sign-off.
+
+**SUPERSEDED 2026-08-03 (owner axioms) — the egress gate is the wrong
+fix and this item is REWRITTEN below.** The owner stated the two
+principles as axioms — *lossless backpressure stalls come only from the
+immediate next neighbour; the lossy end-to-end guard runs from the
+farthest end (client) to the nearest end (capture admission), and its
+response is drop-by-coalesce, never a hold* — and observed that under
+full enforcement there is no hold-vs-drop decision at egress at all: a
+frame that could not be sent should never have been captured, so
+nothing intermediate ever holds. That is correct, provable by
+induction, and it deletes scope (a)/(b) of the original filing:
+
+* **Induction (no egress hold is reachable).** Admit capture k only
+  while `k ≤ frame_id_client + C_eff` for a constant `C_eff`.
+  `frame_id_client` only rises, frames are sent in id order, so at the
+  instant k is sent, `k − client ≤ k − client_at_admission ≤ C_eff`.
+  Every frame that exists is inside the window when it reaches egress;
+  an egress gate would never fire; there is nothing to hold or drop
+  mid-pipeline. The one precision the induction demands: **the window
+  must be counted from the CAPTURE frontier, not the egress frontier**
+  — counting from `frame_id_server` (what #79's horizon H did) leaves
+  pipeline inventory that can arrive at egress after the window moved,
+  which is exactly what would need a hold.
+* **The drop path already exists and needs zero new code.** Admission
+  denied = no credit = both slots stay busy = xorgxrdp coalesces
+  damage into the dirty region (PRD FR-CAPTURE-8 clause 4, "frames are
+  dropped before they exist — the only legal drop point"). Content is
+  never delayed in a queue; the next admitted capture carries the
+  union, so a slow client gets fewer, *fresher* frames. (Little's law
+  note: on a WAN nothing raises frame rate above window/RTT — drop
+  keeps latency and staleness low, it does not buy throughput.)
+
+**The REWRITTEN item — source admission via the credit frontier
+(design proposed 2026-08-03; owner ACCEPTED same day as the first
+FR-FLOW-1-conforming design — it blocks every item from #82 down).**
+Replace the emission-time window test with a third term in the credit
+frontier itself, at the one existing site:
+
+    credit = min(frame_id_consumed,       /* slot fact: children done */
+                 frame_id_server + 1,     /* pipeline-inventory cap   */
+                 frame_id_client + C)     /* end-to-end wire window   */
+
+and emit unconditionally whenever the frontier advances. Each term now
+consults exactly its own layer; the stall signal (slots) is never
+suppressed by the wire signal — when `client + C` binds, the producer
+is not stalled, it is *dropping* (coalescing) by construction.
+* Wire bound that results: capture rides ≤ 2 slots above the credit,
+  so unacked-at-send ≤ **C + 2**. C is a server policy constant — EGFX
+  has NO client-advertised window (the `max_unacknowledged_frame_count`
+  that fde04e80 honoured is the legacy TS frame-ack capset, which is
+  why the GFX path hardcodes 2 — re-tethering to the client is not
+  possible in GFX), so C's meaning must be stated singularly: "max
+  frames unacked on the wire = C + 2". Wedge replay says C = 2 keeps
+  the credit for f789 immediate; C's exact value is pinned by the
+  step-3 exhaustive enumeration (the frontier is a pure function),
+  not tuned against a run.
+* Client pathologies already handled: EGFX SUSPEND snaps
+  `frame_id_client = frame_id_server` (`xrdp_mm.c:1854-1866`), and
+  cliack already re-invokes `xrdp_mm_update_module_frame_ack`
+  (`xrdp_mm.c:1867`), so the frontier wakes on ack arrival with no new
+  plumbing.
+* What remains of the original #80: only the **telemetry** — the O(1)
+  pending-bytes counter in `trans` (`egress` field c) stays required,
+  because `wait_s ≤ C + 2 frames` is now a claim CI can state but only
+  the counter can verify live; and the frozen-client leg verifies the
+  whole bound end to end.
+* Change surface is enumerated in
+  `docs/experiments/79-layer1-...md` §"The change surface under the
+  two axioms". xorgxrdp: **no change** — credit semantics on the wire
+  are unchanged, only the arithmetic producing the frontier moves.
+  Behaviour stays behind `eager_slot_ack` (coding rule 2: default-off
+  preserves today's behaviour bit for bit).
+
+**Steps (linear, 2026-08-03; absorbing #79's plan):**
+1. **DONE 2026-08-03. Blocking pre-step:** xorgxrdp's SLOT_ONLY
+   handler read at `/workUpdateXorgXrdp` (`10fa3aa23033`). Slot release
+   does NOT consume region-retirement state: `xup_ack_frontier_apply`
+   advances `f->shown` only for a non-SLOT_ONLY ack, retirement is
+   driven from `rect_id_ack_shown` and admission from `rect_id_ack`,
+   and `rdpClientConReturnFrameRegion` is unreachable for a SLOT_ONLY
+   ack. The same read confirmed the drop path needs zero new code
+   (`rdpDeferredUpdateCallback:3984` returns early, damage stays in
+   `dirtyRegion`). Detail: `docs/experiments/80-the-credit-frontier.md`.
+2. **DONE 2026-08-03. The frontier**, plus C as user config in
+   `gfx.toml [avc444_ffmpeg] wire_window` (owner confirmed gfx.toml
+   2026-08-03), range 1–64, out-of-range REFUSED, default 2 as a
+   PLACEHOLDER pending #81. Code: `xrdp_gfx_credit_frontier()`,
+   `xrdp_gfx_region_ack_target()`, `xrdp_gfx_plan_acks()` in
+   `xrdp/xrdp_encoder.h`; `xrdp_mm_emit_credit_frontier()` in
+   `xrdp/xrdp_mm.c`, with the shipped gated emission kept verbatim as
+   `xrdp_mm_emit_legacy_frame_ack()` for `eager_slot_ack = false`
+   (rule 2). Telemetry: `ackslot`/`ackregion` carry `frame_id_client`
+   and C; `egress` field c carries transport bytes queued, in KiB, from
+   a new O(1) `struct trans::wait_bytes` counter — never a per-frame
+   walk of `wait_s` (coding rule 5). Man page: `gfx.toml(5)`.
+3. **DONE 2026-08-03. CI, RED on HEAD verified:**
+   `tests/xrdp/test_avc444_credit_frontier.c` (9 cases) plus 2 config
+   cases in `test_tconfig.c`. The enumeration walks the entire
+   reachable joint xrdp/xorgxrdp state space for C ∈ {1,2,3} asserting
+   INV-SENT / INV-WIRE / INV-LIVE / INV-HELD / deadlock freedom, with
+   three non-vacuity checks (pipeline runs to the end, the wire bound
+   is ATTAINED, the window term is the strict minimum somewhere). The
+   D = 40 wedge is replayed at C = 2 and C = 1 with the event ORDER
+   measured (`i79_x017_ackdelay_20260802_s20/leg_d40`, frames 406–409)
+   and the expected values hand-derived from FR-FLOW-1 clause 3.
+   Reinstating the shipped gate inside the planner turns 4 cases red;
+   the mutation was reverted and is not committed.
+4. **PARTLY DONE 2026-08-03 (2 of the legs, owner-approved arm
+   count). #81 harness, then the VALIDATION GATE.** #81 landed;
+   `i80_wan_pair.sh` ran the two approved legs with the predictions
+   written in its header BEFORE the run. Results and the two red
+   findings are in the landed block above and in
+   `docs/experiments/80-the-credit-frontier.md` §"Step 4". The
+   ack-delay sweep is gone with its proxy (see #81). **Still owed:**
+   the freeze leg; an old-build leg under netem so there is an actual
+   A/B at 40 ms; a C = 2 LAN leg to attribute the residual 18.2 %
+   stalls; and enough RTT points to choose the shipped default.
+   Original scope, kept for the record: ack-delay sweep + freeze
+   leg + netem RTT legs against the fixed deb, predictions re-derived
+   for DROP semantics before the run — period ~flat at ALL D
+   (admission drops instead of stalling); withheld ≈ 0 at every D;
+   `id_server − id_client` at send never > C + 2; freeze leg stops
+   production within C + 2 frames and `wait_s` bytes plateau; the
+   drop visible as damage-area growth per admitted frame at high RTT.
+   The freeze leg is now readable: `egress` field c is the transport's
+   queued KiB, so "`wait_s` plateaus" is a number rather than a claim.
+5. **Fleet A/B** (intent unchanged from the superseded #79 step 5).
+
+**Deliberately NOT done in steps 1–3, and why** (written 2026-08-03
+before step 4 ran; the first bullet was answered later the same day —
+see the UPDATED block at the top of this item):
+* **No live run.** Step 4 needs #81, and #81 has not been built. Every
+  number quoted for this item is from the pre-change captures or from
+  CI; the code has never encoded a frame on a real link.
+  *(2026-08-03, later: #81 landed and two legs ran. This bullet is
+  superseded — the code has now encoded frames at 0.078 ms and at
+  40.4 ms RTT.)*
+* **The default C = 2 is not a recommendation.** It matches the legacy
+  `frames_in_flight` so short-RTT behaviour is preserved, and
+  FR-FLOW-1 clause 4's "default chosen with #81's data" is unmet.
+* **xorgxrdp is unchanged**, as the design predicted: the wire's credit
+  semantics did not move, only the arithmetic producing the value.
+  `/workUpdateXorgXrdp` is now on branch `wip/eager-ack` at the same
+  commit, to keep the two repositories' branch names in step (CLAUDE.md
+  "The other half of the pipeline").
+
+The paragraphs below are the original egress-gate filing, kept for the
+record; its sequencing question is moot (there is no egress gate to
+sequence).
+
+**ORIGINAL FILING (superseded).** #80 was filed as "blocked
+on #79 landing". Tracing the gate's provenance and drawing the
+pipeline's backpressure map suggests the opposite order, and possibly a
+simpler #79.
+
+* The rejection of #79's plain ungate was **conditional on egress being
+  ungated**. With egress gated (this item), a client that falls behind
+  stops `frame_id_server` advancing; the **existing** cap
+  `min(frame_id_consumed, frame_id_server + 1)` then stops the slot
+  credit within one frame, both capture slots fill, and xorgxrdp
+  coalesces and drops (PRD FR-CAPTURE-8 clause 4). That is a bound —
+  and it is the *near-end* drop firing because the pipeline is
+  genuinely full, which is what the drop guard was always meant to
+  mean.
+* If that holds, **#79 needs no horizon H at all**: emit the slot
+  credit at absorb with only the existing cap, and the client bound
+  lives entirely here. One less constant, one less thing pinned by CI,
+  and each signal on its own layer — the slot credit consulting only
+  its immediate neighbour (are the children done with the pixels), the
+  client window consulting only the client.
+* Cost of this order: (b)'s hold-vs-drop question must be answered
+  first, and holding a completed frame at egress is new machinery in
+  the main thread (the assembler produces one buffer per frame; it
+  would have to be held rather than written). On a LAN the hold is
+  ~0.4 ms — ack round trip 7.6 ms against a 7.9 ms slot-free deadline,
+  both measured — so the "queue in front of the display" FR-ACK-3
+  objects to is negligible there; on a WAN it is bounded by the same
+  cap.
+* **Not acted on.** #79's CI and validation gate are written against
+  the horizon form. Reordering means rewriting both, and the decision
+  is the owner's. Evidence and derivation:
+  `docs/experiments/79-layer1-...md`, section "Where the gate came
+  from, and the mechanism mismatch it encodes".
+
+## #81 — WAN RTT simulation harness on the container network namespaces (DONE 2026-08-03)
+
+> **Landed 2026-08-03** as
+> `PR-demo/mac_bisect_matrix/netem_rtt.sh`: delay split in half and
+> applied to BOTH ends of a pod's veth pair, so a round trip picks up
+> the whole RTT. `selftest` is GREEN in 22 s and checks four things —
+> the requested delay appears as a measured one, `clear` restores the
+> exact qdisc lines and the baseline RTT, `apply` REFUSES an interface
+> carrying a foreign qdisc, and the delay is on the **RDP port the
+> client rig dials** rather than only on ICMP to the pod IP. First use:
+> #80 step 4. Record, including the two things that went wrong while
+> building it (`nsenter -n` does not swap the mount namespace, so
+> `/sys/class/net/eth0/iflink` silently returns the host's answer; six
+> stale veths for four pods make name-based resolution unsafe):
+> `docs/experiments/81-the-netem-rtt-harness.md`.
+>
+> **The ack-delay proxy is RETIRED (owner directive, 2026-08-03)** — it
+> burns 100 % of a core when idle and overlaps with netem.
+> `ack_delay_proxy.c`, its self-test and `ack_delay_sweep.sh` are
+> deleted; `i79_ack_delay_analyze.py` is KEPT, because it is the
+> measurement layer both builds' numbers are computed by and the #80
+> head-to-head imports it. **The i79 results are NOT void**: the sweep's
+> own control leg (`d0` through the proxy vs `direct` with no proxy)
+> came out 4.3 % apart, which a spinning core would not have left, and
+> the #80 head-to-head quotes only `direct`. Three idle states were
+> probed on 2026-08-03 and none reproduced the CPU burn, so the state
+> that causes it is not identified — if it happens DURING a leg rather
+> than between legs, the control-leg argument is what to re-examine.
+>
+> **What the harness did NOT do, and it is the one that matters:** two
+> RTT points is not the RTT ∈ {0, 10, 40, 80, 150} matrix this entry
+> specified. That matrix is a multi-leg session run and still needs
+> owner approval with an arm count.
+
+**What.** `tc netem` applied from the host to a fleet pod's veth:
+delay in BOTH directions (true RTT), optional jitter/loss, optional
+`tbf` rate cap. Legs at RTT ∈ {loopback baseline, 10, 40, 80, 150 ms}.
+Harness versioned in `PR-demo/mac_bisect_matrix/`.
+
+**Why a second instrument when `ack_delay_proxy` exists.** They answer
+different questions and both stay. The proxy delays ONLY client→server
+bytes, above TLS — it isolates the ack variable while video delivery
+stays instant, which is what made layer 1 a mechanism test. netem
+delays both directions below TCP — video delivery, TCP ACK clocking
+and frame acks all move together, which is the environment the user's
+"set C by your RTT" guidance and the shipped default C must be derived
+from. Mechanism instrument vs environment instrument; do not compare
+their numbers directly (quality gate 5).
+
+**Requirements.**
+* Verify the applied RTT by measurement through the same path before
+  each leg (ping through the pod netns) — never trust the knob
+  (the 2026-07-31 mode-name lesson).
+* Stateless: restore qdiscs on exit; REFUSE to run if a qdisc the
+  harness did not create is already present on the interface.
+* Server side only; the client rig stays exactly as deployed.
+
+**Output feeds:** #80 step 4's WAN-leg predictions; the shipped
+default C (FR-FLOW-1.4); the RTT → suggested-window table for the
+config docs.
+
+**2-minute rule:** this entry names the harness build and a ≤60 s
+self-check only. A full RTT matrix is a multi-leg session run — owner
+approval with the arm count before running.
+
+## #83 (was #77) — A faster producer (TODO — queued behind #76/#78, reprioritised 2026-08-02)
+
+**What it is.** x014 left the FR-BENCH-1 margin at **1.09×** — the
+textflood producer at 16.91 ms
+against an 18.48 ms pipeline, with the producer's p90 (19.01 ms) inside
+the pipeline's p50 (17.96 ms). At that margin an arm measures the payload
+as much as the server, and the 66 producer stalls in x014 are already
+visible as a p99 that went the wrong way (31 → 46.5 ms) while the mean
+improved by 7 ms.
+
+**Scope.** PRD design B: memmove scroll + strip render instead of a full
+redraw. Offline it is 7.1 ms/frame against today's ~16 ms, which restores
+the margin to ~2.6× at the current pipeline rate and keeps it above 2×
+even if the pipeline reaches 14 ms.
+
+**Reprioritised the day it was filed (owner directive, 2026-08-02).**
+This item was first written as "NEXT, blocks this path", on the reasoning
+that no arm can be read through a payload 9 % from being the limit. That
+reasoning was sound for the fif = 2 configuration and does not apply to
+the one now under investigation: at fif = 1 the pipeline runs at 28.2 ms
+against a 16.26 ms producer, an FR-BENCH-1 margin of **1.74×**, so #76
+and #78 are measurable today. **#76 — a 34 % throughput loss that means
+the pipeline is leaning on a second in-flight frame — outranks it.**
+
+It still gates everything measured at fif = 2, which is the configuration
+every arm before x015 used, and it still gates #74, #61f and #61d. It is
+queued, not closed.
+
+**Acceptance.** Producer p90 strictly below the pipeline p10 at
+3840×2400, stated in the arm's own capture; FR-BENCH-1 margin ≥ 2.0×
+reported beside every ratio thereafter.
+
+## #75 — The LTR rewrite re-serialised a whole picture to edit 30 bytes of slice header (DONE 2026-08-01)
+
+**Why.** #61e measured `collect` at 8.802 ms of a 25.474 ms period, and
+`tools/avc444_ltr_rewrite_bench.c` attributes 7.07 ms of it to the
+rewriter: **1.90-2.03 ns/byte across runs, against 0.03-0.04 ns/byte for
+a plain `memcpy` of the same buffers in the same bench — ~60×.** The
+edit itself is the
+slice header, tens of bytes. This is the largest piece of xrdp-side CPU
+in the frame period and it is not AVC444 overhead in any inherent
+sense.
+
+**What costs it** (measured split, `getrusage` on the bench child):
+byte-at-a-time passes ~72 %, `mmap`/`munmap` + first-touch faults from
+six ~1.7 MB `malloc`s ~19 % (**4228 minor faults per pair measured**
+against 4248 predicted), bulk `memset`/`memcpy` ~9 %.
+
+**The four antipatterns**, in cost order:
+
+1. The CABAC payload is unescaped and re-escaped for nothing. It is
+   byte-aligned in both input and output (`cabac_alignment_one_bit`
+   pads to a byte before it) and copied verbatim, so its escaped bytes
+   are invariant whenever the emulation-prevention zero-state entering
+   the payload is the same in the old and new headers.
+2. Six ~1.7 MB `malloc`/`free` per frame, all above glibc's 128 KB
+   `M_MMAP_THRESHOLD`.
+3. `memset(newr, 0, nal_len + 16)` zeroes a whole picture buffer when
+   only the rewritten header is read before `memcpy` overwrites it.
+4. `find_start_code` is a byte-at-a-time triple compare over the full
+   payload, once per NAL boundary and twice per packet counting the
+   `packet_intra_is_converted` pre-scan.
+
+**Scope.** `xrdp/xrdp_h264_annexb.c` only. No wire change, no protocol
+change, no config knob: the emitted bytes must be IDENTICAL. The fast
+path is taken only when its precondition holds and falls back to
+today's code otherwise.
+
+**Acceptance.** (a) `make check` green with
+`tests/xrdp/test_avc444_ltr.c`'s golden byte vectors UNCHANGED — the
+test is what proves the output did not move, so touching it would void
+the whole exercise; (b) `avc444_ltr_rewrite_bench` ns/byte reported
+before and after on the same input; (c) one deployed arm measuring the
+end-to-end textflood send interval (owner-approved, 2026-08-01, ONE
+arm).
+
+**LANDED.** Offline: **11.027 -> 1.026 ms/pair, 1.90 -> 0.18 ns/byte,
+4228 -> 73 minor faults per pair**, against an unchanged 0.03 ns/byte
+`memcpy` control. Output proven identical two ways: CI 411/411 with the
+golden byte vectors UNTOUCHED, and an FNV-1a digest over 120 whole 4K
+pictures identical before and after (`12c16104c46343cb`). Predicted
+in-session effect: `collect` 8.8 -> ~2.4 ms, period 25.5 -> ~19.1 ms.
+Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`.
+
+**ARM RESULT (x014, one arm, owner-approved).** Period **25.474 ->
+18.476 ms**; `collect` **8.802 -> 1.362 ms** while `pump` held at
+16.585 (the control); 2228 -> 3075 sends, 39.2 -> 54.1 fps. Closure:
+7.440 removed minus 0.515 new wait = 6.925 against a measured 6.998.
+Certificate 7/7, 0 black frames, 0 rewrite failures over 6150 packets.
+
+**And the limit stated before the run arrived.** The producer's interval
+is 16.91 ms against an 18.476 ms pipeline: **FR-BENCH-1 margin 1.09x,
+MARGINAL**. 66 of 3074 cycles (2.15%) now stall on the producer and
+carry 99.7% of all wait time; **p99 send interval REGRESSED 31 -> 46.5
+ms** while mean and p50 improved by ~7 ms. Delivered 18.476 ms (1.38x);
+with producer stalls removed 17.96 ms (1.42x), which is the measured
+p50 and the number a further optimisation starts from.
+
+Record: `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md`;
+capture `captures/i75_x014_rewrite_20260801`.
+
+**Consequence for what comes next, and it is a blocker, not a note:**
+any further arm on this path needs the FASTER PRODUCER first (PRD design
+B, memmove scroll + strip render, 7.1 ms/frame offline). At 1.09x the
+payload is inside the measurement, so #74 Lever 2 — whose remaining
+prize is now `pump`'s 16.6 ms, not `collect`'s — cannot be measured with
+today's textflood. This reopens **#61c** with a concrete number.
+
+## #85 (was #61c) — Is the producer the ceiling? REOPENED 2026-08-01 (#61h voided the run that answered it)
+
+**Answered the day it was opened.** The session Xorg runs at **98.9 % of
+one core with NO client connected at all** — the payload alone saturates
+it. Connecting the client and running the whole capture path moves it to
+**96.4 %**, i.e. *down* 2.5 points: the capture does not add load, it
+displaces payload drawing inside the same single thread.
+
+Share of that thread, from `tools/avc444_pack_bench.c` on this CPU
+(1.3–1.5 ms/frame at 3.686 Mpx × 30.05 fps): **capture ~4 %, everything
+else ~92 %** — xterm glyph compositing, scroll blits, Present emulation,
+fills. Reproduces the T4's 99.9 % (#59) on different hardware.
+
+**Consequence.** No worker-side change is measurable under this payload;
+the producer answers every question first. **Resolved the same day** by
+#61b: textflood drops the session Xorg to 25.3 % and #70B then measures
+1.12x instead of 0.96x. Ratios taken under codeflood are void as
+throughput numbers — see #61d for the ones that need re-running.
+
+`perf` sampling is unavailable on this box (`perf_event_paranoid = 4`,
+host-owned, `sysctl -w` silently fails; `perf record` yields 0 bytes) —
+hence `/proc/<pid>/stat` deltas plus an offline bench. Same class of
+blocker as the seccomp `bpf()` denial in #70B.
+
+**Record:** `captures/i61c_xorg_profile_20260801 (DELETED by #61h, git history only)`.
+
+## #91 (was #71, earlier #65) — multimon capture‖encode: per-monitor ack window + the m≥2 serial cost (TODO — after #70; the global-window arithmetic stands on its own CI pin)
+
+At m≥2 two further issues sit ON TOP of the m=1 serializer (#70):
+
+1. **The xrdp ack window is global while the budget is per-monitor.**
+   `xrdp_gfx_ack_window_open` (fif=2, global) admits ~1 outstanding
+   per monitor at m=2 and halves the intended per-monitor depth. The
+   PRD forbids widening the global pool (bufferbloat, measured
+   2026-07-31: 98.1 ms vs 87.0 ms); the spec shape is ≤2 PER MONITOR.
+   Pinned in CI: `test_overlap_m2_global_window_pins_each_monitor_to_one`
+   documents today's behaviour and flips on the fix.
+2. **The m≥2 serial cost is real and unexplained by overlap alone.**
+   173.7 ms period with 132.1 ms inside our pipeline at 1.33 of 4
+   cores; the 50.1 % cross-monitor interleaving does not make it
+   fast. After #70, re-decompose: how much was the ack pacing, how much is
+   step 7's whole-set drain (a late monitor holds the set), how much
+   is genuinely serial assembly.
+
+Acceptance: per-monitor window (never a pool), CI updated
+deliberately, fleet-arm decomposition showing per-monitor depth 2 at
+m=2, negative arm gaps on both monitors.
+
+## #92 (was #72, earlier #66/#63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (blocked by #71 — FR-PROC-7's preemption signal needs the fifo non-empty at pop time, which needs #70/#71 concurrency first)
+
+Motivated by #62's measured decomposition, not by intuition. On the T4 with
+the textflood payload the 173.7 ms period is:
+
+| segment | ms | % of period |
+|---|---|---|
+| capture + AVC444 pack (xorgxrdp) | 63.7 | 36.7 |
+| encode + LTR rewrite + EGFX assembly (xrdp) | 68.4 | 39.4 |
+| idle, awaiting damage | 41.5 | 23.9 |
+
+76 % of the period is our pipeline, on a box measured at **1.33 of 4 cores**
+with nothing pinned. The cost is serial latency, not arithmetic we cannot
+afford — so the lever that helps is one that removes WORK FROM THE CHAIN,
+not one that makes any single stage faster. The batch already parallelises
+the encode and lands `kids_armed=4` in 100 % of cycles; it cannot help the
+capture in front of it or the assembly behind it.
+
+**Both big segments are paid twice, once per view.** Measured on the same
+run: main P 2.09 MB, aux P 1.69 MB, so the aux view is **44.8 % of the
+bytes**, a second full-frame pack inside `a8r8g8b8_to_avc444_box` (26.5 %
+self, the top symbol in libxorgxrdp), and a second encode.
+
+**Proposal.** While the screen is in motion, send 4:2:0 only — drop the aux
+view — and send the full 4:4:4 pair once it settles. Motion is exactly when
+chroma detail is least perceptible and when the period is longest; a still
+screen is when subpixel-AA text fringes matter and when there is time to
+spare. This attacks capture AND encode AND assembly in one change, which is
+what a 1.41x says is needed.
+
+### Open questions to settle BEFORE implementing
+
+1. **What is "in motion"?** Needs a cheap, deterministic signal — damaged
+   area per cycle, or consecutive cycles with damage above a threshold.
+   It must not flap: oscillating between 420 and 444 every few frames
+   would be visible as chroma breathing on static text.
+2. **How does the settle transition avoid a visible pop?** The aux chain is
+   an LTR chain (#44/#45): resuming it after a gap needs its own intra, or
+   the chain has to survive the motion window unreferenced. Interacts
+   directly with the intra-refresh schedule (`intra_refresh_frames`) and
+   with A1-A7 of the wire audit — those ratchets must still pass.
+3. **Does the client tolerate a stream that alternates?** The EGFX
+   capability is negotiated once. Verify against the Mac and Windows
+   clients before trusting it — this is the class of change that produced
+   the wrong-colour bisect.
+4. **Is the win real?** Predicted from #62: removing the aux view should
+   take ~45 % off the encode segment and roughly half the pack. Measure
+   it with textflood and `e52_period_decompose.py`, same pair, same box —
+   do not accept a rate number without the decomposition.
+
+### Acceptance criteria
+
+* the motion detector is pure logic with unit tests under `tests/`;
+* default OFF, so absent/invalid config reproduces today's behaviour
+  exactly (no functional regression);
+* smoke gate PASS before any measurement (the #61 precondition);
+* wire audit A1-A7 still PASS in both the motion and settled regimes;
+* the E5-2 pair re-run and DECOMPOSED, not just rated;
+* a still-screen visual check that subpixel-AA text is still 4:4:4 sharp.
+
+## #93 (was #73, earlier #67) — T4 benchmark re-runs under restored concurrency (blocked by #70 + #71; #72 optional but preferred)
+
+The numbers the PR sells, re-measured on the representative box once
+the mechanism is proven locally. Requires re-provisioning the T4 from
+bare AMI (DEPLOY_RUNBOOK + persistent-harness install — it must reach
+measurable with no ad-hoc steps).
+
+* E5-2 m=1 4K and the m=2 A/B, decomposed, with FR-BENCH-1's two
+  saturation checks green in the VERDICT (producer stamps are now
+  default-on).
+* Re-verdict #62's 1.41× (annotated producer-confounded-then-cleared;
+  with the serializer fixed (#70) both arms should shift — quote old vs new).
+* Owner onscreen walk (T4 protocol §6): UWP + macOS visual pass was
+  informally confirmed 2026-07-31 pre-fix; repeat on the fixed build.
+
+---
+
+## #94 (was #53) — Arm a monitor only when its pixels changed (TODO, NEXT)
+
+**Why.** Measured 2026-07-30 (#52 results, first flood pair): with one
+active monitor beside an idle one, the batch is **~9 % SLOWER** than the
+serialized path (68.5 ms vs 62.6 ms mean per send). The idle monitor
+still reported full-monitor damage every cycle — the window spans both
+monitors, so a scroll dirties both areas even though only one has
+changed pixels — and the shared deadline (D3) then ties the active
+monitor's frame to the idle monitor's full-area capture, NV12 upload and
+encode. One active monitor next to an idle one is an ordinary desktop,
+so this is a real regression in a common case, not a bench artifact.
+
+**Scope.** Decide per cycle whether a monitor joins the set, on evidence
+that its pixels changed rather than on damage-rect coverage. Candidates
+to evaluate in this order (cheapest first): (a) drop a monitor from the
+set when its previous pair coded as all-skip below a byte threshold and
+its damage rects are unchanged; (b) a capture-side changed-region test
+in xorgxrdp before the slot is handed over; (c) keep the monitor in the
+set but give it its own deadline so it cannot hold the healthy monitor
+(this is the residual coupling already recorded under #45 step 7).
+Whatever lands must NOT drop a real update — a monitor that stops
+sending is worse than one that sends all-skip frames.
+
+**Gate.** The benchmark already exists and needs no new scaffolding: the
+first flood pair (`SESSION_KIND=codeflood` before the 32× line repeat,
+i.e. ink on one monitor only) currently reads 0.91×. Acceptance: **≥
+1.0× on that pair** (no regression against serialized) with **the 2.13×
+two-monitor result unchanged within noise** — both arms re-measured, not
+one. Plus E2 clean and no monitor left un-updated over a 180 s run.
+
+---
+
+## #95 (was #54) — Capture-side handoff: the remaining 2× (TODO)
+
+**Why.** #52 proved the encode side is no longer the constraint: at
+2.13× the worker is **32 % busy**, per-pair service is 14.7 ms (encode
+collected 2.8 + rewrite/emit 12.3) against a 59.9 ms per-monitor period,
+and after a frame's `last=1` the same monitor's next damage arrives
+41 ms (p50) to 105 ms later. Flow control never binds (un-acked p50 0 /
+max 4 of fif = 2, client `queue_depth` 0) and it is not bandwidth
+(495 Mbit/s over loopback with the oracle client). The wait is the
+capture handoff.
+
+**Scope** — #45's two deferred capture questions, now with evidence:
+1. what sets a monitor's floor period (deferred-update pacing vs
+   ack-budget retirement in xorgxrdp), measured per stage rather than
+   inferred from the send interval;
+2. whether the producer can hand BOTH monitors over in one cycle, so the
+   set is armed with two fresh captures instead of one plus a stale
+   slot.
+
+**Gate.** Same instrument as E5-2 (arm-s vs a new arm, `codeflood`,
+180 s, oracle, `E5_BASE_MS` = arm-s's own 29.9 ms): **≥ 1.5×** on top of
+2.13×, worker busy above 60 %, and the `last=1 → next own dmg` wait
+below the per-pair service time. Stop rule as #52: under 1.5× the
+remainder is attributed, not re-tuned.
+
+---
+
+## #96 (was #59) — The capture is 14 % of the bottleneck thread; the rest is not ours to optimise (TODO — one lever left, see #61b)
+
+Answers "which function is slow despite the vectorized capture, and does
+capture dominate the interval?" — profiled on the T4 with
+`PR-demo/t4_profile/xorg_perf_probe.sh` plus `xserver-xorg-core-dbgsym`,
+full write-up and raw profile in
+`PR-demo/mac_bisect_matrix/captures/e52_t4_batched_20260730/CPU_BOTTLENECK.md`.
+
+Of the session Xorg's cycles (it is ~92 % of one core; period ~92 ms):
+
+| path | % | ≈ms/period |
+|---|---|---|
+| xterm glyphs — `ProcRenderComposite → pixman_image_composite32` | 19.3 | 16 |
+| **X Present in software emulation — `present_fake_do_timer → present_execute_copy → pixman_blt`** | **18.8** | **16** |
+| xterm scroll — `ProcCopyArea → pixman_blt` | 16.5 | 14 |
+| **xorgxrdp capture — `rdpDeferredUpdateCallback → rdpCaptureGfxA2 → a8r8g8b8_to_avc444_box`** | **13.8** | **12** |
+| fills — `ProcRenderFillRectangles → fbFill` | 9.1 | 8 |
+
+**Capture does not dominate**: 13.8 % against 44.9 % for the payload's own
+X rendering. Two independent confirmations: with no client connected at all
+the flood alone holds Xorg at **99.9 %** of a core; and `rdpCopyBoxList`
+(the hw→sw staging copy) fires **0 times in 40 s** against `rdpCapture` 825
+— there is no redundant copy on this box.
+
+**The AVX2 kernels are not the problem and are not worth optimising**:
+`avc444_decode_row.avx2` 9.85 % + `a8r8g8b8_to_avc444_box.avx2` 3.59 %, and
+`avc444_pack_bench` predicts 12.6 ms/period against 12 ms profiled — bench
+and profile agree to 5 %.
+
+**One lever, and it is ours:**
+
+**Move the pack off the X server thread** (#54's capture-side half). The
+12 ms is not slow, but it sits on the single thread the whole session is
+queued behind. Hand xrdp a raw XRGB snapshot and pack in the encoder-side
+worker: the same arithmetic, off the critical path.
+
+> ### WITHDRAWN (2026-07-31): the `present_fake` lever — we do not own it
+>
+> This item previously proposed attacking the 18.8 % `present_fake` path
+> (X's Present extension running in software emulation) by setting
+> `Option "DRI3" "0"` in the shipped `xorg.conf` or passing
+> `-extension Present` on the Xorg command line, on the argument that a
+> config file xrdp ships is in our scope.
+>
+> **That argument was wrong and the lever is withdrawn.** Flipping those
+> knobs does not make our code faster; it changes how the *X server*
+> presents, in the hope its emulation path gets cheaper. That is
+> optimising a component we neither own nor ship, measured through a
+> benchmark that was itself the problem — and it changes the behaviour of
+> every session, for a benefit that was never demonstrated (the one
+> attempt, disabling the xfwm4 compositor, did not stick and did not move
+> the number).
+>
+> **#62 supersedes it.** `present_fake` fires on Present requests;
+> `textflood` drives the screen with `XShmPutImage` and issues none, so
+> the payload stops feeding that path rather than the X server being
+> reconfigured to make it cheaper. Whatever remains is a fraction of an
+> X-thread cost that fell 7.7x, and is no longer worth a config change.
+>
+> The rule this leaves behind: **when a profile says the cost is in code
+> we do not own, the fix is to stop generating the work, not to retune
+> the other component.**
+
+One process note worth keeping: the first reading of this profile, taken
+before the dbgsym install when the frames above `rdpCopyArea` were bare
+addresses, blamed xorgxrdp's own staging copy and would have sent an
+optimisation at code that never runs. The uprobe count killed it. Do not
+attribute a stripped stack by inference.
+
+---
+
+## #97 (was #60) — The T4's E5-2 is bimodal and it is not root-caused (TODO)
+
+Sixteen repeats of the batched arm split into two tight clusters — 47–49 ms
+(8 runs) and 67–74 ms (8) — with nothing in between, and the baseline
+measured 77.3 ms once and 108.9 / 109.9 ms later. That is the whole reason
+#55's answer is a band.
+
+The clusters differ in bytes, not just cadence: **580 KB per picture at a
+92 ms period** vs **875 KB at 140 ms**, with `encode collected → last=1`
+moving 21.3 → 32.6 ms in step (`E5-2_run_to_run_variance.txt`). Encode time
+tracks picture size, so the loop has two self-consistent equilibria and
+something tips it at session start.
+
+Ruled out, each with evidence: **codec fallback** (no run logged
+`Matched RFX mode`; every run's `xrdp.log` checked), **corpus position**
+(3 000 lines, per-500-line density varies only 1.17×, fully traversed every
+~12 s so even a 60 s window averages five passes), **the profiler** (both
+clusters occur with and without perf/top/uprobes attached), **compositing**
+(the xfconf change neither stuck nor moved the number), **leftover probes**
+(`perf probe -l` empty), and **GPU clocks** (`nvidia-smi dmon` shows the
+encoder essentially idle in both).
+
+Still open: what selects the equilibrium. Worth trying — pin the payload's
+write rate instead of letting it free-run (a `codeflood` variant with a
+fixed bytes/s), and log per-picture size against period from the first
+frame of a session to see whether the two branches separate at startup or
+drift apart later.
+
+Until it is closed: **E5-2 runs must be ≥180 s, both arms measured in one
+sitting, and the mean bytes-per-picture of the two arms must agree** before
+a ratio is quoted. A pairing whose arms differ in picture size is measuring
+content, not the pipeline.
+
+---
+
+## #86 (was #61b) — textflood wired into the fleet (plumbing DONE; its NUMBERS reopened by #61h)
+
+`SESSION_KIND=textflood` now exists in `banner.sh` and the binary is
+built into the fleet image (builder stage in `Containerfile`). Arms
+**x003/x004** are the #70B A/B under it at 3840x2400.
+
+**The measured figures below are VOID (#61h): they were taken with the
+per-frame trace on log.c, i.e. with ~12 unbuffered writes per frame
+inside the period being measured.** They are kept here only so nobody
+re-quotes them from memory — Session Xorg 96.4 % -> 25.3 % of one core,
+FR-BENCH-1 passing at producer 65.07 fps vs pipeline 24.94 (2.61x). Both
+the producer's rate and the pipeline's have to be measured again on a
+ring-traced build before FR-BENCH-1 can be called passed.
+GLAMOR stays CLOSED-WONTFIX.
+
+**Every throughput number from here uses textflood.** A ratio measured
+under codeflood is a measurement of the X server (#61c).
+
+**Record:** the capture was deleted by #61h's garbage collection; it is
+in git history only.
+
+## #87 (was #61d) — Re-measure the codeflood-era ratios under textflood (TODO)
+
+**#70 (1.11x) and #70B (0.96x) were both measured against a saturated
+producer and are void as throughput numbers.** #70B has been re-run
+(1.12x at 3840x2400); #70's eager ack has not, and neither has #70B at
+2560x1440, where its projection was computed.
+
+**Work.** Re-run the eager-ack A/B (arm-u/arm-v config) under textflood,
+and the emit-split A/B at 2560x1440 under textflood, so the two knobs
+have numbers taken against a producer that is not the clock.
+
+**Why it matters beyond bookkeeping.** #70B's prize is
+resolution-dependent: `pump` and `coll` scale with pixel count and
+`emit` does not, so `emit` was 27 % of the serial chain at 2560x1440 and
+17 % at 3840x2400. The ratio at the smaller geometry should be *larger*,
+and that is a prediction this item can falsify.
+
+## #84 (was #61f) — Cut the delivery loop's latency: the encoder is ack-clocked through a busy main thread (TODO)
+
+**The shape of the loop is established; every DURATION in it is void
+(#61h).** What survives is ordering, which a slow logger cannot
+distort: capture is not damage-clocked — it fires some time after the
+eager slot ack of frame N−2, the captured rect then waits for the xrdp
+main thread to read it, and that same thread is also writing the
+previous frame to the client. FR-CAPTURE-8's two slots buy no lookahead
+at m=1: the frontier reads `ack = N−2, shown = N−3` at 1524/1533
+captures — permanently at cap, re-opened once per encoded frame. When
+the client stops draining, the stall echoes at two-frame spacing
+through the slotack(N−2) budget re-open.
+
+The numbers that used to be here — 8.0 ms trigger, 16.2 ms transit,
+17 ms send window, 1.9 ms margin, 2.249 ms/cycle idle — were all
+measured with ~12 unbuffered log.c writes per frame inside them, and
+the send window in particular was the interval BETWEEN two of those
+writes. They have to be taken again on a ring-traced build before any
+of them means anything. Instrument:
+`PR-demo/mac_bisect_matrix/i61f_delivery_chain.py`.
+
+**Step 1 — cut the main thread's 16 ms xup service latency.** The
+frame exists 16 ms before the thread that must enqueue it reads the
+message. THE DEPENDENCY, stated so it cannot be mistaken again:
+`xup fd readable -> main thread reads the rect -> fifo_add -> encoder
+worker sees it`. A shape qualifies only if it shortens THAT. Candidate
+shapes: service the xup fd from inside the egress write loop; or move
+the enqueue (or the egress writes) off the main thread. This attacks
+BOTH populations. Acceptance: `msgin − cap_sent` p50 drops to low
+single digits on a gate run; `wait` > 1 ms cycles fall accordingly.
+
+**Making the egress itself cheaper is NOT this item (owner, 2026-08-01).**
+The first attempt batched the ~2400 drdynvc PDUs of a frame into one
+buffered write. That is a network-egress optimisation: it does not
+appear anywhere in the dependency above, it carries wire-adjacent risk
+the item never scoped, and it measured worse at every shape tried
+(its own A/B numbers are void under #61h, and the record was deleted
+with them). Reverted whole in `b588a954`. The finding is "wrong lever",
+not "slow lever" — a faster version of it would have been worse,
+because it would have shipped, and no rate number could have told us
+that.
+
+**MEASURED 2026-08-01 on the ring-traced build, and the answer retires
+Step 1's whole premise.** The delay this item exists to cut is
+enqueue → submit, and it is **15.316 ms** (p50 15.035, p90 18.199) —
+60 % of a 25.474 ms period. Of that, the worker was idle for
+**0.0019 ms**: a recoverable share of **0.01 %**. The frame sits on the
+fifo for 15 ms because the worker is still encoding the previous one.
+That is serial work in progress, not scheduling slack, so **no earlier
+wake-up, no re-ordering and no cheaper handoff recovers it** — the
+entire class of fix Step 1 was reaching for is ruled out, and the cork
+is confirmed unrelated rather than merely slow.
+
+What is left is arithmetic, and it belongs to #74: `pump` (16.654 ms,
+waiting for the two ffmpeg children) and `collect` (8.802 ms, popping
+NALs and rewriting both views' LTR refs) are serial with each other
+within a frame and across frames. Overlapping them is Lever 2, and the
+prize is now sized: up to 8.8 ms of 25.5 ms.
+
+**Record:** `docs/experiments/61e-the-period-is-encode-and-rewrite.md`;
+capture `captures/i61e_x013_eager_m1_4k_20260801`.
+
+**Step 2 — capture depth, per monitor only** (PRD forbids a global
+pool). A third slot adds one frame of real lookahead and absorbs
+client hiccups up to a full period. Only after Step 1: with a 16 ms
+service latency any extra slot drains into the same queue.
+
+**Falsifiable.** If Step 1 lands and the tail persists at unchanged
+amplitude, the client-forcing story is wrong and the stall origin is
+inside the server after all. Note the forcing is client-dependent:
+this client is the oracle harness (its dump goes to tmpfs, so disk
+writes are ruled OUT as its pause source — the pause is unattributed,
+see #61g); a real client's hiccup spectrum differs, but the 1.9 ms
+margin is ours.
+
+**Why it matters beyond 6.1 %.** Any further reduction of worker-side
+serial time now converts into more of this wait rather than into rate.
+The worker is no longer the only ceiling.
+
+## #88 (was #61g) — The oracle client's 50–150 ms pauses: NOT scheduling; what they are is still open (TODO)
+
+**Step 1 is ANSWERED, and it rules the planned fix out.** One 60 s gate
+run on x006 with per-thread `/proc/<tid>/schedstat` sampling
+(2026-08-01; the capture and its record were garbage-collected by #61h
+and are in git history only — the finding is a RATIO of the client's own
+counters, which the server's logger does not touch): run-delay
+summed over every client thread is 0.326 s in 57.0 s — **0.5 % of the
+client's CPU time**, and no higher inside the ack holes (6.0 ms/s) than
+outside (5.4 ms/s). The client runs at ~0.65 cores throughout, on a
+32-core box at load ~1. **Host CPU contention is not what pauses it**,
+so the pin/nice fix that was queued as Step 2 is withdrawn — it would
+have targeted a mechanism that is not operating.
+
+The dump was already ruled out (`/tmp` is tmpfs). What the client is
+actually doing during a pause is unattributed, and the honest position
+is that it stays unattributed until someone has a cheap way to ask.
+
+**Do not build another sampler for it.** The one used here was a custom
+wheel next to `common/perf_trace`; it cost 36 % of a core and moved the
+rate it was measuring (37.6 vs 36.8 ms on the same arm), and its whole
+yield was the single number above. It is reverted. Next candidate
+instruments, cheapest first: the client's own `--log-level` timing on
+the DVC receive path; `perf record` on the client pid for 5 s; a
+one-line `/proc/<pid>/stat` delta before/after. None of them is a new
+tool in `PR-demo/`.
+
+**Explicitly out of scope without owner sign-off:** enlarging the
+loopback socket buffers to hide client pauses from the server. That
+would change what E5 *means* (it removes the client-forcing the
+server currently absorbs), and buffering-away a symptom is the
+fallback shape the honesty rule exists to catch.
+
+**Not a substitute for #61f.** A perfect client removes the forcing,
+not the vulnerability: the 1.9 ms margin and the 16 ms main-thread
+service latency stay ours.
+
+**Caution for anyone re-measuring here.** x006 measured 36.8 ms in the
+morning and 41.2–41.8 ms the same evening — same arm, same image, same
+payload, cause unestablished (host load 1.0 → 1.9). Quote a treatment
+only against a control from its own pass.
+
+## #61h — Per-frame trace off log.c and into the perf ring (DONE 2026-08-01)
+
+Every `GFX_TRACE` / `ACK_TRACE` record was a `LOG(LOG_LEVEL_INFO, …)` —
+global mutex, unbuffered `write()`, ~12 per frame, nine of them on the
+xrdp main thread. The instrument sat on the path it measured, and the
+"17 ms send window" the whole first #61f attempt was designed against is
+the interval between two of those log lines.
+
+Fixed in `66a60311`: records go to `common/perf_trace` (payload widened
+2 → 6 ints so a GFX send fits in one event), the sink formats through
+one schema function, the file opens with a `# perfbase` line carrying
+both clocks, and a trace knob armed without `XRDP_PERF_TRACE` warns once
+and disarms instead of silently recording nothing.
+`perf_trace_lines.py` renders the ring back into the line shapes the
+existing analyses read. CLAUDE.md rule 5 now requires the ring for
+anything at frame rate.
+
+Verified on a 60 s run of the fixed build: **zero** `GFX_TRACE` lines in
+the pod's `xrdp.log`, records present in the ring.
+
+**The replacement is now measured, not just argued (2026-08-01).** The
+armed ring costs a producer thread **~7 µs per frame** (p99 50 µs, worst
+frame observed 91 µs) for the twelve records the hot path writes — 0.02 %
+of a frame period, worst frame 0.37 % — plus 0.5–0.6 % of one core in
+total across both threads. Disarmed, which is what ships, a
+`PERF_TRACE6` costs ~30–45 ns. **Timing taken with the ring armed can be
+quoted as if the ring were not there.** Instrument:
+`tools/perf_trace_bench.c`, two arms, 20 s each, linking the shipped
+`common/perf_trace.c`.
+
+Open and small: 29 % of frames carry a minor page fault (first touch of
+the 393 KB ring and the sink's 1 MB stdio buffer), which is inside the
+worst case above. A `memset` of both at `perf_trace_open()` would move
+it off the producer thread. Not applied — it is shipped-code change and
+a third arm.
+
+**Records:** `docs/experiments/61h-the-logger-was-in-the-measurement.md`
+(the defect and what it voided), `docs/experiments/61h-what-the-ring-costs.md`
+(what the replacement costs).
+
+**Consequence, and it is large: every timing number measured with the
+trace armed is void.** Twenty-five capture directories and three
+experiment records were deleted from the tree (they remain in git
+history). The items that had closed on them are reopened below.
+
+## #61e — DONE 2026-08-01 (redone on the ring): the period is encode + LTR rewrite, and `capture ‖ encode` HOLDS at m=1
+
+**Answered on arm x013**, one monitor at 3840×2400, textflood, eager ack
++ emit split, 2227 sends, 0 trace drops. The frame period is **25.474 ms
+and 100 % of it is the encoder worker running serially**: 16.654 ms
+waiting for the two ffmpeg children to encode the frame (65.4 %),
+8.802 ms popping the encoded NALs and rewriting both views' LTR
+references (34.6 %), 0.018 ms for everything else (0.1 %). Per-cycle
+closure residual max |0.000000| ms; the 25.46 ms send-to-send interval
+agrees independently.
+
+`capture ‖ encode` at m=1 **HOLDS**: worker `wait` 0.0019 ms mean, 0 of
+2226 cycles over 1 ms, 100 % of frames already enqueued, fifo depth 0 at
+all takes — with gate 2b run first to prove the bracket could have shown
+a stall. Read the condition, though: capture is hidden *because encode
+is slow*, so a materially faster encoder reopens the question.
+
+**No ratio is claimed** — one arm, no control. The gate's
+`2.01x` line is against the stale `SESSION_KIND=code` default baseline
+and is void as a comparison.
+
+**Record:** `docs/experiments/61e-the-period-is-encode-and-rewrite.md`.
+Open follow-up recorded there: `collect` at 8.8 ms/frame is 5× an
+offline bench figure of 1.75 ms/pair that states no resolution.
+
+## #61e — the reopening this replaced (2026-08-01)
+
+Previously marked DONE with a period closing to 0.007 ms unattributed, a
+worker idling 2.249 ms/cycle (35 % of cycles stalled), and PRD's
+`capture ‖ encode` row declared falsified with the emit split on.
+
+**All of that is void (#61h).** Those runs carried ~12 unbuffered log.c
+writes per frame, nine on the xrdp main thread, inside the period being
+attributed — and the stage brackets were being differenced against a
+period the logger inflated. The tracer-transparency argument that
+covered this is void for the same reason: its controls (armed vs
+disarmed ring, new vs old build) had the log.c lines in BOTH arms, so it
+could not see them.
+
+**What is still standing** is one ordering fact, which a slow instrument
+cannot distort: capture is ack-clocked, not damage-clocked — the
+xorgxrdp frontier reads `ack = N−2, shown = N−3` at essentially every
+capture, so FR-CAPTURE-8's two slots buy no lookahead at m=1.
+
+**To redo, on a ring-traced build:** the period attribution and the
+`capture ‖ encode` verdict, control and treatment in ONE pass. Do not
+compare anything to a pre-#61h number.
+
+## #89 (was #70B) — REOPENED 2026-08-01: does the emit split buy anything?
+
+Previously marked DONE at 1.12x under textflood (and 0.96x under
+codeflood, already void as producer-bound). **The 1.12x is void (#61h)**
+— measured on x001–x004, all with the per-frame trace on log.c.
+
+The code ships and stays default-off; its prerequisite refactor fixed a
+real use-after-free and that is unaffected. What has to be measured
+again is whether splitting the emit off the worker moves the rate at
+all, and by how much. PRD FR-ACK-2 still names it as #70's completion.
+
+## #90 (was #74) — Lever 2 architecture: DECISION OPEN (owner discussion next iteration; was task "#40 implement FR-PROC-7")
+
+Lever 2 was queued as "implement FR-PROC-7's submit/collect
+construction + the three policies" on the implicit shape of ONE worker
+thread. The #61e/#61f decomposition reopened the shape question, and
+the owner has argued (2026-08-01) for a different one. **Do not start
+implementation until this is decided.** The candidates:
+
+- **A. Depth reorder, one thread** (the shape #40 assumed):
+  `subm(N+1) → coll(N)+book+rel(N) → pump(N+1)`. Period
+  `subm + max(encode, tail)` ≈ 21 ms at m=1 — but only while
+  `tail ≤ encode` (13.7 vs 16.7 ms today, 3 ms margin), and the fixed
+  service order idles the children whenever encode finishes early.
+  The owner's objection: capture-ready and encode-done are independent
+  events; a hardwired order is a bet that worker CPU stays faster than
+  ffmpeg, and it stops paying exactly where serialization hurts most
+  (tail ~27 ms at m=2 > encode ~17 ms under the set-pump).
+- **B. Submit/collect stage threads** (owner proposal): a submit side
+  owning stdin fds + schedule cadence, a collect side owning stdout
+  fds + the NUT demux/LTR rewrite, bounded one-frame SPSC queue
+  between them; event-driven on whichever upstream fires first.
+  Period `max(subm, tail, encode)` — generalizes to m≥2 (~27 ms vs
+  A's ~36 ms). Each child's stream is touched by exactly one thread,
+  so per-child ordering is structural; shared state shrinks to handle
+  lifecycle + error stop-the-line.
+- **C. Resumable-coll state machine on one thread** — rejected in
+  discussion: hand-rolled coroutines in C to slice an 8.5 ms
+  demux+rewrite is strictly heavier than a thread, and the codebase
+  precedent (emit thread, FR-TRACE-1 ring) already buys threads with
+  narrow queues for exactly this problem.
+
+Constraints that survive whichever shape wins: **#61f Step 1 first**
+(a 21–27 ms pipeline behind a ~32 ms delivery loop converts the whole
+gain into `wait`); the bounded queue is the contract (the bufferbloat
+prohibition applies as it did to the global pool); PRD's "exactly one
+worker thread / a measurement a set-pump cannot reach" paragraph
+(concurrency section) stands until superseded by a dated amendment —
+option B requires that amendment, and the m≥2 tail arithmetic above is
+the candidate measurement, currently *projected*, not measured (#71
+owns the m≥2 numbers).
+
+---
+
+# Closed — records in `docs/experiments/`
+
+Each line is what the work decided. The conditions, tables and
+retractions are in the linked file; the code is in git.
+
+| item | outcome | record |
+|---|---|---|
+| **#45** intra refresh, one-thread `pump_set`, per-monitor capture budget | DONE. E5 resolved by #52 at 2.13×. | [`45-intra-refresh-and-pump-set.md`](docs/experiments/45-intra-refresh-and-pump-set.md) |
+| **#52** E5-2 saturated-payload frame interval | DONE. 2.13× GREEN; retired the 51.1 ms cadence baseline as a reading of a 10 Hz metronome. | [`52-e5-2-saturated-payload.md`](docs/experiments/52-e5-2-saturated-payload.md) |
+| **#55** E5-2 on the T4 | DONE. 1.5×–2.3× AMBER, attributed to a saturated Xorg. T4 now decommissioned. | [`55-e5-2-on-the-t4.md`](docs/experiments/55-e5-2-on-the-t4.md) |
+| **#59/#60** T4 attribution corrections | Recorded. Capture is 13.8 % of the bottleneck thread; the E5-2 bimodality was never root-caused and the box is gone. | [`59-61-corrected-attribution.md`](docs/experiments/59-61-corrected-attribution.md) |
+| **#61** GLAMOR on NVIDIA | CLOSED-WONTFIX — renders black; the campaign built on it is void. Payload half continues as #61b above. | [`61-glamor-on-nvidia.md`](docs/experiments/61-glamor-on-nvidia.md) |
+| **#62** textflood payload | DONE. 1.41× RED, then annotated producer-confounded. | [`62-textflood-payload.md`](docs/experiments/62-textflood-payload.md) |
+| **#64** rect_id ack "ghost" | CLOSED. Root cause REFUTED — the ack is an echo and never drifted. Machinery survived into #70. | [`64-rect-id-ack-ghost.md`](docs/experiments/64-rect-id-ack-ghost.md) |
+| **#70** eager slot-release ack | DONE, shipped default-off. 1.11×, encode‖tail 4.8 → 8.5 ms. Step 0 answered NO. Incomplete without #70B per PRD FR-ACK-2. | [`70-eager-slot-release-ack.md`](docs/experiments/70-eager-slot-release-ack.md) |
+
+## #98 — act on the flow-control literature survey (TODO — filed 2026-08-04; OWNER DECISIONS NEEDED before any code)
+
+**What.** The owner suspected we were re-deriving known theory; a
+web-verified literature survey (15 years of SIGCOMM/NSDI/MobiCom/CoNEXT
++ deployed cloud-gaming systems) confirms it and is filed at
+`docs/research/flow-control-survey-2026-08.md`. Summary of what it
+settles about our measured 40 ms equilibrium:
+
+* The measured closed form (`ack_latency = 50.5 ms + queue/43.1 MiB/s`,
+  standing queue = window_bytes − BDP, drain = cwnd/RTT) is textbook —
+  it is BBR's window-limited operating-region equation plus Little's
+  law, and the multiple-equilibria property is Kleinrock (1979) /
+  Jaffe (1981). The cwnd pinning is RFC 7661 behaving as specified,
+  and its own recommended mitigation is pacing.
+* **The bound to chase:** send-to-ack ≥ RTT + frame_size/bandwidth
+  ≈ 60–100 ms on our 40 ms link, vs 203.7 measured.
+* **The field's figures of merit** (every deployed system: Stadia/GCC,
+  Google SQP, Tencent Pudica NSDI '24, Salsify NSDI '18): p95/p99
+  per-frame delivery delay at a quality floor, stall rate, and the
+  quality×delay Pareto — NOT frames/s at a given RTT. Industry latency
+  budgets: <100 ms end-to-end for gaming-class, <150 ms RTC-class.
+* **Remedies by implementation weight**, with the survey's expected
+  effect on our numbers:
+  - Tier 0 (config, hours): BBR + fq pacing on the server egress,
+    `tcp_slow_start_after_idle=0`, buffers ≥ BDP + 2 frames.
+  - Tier 1 (socket code, days): `TCP_NOTSENT_LOWAT` (~128 KB) so the
+    standing queue lives in xrdp where damage-coalescing can eat it,
+    plus userspace frame pacing (Trickle ATC '12 / SQP): spread each
+    frame over the period at ~1.2× the needed rate instead of a
+    3.4 MB burst. Tier 0+1 expected: 203.7 → ~60–100 ms send-to-ack,
+    11.5 → ~25–45 fps at 40 ms.
+  - Tier 2 (app rate control, weeks): encoder per-frame byte budget =
+    delivered_rate × period — the direction EVERY deployed system
+    converged on; the only tier that survives a genuinely slow link;
+    what 60 fps at 40 ms requires (≤750 KB/frame at 43 MiB/s). Also:
+    size the credit C to ⌈RTT/period⌉ + 1 rather than a constant.
+  - Tier 3 (transport, months): QUIC / RDPEUDP2-style UDP. The survey's
+    read: most of the latency win is already captured at Tier 2;
+    Tier 3 buys loss-resilience (irrelevant on our loss-free testbed,
+    relevant on real WANs).
+
+**Logistics recon (2026-08-04, probed live on this box, the pods and
+the veths — not assumed):**
+* Feasible from inside the incus box / pods with no metal-host help:
+  every per-netns sysctl (`tcp_slow_start_after_idle`, `tcp_wmem`,
+  `tcp_notsent_lowat`, `tcp_congestion_control` — all verified
+  WRITABLE in both the incus netns and a pod netns); every per-socket
+  option (`TCP_NOTSENT_LOWAT`, `SO_MAX_PACING_RATE`, `SO_SNDBUF` to
+  8 MB verified accepted in the pod netns — xrdp runs as root in
+  privileged pods, so the `wmem_max` cap does not bind, but note an
+  explicit `SO_SNDBUF` disables kernel autotuning and must be sized
+  deliberately); and the `fq` pacing qdisc (`sch_fq` is available —
+  installed and removed cleanly on a fleet veth).
+* NOT feasible from here: **BBR**. `tcp_available_congestion_control`
+  is `reno cubic` only; `setsockopt(TCP_CONGESTION, "bbr")` in the pod
+  netns fails ENOENT; the incus container has NO `/lib/modules` tree
+  and cannot load kernel modules (module loading is a metal-host
+  operation; the shared kernel is `7.0.0-27-generic`).
+* **Metal-host accommodation (owner action, two lines + persistence):**
+      sudo modprobe tcp_bbr
+      echo tcp_bbr | sudo tee /etc/modules-load.d/tcp_bbr.conf
+  Optionally, so non-privileged namespaces may also select it:
+      sudo sysctl -w net.ipv4.tcp_allowed_congestion_control="reno cubic bbr"
+  If `modprobe` reports the module missing, the metal host needs its
+  kernel's standard modules package (`tcp_bbr.ko` ships in the stock
+  Ubuntu `linux-modules` for -generic kernels). Once loaded it is
+  global: it appears in the available list in every namespace, and our
+  privileged processes (CAP_NET_ADMIN) can select it per-socket or
+  per-netns with nothing else changed.
+* Interplay with the netem harness: netem owns the root qdisc on the
+  shaped interfaces, so `fq` cannot also be root there. Not a blocker:
+  BBR paces internally since kernel 4.13 (fq optional), and
+  `SO_MAX_PACING_RATE` works without fq (verified). If fq is ever
+  wanted under netem it can stack as netem's child.
+
+**Tier 0 A/B RUN 2026-08-05 (owner-directed) — CONFIRMED AT THE
+FLOOR.** Two legs on x019 at netem 40 ms, cubic-control vs
+bbr+ssai=0+wmem16M, knob proven on the live socket, control leg
+reproduced the 2026-08-03 baseline to 0.1 %. Result: send-to-ack
+204.2 → **50.1 ms** (theory floor ≈ 50–55 on a 40.38 ms link), fps
+11.5 → **36.6**, transport queue 6.65 MB → **25 KiB**, wire bound
+held, cwnd 4.5k → 23k pkts. The survey's Tier-0 mechanism claim is
+confirmed by intervention; details and the BBR ProbeRTT caveat in
+`docs/experiments/98-tier0-bbr-ab.md`. Still owed: LAN regression
+check of tier0, C>1 under tier0 (model now predicts ~56 fps at C=2),
+Tier 1, and the FoM decision.
+
+**Bandwidth-limited legs RUN 2026-08-06 (owner-directed) — GRACEFUL
+by the pre-registered definition.** Harness gained a declared tbf
+bottleneck (rate verified by measurement per leg). bbr at 400/200/100
+Mbit + cubic contrast at 200, all C = 1, RTT 40: fps tracks link/frame
+within 3 % (12.8/6.5/3.35), send-to-ack flat at 0.72–0.90 of the
+window bound (C+2)·S/B + RTT, wire bound held, drops ≤ 30 pkts/leg,
+frames stay fresh by coalescing. cubic ≈ bbr when the link binds — the
+window governs; but cubic re-inflates capture-to-send 21 → 52 ms and
+parks the standing frames in wait_s instead of the socket. The bounded
+delay is still ~0.9 s at 100 Mbit: interactivity at low rates needs
+smaller frames (Tier 2), quantified at ≤0.5 MB/frame for a 150 ms
+budget at 200 Mbit. Record: `docs/experiments/98-tier0-bbr-ab.md`
+addendum; capture `i98_bwlimit_20260806_003023_s20`.
+
+**Resolution sweep RUN 2026-08-06 (owner-directed) — trend CONFIRMED
+at 1440p/1080p.** fps = B/S within 3 % and ack flat under the window
+bound on all four legs; frame bytes scale with pixels at a constant
+~0.39 B/px (CQP 20 textflood), so S is predictable from geometry.
+Budget mapping: at 40 ms/200 Mbit today's build is interactive at
+1080p (91 ms), marginal at 1440p (167 ms), not at 4K (436 ms).
+Capture `i98_bwlimit_res_20260806_004607_s20`.
+
+**Decisions this item needs from the owner, in order:**
+1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
+   floor + stall rate + quality×delay Pareto) in place of / beside
+   fps-at-RTT? This changes what every future WAN gate asserts.
+2. Authorize a Tier 0+1 experiment (the cheapest lever the survey
+   predicts moves 203.7 ms materially; needs an arm count + wall time
+   stated before running, per the 2-minute rule).
+3. Whether Tier 2 (encoder rate adaptation) enters the roadmap as its
+   own item — it is a new control loop touching the encoder config
+   surface, not a tweak.
+
+**Interaction with #80:** none of this reopens #80's steps 1–3 — the
+credit frontier is about WHO stalls WHOM inside the server, and its
+LAN result stands. It reframes step 4's remaining work: the C-table's
+prerequisite ("declared TCP environment") now has a concrete shape —
+declare CC algorithm, pacing, and buffer sizes per leg — and C's own
+sizing rule has a candidate closed form (⌈RTT/period⌉ + 1) to test
+instead of a table search.

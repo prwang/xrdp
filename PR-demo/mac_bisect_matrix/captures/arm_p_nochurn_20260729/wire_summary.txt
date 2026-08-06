@@ -1,0 +1,20 @@
+arm-p (ltr_rekey_surface_reset = false), xrdp-dev 6894d7de2202, 200 s,
+SESSION_KIND=code.
+
+EGFX surface lifecycle events in the whole capture: 2
+    @4217  CREATE_SURFACE        surface 0, 1024x768
+    @4279  MAP_SURFACE_TO_OUTPUT surface 0 at 0,0
+  -- both at connect. ZERO mid-session churn: no DELETE_SURFACE, no
+  re-CREATE, no re-MAP. Nothing for a client to repaint on.
+
+Re-keys still fire, which is the entire point:
+  server log "reached the re-key threshold" ......... 7
+  server log surface rebuild/replace ................ 0
+  IDR records ....... [0, 536, 1072, 1608, 2144, 2680, 3216, 3752]
+  spacing ........... 536 records = 268 pairs, exactly the threshold
+  counter reset ..... prev frame_num 535 -> IDR frame_num 0
+  damage ............ (0,0,1024,768) whole surface, every boundary
+  steady state ...... 4136 non-IDR, 8 exceptions = the designed aux
+                      seed after each main IDR
+
+Owner's gate: 4144 pictures, 4144 decoded, 0 black frames.

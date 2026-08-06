@@ -1,0 +1,77 @@
+=== #45 gate run: arm-r, oracle client, 180s ===
+image:    host install (no image): ubuntu@100.24.126.48
+Linux 7.0.0-1009-aws x86_64
+Tesla T4
+package: xorgxrdp-dev 1:0.10.80+git20260729225933.d77d05463e52
+package: xrdp-dev 0.10.80+git20260730013346.52b8798839ad
+monitors: OK: 2 monitors (2560x1440_60 at 0x0, 3840x2400R at 2560x0)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#intra_refresh_framesitself(#45D7)andappendsitaftertheadmin
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 2018 over 175.4 s
+send-to-send gap: mean 87.0 ms  p50 128 ms  p90 174 ms  p99 205 ms
+11.50 sends/s = 5.75 pairs/s per monitor (2 monitors)
+surface 0 own period: n=1009 mean 174.0 ms  p50 169.0 ms
+surface 1 own period: n=1009 mean 173.0 ms  p50 169.0 ms
+damage coverage: surface 0: 1009  surface 1: 1009
+         both monitors inked (worst imbalance 1.00x) — this is the two-monitor regime
+cycles: 1011   kids_armed: 2:4 (0%)  4:1007 (100%)
+worker busy (batch arm -> last=1): 93.2 s of 175.4 s = 53%   mean service 92.1 ms
+             (100% busy = the pipeline is the limit; a low number with a long interval = the payload or capture is)
+
+E5 GATE: baseline 122.9 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 87.0 ms  ->  1.41x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+   1007 kids_armed=4
+      4 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== E2 — wire audit (--assert) on oracle_avc_s1.bin ===
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT0      : 1006/1007
+      avg P size=2086291B   avg I/IDR size=3561086B   inter share of pictures=99.5%
+aux  pictures=1007   P(inter)=1002   I(intra)=5     IDR=0
+      P slices retargeted to OWN slot LT1 : 1002/1002
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT1      : 1007/1007
+      avg P size=1693849B   avg I/IDR size=2764211B   inter share of pictures=99.5%
+
+merged decode-order frame_num chain: 2014 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
+  A2 intra only on a scheduled index       PASS  unscheduled intra: main [] aux []
+  A3 cuts are paired across views          PASS  main intra ordinals [0, 240, 480, 720, 960] ... aux [0, 240, 480, 720, 960]
+  A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
+  A5 own-slot refs and self-marks          PASS  all pictures conform
+  A6 one contiguous frame_num chain        PASS  0 gap(s)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 239 aux 239 (bound 240)
+
+ASSERT VERDICT: PASS -- 7 checks, all clean
+wire audit exit: 0
+
+=== E2 — black-frame check ===
+oracle_avc_s1.bin
+  pictures in capture     : 2014
+  frames decoded          : 2014
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS

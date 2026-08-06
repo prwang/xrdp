@@ -63,9 +63,12 @@ int main (void)
     srunner_add_suite(sr, make_suite_avc444_caps());
     srunner_add_suite(sr, make_suite_avc444_metablock());
     srunner_add_suite(sr, make_suite_avc444_h264());
+    srunner_add_suite(sr, make_suite_avc444_ltr());
     srunner_add_suite(sr, make_suite_avc444_nut());
     srunner_add_suite(sr, make_suite_avc444_ffmpeg());
     srunner_add_suite(sr, make_suite_avc444_multimon());
+    srunner_add_suite(sr, make_suite_avc444_emit_split());
+    srunner_add_suite(sr, make_suite_avc444_credit_frontier());
 
     srunner_set_tap(sr, "-");
     srunner_run_all (sr, CK_ENV);

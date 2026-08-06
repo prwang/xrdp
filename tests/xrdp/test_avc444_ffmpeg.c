@@ -7,8 +7,12 @@
 #include <stdio.h>
 
 #include "xrdp_encoder_ffmpeg.h"
+#include "xrdp_h264_annexb.h"
 #include "xrdp_avc444_convert.h"
 #include "os_calls.h"
+#include "string_calls.h"
+#include "log.h"
+#include "xrdp_encoder.h"
 #include "test_xrdp.h"
 
 /*
@@ -42,6 +46,13 @@ have_ffmpeg(struct xrdp_ffmpeg_avc444_config *cfg)
 
     if (path == NULL || path[0] != '/' || !g_file_exist(path))
     {
+        /* Check has no skip verdict: a gated test that returns early is
+         * reported as "Passed". Say so in the log, every time, so a run
+         * where this whole file executed NOTHING cannot be read as
+         * evidence that the ffmpeg path works. */
+        LOG(LOG_LEVEL_WARNING, "test_avc444_ffmpeg: SKIPPED (reported as "
+            "PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an "
+            "absolute stock ffmpeg to actually run this test");
         return 0;
     }
     xrdp_ffmpeg_avc444_config_default(cfg);
@@ -319,6 +330,177 @@ END_TEST
  * runner is synchronous: every submitted picture must come back READY from
  * the same call (never an older picture -- that was the content/region
  * desync bug), in submit order, with the first being the reset keyframe. */
+/* Mostly-static planar YUV444: a flat field with one small moving block.
+ * fill_yuv444_seed() rewrites every pixel every frame, which makes x264
+ * code each picture intra -- fine for the pipeline tests, but useless for
+ * the LTR chain, whose whole subject is the P-slice reference topology
+ * (and whose rewriter does not yet accept a mid-stream non-IDR I -- the
+ * gap FR-H264-6/#45 closes). */
+static void
+fill_yuv444_mostly_static(unsigned char *yuv, int w, int h, int i)
+{
+    int area = w * h;
+    int bx = (i * 4) % (w - 16);
+    int y;
+    int x;
+
+    memset(yuv, 0x40, area);
+    memset(yuv + area, 0x80, area);
+    memset(yuv + 2 * area, 0x80, area);
+    for (y = 8; y < 24; y++)
+    {
+        for (x = bx; x < bx + 16; x++)
+        {
+            yuv[y * w + x] = 0xd0;
+        }
+    }
+}
+
+/* BACKLOG #48: the aux_ltr_chain re-key threshold is settable, and the
+ * re-key must fire AT it -- not early, not late, and never by dropping
+ * the frame that trips it. The shared frame_num advances by two per pair
+ * (one value per view), so a threshold of N is crossed on pair N/2.
+ *
+ * This is the ratchet behind the lowered-threshold fleet arm: if the
+ * counter ever stopped driving the re-key, the wrap guard would go quiet
+ * and the failure would only appear ~18 min into a live session. */
+START_TEST(test_ffmpeg_ltr_rekey_cycle)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair;
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    int i;
+    int rc;
+    int fired_at = -1;
+    /* an encoder whose stream shape the LTR rewriter accepts: CABAC on,
+     * one reference, no weighted P (verified against ltr_cache_ok with
+     * tools/avc444_ltr_wire_audit.py --annexb) */
+    static const char *const ltr_args[] =
+    {
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+        "-refs", "1", "-bf", "0", "-g", "30000",
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
+    };
+    const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
+    /* the value arm-o deploys: proves a REAL configured threshold
+     * fires, and fires early (pair 268), not merely the API minimum */
+    const int threshold = 536;
+    const int max_pairs = 5000;   /* bounded expectation: see below */
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    /* Build cfg through the REAL plumbing hop rather than by hand: the
+     * arm-o failure (2026-07-29) was a dropped field in exactly this
+     * copy, and a test that sets cfg directly is blind to it. */
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = threshold;
+        /* explicit, not inherited from a zeroed struct: the scheduled
+         * refresh now drives both children's argv and the rewriter's
+         * observed-vs-requested check (#45 step 2) */
+        e.avc444_intra_refresh_frames = 24;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+        ck_assert_int_eq(cfg.ltr_rekey_frame_num, threshold);
+        ck_assert_int_eq(cfg.aux_ltr_chain, 1);
+        ck_assert_int_eq(cfg.intra_refresh_frames, 24);
+    }
+    cfg.encoder_args.count = nargs;
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", ltr_args[i]);
+    }
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+    ck_assert_ptr_ne(enc, NULL);
+    /* nothing pending before the first pair */
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_rekey_pending(enc), 0);
+    for (i = 0; i < max_pairs; i++)
+    {
+        fill_yuv444_mostly_static(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
+                                            conv->aux_nv12, conv->nv12_size,
+                                            (unsigned long long)i, &pair);
+        /* the LTR chain must engage: a guard rejection would surface here
+         * as ERROR, and this test would be silently proving nothing */
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        /* the pair that trips the re-key STILL SHIPS -- dropping it would
+         * lose that frame's damage (the stuck-last-frame class) */
+        ck_assert_int_gt(pair.main_len, 0);
+        ck_assert_int_gt(pair.aux_len, 0);
+        if (xrdp_ffmpeg_avc444_rekey_pending(enc) && fired_at < 0)
+        {
+            fired_at = i;
+            break;
+        }
+    }
+    /* two frame_num values per pair: the trip is on pair threshold/2 - 1
+     * (zero-based), i.e. the first pair whose SECOND value reaches it */
+    /* Fires at EXACTLY the configured counter (two frame_num per pair),
+     * and fires EARLY. A harness that just waits is a defect: the arm-o
+     * run burned ~20 min because a dead knob is indistinguishable from a
+     * slow one unless the expectation is bounded. Bound it here. */
+    ck_assert_int_eq(fired_at, threshold / 2 - 1);
+    ck_assert_int_lt(fired_at, max_pairs);
+    ck_assert_int_lt(fired_at, 5000);
+
+    /* Cross the boundary the way the caller does (xrdp_encoder.c: the
+     * pair has shipped, now destroy the encoder so the next damaged frame
+     * rebuilds it). This half is what makes #48 testable INDEPENDENTLY of
+     * the #45 non-IDR-I gap: a re-key never asks the rewriter to splice a
+     * mid-stream non-IDR I -- the child is destroyed, so its replacement's
+     * first picture is a real IDR, the one intra shape the rewriter has
+     * always accepted (xrdp_h264_annexb.c: ntype == 5 resets the chain). */
+    xrdp_ffmpeg_avc444_delete(enc);
+    enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+    ck_assert_ptr_ne(enc, NULL);
+    /* the fresh pair starts a new epoch: nothing pending, and the first
+     * picture is the reset keyframe */
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_rekey_pending(enc), 0);
+    for (i = 0; i < 4; i++)
+    {
+        fill_yuv444_mostly_static(xrgb, w, h, fired_at + 1 + i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
+                                            conv->aux_nv12, conv->nv12_size,
+                                            (unsigned long long)i, &pair);
+        /* the post-re-key chain must splice cleanly: main IDR then P, aux
+         * seed-I then P. A failure here would mean the epoch restart -- not
+         * merely its trigger -- is broken. */
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_gt(pair.main_len, 0);
+        ck_assert_int_gt(pair.aux_len, 0);
+        if (i == 0)
+        {
+            ck_assert_int_eq(pair.main_keyframe, 1);
+        }
+        /* and the new epoch must be far from the threshold again */
+        ck_assert_int_eq(xrdp_ffmpeg_avc444_rekey_pending(enc), 0);
+    }
+    xrdp_ffmpeg_avc444_delete(enc);
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
 START_TEST(test_ffmpeg_encode_single)
 {
     struct xrdp_ffmpeg_avc444_config cfg;
@@ -481,6 +663,426 @@ START_TEST(test_ffmpeg_resize_recycle)
 END_TEST
 
 /******************************************************************************/
+/* REGRESSION (arm-o, 2026-07-29): the gfx.toml -> runner plumbing has four
+ * hops (tconfig -> xrdp_mm -> struct xrdp_encoder -> cfg) and the LAST one
+ * is a hand-written field-by-field copy. ltr_rekey_frame_num was added to
+ * the first three and dropped from the fourth, so the knob parsed, logged
+ * a WARNING naming the lowered value, and never reached the encoder: the
+ * deployed threshold stayed the compiled-in default and the #48 re-key
+ * could not fire at all. 72698 pairs on arm-o produced ZERO boundaries.
+ *
+ * The pre-existing ffmpeg test could not catch it because it sets the
+ * config struct directly, bypassing this hop entirely. This test drives
+ * the real function. Every session-scoped field gets a value distinct
+ * from the default so a dropped assignment fails here. */
+START_TEST(test_avc444_cfg_from_encoder_carries_every_field)
+{
+    struct xrdp_encoder enc;
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444_config defaults;
+
+    xrdp_ffmpeg_avc444_config_default(&defaults);
+    memset(&enc, 0, sizeof(enc));
+    enc.avc444_chroma_align = 16;
+    enc.avc444_dump_extra = 1;
+    enc.avc444_strip_sei = 1;
+    enc.avc444_sanitize_hrd = 1;
+    enc.avc444_strip_pic_struct = 1;
+    enc.avc444_aux_ltr_chain = 1;
+    enc.avc444_ltr_rekey_frame_num = 536;
+    enc.avc444_fault_aux_delay = 1;
+    enc.avc444_fault_strip_mmco = 1;
+    snprintf(enc.avc444_path, sizeof(enc.avc444_path), "/opt/x/ffmpeg");
+    enc.avc444_encoder_args.count = 2;
+    snprintf(enc.avc444_encoder_args.arg[0],
+             sizeof(enc.avc444_encoder_args.arg[0]), "-c:v");
+    snprintf(enc.avc444_encoder_args.arg[1],
+             sizeof(enc.avc444_encoder_args.arg[1]), "h264_nvenc");
+
+    xrdp_avc444_cfg_from_encoder(&enc, &cfg);
+
+    ck_assert_int_eq(cfg.chroma_align, 16);
+    ck_assert_int_eq(cfg.use_dump_extra, 1);
+    ck_assert_int_eq(cfg.strip_sei, 1);
+    ck_assert_int_eq(cfg.sanitize_hrd, 1);
+    ck_assert_int_eq(cfg.strip_pic_struct, 1);
+    ck_assert_int_eq(cfg.aux_ltr_chain, 1);
+    ck_assert_int_eq(cfg.fault_aux_delay, 1);
+    ck_assert_int_eq(cfg.fault_strip_mmco, 1);
+    ck_assert_str_eq(cfg.path, "/opt/x/ffmpeg");
+    ck_assert_int_eq(cfg.encoder_args.count, 2);
+    ck_assert_str_eq(cfg.encoder_args.arg[1], "h264_nvenc");
+    /* structural, never configurable (PRD FR-H264-7) */
+    ck_assert_int_eq(cfg.aux_intra_leaf, 1);
+    /* THE bug: settable everywhere except where it mattered */
+    ck_assert_int_eq(cfg.ltr_rekey_frame_num, 536);
+    ck_assert_int_ne(cfg.ltr_rekey_frame_num, defaults.ltr_rekey_frame_num);
+}
+END_TEST
+
+
+/*****************************************************************************/
+/* nal_unit_type of the first VCL NAL of an annex-b packet, or -1 */
+static int
+ff_first_vcl_type(const unsigned char *p, int len)
+{
+    int i;
+
+    for (i = 0; i + 4 < len; i++)
+    {
+        if (p[i] == 0 && p[i + 1] == 0 && p[i + 2] == 0 && p[i + 3] == 1)
+        {
+            int t = p[i + 4] & 0x1f;
+
+            if (t == 1 || t == 5)
+            {
+                return t;
+            }
+        }
+    }
+    return -1;
+}
+
+/*****************************************************************************/
+/* is that first VCL NAL an intra picture (IDR, or slice_type I)? */
+static int
+ff_first_vcl_is_intra(const unsigned char *p, int len)
+{
+    int i;
+
+    for (i = 0; i + 6 < len; i++)
+    {
+        if (p[i] == 0 && p[i + 1] == 0 && p[i + 2] == 0 && p[i + 3] == 1)
+        {
+            int t = p[i + 4] & 0x1f;
+
+            if (t == 5)
+            {
+                return 1;
+            }
+            if (t == 1)
+            {
+                /* first_mb_in_slice ue + slice_type ue, both small in
+                 * our shape: first_mb == 0 is the single bit 1, so
+                 * slice_type starts at bit 1 of the byte after the NAL
+                 * header. I slices are 2 or 7; the exp-Golomb codes are
+                 * 011 (2) and 0001000 (7). */
+                unsigned int b = p[i + 5];
+
+                if ((b & 0x80) == 0)
+                {
+                    return 0;      /* first_mb != 0: not a picture start */
+                }
+                if ((b & 0x70) == 0x30)
+                {
+                    return 1;      /* slice_type 2 */
+                }
+                if ((b & 0x7f) == 0x08)
+                {
+                    return 1;      /* slice_type 7 */
+                }
+                return 0;
+            }
+        }
+    }
+    return 0;
+}
+
+/* BACKLOG #45 step 2 / E2, on the REAL child: with a scheduled paired
+ * intra refresh every N pictures, every pair must ship (the rewriter's
+ * observed-vs-requested check fails the pair on a skipped or de-phased
+ * cut, so a long clean run IS the proof the schedule is honoured), and
+ * the refreshed pictures must be non-IDR I in BOTH views -- no IDR
+ * mid-stream, one contiguous chain.
+ *
+ * This is the closest a unit test gets to the wire gate: it drives two
+ * real ffmpeg children through the real rewriter and parses what comes
+ * out. It only runs with XRDP_TEST_FFMPEG_PATH set (see have_ffmpeg). */
+START_TEST(test_ffmpeg_scheduled_paired_cut_live)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair;
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    const int period = 24;
+    const int pairs = 3 * 24 + 5;
+    int main_intra = 0;
+    int aux_intra = 0;
+    int main_idr_mid = 0;
+    int aux_idr_mid = 0;
+    int i;
+    int rc;
+    static const char *const ltr_args[] =
+    {
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+        "-refs", "1", "-bf", "0",
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
+    };
+    const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+        e.avc444_intra_refresh_frames = period;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+        ck_assert_int_eq(cfg.intra_refresh_frames, period);
+    }
+    cfg.encoder_args.count = nargs;
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", ltr_args[i]);
+    }
+    /* deliberately NO -g in the admin args: the runner pins it to the
+     * refresh period itself (D7), and this proves it does */
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+    ck_assert_ptr_ne(enc, NULL);
+    for (i = 0; i < pairs; i++)
+    {
+        int mt;
+        int at;
+
+        fill_yuv444_mostly_static(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        rc = xrdp_ffmpeg_avc444_encode_pair(enc, conv->main_nv12,
+                                            conv->aux_nv12, conv->nv12_size,
+                                            (unsigned long long)i, &pair);
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        mt = ff_first_vcl_type(pair.main_data, pair.main_len);
+        at = ff_first_vcl_type(pair.aux_data, pair.aux_len);
+        /* mt/at: 5 = IDR, 1 = non-IDR reference; -1 = no VCL found */
+        ck_assert_int_ne(mt, -1);
+        ck_assert_int_ne(at, -1);
+        if (i == 0)
+        {
+            /* the epoch entry: a real IDR on the main view only */
+            ck_assert_int_eq(mt, 5);
+            ck_assert_int_eq(at, 1);
+        }
+        else
+        {
+            if (mt == 5)
+            {
+                main_idr_mid++;
+            }
+            if (at == 5)
+            {
+                aux_idr_mid++;
+            }
+        }
+        if (ff_first_vcl_is_intra(pair.main_data, pair.main_len))
+        {
+            main_intra++;
+            /* a refresh lands on a scheduled ordinal, in both views */
+            ck_assert_int_eq(i % period, 0);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair.aux_data, pair.aux_len), 1);
+        }
+        if (ff_first_vcl_is_intra(pair.aux_data, pair.aux_len))
+        {
+            aux_intra++;
+            ck_assert_int_eq(i % period, 0);
+        }
+    }
+    /* the epoch entry plus one cut per period, in each view */
+    ck_assert_int_eq(main_intra, 1 + (pairs - 1) / period);
+    ck_assert_int_eq(aux_intra, main_intra);
+    /* and no IDR anywhere after the first picture, in either view */
+    ck_assert_int_eq(main_idr_mid, 0);
+    ck_assert_int_eq(aux_idr_mid, 0);
+    xrdp_ffmpeg_avc444_delete(enc);
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
+/* BACKLOG #45 E4, at the unit level: ONE thread drives FOUR views
+ * concurrently. Two encoder handles stand in for two damaged monitors;
+ * each handle owns two children (main + aux). One submit pass, ONE
+ * pump_pairs call over both handles, one collect pass -- and
+ * pump_pairs reports how many children it armed in that single poll
+ * set, which is the counter E4 asserts rather than inferring
+ * concurrency from a wall-clock improvement.
+ *
+ * What this does NOT prove: that the four encodes overlap in time. The
+ * poll set makes overlap possible (all four fds are armed in one poll
+ * and serviced in one pass); the measurement that it HAPPENS is E5's
+ * oracle frame interval on the real path. Stated here so the test is
+ * not read as more than it is. */
+START_TEST(test_ffmpeg_pump_set_four_views_one_thread)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *handles[2];
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair[2];
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    /* 24 is XRDP_H264_INTRA_REFRESH_FRAMES_MIN: anything smaller is
+     * clamped by the runner, and a test that asked for 8 would silently
+     * be measuring 24 (it did, first time round) */
+    const int period = XRDP_H264_INTRA_REFRESH_FRAMES_MIN;
+    const int pairs = 30;
+    int cuts = 0;
+    int bad_handle;
+    int kids_armed;
+    int i;
+    int k;
+    static const char *const ltr_args[] =
+    {
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+        "-refs", "1", "-bf", "0",
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
+    };
+    const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+        e.avc444_intra_refresh_frames = period;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+    }
+    cfg.encoder_args.count = nargs;
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", ltr_args[i]);
+    }
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    for (k = 0; k < 2; k++)
+    {
+        handles[k] = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+        ck_assert_ptr_ne(handles[k], NULL);
+    }
+    for (i = 0; i < pairs; i++)
+    {
+        fill_yuv444_mostly_static(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        /* submit pass: both monitors, nothing written to a pipe yet */
+        for (k = 0; k < 2; k++)
+        {
+            ck_assert_int_eq(
+                xrdp_ffmpeg_avc444_submit_pair(handles[k],
+                                               conv->main_nv12,
+                                               conv->aux_nv12,
+                                               conv->nv12_size,
+                                               (unsigned long long)i),
+                XRDP_FFMPEG_PAIR_READY);
+        }
+        /* ONE poll set over four children */
+        bad_handle = -1;
+        kids_armed = 0;
+        ck_assert_int_eq(xrdp_ffmpeg_avc444_pump_pairs(handles, 2,
+                         &bad_handle, &kids_armed),
+                         XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_eq(kids_armed, 4);
+        ck_assert_int_eq(bad_handle, -1);
+        /* collect pass: each monitor's pair, in its own chain */
+        for (k = 0; k < 2; k++)
+        {
+            ck_assert_int_eq(
+                xrdp_ffmpeg_avc444_collect_pair(handles[k],
+                                                (unsigned long long)i,
+                                                &pair[k]),
+                XRDP_FFMPEG_PAIR_READY);
+            ck_assert_int_gt(pair[k].main_len, 0);
+            ck_assert_int_gt(pair[k].aux_len, 0);
+            ck_assert_int_eq((int)pair[k].desktop_sequence, i);
+            /* no IDR after the first picture, in either monitor */
+            if (i > 0)
+            {
+                ck_assert_int_eq(ff_first_vcl_type(pair[k].main_data,
+                                                   pair[k].main_len), 1);
+                ck_assert_int_eq(ff_first_vcl_type(pair[k].aux_data,
+                                                   pair[k].aux_len), 1);
+            }
+        }
+        /* both monitors cut on the same ordinals: independent chains,
+         * identical schedule */
+        if (ff_first_vcl_is_intra(pair[0].main_data, pair[0].main_len))
+        {
+            cuts++;
+            ck_assert_int_eq(i % period, 0);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[1].main_data,
+                                      pair[1].main_len), 1);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[0].aux_data,
+                                      pair[0].aux_len), 1);
+            ck_assert_int_eq(
+                ff_first_vcl_is_intra(pair[1].aux_data,
+                                      pair[1].aux_len), 1);
+        }
+    }
+    ck_assert_int_eq(cuts, 1 + (pairs - 1) / period);
+    for (k = 0; k < 2; k++)
+    {
+        xrdp_ffmpeg_avc444_delete(handles[k]);
+    }
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
+/* RETIRED with BACKLOG #45 step 2 (recorded as C6).
+ *
+ * test_ltr_counter_cap_detects_unreachable_rekey used to pin the
+ * arithmetic of the arm-o incident: a main GOP IDR RESET the shared
+ * frame_num counter, the counter advanced by two per pair, so a child
+ * GOP of g pairs capped it at 2g and `-g 30000` against the 65024
+ * threshold made the re-key structurally unreachable (72698 pairs, zero
+ * boundaries, 20 minutes of silence).
+ *
+ * Step 2 deletes that reset: a mid-stream main IDR is now a scheduled
+ * refresh whose mmco6 replaces LT0 and leaves the counter running, so
+ * the 2g cap model -- and the helper that computed it,
+ * xrdp_ffmpeg_avc444_ltr_counter_cap() -- became FALSE exactly at the
+ * D7 target of `-g 240`. A warning that fires on a correct
+ * configuration is worse than no warning, so the helper and this test
+ * are gone rather than adjusted.
+ *
+ * The guard did not disappear with them, it got stronger: the mechanism
+ * itself is now asserted directly by
+ * test_ltr_cut_midstream_idr_keeps_chain (tests/xrdp/test_avc444_ltr.c),
+ * which feeds a real mid-stream IDR packet through the rewriter and
+ * requires the shared counter to CONTINUE (frame_num 10 -> 11) and LT1
+ * to survive. An arithmetic model of a reset is not needed once the
+ * reset cannot happen. */
+
 Suite *
 make_suite_avc444_ffmpeg(void)
 {
@@ -496,6 +1098,10 @@ make_suite_avc444_ffmpeg(void)
     tcase_add_test(tc, test_ffmpeg_probe_timeout_classified);
     tcase_add_test(tc, test_ffmpeg_single_sps_per_keyframe);
     tcase_add_test(tc, test_ffmpeg_encode_pair);
+    tcase_add_test(tc, test_ffmpeg_ltr_rekey_cycle);
+    tcase_add_test(tc, test_ffmpeg_scheduled_paired_cut_live);
+    tcase_add_test(tc, test_ffmpeg_pump_set_four_views_one_thread);
+    tcase_add_test(tc, test_avc444_cfg_from_encoder_carries_every_field);
     tcase_add_test(tc, test_ffmpeg_encode_single);
     tcase_add_test(tc, test_ffmpeg_resize_recycle);
     suite_add_tcase(s, tc);

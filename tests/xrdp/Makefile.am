@@ -35,6 +35,14 @@ EXTRA_DIST = \
   gfx/gfx_missing_h264.toml \
   gfx/gfx_avc444_ffmpeg.toml \
   gfx/gfx_avc444_empty_args.toml \
+  gfx/gfx_avc444_rekey.toml \
+  gfx/gfx_avc444_rekey_bad.toml \
+  gfx/gfx_avc444_intra_refresh.toml \
+  gfx/gfx_avc444_intra_refresh_bad.toml \
+  gfx/gfx_avc444_rekey_nochurn.toml \
+  gfx/gfx_avc444_rekey_churn.toml \
+  gfx/gfx_avc444_wire_window.toml \
+  gfx/gfx_avc444_wire_window_bad.toml \
   gfx/fake_encoder_hang.sh \
   avc444/fixture_4frame.nut \
   avc444/PROVENANCE.md \
@@ -56,9 +64,14 @@ test_xrdp_SOURCES = \
     test_avc444_caps.c \
     test_avc444_metablock.c \
     test_avc444_h264.c \
+    test_avc444_ltr.c \
+    test_avc444_ltr_vectors.h \
+    test_avc444_ltr_cut_vectors.h \
     test_avc444_nut.c \
     test_avc444_ffmpeg.c \
     test_avc444_multimon.c \
+    test_avc444_emit_split.c \
+    test_avc444_credit_frontier.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \

@@ -69,4 +69,18 @@ xrdp_accel_assist/xrdp-accel-assist
 *.deb
 
 # local test-VM harness (contains credentials + large binary dumps) — never commit
-vm/
+vm
+
+# Fleet capture evidence: the oracle client's bitstream dumps and the
+# transport dumps are hundreds of MB to gigabytes each. They are
+# REGENERABLE by re-running the gate, and CLAUDE.md has always said they
+# must not be committed -- but nothing enforced it, and 13.6 GB of them
+# reached git history anyway (stripped 2026-08-01, see #61h). The README,
+# VERDICT.txt, logs and rendered traces beside them ARE the record and
+# stay tracked.
+PR-demo/mac_bisect_matrix/captures/**/*.bin
+PR-demo/mac_bisect_matrix/captures/**/*.dump
+PR-demo/mac_bisect_matrix/captures/**/oracle/
+
+# turn pre-flight draft (CLAUDE.md "Turn pre-flight") — scratch, never committed
+.turn_draft.md

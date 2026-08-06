@@ -1,0 +1,447 @@
+seq=000000 sid=0 codec=0x000F len=331 rect=0,0,1280,800 AVC444 LC=1 cbStream1=327 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000001 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000002 sid=0 codec=0x000F len=1313 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1309 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000003 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000004 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000005 sid=0 codec=0x000F len=6116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000006 sid=0 codec=0x000F len=140 rect=0,0,1280,800 AVC444 LC=1 cbStream1=136 s1.numRegionRects=1 s1.rect0=608,368,624,416 s1.qp0=22 s1.qual0=100
+seq=000007 sid=0 codec=0x000F len=230 rect=0,0,1280,800 AVC444 LC=1 cbStream1=226 s1.numRegionRects=1 s1.rect0=416,368,864,464 s1.qp0=22 s1.qual0=100
+seq=000008 sid=0 codec=0x000F len=195 rect=0,0,1280,800 AVC444 LC=1 cbStream1=191 s1.numRegionRects=1 s1.rect0=416,368,864,464 s1.qp0=22 s1.qual0=100
+seq=000009 sid=0 codec=0x000F len=6171 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000010 sid=0 codec=0x000F len=13840 rect=0,0,1280,800 AVC444 LC=1 cbStream1=13836 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000011 sid=0 codec=0x000F len=1306 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1302 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000012 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000013 sid=0 codec=0x000F len=1313 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1309 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000014 sid=0 codec=0x000F len=1306 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000015 sid=0 codec=0x000F len=7995 rect=0,0,1280,800 AVC444 LC=1 cbStream1=7991 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000016 sid=0 codec=0x000F len=6178 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6174 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000017 sid=0 codec=0x000F len=4674 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4670 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000018 sid=0 codec=0x000F len=3481 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3477 s1.numRegionRects=2 s1.rect0=0,0,1280,752 s1.qp0=30 s1.qual0=72
+seq=000019 sid=0 codec=0x000F len=8816 rect=0,0,1280,800 AVC444 LC=1 cbStream1=8812 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000020 sid=0 codec=0x000F len=13105 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000021 sid=0 codec=0x000F len=944 rect=0,0,1280,800 AVC444 LC=1 cbStream1=940 s1.numRegionRects=1 s1.rect0=432,752,1280,800 s1.qp0=22 s1.qual0=100
+seq=000022 sid=0 codec=0x000F len=824 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000023 sid=0 codec=0x000F len=962 rect=0,0,1280,800 AVC444 LC=1 cbStream1=958 s1.numRegionRects=1 s1.rect0=0,752,1280,800 s1.qp0=22 s1.qual0=100
+seq=000024 sid=0 codec=0x000F len=121 rect=0,0,1280,800 AVC444 LC=1 cbStream1=117 s1.numRegionRects=1 s1.rect0=0,752,1280,800 s1.qp0=22 s1.qual0=100
+seq=000025 sid=0 codec=0x000F len=1096 rect=0,0,1280,800 AVC444 LC=0 cbStream1=100 s1.numRegionRects=1 s1.rect0=1104,752,1152,800 s1.qp0=22 s1.qual0=100 s2.numRegionRects=2 s2.rect0=0,752,1104,800 s2.qp0=22 s2.qual0=100
+seq=000026 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=432,752,544,800 s1.qp0=22 s1.qual0=100
+seq=000027 sid=0 codec=0x000F len=114 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000028 sid=0 codec=0x000F len=244 rect=0,0,1280,800 AVC444 LC=1 cbStream1=240 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000029 sid=0 codec=0x000F len=225 rect=0,0,1280,800 AVC444 LC=1 cbStream1=221 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000030 sid=0 codec=0x000F len=3684 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3680 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000031 sid=0 codec=0x000F len=2037 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2033 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000032 sid=0 codec=0x000F len=2274 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2270 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000033 sid=0 codec=0x000F len=1282 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1278 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000034 sid=0 codec=0x000F len=91 rect=0,0,1280,800 AVC444 LC=1 cbStream1=87 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000035 sid=0 codec=0x000F len=469 rect=0,0,1280,800 AVC444 LC=1 cbStream1=465 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000036 sid=0 codec=0x000F len=826 rect=0,0,1280,800 AVC444 LC=1 cbStream1=822 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000037 sid=0 codec=0x000F len=1586 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1582 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000038 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000039 sid=0 codec=0x000F len=115 rect=0,0,1280,800 AVC444 LC=1 cbStream1=111 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000040 sid=0 codec=0x000F len=1012 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1008 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000041 sid=0 codec=0x000F len=991 rect=0,0,1280,800 AVC444 LC=1 cbStream1=987 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000042 sid=0 codec=0x000F len=938 rect=0,0,1280,800 AVC444 LC=1 cbStream1=934 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000043 sid=0 codec=0x000F len=846 rect=0,0,1280,800 AVC444 LC=1 cbStream1=842 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000044 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000045 sid=0 codec=0x000F len=2195 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2191 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000046 sid=0 codec=0x000F len=1157 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1153 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000047 sid=0 codec=0x000F len=130 rect=0,0,1280,800 AVC444 LC=1 cbStream1=126 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000048 sid=0 codec=0x000F len=2014 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2010 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000049 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000050 sid=0 codec=0x000F len=14731 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000051 sid=0 codec=0x000F len=2068 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2064 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000052 sid=0 codec=0x000F len=117 rect=0,0,1280,800 AVC444 LC=1 cbStream1=113 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000053 sid=0 codec=0x000F len=6061 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000054 sid=0 codec=0x000F len=2368 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2364 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000055 sid=0 codec=0x000F len=128 rect=0,0,1280,800 AVC444 LC=1 cbStream1=124 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000056 sid=0 codec=0x000F len=2122 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2118 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000057 sid=0 codec=0x000F len=5460 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000058 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000059 sid=0 codec=0x000F len=2237 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2233 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000060 sid=0 codec=0x000F len=7370 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000061 sid=0 codec=0x000F len=102 rect=0,0,1280,800 AVC444 LC=1 cbStream1=98 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000062 sid=0 codec=0x000F len=2126 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2122 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000063 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000064 sid=0 codec=0x000F len=2529 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2525 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000065 sid=0 codec=0x000F len=104 rect=0,0,1280,800 AVC444 LC=1 cbStream1=100 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000066 sid=0 codec=0x000F len=2837 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2833 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000067 sid=0 codec=0x000F len=9925 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000068 sid=0 codec=0x000F len=102 rect=0,0,1280,800 AVC444 LC=1 cbStream1=98 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000069 sid=0 codec=0x000F len=3134 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3130 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000070 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000071 sid=0 codec=0x000F len=119 rect=0,0,1280,800 AVC444 LC=1 cbStream1=115 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000072 sid=0 codec=0x000F len=9776 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000073 sid=0 codec=0x000F len=3521 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3517 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000074 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000075 sid=0 codec=0x000F len=138 rect=0,0,1280,800 AVC444 LC=1 cbStream1=134 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000076 sid=0 codec=0x000F len=5586 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5582 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000077 sid=0 codec=0x000F len=2863 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2859 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000078 sid=0 codec=0x000F len=2500 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2496 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000079 sid=0 codec=0x000F len=5369 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5365 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000080 sid=0 codec=0x000F len=27297 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000081 sid=0 codec=0x000F len=6824 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6820 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000082 sid=0 codec=0x000F len=2218 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2214 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000083 sid=0 codec=0x000F len=2136 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2132 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000084 sid=0 codec=0x000F len=2303 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2299 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000085 sid=0 codec=0x000F len=2918 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2914 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000086 sid=0 codec=0x000F len=6932 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6928 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000087 sid=0 codec=0x000F len=1978 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1974 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000088 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000089 sid=0 codec=0x000F len=3331 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3327 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000090 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000091 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000092 sid=0 codec=0x000F len=2876 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2872 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000093 sid=0 codec=0x000F len=2258 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2254 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000094 sid=0 codec=0x000F len=105 rect=0,0,1280,800 AVC444 LC=1 cbStream1=101 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000095 sid=0 codec=0x000F len=3760 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3756 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000096 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000097 sid=0 codec=0x000F len=210 rect=0,0,1280,800 AVC444 LC=1 cbStream1=206 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000098 sid=0 codec=0x000F len=3146 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3142 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000099 sid=0 codec=0x000F len=2644 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2640 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000100 sid=0 codec=0x000F len=119 rect=0,0,1280,800 AVC444 LC=1 cbStream1=115 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000101 sid=0 codec=0x000F len=8050 rect=0,0,1280,800 AVC444 LC=1 cbStream1=8046 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000102 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000103 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000104 sid=0 codec=0x000F len=137 rect=0,0,1280,800 AVC444 LC=1 cbStream1=133 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000105 sid=0 codec=0x000F len=5469 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5465 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000106 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000107 sid=0 codec=0x000F len=110 rect=0,0,1280,800 AVC444 LC=1 cbStream1=106 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000108 sid=0 codec=0x000F len=4556 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4552 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000109 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000110 sid=0 codec=0x000F len=134 rect=0,0,1280,800 AVC444 LC=1 cbStream1=130 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000111 sid=0 codec=0x000F len=4738 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4734 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000112 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000113 sid=0 codec=0x000F len=123 rect=0,0,1280,800 AVC444 LC=1 cbStream1=119 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000114 sid=0 codec=0x000F len=36825 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000115 sid=0 codec=0x000F len=15864 rect=0,0,1280,800 AVC444 LC=1 cbStream1=15860 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000116 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000117 sid=0 codec=0x000F len=11674 rect=0,0,1280,800 AVC444 LC=1 cbStream1=11670 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000118 sid=0 codec=0x000F len=3238 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3234 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000119 sid=0 codec=0x000F len=2680 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2676 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000120 sid=0 codec=0x000F len=5672 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5668 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000121 sid=0 codec=0x000F len=3350 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3346 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000122 sid=0 codec=0x000F len=124 rect=0,0,1280,800 AVC444 LC=1 cbStream1=120 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000123 sid=0 codec=0x000F len=2117 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2113 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000124 sid=0 codec=0x000F len=3760 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3756 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000125 sid=0 codec=0x000F len=2103 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2099 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000126 sid=0 codec=0x000F len=98 rect=0,0,1280,800 AVC444 LC=1 cbStream1=94 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000127 sid=0 codec=0x000F len=1882 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1878 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000128 sid=0 codec=0x000F len=120 rect=0,0,1280,800 AVC444 LC=1 cbStream1=116 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000129 sid=0 codec=0x000F len=2659 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2655 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000130 sid=0 codec=0x000F len=133 rect=0,0,1280,800 AVC444 LC=1 cbStream1=129 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000131 sid=0 codec=0x000F len=2661 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2657 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000132 sid=0 codec=0x000F len=2647 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2643 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000133 sid=0 codec=0x000F len=4924 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4920 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000134 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000135 sid=0 codec=0x000F len=3530 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3526 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000136 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000137 sid=0 codec=0x000F len=3912 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3908 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000138 sid=0 codec=0x000F len=3387 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3383 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000139 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000140 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000141 sid=0 codec=0x000F len=127 rect=0,0,1280,800 AVC444 LC=1 cbStream1=123 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000142 sid=0 codec=0x000F len=2971 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2967 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000143 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000144 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000145 sid=0 codec=0x000F len=2201 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2197 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000146 sid=0 codec=0x000F len=3226 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3222 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000147 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000148 sid=0 codec=0x000F len=109 rect=0,0,1280,800 AVC444 LC=1 cbStream1=105 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000149 sid=0 codec=0x000F len=6264 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6260 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000150 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000151 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000152 sid=0 codec=0x000F len=135 rect=0,0,1280,800 AVC444 LC=1 cbStream1=131 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000153 sid=0 codec=0x000F len=5174 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5170 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000154 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000155 sid=0 codec=0x000F len=147 rect=0,0,1280,800 AVC444 LC=1 cbStream1=143 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000156 sid=0 codec=0x000F len=4674 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4670 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000157 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000158 sid=0 codec=0x000F len=108 rect=0,0,1280,800 AVC444 LC=1 cbStream1=104 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000159 sid=0 codec=0x000F len=5550 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5546 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000160 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000161 sid=0 codec=0x000F len=113 rect=0,0,1280,800 AVC444 LC=1 cbStream1=109 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000162 sid=0 codec=0x000F len=5727 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5723 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000163 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000164 sid=0 codec=0x000F len=5681 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5677 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000165 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000166 sid=0 codec=0x000F len=144 rect=0,0,1280,800 AVC444 LC=1 cbStream1=140 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000167 sid=0 codec=0x000F len=38030 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000168 sid=0 codec=0x000F len=4743 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4739 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000169 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000170 sid=0 codec=0x000F len=140 rect=0,0,1280,800 AVC444 LC=1 cbStream1=136 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000171 sid=0 codec=0x000F len=7287 rect=0,0,1280,800 AVC444 LC=1 cbStream1=7283 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000172 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000173 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000174 sid=0 codec=0x000F len=174 rect=0,0,1280,800 AVC444 LC=1 cbStream1=170 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000175 sid=0 codec=0x000F len=5305 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5301 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000176 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000177 sid=0 codec=0x000F len=145 rect=0,0,1280,800 AVC444 LC=1 cbStream1=141 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000178 sid=0 codec=0x000F len=5382 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5378 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000179 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000180 sid=0 codec=0x000F len=138 rect=0,0,1280,800 AVC444 LC=1 cbStream1=134 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000181 sid=0 codec=0x000F len=5178 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5174 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000182 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000183 sid=0 codec=0x000F len=155 rect=0,0,1280,800 AVC444 LC=1 cbStream1=151 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000184 sid=0 codec=0x000F len=6122 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6118 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000185 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000186 sid=0 codec=0x000F len=132 rect=0,0,1280,800 AVC444 LC=1 cbStream1=128 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000187 sid=0 codec=0x000F len=5325 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5321 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000188 sid=0 codec=0x000F len=30917 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000189 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000190 sid=0 codec=0x000F len=156 rect=0,0,1280,800 AVC444 LC=1 cbStream1=152 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000191 sid=0 codec=0x000F len=378 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000192 sid=0 codec=0x000F len=6159 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6155 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000193 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000194 sid=0 codec=0x000F len=10408 rect=0,0,1280,800 AVC444 LC=1 cbStream1=10404 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000195 sid=0 codec=0x000F len=4462 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4458 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000196 sid=0 codec=0x000F len=4817 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4813 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000197 sid=0 codec=0x000F len=3301 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3297 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000198 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000199 sid=0 codec=0x000F len=147 rect=0,0,1280,800 AVC444 LC=1 cbStream1=143 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000200 sid=0 codec=0x000F len=2319 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2315 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000201 sid=0 codec=0x000F len=3291 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3287 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000202 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000203 sid=0 codec=0x000F len=110 rect=0,0,1280,800 AVC444 LC=1 cbStream1=106 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000204 sid=0 codec=0x000F len=2243 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2239 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000205 sid=0 codec=0x000F len=4175 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4171 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000206 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000207 sid=0 codec=0x000F len=142 rect=0,0,1280,800 AVC444 LC=1 cbStream1=138 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000208 sid=0 codec=0x000F len=2925 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2921 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000209 sid=0 codec=0x000F len=5661 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5657 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000210 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000211 sid=0 codec=0x000F len=5942 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5938 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000212 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000213 sid=0 codec=0x000F len=217 rect=0,0,1280,800 AVC444 LC=1 cbStream1=213 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000214 sid=0 codec=0x000F len=6382 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6378 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000215 sid=0 codec=0x000F len=3632 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3628 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000216 sid=0 codec=0x000F len=226 rect=0,0,1280,800 AVC444 LC=1 cbStream1=222 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000217 sid=0 codec=0x000F len=2584 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2580 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000218 sid=0 codec=0x000F len=4588 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4584 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000219 sid=0 codec=0x000F len=4090 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4086 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000220 sid=0 codec=0x000F len=188 rect=0,0,1280,800 AVC444 LC=1 cbStream1=184 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000221 sid=0 codec=0x000F len=2999 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2995 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000222 sid=0 codec=0x000F len=5016 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5012 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000223 sid=0 codec=0x000F len=4069 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4065 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000224 sid=0 codec=0x000F len=3697 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3693 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000225 sid=0 codec=0x000F len=2729 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2725 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000226 sid=0 codec=0x000F len=4506 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4502 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000227 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000228 sid=0 codec=0x000F len=2295 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2291 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000229 sid=0 codec=0x000F len=126 rect=0,0,1280,800 AVC444 LC=1 cbStream1=122 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000230 sid=0 codec=0x000F len=3311 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3307 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000231 sid=0 codec=0x000F len=3079 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3075 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000232 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000233 sid=0 codec=0x000F len=3944 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3940 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000234 sid=0 codec=0x000F len=170 rect=0,0,1280,800 AVC444 LC=1 cbStream1=166 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000235 sid=0 codec=0x000F len=3925 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3921 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000236 sid=0 codec=0x000F len=4343 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4339 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000237 sid=0 codec=0x000F len=11500 rect=0,0,1280,800 AVC444 LC=1 cbStream1=11496 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000238 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000239 sid=0 codec=0x000F len=4282 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4278 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000240 sid=0 codec=0x000F len=2838 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2834 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000241 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000242 sid=0 codec=0x000F len=130 rect=0,0,1280,800 AVC444 LC=1 cbStream1=126 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000243 sid=0 codec=0x000F len=5046 rect=0,0,1280,800 AVC444 LC=1 cbStream1=5042 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000244 sid=0 codec=0x000F len=3741 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3737 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000245 sid=0 codec=0x000F len=117 rect=0,0,1280,800 AVC444 LC=1 cbStream1=113 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000246 sid=0 codec=0x000F len=2622 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2618 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000247 sid=0 codec=0x000F len=4441 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4437 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000248 sid=0 codec=0x000F len=2588 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2584 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000249 sid=0 codec=0x000F len=160 rect=0,0,1280,800 AVC444 LC=1 cbStream1=156 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000250 sid=0 codec=0x000F len=2921 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2917 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000251 sid=0 codec=0x000F len=2392 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2388 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000252 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000253 sid=0 codec=0x000F len=3001 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2997 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000254 sid=0 codec=0x000F len=113 rect=0,0,1280,800 AVC444 LC=1 cbStream1=109 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000255 sid=0 codec=0x000F len=3575 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3571 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000256 sid=0 codec=0x000F len=3466 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3462 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000257 sid=0 codec=0x000F len=7491 rect=0,0,1280,800 AVC444 LC=1 cbStream1=7487 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000258 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000259 sid=0 codec=0x000F len=4058 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4054 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000260 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000261 sid=0 codec=0x000F len=104 rect=0,0,1280,800 AVC444 LC=1 cbStream1=100 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000262 sid=0 codec=0x000F len=3059 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3055 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000263 sid=0 codec=0x000F len=3130 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3126 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000264 sid=0 codec=0x000F len=126 rect=0,0,1280,800 AVC444 LC=1 cbStream1=122 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000265 sid=0 codec=0x000F len=2076 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2072 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000266 sid=0 codec=0x000F len=3587 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3583 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000267 sid=0 codec=0x000F len=3272 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3268 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000268 sid=0 codec=0x000F len=3149 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3145 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000269 sid=0 codec=0x000F len=2746 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2742 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000270 sid=0 codec=0x000F len=3501 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3497 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000271 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000272 sid=0 codec=0x000F len=2224 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2220 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000273 sid=0 codec=0x000F len=1591 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1587 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000274 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000275 sid=0 codec=0x000F len=1986 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1982 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000276 sid=0 codec=0x000F len=124 rect=0,0,1280,800 AVC444 LC=1 cbStream1=120 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000277 sid=0 codec=0x000F len=1442 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1438 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000278 sid=0 codec=0x000F len=7437 rect=0,0,1280,800 AVC444 LC=1 cbStream1=7433 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000279 sid=0 codec=0x000F len=2094 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2090 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000280 sid=0 codec=0x000F len=121 rect=0,0,1280,800 AVC444 LC=1 cbStream1=117 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000281 sid=0 codec=0x000F len=914 rect=0,0,1280,800 AVC444 LC=1 cbStream1=910 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000282 sid=0 codec=0x000F len=1939 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1935 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000283 sid=0 codec=0x000F len=1959 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1955 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000284 sid=0 codec=0x000F len=107 rect=0,0,1280,800 AVC444 LC=1 cbStream1=103 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000285 sid=0 codec=0x000F len=1253 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1249 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000286 sid=0 codec=0x000F len=2161 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2157 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000287 sid=0 codec=0x000F len=3065 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3061 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000288 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000289 sid=0 codec=0x000F len=140 rect=0,0,1280,800 AVC444 LC=1 cbStream1=136 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000290 sid=0 codec=0x000F len=3615 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3611 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000291 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000292 sid=0 codec=0x000F len=124 rect=0,0,1280,800 AVC444 LC=1 cbStream1=120 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000293 sid=0 codec=0x000F len=3065 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3061 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000294 sid=0 codec=0x000F len=2715 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2711 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000295 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000296 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000297 sid=0 codec=0x000F len=1661 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1657 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000298 sid=0 codec=0x000F len=1938 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1934 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000299 sid=0 codec=0x000F len=100 rect=0,0,1280,800 AVC444 LC=1 cbStream1=96 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000300 sid=0 codec=0x000F len=1305 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1301 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000301 sid=0 codec=0x000F len=3780 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3776 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000302 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000303 sid=0 codec=0x000F len=4033 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4029 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000304 sid=0 codec=0x000F len=20190 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000305 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000306 sid=0 codec=0x000F len=2603 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2599 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000307 sid=0 codec=0x000F len=126 rect=0,0,1280,800 AVC444 LC=1 cbStream1=122 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000308 sid=0 codec=0x000F len=10609 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000309 sid=0 codec=0x000F len=2800 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2796 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000310 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000311 sid=0 codec=0x000F len=9444 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000312 sid=0 codec=0x000F len=4347 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4343 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000313 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000314 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000315 sid=0 codec=0x000F len=4207 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4203 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000316 sid=0 codec=0x000F len=127 rect=0,0,1280,800 AVC444 LC=1 cbStream1=123 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000317 sid=0 codec=0x000F len=9564 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000318 sid=0 codec=0x000F len=4337 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4333 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000319 sid=0 codec=0x000F len=111 rect=0,0,1280,800 AVC444 LC=1 cbStream1=107 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000320 sid=0 codec=0x000F len=4110 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4106 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000321 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000322 sid=0 codec=0x000F len=158 rect=0,0,1280,800 AVC444 LC=1 cbStream1=154 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000323 sid=0 codec=0x000F len=2514 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2510 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000324 sid=0 codec=0x000F len=133 rect=0,0,1280,800 AVC444 LC=1 cbStream1=129 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000325 sid=0 codec=0x000F len=12295 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000326 sid=0 codec=0x000F len=2720 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2716 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000327 sid=0 codec=0x000F len=98 rect=0,0,1280,800 AVC444 LC=1 cbStream1=94 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000328 sid=0 codec=0x000F len=7967 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000329 sid=0 codec=0x000F len=2245 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2241 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000330 sid=0 codec=0x000F len=104 rect=0,0,1280,800 AVC444 LC=1 cbStream1=100 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000331 sid=0 codec=0x000F len=7306 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000332 sid=0 codec=0x000F len=4917 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4913 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000333 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000334 sid=0 codec=0x000F len=103 rect=0,0,1280,800 AVC444 LC=1 cbStream1=99 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000335 sid=0 codec=0x000F len=2785 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2781 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000336 sid=0 codec=0x000F len=8947 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000337 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000338 sid=0 codec=0x000F len=2893 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2889 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000339 sid=0 codec=0x000F len=105 rect=0,0,1280,800 AVC444 LC=1 cbStream1=101 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000340 sid=0 codec=0x000F len=2370 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2366 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000341 sid=0 codec=0x000F len=106 rect=0,0,1280,800 AVC444 LC=1 cbStream1=102 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000342 sid=0 codec=0x000F len=5463 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000343 sid=0 codec=0x000F len=2429 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2425 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000344 sid=0 codec=0x000F len=102 rect=0,0,1280,800 AVC444 LC=1 cbStream1=98 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000345 sid=0 codec=0x000F len=9417 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000346 sid=0 codec=0x000F len=2485 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2481 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000347 sid=0 codec=0x000F len=106 rect=0,0,1280,800 AVC444 LC=1 cbStream1=102 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000348 sid=0 codec=0x000F len=5579 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000349 sid=0 codec=0x000F len=2868 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2864 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000350 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000351 sid=0 codec=0x000F len=2590 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2586 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000352 sid=0 codec=0x000F len=125 rect=0,0,1280,800 AVC444 LC=1 cbStream1=121 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000353 sid=0 codec=0x000F len=2272 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2268 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000354 sid=0 codec=0x000F len=131 rect=0,0,1280,800 AVC444 LC=1 cbStream1=127 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000355 sid=0 codec=0x000F len=2812 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2808 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000356 sid=0 codec=0x000F len=6616 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000357 sid=0 codec=0x000F len=116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000358 sid=0 codec=0x000F len=2525 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2521 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000359 sid=0 codec=0x000F len=104 rect=0,0,1280,800 AVC444 LC=1 cbStream1=100 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000360 sid=0 codec=0x000F len=2462 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2458 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000361 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000362 sid=0 codec=0x000F len=1381 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1377 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000363 sid=0 codec=0x000F len=104 rect=0,0,1280,800 AVC444 LC=1 cbStream1=100 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000364 sid=0 codec=0x000F len=4828 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000365 sid=0 codec=0x000F len=1332 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1328 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000366 sid=0 codec=0x000F len=116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000367 sid=0 codec=0x000F len=1792 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1788 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000368 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000369 sid=0 codec=0x000F len=1598 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1594 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000370 sid=0 codec=0x000F len=2581 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000371 sid=0 codec=0x000F len=116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000372 sid=0 codec=0x000F len=1862 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1858 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000373 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000374 sid=0 codec=0x000F len=2764 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000375 sid=0 codec=0x000F len=2383 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2379 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000376 sid=0 codec=0x000F len=98 rect=0,0,1280,800 AVC444 LC=1 cbStream1=94 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000377 sid=0 codec=0x000F len=1727 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1723 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000378 sid=0 codec=0x000F len=3548 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000379 sid=0 codec=0x000F len=99 rect=0,0,1280,800 AVC444 LC=1 cbStream1=95 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000380 sid=0 codec=0x000F len=1445 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1441 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000381 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000382 sid=0 codec=0x000F len=2914 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000383 sid=0 codec=0x000F len=1388 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1384 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000384 sid=0 codec=0x000F len=100 rect=0,0,1280,800 AVC444 LC=1 cbStream1=96 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000385 sid=0 codec=0x000F len=2121 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000386 sid=0 codec=0x000F len=3735 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3731 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000387 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000388 sid=0 codec=0x000F len=2504 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2500 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000389 sid=0 codec=0x000F len=114 rect=0,0,1280,800 AVC444 LC=1 cbStream1=110 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000390 sid=0 codec=0x000F len=2457 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2453 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000391 sid=0 codec=0x000F len=6502 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000392 sid=0 codec=0x000F len=113 rect=0,0,1280,800 AVC444 LC=1 cbStream1=109 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000393 sid=0 codec=0x000F len=99 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000394 sid=0 codec=0x000F len=2659 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2655 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000395 sid=0 codec=0x000F len=137 rect=0,0,1280,800 AVC444 LC=1 cbStream1=133 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000396 sid=0 codec=0x000F len=5597 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000397 sid=0 codec=0x000F len=2702 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2698 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000398 sid=0 codec=0x000F len=5836 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000399 sid=0 codec=0x000F len=116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000400 sid=0 codec=0x000F len=2196 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2192 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000401 sid=0 codec=0x000F len=6009 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000402 sid=0 codec=0x000F len=118 rect=0,0,1280,800 AVC444 LC=1 cbStream1=114 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000403 sid=0 codec=0x000F len=2071 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2067 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000404 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000405 sid=0 codec=0x000F len=2194 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2190 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000406 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000407 sid=0 codec=0x000F len=5053 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000408 sid=0 codec=0x000F len=1425 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1421 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000409 sid=0 codec=0x000F len=106 rect=0,0,1280,800 AVC444 LC=1 cbStream1=102 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000410 sid=0 codec=0x000F len=6891 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000411 sid=0 codec=0x000F len=1719 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1715 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000412 sid=0 codec=0x000F len=102 rect=0,0,1280,800 AVC444 LC=1 cbStream1=98 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000413 sid=0 codec=0x000F len=6217 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000414 sid=0 codec=0x000F len=1625 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1621 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000415 sid=0 codec=0x000F len=116 rect=0,0,1280,800 AVC444 LC=1 cbStream1=112 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000416 sid=0 codec=0x000F len=6309 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000417 sid=0 codec=0x000F len=1697 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1693 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000418 sid=0 codec=0x000F len=105 rect=0,0,1280,800 AVC444 LC=1 cbStream1=101 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000419 sid=0 codec=0x000F len=2193 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2189 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000420 sid=0 codec=0x000F len=4157 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000421 sid=0 codec=0x000F len=102 rect=0,0,1280,800 AVC444 LC=1 cbStream1=98 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000422 sid=0 codec=0x000F len=3089 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3085 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000423 sid=0 codec=0x000F len=105 rect=0,0,1280,800 AVC444 LC=1 cbStream1=101 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000424 sid=0 codec=0x000F len=8191 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000425 sid=0 codec=0x000F len=2614 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2610 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000426 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000427 sid=0 codec=0x000F len=8772 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000428 sid=0 codec=0x000F len=2982 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2978 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000429 sid=0 codec=0x000F len=109 rect=0,0,1280,800 AVC444 LC=1 cbStream1=105 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000430 sid=0 codec=0x000F len=2631 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2627 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000431 sid=0 codec=0x000F len=136 rect=0,0,1280,800 AVC444 LC=1 cbStream1=132 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000432 sid=0 codec=0x000F len=4258 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4254 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000433 sid=0 codec=0x000F len=13130 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000434 sid=0 codec=0x000F len=112 rect=0,0,1280,800 AVC444 LC=1 cbStream1=108 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000435 sid=0 codec=0x000F len=3222 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3218 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000436 sid=0 codec=0x000F len=134 rect=0,0,1280,800 AVC444 LC=1 cbStream1=130 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000437 sid=0 codec=0x000F len=3144 rect=0,0,1280,800 AVC444 LC=1 cbStream1=3140 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000438 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000439 sid=0 codec=0x000F len=124 rect=0,0,1280,800 AVC444 LC=1 cbStream1=120 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000440 sid=0 codec=0x000F len=9276 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000441 sid=0 codec=0x000F len=4176 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4172 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000442 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000443 sid=0 codec=0x000F len=110 rect=0,0,1280,800 AVC444 LC=1 cbStream1=106 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000444 sid=0 codec=0x000F len=4042 rect=0,0,1280,800 AVC444 LC=1 cbStream1=4038 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000445 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000446 sid=0 codec=0x000F len=119 rect=0,0,1280,800 AVC444 LC=1 cbStream1=115 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100

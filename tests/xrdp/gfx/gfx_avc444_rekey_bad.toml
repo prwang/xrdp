@@ -1,0 +1,10 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# Above XRDP_H264_LTR_FRAME_NUM_REKEY_MAX: honouring this would let a
+# decoder meet the frame_num wrap the re-key exists to prevent, so the
+# loader must REFUSE it and keep the default.
+ltr_rekey_frame_num = 70000

@@ -1,0 +1,12 @@
+seq=000000 sid=0 codec=0x000F len=331 rect=0,0,1280,800 AVC444 LC=1 cbStream1=327 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000001 sid=0 codec=0x000F len=90 rect=0,0,1280,800 AVC444 LC=1 cbStream1=86 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000002 sid=0 codec=0x000F len=1313 rect=0,0,1280,800 AVC444 LC=1 cbStream1=1309 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000003 sid=0 codec=0x000F len=101 rect=0,0,1280,800 AVC444 LC=1 cbStream1=97 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000004 sid=0 codec=0x000F len=6229 rect=0,0,1280,800 AVC444 LC=1 cbStream1=6225 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000005 sid=0 codec=0x000F len=157 rect=0,0,1280,800 AVC444 LC=1 cbStream1=153 s1.numRegionRects=1 s1.rect0=416,368,864,464 s1.qp0=22 s1.qual0=100
+seq=000006 sid=0 codec=0x000F len=6250 rect=0,0,1280,800 AVC444 LC=2 cbStream1=0
+seq=000007 sid=0 codec=0x000F len=331 rect=0,0,1280,800 AVC444 LC=1 cbStream1=327 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=38 s1.qual0=44
+seq=000008 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000009 sid=0 codec=0x000F len=2665 rect=0,0,1280,800 AVC444 LC=1 cbStream1=2661 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100
+seq=000010 sid=0 codec=0x000F len=93 rect=0,0,1280,800 AVC444 LC=1 cbStream1=89 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=30 s1.qual0=72
+seq=000011 sid=0 codec=0x000F len=97 rect=0,0,1280,800 AVC444 LC=1 cbStream1=93 s1.numRegionRects=1 s1.rect0=0,0,1280,800 s1.qp0=22 s1.qual0=100

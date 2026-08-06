@@ -1140,6 +1140,29 @@ getLogFile(char *replybuf, int bufsize)
 }
 
 /**
+ * Rounds a microsecond fraction of a second to whole milliseconds
+ */
+int
+log_usec_to_msec(int usec)
+{
+    int msec;
+
+    if (usec < 0)
+    {
+        return 0;
+    }
+    msec = (usec + 500) / 1000;
+    if (msec > 999)
+    {
+        /* 999500 and up would round to 1000, printing a fourth digit
+           and disagreeing with the seconds field it is appended to */
+        msec = 999;
+    }
+
+    return msec;
+}
+
+/**
  * Returns formatted datetime for log
  */
 char *
@@ -1156,7 +1179,7 @@ getFormattedDateTime(char *replybuf, int bufsize)
     gettimeofday(&tv, NULL);
     now = localtime(&tv.tv_sec);
 
-    millisec = (tv.tv_usec + 500 / 1000);
+    millisec = log_usec_to_msec((int)tv.tv_usec);
     g_snprintf(buf_millisec, sizeof(buf_millisec), "%03d", millisec);
 
     strftime(buf_datetime, sizeof(buf_datetime), "%FT%T.", now);

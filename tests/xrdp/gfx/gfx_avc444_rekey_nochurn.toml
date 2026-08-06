@@ -1,0 +1,11 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+ltr_rekey_frame_num = 536
+# BACKLOG #48 (2026-07-29): mask the EGFX surface churn from the client.
+# The re-key still rebuilds the encoder pair -- fresh IDR, shared counter
+# reset -- which is the only thing it is actually for.
+ltr_rekey_surface_reset = false

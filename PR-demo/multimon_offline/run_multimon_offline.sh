@@ -15,7 +15,7 @@
 #     (install the clean dev .deb per CLAUDE.md "Deployment"), OR set HOST to
 #     an isolated instance.
 #   - xserver-xorg-video-dummy installed (client-side 2-monitor X server).
-#   - tester account, empty password (as in tail_flush_ab/keytest.sh).
+#   - tester account, empty password (as in smoke_gate/keytest.sh).
 #
 # Box assumptions (documented per PR-demo policy, env-overridable):
 set -u

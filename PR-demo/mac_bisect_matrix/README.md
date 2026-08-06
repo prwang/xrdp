@@ -44,6 +44,31 @@ construction, and the tester always knows which arm is on screen.
 - `k8s/*.yaml` — namespace + one Deployment per arm (privileged, `/dev/dri`
   hostPath, `hostPort` pinned to `hostIP 127.0.0.1`).
 - `build_and_deploy.sh` — build → import into k3s → apply → roll → wait.
+- `e_gate_run.sh` — the acceptance-gate runner (E2/E3/E4/E5 in one
+  offscreen dual-monitor session). `E_TARGET=pod` (default) measures a
+  fleet arm; `E_TARGET=ssh` measures a real box over an ssh port-forward
+  with the client side still here — see
+  `../t4_profile/E5-2_T4_PROTOCOL.md`.
+- `e52_flood_analyze.py` — where the frame interval goes, per arm: service
+  split, per-monitor period, the `last=1 → next own dmg` wait that says
+  whether the pipeline was full, `kids_armed` histogram, ack path.
+- `netem_rtt.sh` — BACKLOG #81: simulate a WAN by putting a `tc netem`
+  delay on BOTH ends of one arm's veth pair (half the RTT each way), so
+  a round trip picks up the whole thing. Verifies the applied RTT by
+  measurement through that arm's own RDP hostPort, refuses an interface
+  carrying a qdisc it did not create, and restores everything on exit.
+  `netem_rtt.sh selftest <arm>` proves all four in 22 s.
+  **It replaces `ack_delay_proxy` / `ack_delay_sweep.sh`, deleted
+  2026-08-03** (owner: 100 % CPU when idle, and it overlaps with netem).
+  `i79_ack_delay_analyze.py` stays — it is the measurement layer the
+  #80 head-to-head imports, not part of the proxy.
+- `i80_wan_pair.sh` + `i80_wan_pair_analyze.py` — BACKLOG #80 step 4:
+  the credit frontier measured at two round-trip times (arms x018/x019),
+  with the predictions written into the runner's header before the run.
+- **`sessions_off.sh` — run this after a campaign.** A fleet session keeps
+  running its payload after the client disconnects; accumulated sessions
+  were found burning ~4 cores (2026-07-30). One command logs every session
+  off and kills the dev-box client rig.
 
 ## Host assumptions (this dev box)
 
@@ -55,6 +80,29 @@ construction, and the tester always knows which arm is on screen.
 - GPU: AMD render node `/dev/dri/renderD128`, shared by all arms and the
   host instance (VAAPI contexts are independent; fine at banner frame
   rates).
+
+## Host operating point for performance runs (owner-measured, 2026-08-02)
+
+The container cannot administer host power management (user-mode incus
+with `/dev/dri` mapped in): DVFS pinning is done on the METAL host by
+the owner, per the procedure in
+`docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`.
+Measured outcomes on this box, binding for future runs:
+
+- **CPU**: the amd_pstate recipe (`scaling_governor` +
+  `energy_performance_preference` = `performance` on all cores) works
+  as written.
+- **GPU**: use **`high`**, NOT `profile_peak`.
+  `power_dpm_force_performance_level=high` already pins
+  **MCLK 1000 MHz / SCLK 2900 MHz**, which is sufficient.
+  `profile_peak` drives the package to an uncomfortable thermal/power
+  state — **~85 °C with NO load** — which is itself a confound (skin-
+  temp/STAPM behaviour changes) and a hardware-stress risk. Do not use
+  it on this box.
+- Every capture taken with pins active must say so (the `level=` column
+  of `clock_log.sh` records the GPU side; note the CPU side in the
+  capture README). Pinned and auto runs are different conditions —
+  never compared as one arm.
 
 ## Adding/changing an arm
 

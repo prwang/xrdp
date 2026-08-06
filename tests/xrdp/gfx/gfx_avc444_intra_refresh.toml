@@ -1,0 +1,10 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
+# pictures per view. 48 is in range [24,4096] and short enough that a
+# fleet arm reaches four cuts within seconds of animation.
+intra_refresh_frames = 48

@@ -38,6 +38,7 @@
 #include "toml.h"
 #include "ms-rdpbcgr.h"
 #include "xrdp_tconfig.h"
+#include "xrdp_h264_annexb.h"
 #include "string_calls.h"
 
 #define TCLOG(log_level, args...) LOG(log_level, "TConfig: " args)
@@ -418,8 +419,17 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_strip_sei = 0;
     config->avc444_ffmpeg_sanitize_hrd = 0;
     config->avc444_ffmpeg_strip_pic_struct = 0;
+    config->avc444_ffmpeg_aux_ltr_chain = 0;
+    config->avc444_ffmpeg_ltr_rekey_surface_reset = 0;
+    config->avc444_ffmpeg_ltr_rekey_frame_num =
+        XRDP_H264_LTR_FRAME_NUM_REKEY;
+    config->avc444_ffmpeg_intra_refresh_frames =
+        XRDP_H264_INTRA_REFRESH_FRAMES;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
+    config->avc444_ffmpeg_eager_slot_ack = 0;
+    config->avc444_ffmpeg_emit_thread = 0;
+    config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
@@ -433,8 +443,43 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t ss = toml_bool_in(avc, "strip_sei");
             toml_datum_t sh = toml_bool_in(avc, "sanitize_hrd");
             toml_datum_t sp = toml_bool_in(avc, "strip_pic_struct");
+            toml_datum_t lc = toml_bool_in(avc, "aux_ltr_chain");
+            toml_datum_t rk = toml_int_in(avc, "ltr_rekey_frame_num");
+            toml_datum_t ir = toml_int_in(avc, "intra_refresh_frames");
+            toml_datum_t rs = toml_bool_in(avc,
+                                           "ltr_rekey_surface_reset");
             toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
             toml_datum_t fm = toml_bool_in(avc, "fault_strip_mmco");
+            toml_datum_t es = toml_bool_in(avc, "eager_slot_ack");
+            toml_datum_t et = toml_bool_in(avc, "emit_thread");
+            toml_datum_t ww = toml_int_in(avc, "wire_window");
+            if (es.ok)
+            {
+                config->avc444_ffmpeg_eager_slot_ack = es.u.b ? 1 : 0;
+            }
+            if (ww.ok)
+            {
+                /* same contract as the other bounded ints: out of range
+                 * is REFUSED and the default stands, never clamped */
+                if (ww.u.i < XRDP_GFX_WIRE_WINDOW_MIN ||
+                        ww.u.i > XRDP_GFX_WIRE_WINDOW_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg wire_window "
+                          "%lld out of range [%d,%d]; keeping the default "
+                          "%d", (long long)ww.u.i,
+                          XRDP_GFX_WIRE_WINDOW_MIN,
+                          XRDP_GFX_WIRE_WINDOW_MAX,
+                          config->avc444_ffmpeg_wire_window);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_wire_window = (int)ww.u.i;
+                }
+            }
+            if (et.ok)
+            {
+                config->avc444_ffmpeg_emit_thread = et.u.b ? 1 : 0;
+            }
             if (tf.ok)
             {
                 config->avc444_ffmpeg_tail_flush = tf.u.b ? 1 : 0;
@@ -454,6 +499,78 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             if (sp.ok)
             {
                 config->avc444_ffmpeg_strip_pic_struct = sp.u.b ? 1 : 0;
+            }
+            if (lc.ok)
+            {
+                config->avc444_ffmpeg_aux_ltr_chain = lc.u.b ? 1 : 0;
+            }
+            if (rs.ok)
+            {
+                config->avc444_ffmpeg_ltr_rekey_surface_reset =
+                    rs.u.b ? 1 : 0;
+                if (!rs.u.b)
+                {
+                    LOG(LOG_LEVEL_INFO, "TConfig: avc444_ffmpeg "
+                        "ltr_rekey_surface_reset is OFF: the re-key "
+                        "restarts the encoder (fresh IDR, counter reset) "
+                        "without any EGFX surface lifecycle event");
+                }
+            }
+            if (rk.ok)
+            {
+                /* out-of-range is REFUSED here (the default stands) so a
+                 * typo cannot silently weaken the wrap guard; the runner
+                 * clamps independently as a second line of defence */
+                if (rk.u.i < XRDP_H264_LTR_FRAME_NUM_REKEY_MIN ||
+                        rk.u.i > XRDP_H264_LTR_FRAME_NUM_REKEY_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "ltr_rekey_frame_num %lld out of range [%d,%d]; "
+                          "keeping the default %d", (long long)rk.u.i,
+                          XRDP_H264_LTR_FRAME_NUM_REKEY_MIN,
+                          XRDP_H264_LTR_FRAME_NUM_REKEY_MAX,
+                          config->avc444_ffmpeg_ltr_rekey_frame_num);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_ltr_rekey_frame_num = (int)rk.u.i;
+                    if (rk.u.i < XRDP_H264_LTR_FRAME_NUM_REKEY_MAX)
+                    {
+                        TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                              "ltr_rekey_frame_num lowered to %lld: the "
+                              "re-key boundary (surface reset + fresh IDR) "
+                              "will fire far more often than in production "
+                              "-- test arms only", (long long)rk.u.i);
+                    }
+                }
+            }
+            if (ir.ok)
+            {
+                /* same contract as ltr_rekey_frame_num: out-of-range is
+                 * REFUSED here (the default stands) and the runner
+                 * clamps independently */
+                if (ir.u.i < XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+                        ir.u.i > XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "intra_refresh_frames %lld out of range "
+                          "[%d,%d]; keeping the default %d",
+                          (long long)ir.u.i,
+                          XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+                          XRDP_H264_INTRA_REFRESH_FRAMES_MAX,
+                          config->avc444_ffmpeg_intra_refresh_frames);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_intra_refresh_frames =
+                        (int)ir.u.i;
+                }
+                if (!config->avc444_ffmpeg_aux_ltr_chain)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "intra_refresh_frames is set but aux_ltr_chain "
+                          "is OFF: the scheduled refresh is inert");
+                }
             }
             if (fa.ok)
             {
