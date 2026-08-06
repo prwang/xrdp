@@ -1,0 +1,6 @@
+netem_rtt: x019 applied 40 ms RTT (20000 us each way, jitter 0 ms, loss 0 %)
+netem_rtt: declared environment: netem limit 25000 pkts/direction; single-flow TCP ceiling ~= tcp_wmem_max (16777216 B) / RTT = ~419 MB/s
+netem_rtt: declared bottleneck: 100 Mbit/s server->client, drop-tail buffer 100 ms at that rate; ack direction unshaped
+netem_rtt: requested 40 ms, measured 40.290 ms, tolerance 6.000 ms -> OK
+40.290
+netem_rtt: bottleneck verify: configured 12.5 MB/s, bulk-measured 11.4 MB/s

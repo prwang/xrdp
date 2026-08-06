@@ -1,0 +1,4 @@
+== xrandr --listmonitors ==
+Monitors: 1
+ 0: +*DUMMY0 2560/677x1440/381+0+0  DUMMY0
+OK: 1 monitor (2560x1440R at 0x0; DUMMY1 off)

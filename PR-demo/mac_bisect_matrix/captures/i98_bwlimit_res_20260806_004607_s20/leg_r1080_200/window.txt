@@ -1,0 +1,7 @@
+t0 1785977268
+t1 1785977299
+delay_ms 40
+rate_mbit 200
+mode 1920x1080R
+secs 20
+leg r1080_200

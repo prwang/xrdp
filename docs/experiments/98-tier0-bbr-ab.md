@@ -100,3 +100,20 @@ large in absolute terms** — ~0.44 s at 200 Mbit, ~0.9 s at 100 Mbit —
 because at fixed S the window bound IS (C+2) frame-serializations.
 Interactivity budgets (<100–150 ms) at these rates require S ≈ 0.5 MB
 at 200 Mbit: Tier 2 encoder rate adaptation, as the survey concluded.
+
+## Addendum 2026-08-06 (later): the trend holds at 2560×1440 and 1920×1080
+
+Owner-directed follow-up. Four more legs (bbr+tier0, C = 1, 40 ms,
+declared bottleneck): {1440p, 1080p} × {200, 100 Mbit}. Capture:
+`i98_bwlimit_res_20260806_004607_s20`, predictions pre-registered.
+
+The falsifier did not fire: fps = B/S within 3 % on every leg, ack
+latency flat and under the window bound everywhere, wire bound held.
+Frame size followed pixel count almost exactly — **0.39 bytes/pixel at
+CQP 20 textflood, constant from 2.07 to 9.22 Mpx** — so S (and
+therefore the whole bandwidth-limited behaviour) is predictable from
+geometry on this payload. One benign band-miss: 1080p@200 queues even
+less than modeled (ratio 0.61 vs the 0.70–0.90 band). Practical
+corollary recorded in the capture README: at 40 ms / 200 Mbit, today's
+build is already inside a 100–150 ms interactivity budget at 1080p
+(91 ms), marginal at 1440p (167 ms), not at 4K (436 ms).

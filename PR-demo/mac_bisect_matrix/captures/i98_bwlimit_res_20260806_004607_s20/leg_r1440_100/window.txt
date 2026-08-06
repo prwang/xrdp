@@ -1,0 +1,7 @@
+t0 1785977230
+t1 1785977260
+delay_ms 40
+rate_mbit 100
+mode 2560x1440R
+secs 20
+leg r1440_100

@@ -1874,6 +1874,14 @@ smaller frames (Tier 2), quantified at ≤0.5 MB/frame for a 150 ms
 budget at 200 Mbit. Record: `docs/experiments/98-tier0-bbr-ab.md`
 addendum; capture `i98_bwlimit_20260806_003023_s20`.
 
+**Resolution sweep RUN 2026-08-06 (owner-directed) — trend CONFIRMED
+at 1440p/1080p.** fps = B/S within 3 % and ack flat under the window
+bound on all four legs; frame bytes scale with pixels at a constant
+~0.39 B/px (CQP 20 textflood), so S is predictable from geometry.
+Budget mapping: at 40 ms/200 Mbit today's build is interactive at
+1080p (91 ms), marginal at 1440p (167 ms), not at 4K (436 ms).
+Capture `i98_bwlimit_res_20260806_004607_s20`.
+
 **Decisions this item needs from the owner, in order:**
 1. Adopt the field's FoMs in the PRD (p99 frame delay at a quality
    floor + stall rate + quality×delay Pareto) in place of / beside
