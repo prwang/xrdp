@@ -536,3 +536,167 @@ rate sets the ack latency, the ack latency sets the period, and the
 period sets the offered load right back at the drain rate. The voided
 bufferbloat leg had found a *different, faster* equilibrium of the same
 loop, which is why its removal slowed the pipeline.
+
+---
+
+# Rescope, 2026-08-06 (owner decision): the RTT → C table and a simulation-chosen default are OUT OF SCOPE
+
+**Supersedes this file's status header.** The header at the top says
+"Steps 4 and 5 … have NOT run. Nothing here is a live measurement of
+the new code." That was true when it was written and is no longer:
+the step-4 sections below it are live measurements on arms x018
+(loopback baseline) and x019 (40 ms simulated round trip). Read the
+header as a statement about 2026-08-03 morning, not about this file.
+
+## Terms, once
+
+* **C, the wire window** (`gfx.toml [avc444_ffmpeg] wire_window`) is
+  the third term of the credit: the encoder will let the X server
+  capture at most C frames beyond what the *client* has acknowledged.
+  It is the only client-facing term in the frontier; the other two ask
+  the ffmpeg children and the encoder's own inventory.
+* **"Choosing the shipped default"** means picking the number a normal
+  installation gets when `gfx.toml` says nothing.
+
+## What the owner ruled
+
+Two things are struck from this item's remaining scope:
+
+1. **The RTT → C table** that PRD FR-FLOW-1 clause 4 asks for — a
+   recommended C per round-trip time.
+2. **Choosing the shipped default from the simulation data**, i.e.
+   from `netem_rtt.sh` legs.
+
+The reason is not that the netem legs are bad measurements. It is that
+**a delay-and-bandwidth simulation on one host cannot claim validity
+for wild WAN environments.** Every WAN number in the sections above
+comes through one `tc netem` qdisc between two network namespaces on
+one box, with one congestion-control algorithm, one buffer
+configuration, no competing traffic, no route changes, no loss, no
+reordering, and no middleboxes. The mechanism findings that came out of
+it are real and transferable — congestion-window validation pinning
+`cwnd`, the standing transport queue, the self-reinforcing
+period/ack-latency loop — because they are properties of TCP and of
+this pipeline's traffic shape. A *number* recommended to every
+deployment is not transferable in the same way, and this item is not
+going to produce one from a simulation.
+
+**The shipped default therefore stays C = 2, on legacy-equivalence
+grounds and nothing else.** That is what the code already does
+(`XRDP_GFX_WIRE_WINDOW_DEFAULT` = 2, `xrdp/xrdp_tconfig.h:43`), and
+the field's own comment already says why: it is "a PLACEHOLDER matching
+the legacy `frames_in_flight`" (`xrdp/xrdp_tconfig.h:225`). The
+justification is now explicit rather than provisional — 2 is the value
+that reproduces the behaviour of the gate this item replaced, so a
+site that upgrades and changes nothing sees the same admission
+cadence it saw before. It is not claimed to be optimal for any link.
+
+## What is still in scope
+
+* The **freeze leg** on the existing x018 arm (a client that stops
+  acknowledging), which tests the bound directly: production must stop
+  within C + 2 frames and the transport queue must plateau rather than
+  grow. Owner-approved 2026-08-06.
+* The **eager-ack A/B** on the two new config-only arms x020 and x021,
+  described in the next section.
+* Everything already recorded above about the mechanism.
+
+---
+
+# 2026-08-06: the shipped default has never been run — every wire window in this tree is 1, and the code ships 2
+
+This belongs in the record because it changes what every conclusion
+above is *about*.
+
+## The count, verified in the tree
+
+`wire_window` appears as a setting (a `wire_window = N` line, not a
+comment) in 18 files. Broken down:
+
+| value | files | what they are |
+|---:|---:|---|
+| **1** | **14** | every arm that has ever run the credit frontier |
+| 2 | 2 | `gfx/x020.toml`, `gfx/x021.toml` — written today for the approved A/B, **not yet run** |
+| 6 | 1 | `tests/xrdp/gfx/gfx_avc444_wire_window.toml` — a CI fixture proving a non-default value parses |
+| 0 | 1 | `tests/xrdp/gfx/gfx_avc444_wire_window_bad.toml` — a CI fixture proving an out-of-range value is refused |
+
+The fourteen `wire_window = 1` files are:
+
+* **2 from this item (#80):** the archived configs of
+  `captures/i80_wanpair_20260803_125816_s20/leg_lan` (arm x018,
+  unshaped) and
+  `captures/i80_wan40_fixedlimit_20260803_221910_s20/leg_wan`
+  (arm x019, 40 ms).
+* **10 from BACKLOG #98:** the archived configs of every leg of
+  `i98_tier0_ab_20260805_235328_s20` (2 legs),
+  `i98_bwlimit_20260806_003023_s20` (4 legs) and
+  `i98_bwlimit_res_20260806_004607_s20` (4 legs).
+* **2 live arm files:** `PR-demo/mac_bisect_matrix/gfx/x018.toml` and
+  `gfx/x019.toml`, line 69 in each.
+
+## Verified on the wire, not only in the config
+
+Reading the configs is not enough — a `gfx.toml` that never reached the
+encoder would look identical. The encoder echoes the value it is
+actually using into every acknowledgement it emits: field `e` of the
+`ackslot` and `ackregion` performance records is `encoder->wire_window`
+(`xrdp/xrdp_mm.c:1733` and `:1748`). Across the de-duplicated rings of
+all twelve archived credit-frontier legs — **5493 acknowledgement
+records** — field `e` reads **1 in every one of them. None reads 2.**
+
+(De-duplicated because `e_gate_run.sh` copies the four newest ring
+files out of the pod and a ring outlives its run, so a leg's directory
+also holds byte-identical rings from earlier legs; counting the raw
+files gives 12 506 records for 5493 real ones.)
+
+The pre-#80 captures (`i61e_x013…`, `i75_x014…`, `i76_x015…`,
+`i78_x017…`, `i79_x017…`) carry 0 in that field: those builds predate
+the credit frontier and the slot did not hold C yet. They say nothing
+about the window either way.
+
+## What it means
+
+**Every conclusion in this record describes the tightest window the
+code allows, not the one it ships.** C = 1 is `XRDP_GFX_WIRE_WINDOW_MIN`
+— one below it (C = 0) admits no capture at all. So the measurements
+above — the 40 ms leg's 86.7 ms period and 203.7 ms send-to-ack, the
+6.7 MB standing queue, "the `client + C` term was the binding term on
+100 % of stalled cycles", the per-frame regression
+`ack_latency = 50.5 ms + queue / 43.1 MiB/s` — are all the
+**C = 1 behaviour of a default-C = 2 product**.
+
+This cuts in a specific direction and it is worth being precise about
+which. C is an upper bound on how far ahead of the client the producer
+may run, so C = 1 is the *most* restrictive shipping configuration:
+it admits the fewest frames, holds the least in the transport queue,
+and stalls soonest. Going to the shipped 2 relaxes it. The FR-ACK-3
+objection to a larger window — that raising C buys no frame rate once
+bytes through one TCP flow are the constraint, and only deepens the
+standing queue — was argued above **from a C = 1 measurement**, and the
+one number it predicts (queue depth scaling with C) has never been
+observed at any other C.
+
+**The owner-approved A/B on arms x020 and x021 is the first run in
+this project's history that will exercise the shipped default.** The
+two arms' `gfx.toml` bodies differ by exactly one line —
+`eager_slot_ack`, false on x020 and true on x021 — and both carry
+`wire_window = 2`. On x021 that 2 is live and is the credit's client
+term. On x020 it is inert, because the legacy acknowledgement path is
+the only code that arm enters and it never consults the field; x020
+reaches the same allowance of 2 unacknowledged frames through
+`XRDP_GFX_FRAMES_IN_FLIGHT`. Holding the *number* equal at 2 on both
+sides is what makes the comparison about the ack mechanism rather than
+about window size, and it is why x021 is the first frame this project
+has ever encoded at C = 2.
+
+**Mechanism check, to run before any rate from either arm is read**
+(and note that the expected value of field `e` is different on each
+arm, precisely because the two arms take different code paths):
+
+* **x021** — every `ackslot`/`ackregion` record must read field
+  `e` = **2**. A 1 means `gfx.toml` did not reach the encoder; the run
+  then says nothing about the shipped default.
+* **x020** — zero `ackslot` records at all, and field `e` = **0** on
+  every `ackregion` record, because the legacy call site passes a
+  literal 0 there (`xrdp/xrdp_mm.c:1786`). An `ackslot` record on this
+  arm means the eager path ran and it is not a control.

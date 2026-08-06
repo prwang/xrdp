@@ -853,10 +853,41 @@ effect: the encoder's own depth is provably one frame — `pump_pairs`
 waits for the just-submitted set and `collect_pair` verifies
 `desktop_sequence`, so no second frame is ever inside a child — and the
 worker's `wait` bracket is 0.002 ms/cycle under fif = 1, meaning it is
-never starved. **So the second credit was hiding a stall, and finding
-that stall is the top open item (BACKLOG #76).** Until it is found, the
-`capture ‖ encode` row above is qualified: what it asserts is measured at
+never starved. **So the second credit was hiding a stall.** The
+`capture ‖ encode` row above is therefore qualified: what it asserts is
+measured at
 fif = 2, and fif = 2 is not the configuration this requirement targets.
+*(This sentence used to read "Until it is found, the ... row is
+qualified". The stall has since been found and fixed — see the amendment
+below — and the qualification survives that on its own terms: no run has
+re-established the row's overlap evidence at fif = 1.)*
+
+**AMENDED 2026-08-06 — three corrections to the paragraph above, in the
+order that matters:**
+
+* **The stall was found, and it is fixed.** BACKLOG #79's ack-delay
+  sweep identified it causally as the *withheld slot credit*: the
+  producer's permission to capture was gated on the client's ack, so at
+  fif = 1 capture waited a round trip that at fif = 2 the second credit
+  paid for. BACKLOG #80's credit frontier replaced that gate and shipped
+  behind `eager_slot_ack` (FR-FLOW-1, implemented 2026-08-03). The
+  sentence this paragraph used to end on — "finding that stall is the
+  top open item (BACKLOG #76)" — is therefore retired; #76 is now #82
+  and is about something narrower, below.
+* **The 34 % / 18.5 → 28.2 ms figure is ONE UNREPRODUCED OBSERVATION,
+  under re-test, and is NOT retired.** BACKLOG #78's controlled re-run —
+  same host, same config — measured the worker's wait-for-the-ffmpeg-
+  children bracket (`pump`) at **16.40 ms under fif = 1, equal to
+  fif = 2**, against the **26.7 ms** the original x015 run recorded once
+  and never again. One run says the cost exists; one says it does not.
+  Reproducing or retiring it is **BACKLOG #82** (was #76), and the owner
+  approved an x015 rerun with an x014 control on 2026-08-06. Quote the
+  28.2 ms period only with this sentence attached.
+* **The qualification on the `capture ‖ encode` row is NOT lifted.**
+  That row's overlap evidence is still measured at fif = 2, and no run
+  has re-established it on the credit-frontier build. The fix to the
+  stall does not retroactively make a fif = 2 measurement a fif = 1
+  result.
 
 **FR-ACK-3 PROVENANCE (traced 2026-08-03, and it changes what the clause
 is claiming).** The window is not this project's design. It arrives with
@@ -875,7 +906,7 @@ and the client's advertised value is consulted only in the legacy
 `else` branch. In GFX the number therefore has **no protocol meaning**:
 not the client's limit, not the pipeline's depth, and nothing re-derived
 what it should bound when the tether was cut. Every fif = 1 vs fif = 2
-result in BACKLOG #76/#78/#79 is a result about that untethered
+result in BACKLOG #82 (was #76)/#78/#79 is a result about that untethered
 constant.
 
 **FR-ACK-3 AMENDMENT — the bound must count the WIRE, not only the
@@ -897,7 +928,7 @@ measured — all read from the source, and the last two confirmed by the
   capture admission. Client-outstanding is bounded only *emergently* —
   by starving the producer until the pipeline drains — which is
   approximate (it settled at 2, not 1) and is the entire cost measured
-  in BACKLOG #76/#78/#79.
+  in BACKLOG #82 (was #76)/#78/#79.
 * **There is no other rate control on this path.**
   `trans_write_copy_s()` cannot fail for want of a wire: the remainder
   is `malloc`ed onto the unbounded `self->wait_s` list and 0 is returned
@@ -978,7 +1009,7 @@ reviewed against.
    further down the pipe, and never on the network. The 2017 gate
    (provenance above) is the precedent violation: a capture-admission
    signal was made to wait on a client round trip, and the measured
-   cost is BACKLOG #76/#78/#79.
+   cost is BACKLOG #82 (was #76)/#78/#79.
 2. **The lossy guard runs farthest end → nearest end, and its only
    response is drop-by-coalesce at the source.** The client's ack
    frontier reaches exactly one decision point: capture ADMISSION.
@@ -1148,7 +1179,7 @@ cycles** against 0.6 % at 10 Hz, so step 7's premise is exercised, and
 the E2 wire assertions hold under the flood (7/7, zero black frames,
 ~0.93 MB per picture).
 
-**On the T4 the same code is worth 1.5×–2.3× (2026-07-30, BACKLOG #55/#60;
+**On the T4 the same code is worth 1.5×–2.3× (2026-07-30, BACKLOG #55 and #93, was #60;
 evidence `PR-demo/mac_bisect_matrix/captures/e52_t4_*_20260730/`).** Same
 A/B, run on the representative low-to-average old-CPU target (Tesla T4 /
 NVENC, 4-vCPU Xeon 8259CL): the 180 s pair gave baseline **77.3 ms** →
@@ -1156,12 +1187,12 @@ batched **46.3 ms** (per-monitor period 155 → 92 ms, `kids_armed=4` in
 **93 %** of cycles) = 1.67×; repeats found the box **bimodal**, and two
 further pairings gave 1.51× and 2.26×. Every pairing clears 1.5×, so the
 conclusion holds while the single number does not — **quote the band**. The
-bimodality is not root-caused (#60); a pairing is only trustworthy when
+bimodality is not root-caused (#93, was #60 then #97); a pairing is only trustworthy when
 both arms report the same mean bytes per picture, which the 180 s pair does
 (602.7 vs 594.0 KB).
 
 AMBER, and attributed rather than re-tuned: the session **Xorg is a single
-thread at ~92 % of one core**, and the profile says where it goes (#59) —
+thread at ~92 % of one core**, and the profile says where it goes (#96, was #59) —
 payload glyph+scroll+fill rendering **44.9 %**, the X **Present** extension
 running in software emulation **18.8 %**, and xorgxrdp's **entire capture
 just 13.8 %** (~12 ms of a 92 ms period, matching `avc444_pack_bench`'s
@@ -1169,7 +1200,7 @@ just 13.8 %** (~12 ms of a 92 ms period, matching `avc444_pack_bench`'s
 each, the worker idles 55 % of the time, and flow control never binds. So
 the capture is *not* the dominant term even on the box where the pipeline
 is capture-bound: the X server is, and 12 ms of the capture's cost is
-merely stuck on the same single thread — which is why #54's remedy is to
+merely stuck on the same single thread — which is why #95's (was #54) remedy is to
 move the pack off that thread rather than to make it faster.
 
 **Quote the ratio with its box**: 2.13× is a VAAPI/32-core number and
@@ -1238,7 +1269,7 @@ A run that fails either check is **producer-limited: it is not an E5
 result and can neither confirm nor falsify any pipeline property.** It
 is reported as VOID with the producer's own rate beside the pipeline's.
 
-**Status: PASSING as measured (#65 step 0 — chain since renumbered, now #71, 2026-07-31, T4 m=1
+**Status: PASSING as measured (#65 step 0 — chain since renumbered, now #91, 2026-07-31, T4 m=1
 3840×2160).** With `--stamps` telemetry (default-on): the producer runs
 at **27.66 fps** against the pipeline's 8.21 sends/s — 1.7× over the
 floor, p50 2 fresh damage frames pending during every encode. Both
@@ -1287,7 +1318,7 @@ same producer and the batch's true gain understated; the m=1 "0/205
 overlap" T4 run convicts the producer, not the pipeline; and the PRD's
 `capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
 holding, which its 1600×912 evidence satisfied and 4K does not.
-Tracked under the linear chain **BACKLOG #70 → #70B → #71 → #72 → #73** (renumbered twice, last 2026-07-31 after the m=1 serializer was measured; earlier chain forms and this paragraph's history at commit `0db74f6e`).
+Tracked under the linear chain **BACKLOG #70 → #87 (was #70B, via #89) → #91 (was #71) → #92 (was #72) → #93 (was #73)** (renumbered three times, last 2026-08-06; earlier chain forms and this paragraph's history at commit `0db74f6e`).
 
 ### FR-TRACE-1: The perf tracer must not be able to perturb what it measures (owner directive, 2026-08-01)
 
@@ -1387,49 +1418,86 @@ never drifted. Its machinery — echoed identity, ack totality, the
 displayed flag, region return on non-display — survives verbatim in
 **BACKLOG #70** (eager slot-release ack) with the corrected rationale
 (concurrency, not correctness) and an earlier emission point
-(max(absorb N, egress N−1)). The eager ack is only half the change:
-see **FR-ACK-2**, which makes the assembly split of BACKLOG #70B a
-requirement rather than a follow-up, with the measurements showing why
-the ack alone only relocates the wait. Full former text of this FR, with the
+(max(absorb N, egress N−1)). See **FR-ACK-2** for the assembly
+(`emit`) split. *(Amended 2026-08-06: this pointer used to say the split
+was a requirement rather than a follow-up. FR-ACK-2 no longer requires
+the two to ship together — the measurements that coupled them were
+instrumented through `log.c` and are deleted; the re-measurement is
+BACKLOG #87, which absorbed the old #70B.)* Full former text of this FR, with the
 invariant proofs, is preserved at commit `0db74f6e`; history pointers
 in NG-9.
 
-### FR-ACK-2: the eager slot-release ack is incomplete without the emit split (2026-08-01, measured)
+### FR-ACK-2: the eager slot-release ack and the assembly (`emit`) split — correctness contract only (2026-08-01; the ship-together requirement RETIRED 2026-08-06)
 
-> **SUPERSEDED IN PART, 2026-08-01 (same day), by measurement.** The
-> split was built and measured twice.
+> **THE EMIT-SPLIT REQUIREMENT IS RETIRED AND ITS MEASUREMENTS ARE
+> DELETED — 2026-08-06, owner decision.**
 >
-> Under the `codeflood` payload it came out at **0.96x** (33.3 ->
-> 34.7 ms) — but that measurement is VOID as a throughput number: #61c
-> showed the session Xorg was at **96.4 % of one core** and at 98.9 %
-> with no client attached at all, so the producer set the period and the
-> worker had 28 % slack before the split was applied. Re-run under
-> `textflood` at 3840x2400, with the producer at 25.3 % and FR-BENCH-1
-> passing at a **2.61x** margin, the same knob measures **1.12x**
-> (40.1 -> 35.9 ms).
+> **(a) What was deleted, and why.** Three things were removed from this
+> FR today: the per-cycle stage table that decomposed a 32.56 ms worker
+> cycle at 2560×1440 (`pump` 10.78, `coll` 3.22, `emit` 5.96 ms, and the
+> "children are idle 67 % of wall time" claim built on it); the
+> acceptance projection derived from it (`emit` 6.39 ms = 27 % of a
+> 24.02 ms serial chain at 2560×1440, projected period 22.6–26.6 ms from
+> 32.56 ms = **1.22×–1.44×**); and the two A/B ratios quoted above them
+> (codeflood **0.96×**, already void for a saturated producer, and
+> textflood **1.12×** with "5.97 ms of serial work removed, 4.30 ms of
+> period recovered"). Every one of those numbers came off a build whose
+> per-frame trace was `common/log.c` — a timestamp format, a global
+> mutex and an **unbuffered `write()` per line** on one shared file
+> handle, with a further such write *inside* the bracket being timed.
+> That is the BACKLOG #61h defect, and CLAUDE.md's rule for it is not
+> "supersede": *a result whose instrument was on the measured path is
+> DELETED*, because a wrong conclusion from sound data teaches something
+> and a number produced by an experiment measuring itself teaches
+> nothing and gets re-quoted by the next reader who skims. The two
+> captures were already removed by #61h
+> (`i70b_x001_ab_20260801`, `i61b_x004_ab_20260801`); git history keeps
+> them.
 >
-> **The acceptance criterion below is still not met**, and the
-> 1.22x-1.44x projection stays withdrawn — now for a reason that
-> survives the payload fix. It was computed at 2560x1440, where `emit`
-> was 6.39 ms of a 24.02 ms serial chain (27 %). `pump` and `coll` scale
-> with pixel count and `emit` does not, so at 3840x2400 `emit` is 17 %
-> of a 35.04 ms chain and the most the split could buy is smaller.
-> **The size of the gain is resolution-dependent; the mechanism is
-> not.** What the textflood run confirms is that the mechanism does what
-> this FR specifies: 5.97 ms of serial work removed, 4.30 ms of period
-> recovered (72 % conversion), wire audit 7/7, zero black frames.
+> **(b) What replaces them.** On the ring-traced build — where a trace
+> point is a vDSO clock read plus a store into the calling thread's own
+> ring, with a separate sink thread doing the I/O (FR-TRACE-1) — the
+> assembly stage is **0.342 ms median at 3840×2400** (capture
+> `i75_x014_rewrite_20260801`, n = 3075 `emit_beg`→`emit_end` pairs,
+> p99 0.558 ms, max 2.284 ms) and **0.333 ms median** on
+> `i78_x017_pumpsplit_20260802` (n = 2515). Read directly from the raw
+> rings under `PR-demo/mac_bisect_matrix/captures/<run>/perf/enc.*`,
+> paired by frame identity. Not 5.96 ms, and not 6.39 ms: the stage the
+> deleted table sized at a quarter of the worker's cycle is about a
+> third of a millisecond.
 >
-> The correctness content below — the join point, the thread shape, the
-> shared-state rules — held on every run and is NOT superseded.
-> Evidence:
-> `captures/i70b_x001_ab_20260801 (DELETED by #61h, git history only)`
-> (codeflood, void) and `i61b_x004_ab_20260801 (DELETED by #61h)`
-> (textflood, 1.12x). Text below kept verbatim, wrong projection
-> included.
+> **The caveat is load-bearing and bounds what may be claimed.** Every
+> ring capture in this tree runs with the split ON — checked
+> 2026-08-06 across all 13 capture directories under
+> `PR-demo/mac_bisect_matrix/captures/` that contain a `perf/enc.*`
+> ring: `emit_thread = true` in every one of their `gfx.toml` files, no
+> exceptions. So what those numbers measure is the COST OF
+> THE STAGE with the split already applied — the time the assembler
+> thread spends on it — not the time the worker would spend doing the
+> same work inline. Nothing on a ring build measures it inline. The
+> ceiling on what the split can remove from the worker's serial chain is
+> therefore that stage cost, **~0.34 ms**, unless running it inline were
+> far more expensive than running it on the assembler, for which there
+> is no evidence in the tree. **~0.34 ms is a ceiling, never a measured
+> gain**; the side-by-side that would produce a gain is BACKLOG #87.
+>
+> **(c) Consequence for this FR.** The normative clause that followed —
+> "the eager slot-release ack MUST NOT be shipped without the assembly
+> split" — is **STRUCK**. It rested entirely on the deleted 27 % / 6.39 ms
+> figure: a stage worth a quarter of the cycle is a shipping
+> prerequisite, a stage worth 0.34 ms is a tuning question. The two
+> changes are now independent, each judged on its own evidence, and this
+> FR requires of the split only the correctness contract below (the join
+> point, the one permanent assembler thread, the shared-state rules),
+> which held on every run and is untouched by the deletion. Record:
+> `docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md`.
+> The re-measurement of both ratios under textflood on ring-traced
+> builds, at 2560×1440 as well as 3840×2400, is BACKLOG #87.
 
-**The eager slot-release ack (BACKLOG #70) MUST NOT be shipped without
-the assembly (`emit`) split of BACKLOG #70B.** On its own it converts a
-producer-side wait into a worker-side queue and stops there.
+**The ship-together coupling between the eager slot-release ack
+(BACKLOG #70) and the assembly (`emit`) split is STRUCK (2026-08-06);
+see the retirement block above.** What the eager ack does on its own is
+convert a producer-side wait into a worker-side queue, and stop there.
 
 Measured, m=1 at 2560×1440 under a saturated payload (arm-u/arm-v/arm-w,
 1290–1730 frames each):
@@ -1442,33 +1510,31 @@ Measured, m=1 at 2560×1440 under a saturated payload (arm-u/arm-v/arm-w,
 The eager ack does exactly what it claims — the next frame is *already
 in the fifo* before the current one is absorbed on 61 % of frames — and
 the wait simply moves in front of the encoder worker. Period improves
-1.11×, and no further.
+1.11×, and no further. *(That 1.11× is a codeflood-era number and is
+owed a re-measurement on a ring-traced build under textflood by
+BACKLOG #87, along with the split's own ratio.)*
 
 #### Why a ready capture does not stop the children starving
 
 The two FFmpeg children are fed by `submit` and driven by `pump`, and
 **both run on the encoder worker thread**. Input readiness is therefore
 necessary but not sufficient: any worker-thread time not spent feeding
-the children is time they are idle *with work available*. Per 32.56 ms
-cycle, measured:
+the children is time they are idle *with work available*.
 
-```
-pump           10.78 ms   children have work
-pump_end -> coll_beg 2.60
-coll                 3.22   NUT pop + LTR rewrite
-coll_end -> emit_beg 2.25
-emit                 5.96   <-- assembly: pure CPU, touches no child
-emit_end -> drain    4.04
-drain + subm         3.70
-               -------
-               21.77 ms   children have NOTHING, and a frame is queued
-```
+*(The per-cycle stage table that quantified that idle time at
+2560×1440 — and the "children are idle 67 % of wall time" claim read
+off it — was DELETED 2026-08-06 with the rest of the log.c-instrumented
+measurements; see the retirement block at the top of this FR. What
+follows is the structural claim, which is a property of the code rather
+than of any run.)*
 
-**The children are idle 67 % of wall time** while the stage they are
-waiting behind is not encoding at all. `emit` is the largest such stage
-and is provably independent of them — it reads the *already collected*
-bitstream and touches no child, no capture page, and (FR-PROC-6) no
-borrowed shmem. That is what makes it separable.
+`emit` is independent of the children — it reads the *already
+collected* bitstream and touches no child, no capture page, and
+(FR-PROC-6) no borrowed shmem. That is what makes it separable. **How
+much worker time separating it is worth is a different question and is
+not answered here**: the stage itself costs 0.342 ms median at
+3840×2400 on the ring build (above), and the side-by-side that would
+turn that ceiling into a gain is BACKLOG #87.
 
 #### The join point is a correctness requirement, not a tuning choice
 
@@ -1498,9 +1564,13 @@ assembly **before `collect(N+1)`**, and MUST NOT join it before
   Joining at the top of the loop leaves the children idle for the whole
   of `emit`, which is the starvation this FR exists to remove: the work
   would have moved to another thread and bought nothing.
-- **Between them it is free.** `emit` (5.96 ms) fits entirely inside
-  `submit(N+1) + pump(N+1)` (14.5 ms), so the join is not expected to
-  block the worker at all at this geometry. A bounded depth-1 handoff
+- **Between them it is free.** `emit` fits entirely inside
+  `submit(N+1) + pump(N+1)`, and by a wider margin than this FR
+  originally claimed: 0.342 ms median of assembly against a `pump` that
+  BACKLOG #78 splits into feed 2.61 / encode-wait 13.38 / drain 0.41 ms
+  at 3840×2400. The join is not expected to block the worker at all at
+  either geometry. *(The pre-2026-08-06 wording put the same argument in
+  deleted numbers — `emit` 5.96 ms inside 14.5 ms.)* A bounded depth-1 handoff
   expresses the join, keeps PDU order trivially (one assembler thread),
   and requires no change to either ack.
 
@@ -1518,9 +1588,12 @@ independent reasons:
 2. **The frame budget below is only provable at assembly depth 1.** N
    concurrent assemblers put N frames in assembly and the resident set
    is no longer `{capture N+2, children N+1, assembly N}`.
-3. **Cost.** `clone` + stack + first-touch is tens of µs against a
-   5.96 ms body, paid every frame, to buy nothing the permanent thread
-   does not already give.
+3. **Cost.** `clone` + stack + first-touch is tens of µs, paid every
+   frame, to buy nothing the permanent thread does not already give —
+   and against an assembly body now measured at 0.342 ms median that is
+   a material fraction of the very stage being moved, so this reason is
+   stronger since 2026-08-06, not weaker. *(It was first written against
+   a 5.96 ms body, a figure since deleted — see the retirement block.)*
 
 **Handoff.** A depth-1 slot in `struct xrdp_encoder`, guarded by two
 counting semaphores (`tc_sem_create`/`_dec`/`_inc`, already in
@@ -1629,11 +1702,20 @@ map (`XUP_CAP_SENT_SLOTS`) already size for.
 
 #### Acceptance
 
-Projected period 22.6–26.6 ms from 32.56 ms — **1.22×–1.44×**; the range
-is the 4.04 ms inter-cycle gap, which this change does not determine.
-Quote the range, not its optimistic end. The transport is not the
-constraint at either figure: the main thread is at ≤39 % occupancy and
-binds only near a 12.6 ms period (~79 fps).
+**There is no acceptance number for the split, and this FR no longer
+projects one (2026-08-06).** The 1.22×–1.44× projection was deleted with
+the 2560×1440 stage table it was computed from — see the retirement
+block at the top of this FR — and nothing has replaced it, because no
+run on a ring-traced build has measured the same work inline on the
+worker for comparison. What is known: the stage costs 0.342 ms median at
+3840×2400 with the split on, which bounds what removing it from the
+worker's serial chain can be worth.
+
+The split ships default-off. This FR requires of any build that enables
+it only the correctness contract above — the join point, one permanent
+assembler thread, the shared-state rules. The A/B that would produce an
+acceptance figure (both geometries, textflood, ring-traced, both arms
+reporting their FR-BENCH-1 producer margin) is **BACKLOG #87**.
 
 ### FR-PROC-7: Preemptive aux — LC=1/LC=2 scheduling without an idle heuristic (designed 2026-07-26; ordered AFTER FR-CAPTURE-8, which is its prerequisite)
 
