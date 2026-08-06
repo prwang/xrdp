@@ -83,6 +83,13 @@ slot-only credit). The leg contains 363 and 222 of them respectively,
 client's own acknowledgements (`cliack`) likewise stop at 362 — 363 of
 them in the leg, none after the freeze.
 
+That "C = 1 on every credit record" is also the mechanism check for this
+arm: it is `encoder->wire_window` read at the emission site, so it proves
+`wire_window = 1` reached the encoder. The separate `frames_in_flight`
+field on the 1460 network writes reads 1 as well, but it is **not** what
+sets the window here — with `eager_slot_ack = true` the ack dispatch goes
+to the credit frontier and never consults it (`xrdp/xrdp_mm.c:1799-1822`).
+
 **3. The transport queue plateaus because there is nothing left to
 append.** The `egress` record is written when a frame's last byte has
 been handed to xrdp's transport, and its third field is
@@ -108,8 +115,10 @@ byte reached the transport. Over the leg's 365 frames:
 | distance (frames) | frames | meaning |
 |---|---|---|
 | 1 | 222 | the client was fully caught up bar the frame just handed over |
-| 2 | 142 | one earlier frame not yet acknowledged |
-| **3** | **1** | frame 365, after the freeze — **the bound C + 2, attained** |
+| 2 | 142 | one earlier frame also not yet acknowledged |
+| **3** | **1** | two earlier frames also outstanding — frame 365, after the freeze: **the bound C + 2, attained** |
+
+(222 + 142 + 1 = 365, the leg's whole frame count.)
 
 This quantity can never be 0: a client cannot have acknowledged a frame
 that has not yet been handed to the transport.
@@ -159,8 +168,8 @@ of it.
 ## Reproducing the numbers
 
 The ring is `perf/enc.727` — the pod also carries `enc.31` and `enc.267`
-from earlier runs, whose `# perfbase real_ns` headers are ~5 minutes and
-~3 days older; pooling them would double-count. Records are
+from earlier runs, whose `# perfbase real_ns` headers are both about
+3.2 days older; pooling them would double-count. Records are
 `<monotonic_ns> <tid> <tag> <six ints>`, placed on the wall clock as
 `real_ns = R + (ts − M)` from the header's `M`/`R`. Field meanings are at
 the `PERF_TRACE6` call sites: `egress` `xrdp/xrdp_mm.c:4379`, `ackslot`

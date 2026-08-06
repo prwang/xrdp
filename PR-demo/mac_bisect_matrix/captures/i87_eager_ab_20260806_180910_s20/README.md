@@ -196,11 +196,15 @@ wait should depend only on the encoder, never on the network. The defect
 it replaces withheld that permission behind the client's acknowledgement
 window (BACKLOG #79).
 
-Measured per frame identity (credit for frame k−2 minus the moment the
-children absorbed k−2; paired by id, never by time window), one row per
-leg, never pooled:
+Measured per frame identity, never by time window: for each capture k,
+the first credit naming an id at least k−2, minus the moment the children
+absorbed frame k−2's input — kept only when that credit landed before
+capture k arrived, so that what is measured is a wait that was actually
+on the path to the next capture. The frame counts below differ slightly
+from those in the period table because the first frames of a leg have no
+k−2 to pair with. One row per leg, never pooled:
 
-| leg (arm) | frames | p50 | p90 | mean | cycles waiting > 10 ms |
+| leg (arm) | frames | p50 | p90 | mean | frames waiting > 10 ms |
 |---|---|---|---|---|---|
 | a1 (x020, control) | 886 | 8.825 ms | 10.582 ms | 8.975 ms | 146 (16.5 %) |
 | b1 (x021, treatment) | 951 | **0.015 ms** | **0.040 ms** | 0.163 ms | 8 (0.8 %) |
@@ -239,7 +243,14 @@ the thing that is late, so the acknowledgement mechanism cannot matter.
 The corroborating detail is the encoder worker's idle bracket, "time the
 worker held nothing to encode": in pair 2 it is 0.002 ms on both arms —
 the worker never waits at all — against 1.663 ms (control) and 0.195 ms
-(treatment) in pair 1.
+(treatment) in pair 1. Those four figures count only brackets that begin
+at or after the leg's first capture; every leg also holds one bracket of
+about 2.64 s from before it, which is the worker idling between session
+start and the first frame of the payload and belongs to no cycle.
+Including it would add 2.8–4.3 ms to each of the four and say nothing
+about either arm — see the companion capture
+`i82_x015_rerun_20260806_181825_s20`, where that mistake was made and
+corrected.
 
 ## Producer margin, and what it voids
 
@@ -278,11 +289,14 @@ with the rest of this run: the arms that release the capture slot early
 Per leg, use the ring in `leg_*/perf/` whose `# perfbase real_ns` header
 is **latest**; the pods accumulate rings from earlier sessions and
 pooling them double-counts. Window each leg to the `t0`/`t1` in its
-`window.txt`. No warm-up period is dropped in the tables above, matching
-the first reading of the run; dropping the first second after the first
-capture changes the encoder-wait means by about 0.13–0.23 ms and removes
-one 123–242 ms outlier per leg, which is the session's very first encode
-(cold ffmpeg children) and not a recurring event.
+`window.txt`. No warm-up period is dropped in the tables above,
+matching the first reading of the run: every record from the leg's first
+capture onward is counted. (Records from before that first capture are
+excluded, which affects only the worker's idle bracket — see the note
+under "Frame period".) Dropping the first second *after* the first
+capture instead changes the encoder-wait means by 0.14–0.24 ms and
+removes one 123–242 ms outlier per leg, which is the session's very first
+encode with cold ffmpeg children and not a recurring event.
 
 Field meanings are at the `PERF_TRACE6` call sites: `egress`
 `xrdp/xrdp_mm.c:4379`, `ackslot`/`ackregion` `:1729,1745`, `send` `:4308`,
@@ -295,8 +309,20 @@ thread.
 Frame period 19.110 → 17.683 mean, 26.585 → 19.280 at p90, 30.158 →
 24.161 at p99 in pair 1; 27.423 → 27.391 in pair 2. Encoder wait
 16.258 / 16.457 → 26.223 / 26.188. Slot-credit counts 938 and 616 at
-C = 2, and zero on the control. The wait-for-permission p50/p90 figures
-in the table above. The one small difference: the control's share of
-cycles waiting over 10 ms re-derives as 16.5 % and 13.3 %, against 16.4 %
-and 14.4 % first reported; the second of those is a real 1.1-point gap
-and the figure in this README is the one to use.
+C = 2, and zero on the control. The wait-for-permission p50 and p90
+figures in the table above (8.825 / 8.677 and 10.582 / 10.247 on the
+control; 0.015 / 0.027 and 0.040 / 0.047 on the treatment).
+
+Three small differences, all in this README's favour and none of them
+changing a conclusion:
+
+* the control's share of frames waiting over 10 ms for permission to
+  capture re-derives as 16.5 % and 13.3 %, against 16.4 % and 14.4 %
+  first reported — the second is a real 1.1-point gap;
+* the treatment's mean wait re-derives as 0.163 ms and 0.028 ms against
+  0.19 and 0.03 first reported (and see the shape warning above: that
+  mean should not be quoted alone in either version);
+* the treatment's frame-period p99 in pair 1 re-derives as 24.161 ms,
+  matching what was reported, but the percentile convention matters at
+  these sample sizes — the figures here take the value at
+  `sorted[int(0.99·n)]`.

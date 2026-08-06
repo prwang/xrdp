@@ -86,8 +86,14 @@ It is the "encoder wait" #82 is about.
 | c2 (x014, fif 2) | 934 | **16.199 ms** | 15.978 | 17.019 | 18.891 | 120.915 |
 | f2 (x015, fif 1) | 755 | **16.305 ms** | 16.092 | 17.163 | 18.912 | 121.870 |
 
-The two arms interleave inside a 0.15 ms band. There is no 26.7 ms here
-and no trend in the direction #76 predicted.
+All four legs sit in a 0.145 ms band. Both frames-in-flight-2 legs are at
+its bottom and both frames-in-flight-1 legs at its top, so there is an
+ordering — of 0.05 to 0.11 ms. That is two orders of magnitude below the
+~10.5 ms gap the filed observation implied (26.73 against ~16.2), and its
+sign is not stable between sittings: the controlled re-run recorded in
+the #78 document measured frames-in-flight 1 at **16.40 ms** against
+frames-in-flight 2's **16.44 ms**, i.e. the other way round. There is no
+26.7 ms here and no effect worth a name.
 
 **About the ~120 ms maximum, which was first reported as "a rare,
 consistent outlier".** It is consistent, but it is not rare and it is not
@@ -139,9 +145,14 @@ roughly a quarter to a third of frames wait tens of milliseconds.
 **Why the worker is idle: it is waiting for permission to capture.** The
 metric is the interval between the ffmpeg children absorbing a frame's
 pixels — at which point the capture pages the producer lent are free —
-and xrdp actually telling the producer it may capture again:
+and xrdp actually telling the producer it may capture again. Paired by
+frame identity, never by time window: for each capture k, the first
+credit naming an id at least k−2 minus the moment the children absorbed
+frame k−2's input, kept only when that credit landed before capture k
+arrived. The last column counts frames whose wait exceeded 10 ms, the
+threshold #78 and #79 both quoted.
 
-| leg (arm) | frames | p50 | p90 | p99 | > 10 ms |
+| leg (arm) | frames | p50 | p90 | p99 | frames waiting > 10 ms |
 |---|---|---|---|---|---|
 | c1 (x014, fif 2) | 946 | 0.015 ms | 0.042 | 37.971 | 28 (3.0 %) |
 | f1 (x015, fif 1) | 797 | 0.020 ms | **32.914** | 43.282 | 203 (25.5 %) |
@@ -195,8 +206,8 @@ transient as the APU's sustained-power budget and asked for
   distinguish it from the host state.
 * Or the wait rising with frames-in-flight held constant while GPU clocks
   and package power are being sampled during the legs, so the host state
-  is observed rather than inferred. Nothing in this capture or in #87's
-  measured the GPU during a leg.
+  is observed rather than inferred. Neither this capture nor the A/B
+  cross-referenced above sampled the GPU during a leg.
 
 Absent either, the number belongs in the host-state bucket, which is
 where BACKLOG #88 already holds this host's other unattributed pauses.
@@ -225,7 +236,10 @@ pointed at the wrong thing teaches nothing.
 
 The swap is still provable from this capture, because each leg directory
 carries the target pod's whole ring collection, including rings left by
-earlier sessions. Session start times, taken from each ring's
+earlier sessions. The `leg_c*` directories hold one family of process ids
+(19009, 19550, 19853, 20094, 20396) and the `leg_f*` directories another
+(261, 658, 956, 1369, 1671), so which pod a ring came from is
+unambiguous. Session start times, taken from each ring's
 `# perfbase real_ns` header:
 
 | session start (UTC) | pod | which attempt |
@@ -286,7 +300,8 @@ exist yet.
   *begins before the leg's first capture arrives*: the encoder worker
   sitting idle between session start and the first frame of the payload.
   It is present identically on all four legs (2640.2, 2643.3, 2642.6,
-  2640.6 ms) and it is 80 % of the x014 means. Excluding it gives 0.582 /
+  2640.6 ms) and it is roughly four fifths of each x014 mean (78 % and
+  83 %). Excluding it gives 0.582 /
   0.790 against 3.758 / 4.981 ms, the figures used above. This matters
   beyond tidiness: the corrected differences account for 97.8 % and
   97.6 % of the frame-period gap, where the inflated ones overshot it

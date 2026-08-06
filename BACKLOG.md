@@ -70,12 +70,14 @@ stay as "(was #NN)" in each header.
 11. **#95** (was #54) — capture-side handoff: the remaining 2×
 12. **#96** (was #59) — move the pack off the X server thread
 13. **#98** — flow-control survey: owner decisions + owed legs
+14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
 **Done and recorded** — design, implementation behind `eager_slot_ack`
-with C as `gfx.toml [avc444_ffmpeg] wire_window` (default 2 =
-legacy-equivalent), CI enumeration RED-on-HEAD verified
+with C as `gfx.toml [avc444_ffmpeg] wire_window` (default 2 — but see
+the correction below: it is NOT legacy-equivalent), CI enumeration
+RED-on-HEAD verified
 (`tests/xrdp/test_avc444_credit_frontier.c`), LAN head-to-head vs the
 old build (withheld p90 35.3 → 10.6 ms, stalls 29.7 → 18.2 %,
 throughput +16 %), the 40 ms legs including the voided-and-rerun
@@ -183,6 +185,29 @@ both landed, and items 1–3 below are CLOSED.**
    `aux_ltr_chain`'s acceptance gate rather than deciding it separately.
    Owner sign-off required either way (PRD: no default change without
    it).
+
+## #99 — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
+
+A run whose client dialled a DIFFERENT arm from the one the harness
+collected logs for produced no readable result, which is correct — but
+NOT because the guard designed for this fired. `e_gate_run.sh`'s span
+guard only trips when the rendered trace spans TOO LONG, and it is
+skipped entirely when the trace has fewer than two records, which is
+exactly what a wrong target yields. What actually caught it was
+`perf_trace_lines.py`'s "every record fell outside the window" message
+plus the E5 parser reporting zero send records — both loud, neither the
+check that was supposed to own this.
+
+**Work:** assert positively that the arm the client dialled is the arm
+whose logs were collected. The pod's own identity is already available
+on both sides (the session log names it, and the gate knows the port to
+arm mapping it was given), so this is a comparison, not new machinery.
+Add the "trace has too FEW records for the run length" case to the span
+guard while there.
+
+**Why it matters:** the failure is silent in the direction that counts.
+A swapped pair yields an empty trace, and an empty trace is
+indistinguishable from an idle session unless something asserts identity.
 
 ## #88 (was #61g) — the oracle client's 50–150 ms pauses: unattributed
 
@@ -458,6 +483,6 @@ are in git history.
 | **#78** split the `pump` bracket | DONE. FEED 2.61 / ENCODE 13.38 / DRAIN 0.41 ms; falsified its own baseline (fif=1 pump = fif=2's) → #82; the reproducing fif=1 cost was the ack-gated slot release → fixed by #80. | [`78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`](docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md) |
 | **#79** ungate the eager slot ack → horizon form | MERGED INTO #80. Plain ungate rejected (no bound exists past the window — `trans_write_copy_s` cannot fail); horizon form superseded by the credit frontier. Layer-1 sweep confirmed the withheld-credit mechanism causally. | [`79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`](docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md) |
 | **#81** netem RTT harness | DONE. Both-direction delay on the pod veth pair, selftest incl. throughput + zero-drops (after the limit-1000 incident voided the first WAN leg); ack-delay proxy retired. | [`81-the-netem-rtt-harness.md`](docs/experiments/81-the-netem-rtt-harness.md) |
-| **#82** the unreproduced 26.7 ms x015 encoder wait | RETIRED 2026-08-06. Third independent null: the wait is EQUAL at frames-in-flight 1 and 2 (16.21/16.31 vs 16.16/16.20 ms, interleaved, same sitting). The period difference is entirely the worker idling on a withheld credit — #79's defect, fixed by #80. The ~26 ms condition was then seen live on BOTH A/B arms at once, so it is a host state, not a frames-in-flight property. | capture `i82_x015_rerun_20260806_181825_s20` |
+| **#82** the unreproduced 26.7 ms x015 encoder wait | RETIRED 2026-08-06. Third independent null: the wait is EQUAL at frames-in-flight 1 and 2 (16.21/16.31 vs 16.16/16.20 ms, interleaved, same sitting). The period difference is the worker idling on a withheld credit — 0.58/0.79 ms against 3.76/4.98 ms once the one session-startup bracket per leg is excluded, which closes 97.6 % of the period gap — #79's defect, fixed by #80. The ~26 ms condition was then seen live on BOTH A/B arms at once, so it is a host state, not a frames-in-flight property. | capture `i82_x015_rerun_20260806_181825_s20` |
 | **#83** a faster benchmark producer | DONE 2026-08-06. `--scroll strip` (default off) takes the payload 16.2 -> 4.5 ms/frame deployed; FR-BENCH-1 margin 1.05x -> 3.94x and acceptance met (producer p90 5.8 ms below pipeline p10 15.75 ms). The control is the more useful result: a 3.6x faster producer did NOT change the pipeline's rate, so the textflood series was pipeline-limited, not producer-clocked. | capture `i83_strip_payload_20260806_182340_s20` |
 | **#87** emit-split and eager-ack ratios | CLOSED 2026-08-06. Emit split RETIRED unrun — the stage is 0.333 ms at 4K against the 6.39 ms its requirement rested on, which came from a build with two per-frame log writes inside the timed bracket; PRD FR-ACK-2's table, projection and ship-together clause deleted. The eager-ack half was measured in #80's merged A/B. | [`87-the-emit-split-was-measuring-its-own-logger.md`](docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md) |
