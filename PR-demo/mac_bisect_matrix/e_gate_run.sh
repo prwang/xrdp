@@ -99,7 +99,9 @@
 # Env: E_TARGET pod|ssh · E_SSH_HOST (else /root/.t4_host) · E_SSH_KEY ·
 #   E_ARM/E_NS (pod only) · E_PORT · E_USER · E_CRED_FILE · E_MODE
 #   oracle|render · E_REFRESH · E5_BASE_MS · E_OUT · E_COLD 0|1 ·
-#   E_MODE0/E_MODE1/E_POS1/E_MODELINE0/E_MODELINE1 (client geometry)
+#   E_MODE0/E_MODE1/E_POS1/E_MODELINE0/E_MODELINE1 (client geometry) ·
+#   E_FREEZE_AT (BACKLOG #80 freeze leg, default OFF — see below) ·
+#   E_STAMPS (benchmark payload's own per-frame stamps file, server side)
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 SECS=${1:-120}
@@ -142,11 +144,71 @@ NMON=${E_MONITORS:-2}
 E_SIZE=${E_SIZE:-$(echo "${E_MODE0:-3840x2160R}" \
     | sed 's/^\([0-9]\{1,\}x[0-9]\{1,\}\).*$/\1/')}
 XCONF=${E_XORG_CONF:-$MMCONF/xorg-dummy-2mon-4k.conf}
+# --- BACKLOG #80 freeze leg (default OFF) ---------------------------------
+# E_FREEZE_AT=<seconds into the measurement leg> stops the client process
+# group with SIGSTOP that far into the run and resumes it with SIGCONT at
+# teardown. Unset -- the default -- is the ordinary leg: no signal is
+# sent, no trap is installed, and the script takes exactly the path it
+# took before this existed.
+#
+# WHAT THIS FREEZES, AND WHAT IT DOES NOT. Read this before quoting any
+# number from a freeze leg. SIGSTOP stops the whole client PROCESS, so it
+# stops the client READING its TCP socket as well as acknowledging
+# frames. The receive buffer fills, the client advertises a zero TCP
+# window, and the server's writes then block in the kernel. That is a
+# HARSHER condition for the server's queue than an ack-only freeze, not a
+# weaker one: an ack-only freeze would keep draining the socket and would
+# exercise only the EGFX frame-acknowledge window, whereas this exercises
+# the acknowledge window AND transport backpressure at once, and from the
+# server side afterwards the two cannot be told apart. A question that
+# needs the acknowledge window in isolation needs a client that keeps
+# reading and withholds only RDPGFX_FRAME_ACKNOWLEDGE; this harness
+# cannot produce that condition and does not claim to.
+FREEZE_AT=${E_FREEZE_AT:-}
+# Set as soon as the client is launched, so the freeze trap knows whether
+# there is a group to resume. Declared here for `set -u`.
+CLIENT_PGID=
+HOLD_PID=
 STAMP=$(date +%Y%m%d_%H%M%S)
 OUT=${E_OUT:-$D/captures/e_gate_${MODE}_$STAMP}
 mkdir -p "$OUT"
 
 fail() { echo "ABORT: $*" >&2; exit 1; }
+
+# Resume-and-kill for the freeze leg. SIGCONT FIRST, then SIGKILL: a
+# process group left in T (stopped) state is invisible to the "did the
+# client survive" check below in the way that matters -- it is neither
+# doing anything nor gone, it still holds the RDP socket open, and it
+# outlives this script. SIGKILL does remove a stopped process on its
+# own, but sending SIGCONT first is what lets the group run its own exit
+# and be reaped normally. Both kills are no-ops (ESRCH, swallowed) once
+# the group is already dead, which is why this is safe to call from an
+# EXIT trap that fires after the ordinary teardown has run.
+freeze_release()
+{
+    [ -n "$HOLD_PID" ] && kill "$HOLD_PID" 2>/dev/null
+    [ -n "$CLIENT_PGID" ] || return 0
+    kill -CONT -- -"$CLIENT_PGID" 2>/dev/null
+    kill -9 -- -"$CLIENT_PGID" 2>/dev/null
+    return 0
+}
+
+# A mistyped freeze aborts the run rather than quietly producing an
+# ORDINARY leg wearing a freeze label. That is the whole hazard here: a
+# freeze leg and a normal leg differ only in what happened during the
+# sleep, and a silently-ignored E_FREEZE_AT is a run nobody can tell
+# apart from the control afterwards.
+if [ -n "$FREEZE_AT" ]; then
+    case $FREEZE_AT in
+        *[!0-9]*|'') fail "E_FREEZE_AT must be a whole number of seconds \
+into the measurement leg; got '$FREEZE_AT'" ;;
+    esac
+    [ "$FREEZE_AT" -ge 1 ] || fail "E_FREEZE_AT=$FREEZE_AT would freeze the \
+client before the leg starts; it must be >= 1"
+    [ "$FREEZE_AT" -lt "$SECS" ] || fail "E_FREEZE_AT=$FREEZE_AT is not \
+inside a ${SECS}s leg — the client would never be stopped and the run \
+would be an ordinary leg labelled as a freeze leg"
+fi
 
 # --- server side: one command, one place -----------------------------------
 # srv <shell command>   run it on the server under test
@@ -169,6 +231,8 @@ fi
 [ -s "$CRED" ] || fail "no RDP credential at $CRED"
 echo "target=$TARGET server=$SRV_NAME arm=$ARM port=$PORT mode=$MODE" \
      "user=$SU secs=$SECS out=$OUT"
+[ -n "$FREEZE_AT" ] && echo "LEG: FREEZE LEG — the client will be STOPPED" \
+    "${FREEZE_AT}s into the ${SECS}s leg (BACKLOG #80)"
 
 # Record WHAT is deployed before measuring it: a gate result against an
 # unknown build is not a gate result.
@@ -389,6 +453,29 @@ fi
 # nothing (it left a client alive for 2.2 h on 2026-07-29).
 CLIENT_PGID=$!
 unset PW RDPARGS
+# A freeze leg -- and ONLY a freeze leg -- installs a trap, because a
+# STOPPED group is the one thing this harness can leave behind that a
+# later run cannot see and cannot recover from: it holds the RDP socket,
+# it never dies on its own, and the next run's "client survived" warning
+# would be the first anyone hears of it. The trap resumes and kills on
+# every exit path, including an error abort inside the analysis below and
+# a Ctrl-C. It is conditional so that a run with E_FREEZE_AT unset takes
+# exactly the path it took before the freeze leg was added: no trap, and
+# teardown by the same single kill it always used.
+#
+# One limitation, stated rather than hidden: a script started as a
+# BACKGROUND job of a non-interactive shell (`e_gate_run.sh ... &` from a
+# wrapper) has SIGINT ignored on entry and POSIX forbids trapping it
+# again, so the INT line below is inert in that case -- verified on this
+# box 2026-08-06. The EXIT and TERM lines still fire there, and a
+# foreground run (the normal way this is driven) traps all three. Nothing
+# traps SIGKILL: if this harness is `kill -9`ed during a freeze leg the
+# client stays stopped, and `kill -CONT -- -<pgid>` is the manual repair.
+if [ -n "$FREEZE_AT" ]; then
+    trap 'freeze_release' EXIT
+    trap 'freeze_release; exit 130' INT
+    trap 'freeze_release; exit 143' TERM
+fi
 echo "connected; recording for ${SECS}s ..."
 # The run window, for cutting the perf ring down to THIS run. The ring
 # file is the xrdp process's whole life -- a pod that has served three
@@ -396,8 +483,62 @@ echo "connected; recording for ${SECS}s ..."
 # already gets from MARK_P. Without it a 60 s run on a 45-minute-old pod
 # reported "2629 sends over 2713.5 s" (2026-08-01).
 RUN_T0=$(date +%s)
-sleep "$SECS"
+if [ -n "$FREEZE_AT" ]; then
+    # `sleep N & wait` and not a plain `sleep N`. While bash is waiting on
+    # a FOREGROUND child it defers a trapped signal until that child
+    # returns, so with a plain sleep a SIGTERM to this script would sit
+    # unhandled -- and the client would stay FROZEN -- for the whole
+    # remainder of the hold. `wait` is interruptible and the handler runs
+    # at once. Measured on this box 2026-08-06 with a 20 s sleep and a
+    # SIGTERM 1 s in: plain sleep, the handler had still not run when the
+    # test gave up 2 s later; sleep + wait, the handler ran in under a
+    # second. (Ctrl-C at a terminal happens to be prompt either way --
+    # SIGINT reaches the sleep too, because it goes to the whole
+    # foreground group -- but `kill -TERM` from a wrapper script does not,
+    # and that is how this harness is usually stopped.)
+    sleep "$FREEZE_AT" &
+    HOLD_PID=$!
+    wait "$HOLD_PID"
+    HOLD_PID=
+    kill -STOP -- -"$CLIENT_PGID" 2>/dev/null \
+        || echo "WARNING: SIGSTOP to client group $CLIENT_PGID failed —" \
+                "this is NOT a freeze leg, do not read it as one" >&2
+    # The instant, in BOTH clocks, so the analysis can align the freeze
+    # against either instrument without re-deriving an offset:
+    # CLOCK_REALTIME is what the server's GFX_TRACE records are stamped
+    # in, CLOCK_MONOTONIC is what the benchmark payload's own stamps file
+    # (loop_start_ms) is in. On the fleet the pod shares this box's
+    # kernel, so the two CLOCK_MONOTONIC readings are the same clock;
+    # over an ssh port-forward (E_TARGET=ssh) the server is a different
+    # box and only the wall stamp is comparable, and only to within skew.
+    python3 -c "
+import time
+print('freeze_signal  SIGSTOP (whole client process group)')
+print('freeze_at_s    $FREEZE_AT')
+print('leg_secs       $SECS')
+print('mono_ms        %.3f' % (time.clock_gettime(time.CLOCK_MONOTONIC)
+                               * 1000.0))
+print('epoch_ms       %.3f' % (time.time() * 1000.0))
+print('wall_utc       %s' % time.strftime('%Y-%m-%dT%H:%M:%S',
+                                          time.gmtime()))
+print('clock_note     mono_ms is the CLIENT box monotonic clock. It is the')
+print('               same clock as the payload stamps only when the')
+print('               server is a local pod (E_TARGET=pod).')
+" > "$OUT/freeze_instant.txt"
+    cat "$OUT/freeze_instant.txt"
+    echo "client group $CLIENT_PGID FROZEN at +${FREEZE_AT}s;" \
+         "holding for $((SECS - FREEZE_AT))s"
+    sleep $((SECS - FREEZE_AT)) &
+    HOLD_PID=$!
+    wait "$HOLD_PID"
+    HOLD_PID=
+else
+    sleep "$SECS"
+fi
 RUN_T1=$(date +%s)
+# SIGCONT before the teardown kill so a frozen group is running when it
+# is reaped; a no-op on an ordinary leg, where nothing was stopped.
+[ -n "$FREEZE_AT" ] && kill -CONT -- -"$CLIENT_PGID" 2>/dev/null
 kill -9 -- -"$CLIENT_PGID" 2>/dev/null
 sleep 1
 if pgrep -g "$CLIENT_PGID" >/dev/null 2>&1; then
@@ -496,9 +637,36 @@ else
     : > "$OUT/gfx_trace.txt"
 fi
 
+# --- the producer's OWN frame timestamps (PRD FR-BENCH-1) ----------------
+# FR-BENCH-1: "Saturation is verified per run, never assumed. A gate run
+# is valid only if BOTH hold, and the harness VERDICT must print both."
+# The requirement has been in PRD.md since 2026-07-31 and NO CODE HERE
+# IMPLEMENTED IT -- the 1.09x margin that arm x014's record turns on was
+# computed by hand from an archived stamps file after that run, which is
+# exactly the "verify per run" the FR exists to make automatic.
+#
+# The benchmark payload (PR-demo/textflood) writes one line per frame to
+# /tmp/e52_textflood_stamps.tsv INSIDE THE SESSION -- banner.sh passes
+# that path on the fleet, e52_payload.sh takes the same compiled-in
+# default on a real box. It is opened "w" at session start, so the file
+# belongs to the session this run created. The other payloads (code,
+# codeflood, gpuflood) write no stamps at all and the margin below is
+# then reported NOT MEASURED, never as a pass.
+STAMPS=${E_STAMPS:-/tmp/e52_textflood_stamps.tsv}
+PRODSTAMPS=$OUT/textflood_stamps.tsv
+srv_cat "$STAMPS" > "$PRODSTAMPS" 2>/dev/null
+if [ ! -s "$PRODSTAMPS" ]; then
+    rm -f "$PRODSTAMPS"
+    PRODSTAMPS=
+    echo "no producer stamps at $STAMPS on $SRV_NAME — the FR-BENCH-1" \
+         "margin will read NOT MEASURED (expected unless the payload is" \
+         "textflood)"
+fi
+
 # --- the report ----------------------------------------------------------
 {
-    echo "=== #45 gate run: $ARM, $MODE client, ${SECS}s ==="
+    echo "=== #45 gate run: $ARM, $MODE client, ${SECS}s\
+${FREEZE_AT:+, FREEZE LEG at +${FREEZE_AT}s} ==="
     echo "image:    $(cat "$OUT/deployed_image.txt")"
     grep -E "xrdp-dev|xorgxrdp-dev" "$OUT/deployed_packages.txt" \
         | awk '{print "package: " $2 " " $3}'
@@ -506,10 +674,24 @@ fi
     echo "payload:  SESSION_KIND = $(cat "$OUT/deployed_session_kind.txt")"
     echo "refresh:  intra_refresh_frames = \
 $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
+    # A freeze leg must never be readable as an ordinary one. Say so here,
+    # in the VERDICT, above every number it contaminates.
+    if [ -n "$FREEZE_AT" ]; then
+        echo "leg:      *** FREEZE LEG (BACKLOG #80) ***  the client"
+        echo "          process group was SIGSTOPped ${FREEZE_AT}s into"
+        echo "          this ${SECS}s leg and resumed only at teardown."
+        echo "          A stopped client stops READING the socket as well"
+        echo "          as acknowledging frames, so its receive buffer"
+        echo "          fills and it advertises a zero TCP window: the"
+        echo "          rates below cover a leg that was deliberately"
+        echo "          stalled and are NOT comparable to a normal run."
+        echo "          Freeze instant (both clocks): freeze_instant.txt"
+    fi
     echo
 
     echo "=== E5 / rate — send interval from the server's own log ==="
-    python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" "$NMON" <<'PY'
+    python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" "$NMON" \
+             "$PRODSTAMPS" "$RUN_T0" "$RUN_T1" <<'PY'
 import re
 import sys
 
@@ -583,6 +765,114 @@ print("sends: %d over %.1f s" % (len(t), span))
 print("send-to-send gap: mean %.1f ms  p50 %.0f ms  p90 %.0f ms  "
       "p99 %.0f ms" % (mean, pct(0.5), pct(0.9), pct(0.99)))
 nmon = int(sys.argv[4]) if len(sys.argv) > 4 else 2
+
+# --- FR-BENCH-1: what the BENCHMARK PAYLOAD itself managed ---------------
+# The payload writes one tab-separated line per rendered frame; the
+# second field, loop_start_ms, is CLOCK_MONOTONIC milliseconds taken at
+# the top of its render loop (PR-demo/textflood/textflood.c, now_ms()).
+# Its frame interval is the difference between consecutive loop_start_ms.
+# The comment header carries an epoch/monotonic anchor pair so those
+# stamps can be laid on the wall clock the server's records use.
+prod_path = sys.argv[5] if len(sys.argv) > 5 else ""
+run_t0 = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0
+run_t1 = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
+prod = []
+anchor = None
+prod_note = ""
+if prod_path:
+    try:
+        fh = open(prod_path, errors="replace")
+    except OSError:
+        fh = None
+    if fh is not None:
+        for line in fh:
+            if line.startswith("#"):
+                me = re.search(r"epoch_ms=([0-9.]+)", line)
+                mm = re.search(r"mono_ms=([0-9.]+)", line)
+                if me and mm:
+                    anchor = (float(me.group(1)), float(mm.group(1)))
+                continue
+            f = line.split("\t")
+            if len(f) < 2:
+                continue
+            try:
+                prod.append(float(f[1]))
+            except ValueError:
+                continue
+        fh.close()
+prod_total = len(prod)
+prod_scope = "the whole session, NOT cut to this leg"
+# Cut the payload's frames down to THIS measurement leg, for the same
+# reason the perf ring is cut: the stamps file spans the whole SESSION,
+# which outlives the leg on both sides. Arm x014's archived file holds
+# 101.5 s of frames for a 60 s run, and its interval over the whole file
+# is 15.94 ms against 16.90 ms over the leg -- a 6 % error, in the
+# direction that flatters the margin.
+if prod and anchor and run_t1 > run_t0:
+    epoch_ms, mono_ms = anchor
+    win = [v for v in prod
+           if run_t0 <= (epoch_ms + (v - mono_ms)) / 1000.0 <= run_t1]
+    if len(win) >= 30:
+        prod = win
+        prod_scope = "inside this leg"
+    else:
+        prod_note = ("only %d of %d payload frames landed inside the run "
+                     "window, so the WHOLE file is used below. Either the "
+                     "server's wall clock disagrees with this box's, or "
+                     "the payload restarted mid-run -- check before "
+                     "quoting the margin" % (len(win), prod_total))
+elif prod and not anchor:
+    prod_note = ("the stamps file has no epoch/mono anchor header, so the "
+                 "interval below is over the WHOLE session and not just "
+                 "this run's leg")
+
+if len(prod) >= 3:
+    pgaps = sorted(b - a for a, b in zip(prod, prod[1:]))
+    pn = len(pgaps)
+    pmean = sum(pgaps) / pn
+    print("producer frame interval (the benchmark payload's own per-frame "
+          "stamps, %d of %d session frames — %s): mean %.1f ms  p50 %.1f "
+          "ms  p90 %.1f ms"
+          % (len(prod), prod_total, prod_scope, pmean, pgaps[pn // 2],
+             pgaps[min(pn - 1, int(0.9 * pn))]))
+    if prod_note:
+        print("         NOTE: %s" % prod_note)
+    margin = mean / pmean
+    print("FR-BENCH-1 margin = pipeline mean %.1f ms / producer mean "
+          "%.1f ms = %.2fx" % (mean, pmean, margin))
+    # THREE STATES, and never a run-failing one (owner directive,
+    # 2026-08-06). The 2.0x floor stays a hard gate for claims that two
+    # pipeline STAGES OVERLAP -- below it, a second frame may simply not
+    # have existed, and "the stages did not overlap" cannot be told from
+    # "there was nothing to overlap with". Throughput and regression
+    # comparisons do not need the floor, provided both arms share the
+    # payload and the margin is printed beside every number, which is
+    # what this line is for.
+    if margin >= 2.0:
+        print("         OK (>= 2.0x floor): the payload kept damage "
+              "pending at every pipeline completion, so throughput, "
+              "regression AND stage-overlap claims from this run are all "
+              "valid.")
+    else:
+        print("         PRODUCER-LIMITED at %.2fx, under the 2.0x floor. "
+              "Any claim from this run about two pipeline stages "
+              "OVERLAPPING is VOID: the payload is close enough to the "
+              "pipeline that a missing second frame cannot be told from a "
+              "stage that failed to overlap. Throughput and regression "
+              "comparisons against an arm sharing this payload, geometry "
+              "and client REMAIN VALID -- quote this %.2fx beside every "
+              "number taken from them (owner directive, 2026-08-06)."
+              % (margin, margin))
+else:
+    print("producer frame interval: NOT MEASURED — no benchmark payload "
+          "stamps were collected, so the FR-BENCH-1 margin is unknown for "
+          "this run.")
+    print("         This is neither a pass nor a fail. Without it nothing "
+          "here can say whether the pipeline or the payload was the "
+          "limit, so treat every number below as unattributed. Expected "
+          "when the payload is not textflood; if it IS textflood, the "
+          "stamps file was missing on the server (see the collection "
+          "warning above the report).")
 
 # --- what geometry did the SESSION actually run at? ----------------------
 # The client's monitor list is what we asked for; the damage bboxes are what
@@ -737,6 +1027,17 @@ PY
         echo "  NONE -- see the abort above; this line should be unreachable"
     fi
 } | tee -a "$OUT/VERDICT.txt"
+
+# The payload's stamps are archived BESIDE the capture, compressed, in
+# the same shape the x014 record already carries them
+# (textflood_stamps.tsv.gz). They are the evidence behind the margin line
+# printed above, and the margin is now a load-bearing caveat on every
+# throughput number rather than a formality, so it has to be auditable
+# from the capture alone.
+if [ -n "$PRODSTAMPS" ] && [ -f "$PRODSTAMPS" ]; then
+    gzip -f "$PRODSTAMPS" \
+        && echo "producer stamps archived: $PRODSTAMPS.gz"
+fi
 
 # --- LOG THE SESSION OFF. Not optional, and not a courtesy ------------
 # The payload keeps running after the client goes away: the session has
