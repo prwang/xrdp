@@ -1,0 +1,9 @@
+freeze_signal  SIGSTOP (whole client process group)
+freeze_at_s    10
+leg_secs       20
+mono_ms        2074203745.021
+epoch_ms       1786039597117.773
+wall_utc       2026-08-06T18:06:37
+clock_note     mono_ms is the CLIENT box monotonic clock. It is the
+               same clock as the payload stamps only when the
+               server is a local pod (E_TARGET=pod).

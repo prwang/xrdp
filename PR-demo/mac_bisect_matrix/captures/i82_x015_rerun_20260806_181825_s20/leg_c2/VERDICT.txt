@@ -1,0 +1,48 @@
+=== #45 gate run: x014, oracle client, 20s ===
+image:    localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260801232618.73e4cb76d483
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 934 over 16.9 s
+send-to-send gap: mean 18.1 ms  p50 17 ms  p90 19 ms  p99 45 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1100 of 1297 session frames — inside this leg): mean 16.7 ms  p50 16.5 ms  p90 18.8 ms
+FR-BENCH-1 margin = pipeline mean 18.1 ms / producer mean 16.7 ms = 1.08x
+         PRODUCER-LIMITED at 1.08x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.08x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 934 damage records
+55.31 sends/s = 55.31 pairs/s per monitor (1 monitor)
+surface 0 own period: n=934 mean 18.1 ms  p50 17.0 ms
+damage coverage: surface 0: 934
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 934   kids_armed: 2:934 (100%)
+
+E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 18.1 ms  ->  1.25x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    934 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x014
+image:  localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf
+gfx:    sha256:7266096194beb9a4
+key:    localhost/xrdp-bisect:73e4cb76d483.xx10fa3aa-tf|7266096194beb9a4
+when:   2026-08-01T23:29:31Z
+window: 3s at 1920x1080, 71978524 bytes
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x014.cert

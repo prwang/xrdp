@@ -1,0 +1,57 @@
+=== #45 gate run: x018, oracle client, 20s, FREEZE LEG at +10s ===
+image:    localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260803024109.1d5bc0960db8
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+leg:      *** FREEZE LEG (BACKLOG #80) ***  the client
+          process group was SIGSTOPped 10s into
+          this 20s leg and resumed only at teardown.
+          A stopped client stops READING the socket as well
+          as acknowledging frames, so its receive buffer
+          fills and it advertises a zero TCP window: the
+          rates below cover a leg that was deliberately
+          stalled and are NOT comparable to a normal run.
+          Freeze instant (both clocks): freeze_instant.txt
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 365 over 6.9 s
+send-to-send gap: mean 18.9 ms  p50 18 ms  p90 26 ms  p99 29 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1198 of 1345 session frames — inside this leg): mean 15.4 ms  p50 14.9 ms  p90 17.7 ms
+FR-BENCH-1 margin = pipeline mean 18.9 ms / producer mean 15.4 ms = 1.23x
+         PRODUCER-LIMITED at 1.23x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.23x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 365 damage records
+53.16 sends/s = 53.16 pairs/s per monitor (1 monitor)
+surface 0 own period: n=365 mean 18.9 ms  p50 18.0 ms
+damage coverage: surface 0: 365
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 365   kids_armed: 2:365 (100%)
+
+E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 18.9 ms  ->  1.20x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    365 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x018
+image:  localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+gfx:    sha256:d9dce289750b26f0
+key:    localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf|d9dce289750b26f0
+when:   2026-08-03T12:55:40Z
+window: 3s at 1920x1080, 90048846 bytes
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x018.cert

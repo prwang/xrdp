@@ -1,0 +1,62 @@
+target=pod server=xrdp-x020-7dd97875c4-cv749 arm=x020 port=40036 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i87_eager_ab_20260806_180910_s20/leg_a1
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 545 lines, xrdp.log 79 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 543: 1414057 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 3071022396 bytes
+perf_trace_lines: 11540 records rendered, 28396 stage brackets left in the ring file, 3835 outside the run window
+trace span: 19s for a 20s run
+=== #45 gate run: x020, oracle client, 20s ===
+image:    localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260803024109.1d5bc0960db8
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 888 over 16.9 s
+send-to-send gap: mean 19.1 ms  p50 18 ms  p90 26 ms  p99 30 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1103 of 1281 session frames — inside this leg): mean 16.7 ms  p50 16.3 ms  p90 19.0 ms
+FR-BENCH-1 margin = pipeline mean 19.1 ms / producer mean 16.7 ms = 1.14x
+         PRODUCER-LIMITED at 1.14x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.14x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 888 damage records
+52.54 sends/s = 52.54 pairs/s per monitor (1 monitor)
+surface 0 own period: n=888 mean 19.1 ms  p50 18.0 ms
+damage coverage: surface 0: 888
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 888   kids_armed: 2:888 (100%)
+
+E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 19.1 ms  ->  1.19x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    888 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x020
+image:  localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf
+gfx:    sha256:284c20053b9d2239
+key:    localhost/xrdp-bisect:1d5bc0960db8.xx10fa3aa-tf|284c20053b9d2239
+when:   2026-08-06T18:08:02Z
+window: 3s at 1920x1080, 91067105 bytes
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x020.cert
+producer stamps archived: /work/PR-demo/mac_bisect_matrix/captures/i87_eager_ab_20260806_180910_s20/leg_a1/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i87_eager_ab_20260806_180910_s20/leg_a1

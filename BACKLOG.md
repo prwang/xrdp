@@ -56,10 +56,11 @@ weigh everything below against #92 (4:2:0 in motion) — the order past
 #80 is therefore provisional until that review.** Historical numbers
 stay as "(was #NN)" in each header.
 
-1. **#80** — credit frontier: remaining steps (rescoped 2026-08-06)
-2. **#82** (was #76) — the unreproduced 26.7 ms x015 pump: reproduce or retire
-3. **#83** (was #77) — a faster producer
-4. **#87** (was #61d; absorbs #89/was #70B) — re-measure the emit-split and eager-ack ratios under textflood
+1. **#80** — credit frontier: freeze leg and fleet A/B DONE 2026-08-06;
+   what remains is the per-monitor bound and the default-on decision
+2. ~~**#82** — the unreproduced 26.7 ms x015 pump~~ **RETIRED 2026-08-06**
+3. ~~**#83** — a faster producer~~ **LANDED 2026-08-06**, acceptance met
+4. ~~**#87** — emit-split and eager-ack ratios~~ **CLOSED 2026-08-06**
 5. **#88** (was #61g) — oracle client 50–150 ms pauses
 6. **#90** (was #74) — lever-2 architecture decision
 7. **#91** (was #71) — multimon per-monitor ack window + m≥2 serial cost
@@ -92,80 +93,96 @@ model, and #98 measured that at 4K the WAN constraint is TCP/byte
 behaviour, not the credit count. Simulation's job here is verifying the
 MECHANISM and its BOUND, nothing more. Consequences:
 
-* The shipped default stays **C = 2**, justified as legacy
-  `frames_in_flight` equivalence (coding rule 2), not as a
-  simulation-derived optimum. C is documented as an operator knob; the
-  closed form ⌈RTT/period⌉ + 1 is offered as guidance to validate per
-  deployment, never as a certified table.
+* The shipped default stays **C = 2** for now, documented as an operator
+  knob rather than a simulation-derived optimum; the closed form
+  ⌈RTT/period⌉ + 1 is guidance to validate per deployment, never a
+  certified table.
+  * **CORRECTION 2026-08-06, and it breaks the justification above:
+    C = 2 is NOT legacy-equivalent.** The legacy gate emits while
+    `client + fif > server` and the value it emits is `frame_id_server`
+    (`xrdp/xrdp_encoder.h:40-44`), so the highest id it can ever
+    acknowledge is `client + fif − 1`; the frontier clamps the credit at
+    `client + C` directly (`:114-130`). At the two capture slots above
+    the credit that is at most `client + 3` for today's `fif = 2` and
+    `client + 4` for `C = 2`. **The legacy-equivalent window is C = 1.**
+    Predicted from the code and then confirmed by the A/B, whose
+    measured maximum distance between a frame and the client's last
+    acknowledgement was exactly 3 on the control arm and 4 on the
+    treatment arm. Shipping C = 2 therefore permits one more frame of
+    queue than today's default — nothing measurable on loopback, one
+    frame of extra latency on a link where a frame takes real time.
+    **Coding rule 2 says the default must reproduce present behaviour,
+    which points at C = 1; the owner's call, and it also changes the
+    PRD amendment drafted in
+    `docs/experiments/prd-amendment-draft-20260806.md`, which uses the
+    equivalence claim.**
 * **PRD FR-FLOW-1 clause 4 ("default chosen with #81's data") needs a
   matching amendment — owner sign-off required, not yet applied.**
 * Dropped with the rescope: "enough RTT points to choose the default",
   and the old-build-under-netem A/B (it would measure TCP as much as
   the frontier — quality gate 5).
 
+**RUN 2026-08-06 (owner-approved) — the freeze leg and the fleet A/B
+both landed, and items 1–3 below are CLOSED.**
+
+* **Freeze leg GREEN, and the bound is ATTAINED rather than merely
+  held.** Arm x018 at C = 1, the test client's process group stopped
+  mid-leg. The last client acknowledgement was frame 362; exactly one
+  further frame (365) reached the network and production then stopped —
+  365 − 362 = 3 = C + 2 exactly. Zero credit records were emitted in the
+  10 s that followed, while the trace kept recording throughout, so
+  production stopped and the instrument did not. Transport queued bytes
+  went 1109 → 4703 KiB and could not grow further, no frame being
+  produced. Capture `i80_freeze_20260806_180613_s20`. Caveat in the
+  record: stopping the process freezes reading as well as acknowledging,
+  which is a HARSHER condition for the queue than an ack-only freeze.
+* **The A/B ran as one experiment covering items 2 and 3** (arms x020
+  legacy / x021 frontier at C = 2, four interleaved legs; runner
+  `i87_eager_ab.sh`, capture `i87_eager_ab_20260806_180910_s20`). The
+  wait between the encoder absorbing a frame's pixels and the producer
+  being told it may capture again falls from p90 10.6 ms with 16.4 % of
+  cycles waiting over 10 ms, to p90 0.04 ms with 1.0 % — and it holds in
+  both host states the run encountered. Frame period, in the pair where
+  the encoder ran at its normal speed: mean 19.11 → 17.68 ms, p90
+  26.58 → 19.28, p99 30.16 → 24.16. Nothing regressed.
+* **First live run of the shipped default.** Every `wire_window` on
+  record before today was 1; x021 is the first arm to encode a frame at
+  C = 2.
+* **Read the A/B within pairs only.** Between the first and second pair
+  the wait for the ffmpeg children moved 16.3 → 26.2 ms on BOTH arms
+  with every other stage unchanged — a host-level encoder slowdown. GPU
+  DVFS is plausible but was NOT measured during the legs.
+* **The wire bound held and WAS exercised — correcting a first reading
+  of this run.** An initial pass called it a vacuous pass on the grounds
+  that "nothing is ever outstanding at send time"; that statistic came
+  from two fields of the network-write record which are zero by
+  construction (the trace only fires for chunks carrying bytes, and the
+  message bearing a frame's terminal marker carries none). Read from the
+  egress record, which carries the frame's own id and the client's last
+  acknowledged id, the treatment arm reached its bound of C + 2 = 4
+  once and came within one of it 14 times. On loopback it is rarely
+  approached — 99.5 % of frames sit 1 or 2 ids ahead of the client —
+  but "rarely approached" is not "never exercised".
+
 **Still open:**
 
-1. **The freeze leg** (mechanism, from the original approved design): a
-   client that stops acking mid-session → production must stop within
-   C + 2 frames and the transport's queued bytes (`trans::wait_bytes`)
-   must plateau. Seconds of trace; binary check.
-2. **A C = 2 LAN leg** to attribute the residual 18.2 % LAN stalls — at
-   C = 1 all three frontier terms tie at emission (157/157), so the
-   existing records cannot say which term held (gate 2b).
-3. **Step 5 — fleet A/B** on the unmodified harness, acceptance on the
-   mechanism's own telemetry (the withheld distribution; fif = 2
-   equivalent non-regression), before `eager_slot_ack` can be
-   considered for default-on. Arm count needs owner approval.
-4. **Per-monitor caution (owner, 2026-08-03):** the `C + 2·M` bound at
+1. **Per-monitor caution (owner, 2026-08-03):** the `C + 2·M` bound at
    M monitors is UNTESTED — everything measured is single monitor. On
    the return to 2 monitors, re-derive the bound from measurement, not
    multiplication, and only after the single-monitor stall work closes.
    (Findings (a) two-token clamp and (b) unclamped `NOT_DISPLAYED` are
    accepted as-is until a later test rejects them.)
-
-## #82 (was #76) — the unreproduced 26.7 ms x015 pump: reproduce or retire
-
-x015 (fif = 1) measured `pump` = 26.7 ms once; #78's controlled re-run
-measured 16.40 ms — equal to fif = 2 — same host, same config, and the
-reproducing part of the fif = 1 cost (the withheld slot credit) has
-since been fixed by #80's frontier. What is left is ONE unreproduced
-observation. Candidates: transient host power/thermal state during the
-02:07 run; concurrent fleet activity (session state was not recorded
-then; it is now). A rerun of the uninstrumented x015 pod needs owner
-approval. If it does not reproduce, retire the observation with a dated
-note. Records:
-`docs/experiments/76-fif1-costs-throughput-in-a-bracket-it-cannot-reach.md`,
-`docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`.
-
-## #83 (was #77) — a faster producer
-
-**Why.** The textflood producer runs at 16.91 ms/frame against an
-18.48 ms pipeline (x014, `i75_x014_rewrite_20260801`): FR-BENCH-1
-margin **1.09×, MARGINAL**. At that margin an arm measures the payload
-as much as the server — 66 of 3074 cycles stall on the producer and
-carry 99.7 % of all wait time, and p99 regressed 31 → 46.5 ms while the
-mean improved. Every further worker-side ratio is gated on this.
-
-**Scope.** PRD design B: memmove scroll + strip render instead of a
-full redraw. Offline: 7.1 ms/frame against today's ~16 — margin ~2.6×
-at the current pipeline rate, still >2× if the pipeline reaches 14 ms.
-
-**Acceptance.** Producer p90 strictly below pipeline p10 at 3840×2400,
-stated in the arm's own capture; FR-BENCH-1 margin ≥ 2.0× reported
-beside every ratio thereafter.
-
-## #87 (was #61d; absorbs #89/was #70B) — re-measure the emit-split and eager-ack ratios under textflood on the ring build
-
-The codeflood-era ratios (#70 eager ack 1.11×, #70B emit split 0.96×)
-were measured against a saturated producer, and #70B's later 1.12× was
-measured with the per-frame trace on log.c (#61h) — all void. The
-emit-split code ships default-off; its prerequisite refactor fixed a
-real use-after-free and stands. **Work:** re-run the eager-ack A/B and
-the emit-split A/B under textflood on ring-traced builds, including the
-emit split at 2560×1440 — its prize is resolution-dependent (`emit` was
-27 % of the serial chain at 1440p vs 17 % at 4K), so the smaller
-geometry should show the LARGER ratio: a falsifiable prediction. PRD
-FR-ACK-2 still names the emit split as #70's completion.
+2. **Whether `eager_slot_ack` may default ON.** The A/B is now the
+   evidence it was waiting for and nothing regressed, but the flag is
+   ANDed with `aux_ltr_chain`, which is EXPERIMENTAL and default-off —
+   so flipping this alone is a no-op in a default install and a live
+   change only for operators already on the experimental path. Every
+   measurement to date used the oracle client, which acknowledges a
+   frame BEFORE decoding it, so the mechanism has never seen a realistic
+   acknowledgement time. Recommendation: fold the flip into
+   `aux_ltr_chain`'s acceptance gate rather than deciding it separately.
+   Owner sign-off required either way (PRD: no default change without
+   it).
 
 ## #88 (was #61g) — the oracle client's 50–150 ms pauses: unattributed
 
@@ -441,3 +458,6 @@ are in git history.
 | **#78** split the `pump` bracket | DONE. FEED 2.61 / ENCODE 13.38 / DRAIN 0.41 ms; falsified its own baseline (fif=1 pump = fif=2's) → #82; the reproducing fif=1 cost was the ack-gated slot release → fixed by #80. | [`78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md`](docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md) |
 | **#79** ungate the eager slot ack → horizon form | MERGED INTO #80. Plain ungate rejected (no bound exists past the window — `trans_write_copy_s` cannot fail); horizon form superseded by the credit frontier. Layer-1 sweep confirmed the withheld-credit mechanism causally. | [`79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md`](docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md) |
 | **#81** netem RTT harness | DONE. Both-direction delay on the pod veth pair, selftest incl. throughput + zero-drops (after the limit-1000 incident voided the first WAN leg); ack-delay proxy retired. | [`81-the-netem-rtt-harness.md`](docs/experiments/81-the-netem-rtt-harness.md) |
+| **#82** the unreproduced 26.7 ms x015 encoder wait | RETIRED 2026-08-06. Third independent null: the wait is EQUAL at frames-in-flight 1 and 2 (16.21/16.31 vs 16.16/16.20 ms, interleaved, same sitting). The period difference is entirely the worker idling on a withheld credit — #79's defect, fixed by #80. The ~26 ms condition was then seen live on BOTH A/B arms at once, so it is a host state, not a frames-in-flight property. | capture `i82_x015_rerun_20260806_181825_s20` |
+| **#83** a faster benchmark producer | DONE 2026-08-06. `--scroll strip` (default off) takes the payload 16.2 -> 4.5 ms/frame deployed; FR-BENCH-1 margin 1.05x -> 3.94x and acceptance met (producer p90 5.8 ms below pipeline p10 15.75 ms). The control is the more useful result: a 3.6x faster producer did NOT change the pipeline's rate, so the textflood series was pipeline-limited, not producer-clocked. | capture `i83_strip_payload_20260806_182340_s20` |
+| **#87** emit-split and eager-ack ratios | CLOSED 2026-08-06. Emit split RETIRED unrun — the stage is 0.333 ms at 4K against the 6.39 ms its requirement rested on, which came from a build with two per-frame log writes inside the timed bracket; PRD FR-ACK-2's table, projection and ship-together clause deleted. The eager-ack half was measured in #80's merged A/B. | [`87-the-emit-split-was-measuring-its-own-logger.md`](docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md) |
