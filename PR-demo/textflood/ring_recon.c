@@ -1,16 +1,14 @@
 /*
- * ring_recon.c — BACKLOG #65 step 1: is FR-BENCH-1 computationally
- * feasible on the T4-class reference CPU (4 vCPU, ~2 physical cores)?
+ * ring_recon.c — BACKLOG #65 step 1, reused by BACKLOG #83: what does
+ * one frame of each candidate producer design cost, offline (no X
+ * server, no RDP session, nothing deployed is touched — pure compute)?
  *
- * Measures the per-frame CPU cost of the three candidate producer
- * designs, offline (no X server, no RDP session, nothing deployed is
- * touched — pure compute recon):
- *
- *   A  full-frame live render      what textflood ships today: cairo
- *                                  renders every visible row, every
- *                                  frame. Known-failing at 4K.
- *   B  scroll + strip render       memmove the frame up by the step,
- *                                  cairo-render only the newly exposed
+ *   A  full-frame live render      what textflood's --scroll full does:
+ *                                  cairo renders every visible row,
+ *                                  every frame.
+ *   B  scroll + strip render       textflood's --scroll strip: memmove
+ *                                  the frame up by the step, cairo
+ *                                  renders only the newly exposed
  *                                  bottom strip. Keeps per-frame CPU
  *                                  text rendering (FR-BENCH-1 req 2 in
  *                                  its strictest reading) and still
@@ -27,14 +25,36 @@
  * physical cores every producer byte competes with the capture pack
  * and the vmsplice feed for the same DRAM.
  *
+ * WHY THIS BENCH AND NOT textflood --selftest. Both are wanted and they
+ * answer different questions. --selftest lets the producer free-run, so
+ * its time-based content advance settles at a couple of corpus lines
+ * per frame and it reports the standalone frame rate FR-BENCH-1 asks
+ * for. This bench pins the advance at DEF_STEP lines for BOTH designs,
+ * which is the only way A and B are comparable: A's cost does not
+ * depend on the advance and B's is nearly proportional to it, so a
+ * comparison at different advances is not a comparison.
+ *
+ * FIXED 2026-08-06 (BACKLOG #83): bench B rendered the newly exposed
+ * strip from THE WRONG PLACE IN THE CORPUS. It called the row renderer
+ * with a corpus offset of `offset + rows - strip_rows` while asking for
+ * screen rows [rows - strip_rows, rows), and the renderer adds the row
+ * index to the offset — so the strip showed corpus line
+ * offset + (rows - strip_rows) + row instead of offset + step + row,
+ * i.e. rows - 2*step lines off — 85 lines at 3840x2160, where the
+ * bench computed 135 rows of 16 px. Bench B's
+ * TIMING was unaffected — the same number of rows of the same corpus
+ * were rendered either way — but the picture it drew was never the
+ * picture the design produces, so the bench could never have shown a
+ * strip-geometry error. The strip path is now the one textflood.c
+ * ships, including its band clipping, and textflood --verify is what
+ * proves that path pixel-exact against a full redraw.
+ *
  * The corpus structs, parser, loader and the row-render loop are
- * VERBATIM copies of PR-demo/textflood/textflood.c (keep in sync);
- * draw_frame is split into draw_rows so bench B can render a row
- * range, with the full-frame path calling it for every row.
+ * VERBATIM copies of PR-demo/textflood/textflood.c (keep in sync).
  *
  * Build:  cc -O2 -Wall -Wextra -o ring_recon ring_recon.c \
  *             $(pkg-config --cflags --libs cairo) -lpthread
- * Run:    ./ring_recon [corpus]
+ * Run:    ./ring_recon [corpus] [WxH]        default 3840x2160
  */
 
 #include <cairo/cairo.h>
@@ -44,17 +64,21 @@
 #include <string.h>
 #include <time.h>
 
-#define WIDTH 3840
-#define HEIGHT 2160
+#define DEF_WIDTH 3840
+#define DEF_HEIGHT 2160
 #define DEF_CORPUS "/usr/local/share/code_corpus.ansi"
 #define DEF_FONT "DejaVu Sans Mono"
 #define DEF_FONT_SIZE 14.0
 #define DEF_STEP 25
 
-/* FR-BENCH-1: producer must be >= 2x the pipeline's measured rate.
-   Pipeline m=1 3840x2160 on the T4 measured 8.19 sends/s (capture
-   e52_t4_textflood_m1_4k_20260731). */
-#define PIPELINE_FPS 8.19
+/* FR-BENCH-1: the producer must be >= 2x the pipeline's measured rate.
+   Reference period 18.476 ms = 54.1 sends/s, one monitor at 3840x2400,
+   textflood, arm x014 (BACKLOG #75, capture i75_x014_rewrite_20260801).
+   This replaces the T4-era 8.19 sends/s of the 2026-07-31 revision,
+   which was measured at 3840x2160 on hardware that no longer exists —
+   quoting a PASS against it would be quoting a dead pipeline. */
+#define PIPELINE_MS 18.476
+#define PIPELINE_FPS (1000.0 / PIPELINE_MS)
 #define REQUIRED_FPS (2.0 * PIPELINE_FPS)
 
 #define BG_R 0.0000
@@ -264,19 +288,74 @@ corpus_load(struct corpus *cp, const char *path)
     return cp->nlines <= 0;
 }
 
-/* ---- textflood.c draw_frame, split so a row RANGE can be rendered ------- */
+/* ---- textflood.c row renderer, verbatim --------------------------------- */
 
 static void
-draw_rows(cairo_t *cr, const struct corpus *cp, int offset,
-          int width, int row_from, int row_to, double line_height,
-          double baseline)
+draw_row_text(cairo_t *cr, const struct line *ln, int width, double y)
+{
+    int ri;
+    double x;
+    cairo_text_extents_t ext;
+
+    x = 0.0;
+    while (x < width)
+    {
+        double x_before;
+
+        x_before = x;
+        for (ri = 0; ri < ln->nruns && x < width; ri++)
+        {
+            const struct run *rn;
+
+            rn = ln->runs + ri;
+            cairo_set_source_rgb(cr, rn->r / 255.0, rn->g / 255.0,
+                                 rn->b / 255.0);
+            cairo_move_to(cr, x, y);
+            cairo_show_text(cr, rn->text);
+            cairo_text_extents(cr, rn->text, &ext);
+            x += ext.x_advance;
+        }
+        if (x <= x_before)
+        {
+            break;
+        }
+        x += 8.0;
+    }
+}
+
+/* bench A's frame: textflood.c draw_frame, verbatim */
+static void
+draw_frame(cairo_t *cr, const struct corpus *cp, int offset,
+           int width, int rows, double line_height, double baseline)
 {
     int row;
     int li;
-    int ri;
-    double x;
-    double y;
-    cairo_text_extents_t ext;
+
+    cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
+    cairo_paint(cr);
+    for (row = 0; row < rows; row++)
+    {
+        const struct line *ln;
+
+        li = (offset + row) % cp->nlines;
+        ln = cp->lines + li;
+        if (ln->nruns == 0)
+        {
+            continue;
+        }
+        draw_row_text(cr, ln, width, row * line_height + baseline);
+    }
+}
+
+/* bench B's rows: textflood.c draw_rows_banded, verbatim apart from
+   taking the layout as loose arguments rather than a struct */
+static void
+draw_rows_banded(cairo_t *cr, const struct corpus *cp, int offset,
+                 int width, int row_from, int row_to, int line_px,
+                 double baseline)
+{
+    int row;
+    int li;
 
     for (row = row_from; row < row_to; row++)
     {
@@ -288,31 +367,11 @@ draw_rows(cairo_t *cr, const struct corpus *cp, int offset,
         {
             continue;
         }
-        y = row * line_height + baseline;
-        x = 0.0;
-        while (x < width)
-        {
-            double x_before;
-
-            x_before = x;
-            for (ri = 0; ri < ln->nruns && x < width; ri++)
-            {
-                const struct run *rn;
-
-                rn = ln->runs + ri;
-                cairo_set_source_rgb(cr, rn->r / 255.0, rn->g / 255.0,
-                                     rn->b / 255.0);
-                cairo_move_to(cr, x, y);
-                cairo_show_text(cr, rn->text);
-                cairo_text_extents(cr, rn->text, &ext);
-                x += ext.x_advance;
-            }
-            if (x <= x_before)
-            {
-                break;
-            }
-            x += 8.0;
-        }
+        cairo_save(cr);
+        cairo_rectangle(cr, 0, row * line_px, width, line_px);
+        cairo_clip(cr);
+        draw_row_text(cr, ln, width, row * line_px + baseline);
+        cairo_restore(cr);
     }
 }
 
@@ -332,8 +391,8 @@ report(const char *name, double ms, const char *note)
 {
     double fps = 1000.0 / ms;
 
-    printf("  %-28s %7.1f ms/frame = %5.1f fps   %-4s  %s\n",
-           name, ms, fps,
+    printf("  %-28s %7.2f ms/frame = %6.1f fps  %5.2fx pipeline  %-4s %s\n",
+           name, ms, fps, PIPELINE_MS / ms,
            fps >= REQUIRED_FPS ? "PASS" : "FAIL", note);
 }
 
@@ -378,21 +437,37 @@ main(int argc, char **argv)
     double ms_strip;
     double ms_copy1;
     double ms_copy2;
+    int width;
+    int height;
     int stride;
     int rows;
-    int strip_rows;
-    int strip_px;
+    int line_px;
+    int rows_banded;
+    int rb;
+    int shift;
     int offset;
     int i;
     int n;
 
     corpus_path = argc > 1 ? argv[1] : DEF_CORPUS;
+    width = DEF_WIDTH;
+    height = DEF_HEIGHT;
+    if (argc > 2 && sscanf(argv[2], "%dx%d", &width, &height) != 2)
+    {
+        fprintf(stderr, "ring_recon: geometry wants WxH, not %s\n", argv[2]);
+        return 1;
+    }
+    if (width < 64 || height < 64 || width > 16384 || height > 16384)
+    {
+        fprintf(stderr, "ring_recon: geometry out of range\n");
+        return 1;
+    }
     if (corpus_load(&cp, corpus_path) != 0)
     {
         return 1;
     }
 
-    surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, WIDTH, HEIGHT);
+    surf = cairo_image_surface_create(CAIRO_FORMAT_ARGB32, width, height);
     cr = cairo_create(surf);
     /* identical AA setup to textflood.c */
     fo = cairo_font_options_create();
@@ -405,66 +480,80 @@ main(int argc, char **argv)
     cairo_set_font_size(cr, DEF_FONT_SIZE);
     cairo_font_extents(cr, &fext);
     line_height = fext.height;
-    rows = (int) (HEIGHT / line_height);
-    strip_rows = DEF_STEP < rows ? DEF_STEP : rows;
-    strip_px = (int) (strip_rows * line_height + 0.5);
+    /* rows as the shipped full-redraw loop computes it: height/lh + 1,
+       so the partially visible bottom row is drawn. The 2026-07-31
+       revision of this bench used height/lh and so rendered one row
+       fewer than the payload it was standing in for. */
+    rows = (int) (height / line_height) + 1;
+    /* strip mode's pinned integer line height, exactly as textflood.c's
+       layout_init() computes it */
+    line_px = (int) (line_height + 0.5);
+    rows_banded = height / line_px + 1;
+    shift = DEF_STEP * line_px;
+    rb = rows_banded - 1 - DEF_STEP;
     data = cairo_image_surface_get_data(surf);
     stride = cairo_image_surface_get_stride(surf);
-    frame_bytes = (size_t) stride * HEIGHT;
+    frame_bytes = (size_t) stride * height;
+    if (rb < 1 || shift >= height)
+    {
+        fprintf(stderr, "ring_recon: %d lines does not scroll a %d px "
+                "frame of %d px bands\n", DEF_STEP, height, line_px);
+        return 1;
+    }
 
-    printf("ring_recon: %dx%d, %d rows of %.1f px, corpus %d lines, "
-           "frame %.1f MB\n", WIDTH, HEIGHT, rows, line_height,
-           cp.nlines, frame_bytes / 1048576.0);
-    printf("FR-BENCH-1 floor: 2 x %.2f pipeline fps = %.1f fps "
-           "(<= %.1f ms/frame)\n\n", PIPELINE_FPS, REQUIRED_FPS,
-           1000.0 / REQUIRED_FPS);
+    printf("ring_recon: %dx%d, %d rows of %.3f px (strip mode: %d bands "
+           "of %d px), corpus %d lines, step %d lines, frame %.1f MB\n",
+           width, height, rows, line_height, rows_banded, line_px,
+           cp.nlines, DEF_STEP, frame_bytes / 1048576.0);
+    printf("FR-BENCH-1 floor: 2 x %.1f pipeline fps = %.1f fps "
+           "(<= %.2f ms/frame); pipeline period %.3f ms\n\n",
+           PIPELINE_FPS, REQUIRED_FPS, 1000.0 / REQUIRED_FPS, PIPELINE_MS);
 
-    /* ---- A: full-frame live render (shipped textflood) ---- */
+    /* ---- A: full-frame live render (textflood --scroll full) ---- */
     offset = 0;
     n = 12;
     for (i = 0; i < 2; i++)   /* warm the glyph cache */
     {
-        cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
-        cairo_paint(cr);
-        draw_rows(cr, &cp, offset, WIDTH, 0, rows, line_height,
-                  fext.ascent);
+        draw_frame(cr, &cp, offset, width, rows, line_height, fext.ascent);
         offset += DEF_STEP;
     }
     t0 = now_ms();
     for (i = 0; i < n; i++)
     {
-        cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
-        cairo_paint(cr);
-        draw_rows(cr, &cp, offset, WIDTH, 0, rows, line_height,
-                  fext.ascent);
+        draw_frame(cr, &cp, offset, width, rows, line_height, fext.ascent);
         cairo_surface_flush(surf);
         offset += DEF_STEP;
     }
     ms_full = (now_ms() - t0) / n;
-    report("A full-frame live render", ms_full, "(shipped textflood)");
+    report("A full-frame live render", ms_full, "(--scroll full)");
 
-    /* ---- B: memmove scroll + strip render ---- */
+    /* ---- B: memmove scroll + strip render (textflood --scroll strip),
+       at the SAME DEF_STEP lines per frame as A ---- */
     n = 40;
     t0 = now_ms();
     for (i = 0; i < n; i++)
     {
-        memmove(data, data + (size_t) strip_px * stride,
-                frame_bytes - (size_t) strip_px * stride);
+        /* offset is the corpus line shown by band 0 AFTER this scroll,
+           so the exposed bands must be drawn from it too — the bug
+           fixed 2026-08-06 passed a different base here */
+        offset += DEF_STEP;
+        cairo_surface_flush(surf);
+        memmove(data, data + (size_t) shift * stride,
+                (size_t) stride * (height - shift));
         cairo_surface_mark_dirty(surf);
         cairo_save(cr);
-        cairo_rectangle(cr, 0, HEIGHT - strip_px, WIDTH, strip_px);
+        cairo_rectangle(cr, 0, rb * line_px, width, height - rb * line_px);
         cairo_clip(cr);
         cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
         cairo_paint(cr);
-        draw_rows(cr, &cp, offset + rows - strip_rows, WIDTH,
-                  rows - strip_rows, rows, line_height, fext.ascent);
         cairo_restore(cr);
+        draw_rows_banded(cr, &cp, offset, width, rb, rows_banded, line_px,
+                         fext.ascent);
         cairo_surface_flush(surf);
-        offset += DEF_STEP;
     }
     ms_strip = (now_ms() - t0) / n;
     report("B scroll + strip render", ms_strip,
-           "(live CPU text render kept)");
+           "(--scroll strip, live CPU text render kept)");
 
     /* ---- C: pre-rendered ring steady state = one frame memcpy ---- */
     {
@@ -507,7 +596,7 @@ main(int argc, char **argv)
         copy_thread(&a[0]);
         pthread_join(th, NULL);
         ms_copy2 = (now_ms() - t0) / 30;
-        printf("  %-28s %7.1f ms per PAIR of frames = %.1f GB/s "
+        printf("  %-28s %7.2f ms per PAIR of frames = %.1f GB/s "
                "aggregate\n", "C ring blit, 2 threads", ms_copy2,
                2.0 * frame_bytes / 1048576.0 / 1024.0
                / (ms_copy2 / 1000.0));
@@ -517,9 +606,11 @@ main(int argc, char **argv)
 
     printf("\nVERDICT (producer alone; X-side blit adds ~1 more frame "
            "copy on the X thread):\n");
-    printf("  A %5.1f fps  B %5.1f fps  C %5.1f fps  vs floor %.1f fps\n",
+    printf("  A %6.1f fps  B %6.1f fps  C %6.1f fps  vs floor %.1f fps\n",
            1000.0 / ms_full, 1000.0 / ms_strip, 1000.0 / ms_copy1,
            REQUIRED_FPS);
+    printf("  B is %.2fx cheaper per frame than A at the same %d lines "
+           "of scroll\n", ms_full / ms_strip, DEF_STEP);
 
     cairo_font_options_destroy(fo);
     cairo_destroy(cr);
