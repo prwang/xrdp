@@ -449,6 +449,56 @@ the gates got run from memory, the first draft went out unedited, and
 the owner's reply was "I can't read your end-turn conclusion unedited."
 A procedure with no artifact is not a procedure.
 
+#### It applies to QUESTIONS too, and there it matters more (owner directive, 2026-08-06)
+
+**Every `AskUserQuestion` goes through the same four steps and the same
+gates as an end-of-turn message — write the full question text and
+every option to `/work/.turn_draft.md`, read it back, edit it there,
+and only then ask.** This is not a lesser case of the rule. It is the
+worse one: a report the owner cannot read costs a round trip, but a
+QUESTION the owner cannot read costs a wrong answer, and a wrong answer
+to an architectural question sends the project down a path that later
+work is then built on. The owner's words on the day this was written:
+*"It would be disaster I misread your question and lead the project to
+a wrong direction."*
+
+Every gate above applies unchanged. These are the ones a question
+fails in its own particular way:
+
+* **No internal labels in an option, ever — this is where they leak
+  back in.** `x023`, `x024`, `#80 step 5`, `INV-WIRE` are indices into
+  this repository's paperwork. An option that says "x023 = frontier at
+  C = 1, x024 = frontier with the emit thread off" is unreadable by
+  anyone not holding the fleet inventory in their head. Name the
+  CONDITION the arm holds, not the arm.
+* **One variable per option, named in the label.** An option label that
+  carries a design, an arm count and a wall time at once
+  ("Both, one sitting — 2 new arms, ~15 min") forces the reader to
+  decode three things to compare two choices. Put the choice in the
+  label and the cost in the description.
+* **Each option states, in this order: what it decides, what it costs,
+  and what it leaves unanswered.** The third is the one that gets
+  skipped, and it is the one that makes a cheap option honestly
+  comparable to an expensive one.
+* **The question text must be answerable by someone who has not read
+  the analysis above it.** Restate the decision in one plain sentence
+  inside the question. "Which do you want?" is not a question; it is a
+  pointer to a paragraph the owner may not still have in view.
+* **The options must be mutually exclusive and jointly cover the
+  decision**, including the do-nothing option where one genuinely
+  exists. If two options can both be true, it is a multi-select, and
+  say so.
+* **For anything that spends time on hardware, the arm count and the
+  wall time appear in EVERY option**, per the standing rule that an
+  approval covers the experiment that was described.
+
+*Why this was written.* A four-option question about whether to
+characterise two flags was sent with arm names as option labels, three
+variables per option, and a question line that assumed the reader still
+held the preceding analysis. The owner could not answer it and said so.
+The failure was not the content of the choice — it was that the choice
+was unreadable, and unreadable questions are answered by guessing.
+
 #### The edit pass (owner directive, 2026-08-03)
 
 The three gates below check whether the message is TRUE. Nothing
