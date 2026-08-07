@@ -179,6 +179,11 @@ declare -A ARM_XORG_DEB=(
     # shipped frames_in_flight=2 path); x024 = x023 with emit_thread
     # off. So x020 vs x023 isolates the ack mechanism and x023 vs x024
     # isolates the emit thread.
+    # x025 (owner-directed 2026-08-07): the LEGACY path with its window
+    # widened to 3 via XRDP_GFX_FRAMES_IN_FLIGHT. Answers the reviewer
+    # objection "why not just raise the old knob?" -- its gfx.toml body
+    # is byte-identical to x020, so the env var is the only difference.
+    [x025]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x023]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x024]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     # x022 (BACKLOG #83): same server as x021, different PAYLOAD.
@@ -246,6 +251,7 @@ declare -A ARM_TAG=(
     [x020]=1d5bc0960db8.xx10fa3aa-tf
     [x021]=1d5bc0960db8.xx10fa3aa-tf
     [x023]=1d5bc0960db8.xx10fa3aa-tf
+    [x025]=1d5bc0960db8.xx10fa3aa-tf
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
     # payload: same server build, different producer. Comparing it with

@@ -113,10 +113,28 @@ MECHANISM and its BOUND, nothing more. Consequences:
     emission point.** This also closes #80's open attribution question,
     which the emission-time record could not answer because all three
     terms tie there.
-  * **So the frontier at C = 1 is a refactor with no gain, and the gain
-    at C = 2 costs one more frame outstanding than the 2017-era path.**
-    That trade must be argued on its merits; "legacy equivalence" cannot
-    carry it. Capture `i80_c1_nonregression_20260807_141752_s20`.
+  * **SETTLED 2026-08-07: the change is an EXTENSION, and the old knob
+    cannot substitute.** Widening the legacy window to 3 gives the same
+    bound the frontier has at C = 2 (client + 4, measured, distance 4
+    reached) and leaves the stall exactly where it was — withheld p90
+    10.57/10.39 ms and 17.6/15.6 % of cycles, against 10.50 ms and
+    16.4 % at window 2. The frontier in the same sitting: 0.048/0.040 ms
+    and 3.9/2.6 %, with period p90 19.6/19.2 against 26.5/26.5 ms. Same
+    cost, none of the benefit. The reason is in the code and was written
+    down before the run: legacy grants `frame_id_server`, which advances
+    at EGRESS (`xrdp_mm.c:1772`, `:4423`), so no window value lets the
+    producer start a capture that depends on a frame still inside the
+    encoder; the frontier's `frame_id_consumed` / `server + 1` terms are
+    what express that (`xrdp_encoder.h:114-130`, `xrdp_mm.c:4366`).
+    Captures `i80_c1_nonregression_20260807_141752_s20` (window 1 is
+    today's behaviour, measured identical) and
+    `i80_widen_legacy_20260807_143617_s20` (the widened knob, with its
+    prediction pre-registered).
+  * **The upstream sentence, therefore:** window 1 is today's behaviour
+    bit for bit; the frontier adds a pipeline-state term the old gate
+    has no variable for; window 2 is what makes it reachable. One design,
+    one reason, and the cost stated — one more frame outstanding, which
+    the old knob also costs without buying anything.
   * Open, and it is the upstream-facing question: present ONE design
     with one firm reason (owner, 2026-08-07 — maintainers should not be
     handed two ambiguous options for a breaking change to 2017-2018 era
