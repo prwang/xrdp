@@ -377,13 +377,21 @@ At m≥2, two issues on top of the m=1 serializer:
    milliseconds. Replace it with the set-membership decomposition
    above, and note what the trace can and cannot answer today:
 
-   * **Answerable NOW, no code change** — the records already carry
-     what is needed: `pump_end` carries the number of children armed,
-     `absorb` carries (frame id, monitor), and `coll_beg/end` and
-     `emit_beg/end` are per monitor. Set membership, each monitor's own
-     service interval, and per-monitor collect/emit cost are all
-     measurable from captures already in the tree, and the table above
-     was computed that way.
+   * **Answerable NOW, no code change — but LESS than first claimed.**
+     The child COUNT per pump (`pump_end`), each monitor's own service
+     interval (`absorb` carries frame id + monitor) and per-monitor
+     collect/emit cost are all measurable from captures already in the
+     tree, and the table above was computed that way.
+     **WHICH monitors were in a given pump is NOT.** An attempt on
+     2026-08-07 to attribute pumps to monitors by accumulating `absorb`
+     records between `pump_beg` and `pump_end` produced self-
+     contradictory rows — sets of one monitor with four children armed —
+     because the pump records carry no frame or monitor identity and the
+     pairing therefore falls back on a time window. That is the
+     pair-by-identity-never-by-time-window trap, and the numbers it
+     produced are discarded rather than reported. So the per-monitor
+     attribution needs a field too, and the "hard wall" question below
+     cannot be answered without one.
    * **GAP 1, and it is the load-bearing one: nothing records WHY a
      monitor missed a set** — no damage, no credit, or its slot still
      busy. Without it "the window caused the miss" is not falsifiable.
@@ -395,10 +403,31 @@ At m≥2, two issues on top of the m=1 serializer:
      it can, whether the two monitors' encodes genuinely overlap INSIDE
      the pump or serialise within ffmpeg is unknown. Fix: one spare
      field on both records — they already carry six ints and use three.
-   * Only after both gaps: decide whether the fix is admission policy
+   * Only after the gaps: decide whether the fix is admission policy
      (get both monitors into every pump) or something else. Do not
      reach for the window again — raising it improved batching from
      ~40 % to ~52 % and still left the wait where it was.
+
+   **STOP RULE (owner, 2026-08-07). This item is bounded work, not an
+   optimisation campaign.** Land the trace fields, take ONE two-monitor
+   leg with them, and then WRITE DOWN WHAT IS FOUND AND STOP — including,
+   and especially, if what is found is a hard wall we do not own (the
+   encoder or GPU saturating at two 4K-class screens, ffmpeg's own
+   serialisation, a driver limit). A documented wall is a complete
+   result for this item. The reason for the rule: #91 is a quality
+   question about a configuration the shipped claim does not cover
+   (everything upstream is stated as one-monitor), while #93 (the
+   reference box) and #92 (4:2:0 in motion) are on the path to what the
+   PR actually sells. Do not trade those for chasing a multi-monitor
+   number.
+
+   Suggestive but NOT established, and it is what the leg would settle:
+   four children cost ~19.9 ms against ~12.2 ms for two, i.e. 1.63x the
+   time for twice the children. A throughput-saturated encoder would
+   cost about 2x. That hints at headroom rather than a wall — but the
+   two pump sizes may not carry the same pixels (the two monitors are
+   3.69 and 9.22 Mpx) and today's records cannot say which, so it is a
+   hint and nothing more.
 
 2. **The ack window is global while the budget is per-monitor.** At
    m=2 the global fif=2 window admits ~1 outstanding per monitor and
