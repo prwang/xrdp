@@ -191,6 +191,9 @@ declare -A ARM_XORG_DEB=(
     # x028: frontier at wire_window 4 -- the leg that decides whether the
     # session-wide window is what limits a monitor at M = 2 (owner,
     # 2026-08-07). Same image and payload as x022; one config line apart.
+    # x029 (#91): the three attribution fields. Shipped defaults, two
+    # monitors, strip payload -- the arm the two approved legs run on.
+    [x029]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x028]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x027]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x026]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -265,6 +268,7 @@ declare -A ARM_TAG=(
     [x025]=1d5bc0960db8.xx10fa3aa-tf
     [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
     [x028]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
+    [x029]=1fed64c16a89.xx10fa3aa-tf.pc0097388
     [x027]=821218e54c24.xx10fa3aa-xfce.pc0097388
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
@@ -328,6 +332,7 @@ declare -A TAG_DEB=(
     # x027 (the interactive arm): built from HEAD on 2026-08-07, so it
     # carries the SHIPPED defaults -- the credit frontier on by default
     # at wire_window 2, and no emit thread in the binary at all.
+    [1fed64c16a89.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260807211642.1fed64c16a89_amd64.deb"
     [821218e54c24.xx10fa3aa]="xrdp-dev_0.10.80+git20260807153324.821218e54c24_amd64.deb"
 )
 

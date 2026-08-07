@@ -1,0 +1,65 @@
+target=pod server=xrdp-x029-6647f74bb5-5mkfc arm=x029 port=40045 mode=oracle user=probe444 secs=20 out=captures/i91_attribution_m2_20260807_211825_s20/leg_A
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 2 monitors (2560x1440_60 at 0x0, 3840x2400R at 2560x0)
+log marks: session-xorg 1251 lines, xrdp.log 80 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+./e_gate_run.sh: line 543: 1712464 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 2028674024 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 1087 lines, mark was 1251); taking it whole
+perf_trace_lines: 11302 records rendered, 35420 stage brackets left in the ring file, 13991 outside the run window
+trace span: 19s for a 20s run
+=== #45 gate run: x029, oracle client, 20s ===
+image:    localhost/xrdp-bisect:1fed64c16a89.xx10fa3aa-tf.pc0097388
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260807211642.1fed64c16a89
+monitors: OK: 2 monitors (2560x1440_60 at 0x0, 3840x2400R at 2560x0)
+payload:  SESSION_KIND = textflood_strip
+refresh:  intra_refresh_frames = 240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 838 over 16.1 s
+send-to-send gap: mean 19.2 ms  p50 32 ms  p90 39 ms  p99 42 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1764 of 2097 session frames — inside this leg): mean 10.1 ms  p50 8.7 ms  p90 15.6 ms
+FR-BENCH-1 margin = pipeline mean 19.2 ms / producer mean 10.1 ms = 1.90x
+         PRODUCER-LIMITED at 1.90x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.90x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 838 damage records
+52.13 sends/s = 26.06 pairs/s per monitor (2 monitors)
+surface 0 own period: n=419 mean 38.5 ms  p50 38.0 ms
+surface 1 own period: n=419 mean 38.0 ms  p50 38.0 ms
+damage coverage: surface 0: 419  surface 1: 419
+         both monitors inked (worst imbalance 1.00x) — this is the two-monitor regime
+cycles: 420   kids_armed: 2:2 (0%)  4:418 (100%)
+
+E5 GATE: baseline 22.6 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 19.2 ms  ->  1.18x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    418 kids_armed=4
+      2 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x029
+image:  localhost/xrdp-bisect:1fed64c16a89.xx10fa3aa-tf.pc0097388
+gfx:    sha256:59466bb333099e17
+key:    localhost/xrdp-bisect:1fed64c16a89.xx10fa3aa-tf.pc0097388|59466bb333099e17
+when:   2026-08-07T21:17:54Z
+window: 3s at 1920x1080, 288886788 bytes
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x029.cert
+producer stamps archived: captures/i91_attribution_m2_20260807_211825_s20/leg_A/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: captures/i91_attribution_m2_20260807_211825_s20/leg_A

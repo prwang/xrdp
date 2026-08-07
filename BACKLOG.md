@@ -63,7 +63,7 @@ stay as "(was #NN)" in each header.
 4. ~~**#87** — emit-split and eager-ack ratios~~ **CLOSED 2026-08-06**
 5. **#88** (was #61g) — oracle client 50–150 ms pauses
 6. **#90** (was #74) — lever-2 architecture decision
-7. **#91** (was #71) — multimon per-monitor ack window + m≥2 serial cost
+7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-07**: the screens are armed together and encode one after the other; the wall is below us
 8. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest (consolidated 2026-08-06)
 9. **#93** (was #73; absorbs #97/was #60) — T4 re-establishment and re-runs
 10. **#94** (was #53) — arm a monitor only when its pixels changed
@@ -308,157 +308,49 @@ projected, not measured (#91 owns those numbers). The old "do #61f
 step 1 first" constraint is retired — #61f's measurement showed the
 delivery-loop delay IS the encode in progress, not scheduling slack.
 
-## #91 (was #71, earlier #65) — multimon: per-monitor ack window + the m≥2 serial cost
+## #91 (was #71, earlier #65) — multimon: CLOSED 2026-08-07, the wall is below us
 
-At m≥2, two issues on top of the m=1 serializer:
+**Answered and stopped, per the stop rule.** Three attribution fields
+landed (`1fed64c1`), two 20 s legs ran at two monitors on the shipped
+defaults, and the result is a wall in a component we do not own:
 
--1. **MEASURED 2026-08-07: scaling the window by monitor count does NOT
-   fix it, so the "scale by M" option is NOT taken.** Owner asked for
-   the leg and made the fix conditional on it zeroing the stall. It does
-   not. At two monitors, one config line apart, four interleaved legs:
-   `wire_window` 2 -> 4 moves cycles stalled over 10 ms from 14.9 % to
-   8.4 %, but the MEDIAN wait is 4.886 -> 4.546 ms against a
-   one-monitor reference of 0.015 ms, and frame period p50 is flat. It
-   moved cycles out of the sub-0.1 ms bucket (25 % -> 12 %) into the
-   1-10 ms band (57 % -> 77 %) — long waits got rarer, waits did not go
-   away. The bound rose to 7-8 as `C + 2*M` predicts, which the
-   pre-registered prediction had already excluded as proving nothing.
-   **So the session-wide window is at most a minor part of the
-   two-monitor residual.** Capture
-   `i91_window4_m2_20260807_201346_s20`.
-   **THE MECHANISM, now measured from the SAME captures 2026-08-07 —
-   and "one worker serialises both screens" was the wrong phrasing.**
-   The encoder arms one poll set over the whole set of children, so at
-   M = 2 both monitors CAN encode concurrently — four children in one
-   pump. The measured question is whether they do. Fraction of cycles
-   that armed all four (`kids_armed` on the `pump_end` record):
+* **A screen that misses a pump is not held back by our flow control** —
+  157 of 158 absences had the credit already permitting it. (Read with
+  the field's bias: the credit is sampled after the producer decided, so
+  this direction is the one the bias favours; finding 2 is what makes it
+  safe to act on.)
+* **When both screens ARE in one pump, their encodes do not overlap** —
+  in **874 of 874** both-screen pumps one screen's children all produced
+  first output before the other's began. The poll set arms four children
+  together and the encode stack still runs them one screen at a time.
+* **It is not a throughput ceiling.** A both-screen pump is the MOST
+  pixel-efficient composition (2.03 ms/Mpx against 2.43 and 3.56 for
+  single-screen pumps), so capacity is not exhausted; the work simply is
+  not concurrent.
 
-   | condition | both monitors in one pump |
-   |---|---|
-   | legacy path | 32.5 % |
-   | frontier, wire_window 2 | 39.6 / 39.8 / 41.1 % |
-   | frontier, wire_window 4 | 52.0 / 53.1 % |
+Record and limits: capture
+`i91_attribution_m2_20260807_211825_s20`. Analysis of why the window
+divides by monitor count:
+`docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.
 
-   Monotone in the credit, and it is the cost that matters: a pump
-   covering BOTH monitors takes ~19.9 ms against ~12.2 ms for one, so a
-   second monitor joining an existing pump costs ~7.7 ms marginal
-   whereas missing it costs that monitor a whole further ~12.2 ms
-   cycle. Each monitor is served every ~22 ms (p50) with a p90 of
-   36-46 ms. So the two-monitor residual is about **SET MEMBERSHIP** —
-   how often a monitor misses the pump — not about assembly and not
-   about a worker that cannot do two things at once.
-0. **WHY they disagree — analysed statically 2026-08-07, record
-   `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.**
-   A frame id is ONE MONITOR's frame, not a refresh: the producer's
-   `rect_id` is a scalar incremented once per send, and a send is one
-   monitor's capture (`rdpClientCon.c:3621`, and the driver's own
-   comment at `rdpClientCon.h:120`). The window is denominated in those
-   ids and is session-wide, so at M monitors each screen gets ⌊C/M⌋..
-   ⌈C/M⌉ ids. The capture slots are per monitor and do not divide. The
-   ack that carries the credit has NO monitor field (`xup/xup.c:1257`)
-   while the paint direction does (`rdpClientCon.c:3688`).
-   **Provenance is the asymmetry's cause:** the per-monitor budget was
-   decided on measurement (D13, 1079/1079 sends stuck in one slot); the
-   global window was inherited from a 2017 client capability whose
-   tether the GFX path then cut, and monitor count was never considered.
-   **NOT settled: which term binds at M>=2.** Two models disagree
-   (`client + C` versus `server + 1`), the emission record cannot
-   attribute it, and ONE leg settles it — `wire_window = 4` at two
-   monitors, which is also numerically the "scale C by M" fix. One arm,
-   config only, ~10 min. Also found: the man page never states the
-   window is session-wide, and its frame-rate guidance silently assumes
-   one monitor.
-1. **THE PLAN, REWRITTEN 2026-08-07 — the old one asked a stale
-   question.** This item's second half used to read "re-decompose: how
-   much was the ack pacing, how much is step 7's whole-set drain, how
-   much is genuinely serial assembly". That framing predates the set
-   pump and names assembly as a candidate; assembly has since been
-   measured at 0.23-0.33 ms per frame, which cannot explain
-   milliseconds. Replace it with the set-membership decomposition
-   above, and note what the trace can and cannot answer today:
+**What was decided along the way and stays decided:** the window is NOT
+scaled by monitor count (measured — it moved batching from ~40 % to
+~52 % and left the typical wait unchanged), and the per-screen
+consequence is documented in `gfx.toml(5)` instead.
 
-   * **Answerable NOW, no code change — but LESS than first claimed.**
-     The child COUNT per pump (`pump_end`), each monitor's own service
-     interval (`absorb` carries frame id + monitor) and per-monitor
-     collect/emit cost are all measurable from captures already in the
-     tree, and the table above was computed that way.
-     **WHICH monitors were in a given pump is NOT.** An attempt on
-     2026-08-07 to attribute pumps to monitors by accumulating `absorb`
-     records between `pump_beg` and `pump_end` produced self-
-     contradictory rows — sets of one monitor with four children armed —
-     because the pump records carry no frame or monitor identity and the
-     pairing therefore falls back on a time window. That is the
-     pair-by-identity-never-by-time-window trap, and the numbers it
-     produced are discarded rather than reported. So the per-monitor
-     attribution needs a field too, and the "hard wall" question below
-     cannot be answered without one.
-   * **GAP 1, and it is the load-bearing one: nothing records WHY a
-     monitor missed a set** — no damage, no credit, or its slot still
-     busy. Without it "the window caused the miss" is not falsifiable.
-     Fix: one field on the existing damage or absorb record naming the
-     reason admission was declined. No new mechanism (coding rule 5).
-   * **GAP 2: `outfirst`/`feedend` carry no monitor index**, only a
-     sequence number and a main/aux flag, so a four-child pump cannot
-     be split into "this monitor's children" versus "that one's". Until
-     it can, whether the two monitors' encodes genuinely overlap INSIDE
-     the pump or serialise within ffmpeg is unknown. Fix: one spare
-     field on both records — they already carry six ints and use three.
-   * **BOTH GAPS CLOSED IN CODE 2026-08-07 (owner-approved), not yet
-     exercised on a leg.** Three fields, all on records that already
-     existed, all silent unless `XRDP_PERF_TRACE` is set: `pump_beg`/
-     `pump_end` gained a bitmask of the monitors actually in the poll
-     set (built from the same array the pump is handed) plus a second
-     bitmask of the monitors xrdp's own credit would have permitted to
-     capture, and the credit value itself; `outfirst`/`feedend` gained
-     the monitor index, plumbed onto the encoder handle at creation.
-     CI pins the credit predicate against the producer's own contract
-     (`tests/xrdp/test_avc444_credit_frontier.c`, 3 new tests).
-     **What GAP 1 did NOT get, and the leg must not over-claim it:**
-     absent-and-not-permitted is credit-limited, but absent-and-
-     permitted merges "no damage" with "its capture slot was still
-     busy" and cannot separate them — the reason lives in xorgxrdp,
-     which has no perf ring at all.
-   * Only after the gaps: decide whether the fix is admission policy
-     (get both monitors into every pump) or something else. Do not
-     reach for the window again — raising it improved batching from
-     ~40 % to ~52 % and still left the wait where it was.
+**REOPEN ONLY DELIBERATELY, and only for these two questions.** They are
+work against a component we do not own and must not be drifted into:
+1. Is the serialisation in the encode stack, or in our worker draining
+   one child before looking at the next? The feed instants are now
+   recorded per monitor too, so comparing them against the output
+   instants settles it — one analysis, no new run needed, on the capture
+   above.
+2. If it really is the driver or GPU: whether separate encoder processes
+   per monitor would overlap. That is a design change with its own cost.
 
-   **STOP RULE (owner, 2026-08-07). This item is bounded work, not an
-   optimisation campaign.** Land the trace fields, take ONE two-monitor
-   leg with them, and then WRITE DOWN WHAT IS FOUND AND STOP — including,
-   and especially, if what is found is a hard wall we do not own (the
-   encoder or GPU saturating at two 4K-class screens, ffmpeg's own
-   serialisation, a driver limit). A documented wall is a complete
-   result for this item. The reason for the rule: #91 is a quality
-   question about a configuration the shipped claim does not cover
-   (everything upstream is stated as one-monitor), while #93 (the
-   reference box) and #92 (4:2:0 in motion) are on the path to what the
-   PR actually sells. Do not trade those for chasing a multi-monitor
-   number.
-
-   Suggestive but NOT established, and it is what the leg would settle:
-   four children cost ~19.9 ms against ~12.2 ms for two, i.e. 1.63x the
-   time for twice the children. A throughput-saturated encoder would
-   cost about 2x. That hints at headroom rather than a wall — but the
-   two pump sizes may not carry the same pixels (the two monitors are
-   3.69 and 9.22 Mpx) and today's records cannot say which, so it is a
-   hint and nothing more.
-
-2. **The ack window is global while the budget is per-monitor.** At
-   m=2 the global fif=2 window admits ~1 outstanding per monitor and
-   halves the intended depth. The PRD forbids widening the global pool
-   (bufferbloat, measured); the spec shape is ≤2 PER MONITOR. Pinned in
-   CI: `test_overlap_m2_global_window_pins_each_monitor_to_one` flips
-   on the fix. Interacts with #80's per-monitor caution: the wire
-   bound at M monitors must be re-derived from measurement.
-2. **The m≥2 serial cost is real and unexplained by overlap alone**
-   (173.7 ms period, 132.1 ms inside our pipeline at 1.33 of 4 cores,
-   T4-era numbers). After the fix, re-decompose: ack pacing vs
-   whole-set drain vs genuinely serial assembly.
-
-Acceptance: per-monitor window (never a pool), CI updated deliberately,
-fleet-arm decomposition showing per-monitor depth 2 at m=2, negative
-arm gaps on both monitors.
+**Still true and unmeasured:** the per-monitor slot budget's
+independence (the original first half of this item) was never
+decomposed, and nothing here speaks to three or more monitors.
 
 ## #92 (was #72, earlier #66/#63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (CONSOLIDATED 2026-08-06)
 
