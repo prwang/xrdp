@@ -130,6 +130,53 @@ xrdp_gfx_credit_frontier(int frame_id_consumed, int frame_id_server,
 }
 
 /**
+ * BACKLOG #91 -- would the credit xrdp last granted leave this monitor a
+ * free capture slot?
+ *
+ * This is xrdp's side of the producer's admission test, restated from
+ * the CONTRACT rather than from the producer's code. xorgxrdp keeps
+ * XUP_CAP_AVC444_SLOT_COUNT slots PER MONITOR (mirrored here as
+ * XRDP_GFX_CAPTURE_SLOTS) and admits a capture for monitor m when fewer
+ * than that many of m's already-sent frame ids are still unacked
+ * (common/xup_client_info.h, xup_cap_budget_has_capacity). The ack is
+ * CUMULATIVE, so "still unacked" is simply "id greater than the credit"
+ * -- no per-id matching is needed, which is the same reasoning that
+ * lets the producer keep a ring only SLOT_COUNT deep.
+ *
+ * WHAT THIS CAN AND CANNOT CONCLUDE. A "no" here is a positive finding:
+ * xrdp's own flow control is what is holding the monitor back. A "yes"
+ * is only the ABSENCE of an xrdp-side reason -- it does not say the
+ * producer captured, and it cannot say why the producer did not. See
+ * the decomposition written out at the pump record in
+ * xrdp_encoder.c (gfx_batch_run_set).
+ *
+ * @param ids    the monitor's most recently sent frame ids, at most
+ *               XRDP_GFX_CAPTURE_SLOTS of them, in any order. An entry
+ *               below 1 means "no such frame was sent" (the producer
+ *               counts frame ids up from 1).
+ * @param n_ids  how many entries ids[] holds
+ * @param credit the credit frontier xrdp most recently granted, i.e.
+ *               the highest value it has passed to mod_frame_ack
+ * @return != 0 if that credit leaves the monitor a free capture slot
+ */
+static inline int
+xrdp_gfx_credit_permits_capture(const int *ids, int n_ids, int credit)
+{
+    int outstanding;
+    int index;
+
+    outstanding = 0;
+    for (index = 0; index < n_ids; index++)
+    {
+        if (ids[index] > 0 && ids[index] > credit)
+        {
+            outstanding++;
+        }
+    }
+    return outstanding < XRDP_GFX_CAPTURE_SLOTS;
+}
+
+/**
  * BACKLOG #80 -- the ordinary, region-disposing ack's target.
  *
  * That ack says "every region up to N is disposed of; forget the pixels
@@ -375,6 +422,17 @@ struct xrdp_encoder
      * XRDP_H264_LTR_FRAME_NUM_REKEY (2^16-512) and the 2^16-8 hard
      * stop. Worker-only. */
     int avc444_teardown_req[16];
+    /* BACKLOG #91 -- DIAGNOSTIC ONLY, and written ONLY while the perf
+     * trace is armed (perf_trace_on()). Per monitor, the frame ids of
+     * that monitor's last XRDP_GFX_CAPTURE_SLOTS captures, newest at
+     * [0]; 0 means "no such frame". This is the one per-monitor fact
+     * the pump record needs that no existing field carries: the credit
+     * frontier itself is one session-wide number, but the producer's
+     * capture budget is per monitor, so answering "would the credit
+     * have let monitor m capture again" needs m's own outstanding ids.
+     * Fed from the frame id in each set item's STARTFRAME, which is the
+     * same id the producer's own budget is keyed on. Worker-only. */
+    int avc444_mon_frame_id[16][XRDP_GFX_CAPTURE_SLOTS];
     /* tail-flush (OPT-IN last resort, gfx.toml tail_flush; default off): a deep
      * encoder pipeline (e.g. -async_depth > 1) withholds the last frame of an
      * idle-bounded burst until the next input. The root-cause fix is a shallow
@@ -581,6 +639,16 @@ xrdp_ack_trace_on(void);
  * anyway because the blob arrives verbatim off the xup socket. */
 int
 gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes);
+
+/* BACKLOG #91 -- the "would the credit have permitted it" bitmask that
+ * rides on the pump record: bit m set = the credit xrdp last granted
+ * left monitor m a free capture slot, per
+ * xrdp_gfx_credit_permits_capture() above. A monitor xrdp has never
+ * received a frame for gets no bit. Not static so the mask's SEMANTICS
+ * -- bit positions, the unknown-monitor rule -- are pinned by CI rather
+ * than by a live two-monitor run. */
+int
+gfx_batch_credit_mask(const struct xrdp_encoder *self, int credit);
 
 struct xrdp_egfx_rect;
 struct stream;

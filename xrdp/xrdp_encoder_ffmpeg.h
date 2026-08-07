@@ -151,6 +151,22 @@ struct xrdp_ffmpeg_avc444_config
     /* [avc444_ffmpeg] dump_extra), verified */
     /* -- never changed -- by the probe      */
     /* (PRD FR-PROBE-6).                     */
+    int monitor_index;              /* RUNNER-INTERNAL (BACKLOG #91): the   */
+    /* monitor this encoder pair belongs to,  */
+    /* purely so the per-child perf-trace     */
+    /* records can name it. Set by the caller */
+    /* that owns the per-monitor handle array */
+    /* (xrdp_encoder.c) right before create;  */
+    /* NOT session policy, so                 */
+    /* xrdp_avc444_cfg_from_encoder() leaves  */
+    /* it at the default. It lives in the     */
+    /* CONFIG, not on the handle, because     */
+    /* spawn_second_child() copies the config */
+    /* to build the aux child -- which makes  */
+    /* the leaf inherit its parent's monitor  */
+    /* by construction, with no second        */
+    /* assignment anyone can forget. -1 means */
+    /* "not set" (probes, unit tests).        */
     int desktop_fps;                /* coded rate is 2x this               */
     int stream_ready_timeout_ms;
     int picture_timeout_ms;

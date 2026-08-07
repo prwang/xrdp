@@ -238,6 +238,9 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
                                * [avc444_ffmpeg] dump_extra); verified --
                                * never changed -- by the probe
                                * (PRD FR-PROBE-6) */
+    /* BACKLOG #91: "not set". Only the owner of the per-monitor handle
+     * array knows the real index; a probe or a unit test has none. */
+    cfg->monitor_index = -1;
     cfg->desktop_fps = 60;
     cfg->stream_ready_timeout_ms = 2000;
     cfg->picture_timeout_ms = 2000;
@@ -740,8 +743,12 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
              * has finished encoding and started writing the picture
              * (input is consumed strictly before output exists) */
             self->trace_out_seen = 1;
+            /* BACKLOG #91: d = the monitor this child belongs to, so a
+             * four-child pump can be split by screen. -1 when the
+             * creator did not set one (probes, unit tests). */
             PERF_TRACE6("outfirst", trace_seq_front(self),
-                        self->leaf == NULL, n, 0, 0, 0);
+                        self->leaf == NULL, n, self->cfg.monitor_index,
+                        0, 0);
         }
         if (xrdp_nut_feed(self->nut, (unsigned char *)tmp, n) != 0)
         {
@@ -839,8 +846,11 @@ feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
                  * The child may still hold up to one pipe window
                  * unread; FEED here means "input no longer paces the
                  * worker", not "child copied the last byte". */
+                /* BACKLOG #91: d = the monitor, in the SAME field as
+                 * outfirst's, so one reader rule covers both */
                 PERF_TRACE6("feedend", trace_seq_front(self),
-                            self->leaf == NULL, 0, 0, 0, 0);
+                            self->leaf == NULL, 0,
+                            self->cfg.monitor_index, 0, 0);
             }
         }
         return 0;

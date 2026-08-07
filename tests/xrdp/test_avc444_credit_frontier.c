@@ -52,6 +52,7 @@
 #include <string.h>
 #include "arch.h"
 #include "xrdp_encoder.h"
+#include "xup_client_info.h"
 #include "test_xrdp.h"
 
 /*
@@ -913,6 +914,231 @@ START_TEST(test_credit_frontier_frozen_client_halts_at_client_plus_c)
 END_TEST
 
 /****************************************************************************/
+/*
+ * BACKLOG #91 -- the per-monitor "would the credit have permitted this
+ * screen to capture" predicate that the pump trace record carries.
+ *
+ * WHERE THESE EXPECTED VALUES COME FROM. Not from the helper. The rule
+ * is written down in common/xup_client_info.h, the contract header
+ * xrdp and xorgxrdp compile VERBATIM from the same text, and it says
+ * two things:
+ *
+ *   (1) the capture budget is XUP_CAP_AVC444_SLOT_COUNT outstanding
+ *       frames PER MONITOR -- "m INDEPENDENT caps ... never a global
+ *       pool";
+ *   (2) the ack is CUMULATIVE, so retiring is "drop every entry the ack
+ *       covers", never a per-id match.
+ *
+ * Every expected value below is (1) and (2) applied by hand to a
+ * scenario. The frame ids are the producer's rect_ids, which count up
+ * from 1 GLOBALLY -- one counter shared by all monitors -- so two
+ * screens interleave their ids, and that is exactly what makes a single
+ * cumulative credit able to permit one screen and refuse the other.
+ */
+START_TEST(test_credit_permits_capture_from_the_producers_contract)
+{
+    int ids[MODEL_SLOTS];
+
+    /* the contract this test is written against is a TWO slot budget;
+     * if that number ever changes, these hand-derived cases are about a
+     * different machine and must be re-derived, not adjusted */
+    ck_assert_int_eq(MODEL_SLOTS, 2);
+
+    /* Nothing has ever been sent for this monitor. xup_cap_budget_reset
+     * leaves count 0, so the monitor has both its slots. Ids below 1
+     * are the "no such frame" sentinel: the producer's rect_id counts
+     * up FROM 1, so 0 can never be a real capture. */
+    ids[0] = 0;
+    ids[1] = 0;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 0), 1);
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 9), 1);
+
+    /* ONE frame out and unacked. Two slots means one outstanding frame
+     * still leaves room -- this is the whole point of FR-CAPTURE-8's
+     * two-deep budget, and a predicate that said "no" here would pin
+     * the producer to one frame in flight. */
+    ids[0] = 7;
+    ids[1] = 0;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 6), 1);
+
+    /* BOTH slots out and unacked: the monitor is at cap. This is the
+     * only shape that yields "credit-limited" on the trace. */
+    ids[0] = 8;
+    ids[1] = 7;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 6), 0);
+
+    /* the ack is CUMULATIVE: a credit of exactly 7 covers id 7, so one
+     * slot comes back and the monitor may capture again. The boundary
+     * is "at or below", not "below". */
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 7), 1);
+
+    /* a credit above both retires both */
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 8), 1);
+
+    /* the predicate counts, so the order the ids are stored in cannot
+     * matter -- the trace's ring is newest-first, the producer's is
+     * oldest-first, and both must answer the same */
+    ids[0] = 7;
+    ids[1] = 8;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 6), 0);
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 7), 1);
+
+    /* a monitor with only ONE id on record is one outstanding frame at
+     * most, whatever the second slot would have held */
+    ids[0] = 9;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, 1, 0), 1);
+
+    /* TWO SCREENS, ONE CUMULATIVE CREDIT -- the case the whole field
+     * exists for. Global rect_ids 3,5 went to the top screen and 4,6 to
+     * the bottom one. A credit of 3 has retired the top screen's older
+     * frame and NEITHER of the bottom screen's, so the same credit
+     * permits the top screen and refuses the bottom one. */
+    ids[0] = 5;
+    ids[1] = 3;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 3), 1);
+    ids[0] = 6;
+    ids[1] = 4;
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 3), 0);
+    /* one more ack and the bottom screen is released too */
+    ck_assert_int_eq(xrdp_gfx_credit_permits_capture(ids, MODEL_SLOTS, 4), 1);
+}
+END_TEST
+
+/****************************************************************************/
+/*
+ * The same predicate, checked against the PRODUCER'S OWN implementation
+ * of the rule rather than against a table.
+ *
+ * xup_cap_budget_has_capacity() is a different algorithm -- a ring that
+ * is compacted in place by the ack, then a count against the cap --
+ * living in the contract header both processes compile. Agreeing with
+ * it over an enumeration is what says the trace's answer is the
+ * producer's answer, not a plausible restatement of it.
+ */
+static void
+model_replay_sends(struct xup_cap_budget *budget, int (*ids)[MODEL_SLOTS],
+                   int n_mon, int n_sends)
+{
+    int send;
+    int mon;
+    int slot;
+    int rect_id;
+
+    xup_cap_budget_reset(budget);
+    memset(ids, 0, sizeof(ids[0]) * n_mon);
+    for (send = 0; send < n_sends; send++)
+    {
+        /* one GLOBAL rect_id counter, handed out in monitor rotation --
+         * rdpDeferredUpdateCallback's scan order */
+        mon = send % n_mon;
+        rect_id = send + 1;
+        /* the producer's ring, driven exactly as the producer drives it;
+         * ack 0 during the replay so nothing retires early */
+        xup_cap_budget_record_send(budget, mon, rect_id, 0, MODEL_SLOTS);
+        /* the trace's ring: newest first */
+        for (slot = MODEL_SLOTS - 1; slot > 0; slot--)
+        {
+            ids[mon][slot] = ids[mon][slot - 1];
+        }
+        ids[mon][0] = rect_id;
+    }
+}
+
+START_TEST(test_credit_permits_capture_agrees_with_the_producer_budget)
+{
+    struct xup_cap_budget budget;
+    int ids[4][MODEL_SLOTS];
+    int n_mon;
+    int n_sends;
+    int credit;
+    int mon;
+    int expected;
+    int got;
+
+    for (n_mon = 1; n_mon <= 4; n_mon++)
+    {
+        for (n_sends = 0; n_sends <= 12; n_sends++)
+        {
+            for (credit = 0; credit <= 14; credit++)
+            {
+                /* has_capacity() RETIRES as it answers, so the ring is
+                 * rebuilt for every question rather than carried */
+                model_replay_sends(&budget, ids, n_mon, n_sends);
+                for (mon = 0; mon < n_mon; mon++)
+                {
+                    expected = xup_cap_budget_has_capacity(&budget, mon,
+                                                           credit,
+                                                           MODEL_SLOTS);
+                    got = xrdp_gfx_credit_permits_capture(ids[mon],
+                                                          MODEL_SLOTS,
+                                                          credit);
+                    ck_assert_int_eq(got != 0, expected != 0);
+                }
+            }
+        }
+    }
+}
+END_TEST
+
+/****************************************************************************/
+/*
+ * BACKLOG #91 -- the MASK the pump record actually carries.
+ *
+ * The parent analysis reads bit m of this word as "monitor m", so the
+ * bit positions and the unknown-monitor rule are the contract, and they
+ * are pinned here rather than by reading a live capture.
+ */
+START_TEST(test_credit_mask_names_the_permitted_monitors)
+{
+    struct xrdp_encoder enc;
+    int mask;
+
+    memset(&enc, 0, sizeof(enc));
+
+    /* No frame has ever arrived for any monitor. A zeroed history is
+     * "unknown", NOT "idle and permitted": claiming a bit for a monitor
+     * that may not even exist would invent a credit-limited/not
+     * decomposition for fifteen screens nobody has. */
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 0), 0);
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 1000), 0);
+
+    /* Two screens, the interleaved global rect_ids of the hand-derived
+     * case above: top screen (monitor 0) holds 3 and 5, bottom screen
+     * (monitor 1) holds 4 and 6, newest first. */
+    enc.avc444_mon_frame_id[0][0] = 5;
+    enc.avc444_mon_frame_id[0][1] = 3;
+    enc.avc444_mon_frame_id[1][0] = 6;
+    enc.avc444_mon_frame_id[1][1] = 4;
+
+    /* credit 2 retires nothing: both screens are at cap */
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 2), 0);
+    /* credit 3 retires the top screen's older frame only -> bit 0 */
+    mask = gfx_batch_credit_mask(&enc, 3);
+    ck_assert_int_eq(mask, 1 << 0);
+    /* credit 4 retires the bottom screen's older frame too -> both */
+    mask = gfx_batch_credit_mask(&enc, 4);
+    ck_assert_int_eq(mask, (1 << 0) | (1 << 1));
+
+    /* a third screen that has never been seen still contributes no bit,
+     * even while its neighbours are permitted */
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 99),
+                     (1 << 0) | (1 << 1));
+
+    /* the highest monitor index the array can hold lands on the highest
+     * bit the reader will look at -- an off-by-one here would silently
+     * relabel every screen in the analysis */
+    memset(&enc, 0, sizeof(enc));
+    enc.avc444_mon_frame_id[15][0] = 1;
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 1), 1 << 15);
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 0), 1 << 15);
+    /* ... and with both slots of monitor 15 outstanding, no bit */
+    enc.avc444_mon_frame_id[15][0] = 2;
+    enc.avc444_mon_frame_id[15][1] = 1;
+    ck_assert_int_eq(gfx_batch_credit_mask(&enc, 0), 0);
+}
+END_TEST
+
+/****************************************************************************/
 Suite *
 make_suite_avc444_credit_frontier(void)
 {
@@ -935,6 +1161,10 @@ make_suite_avc444_credit_frontier(void)
     tcase_add_test(tc, test_wedge_replay_d40_c1);
     tcase_add_test(tc,
                    test_credit_frontier_frozen_client_halts_at_client_plus_c);
+    tcase_add_test(tc, test_credit_permits_capture_from_the_producers_contract);
+    tcase_add_test(tc,
+                   test_credit_permits_capture_agrees_with_the_producer_budget);
+    tcase_add_test(tc, test_credit_mask_names_the_permitted_monitors);
 
     return s;
 }

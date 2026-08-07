@@ -1630,6 +1630,9 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         cfg.fault_strip_mmco = self->avc444_fault_strip_mmco;
         g_strncpy(cfg.path, self->avc444_path, sizeof(cfg.path) - 1);
         cfg.encoder_args = self->avc444_encoder_args;
+        /* BACKLOG #91: name the monitor on the handle so its children's
+         * trace records can be split by screen */
+        cfg.monitor_index = mon_index;
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {
@@ -1843,6 +1846,10 @@ gfx_avc444_handle_for(struct xrdp_encoder *self, int mon_index,
     {
         struct xrdp_ffmpeg_avc444_config cfg;
         xrdp_avc444_cfg_from_encoder(self, &cfg);
+        /* BACKLOG #91: per-HANDLE, not session policy, so it is set here
+         * and not in xrdp_avc444_cfg_from_encoder(). The aux child
+         * inherits it when spawn_second_child() copies this config. */
+        cfg.monitor_index = mon_index;
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {
@@ -2483,6 +2490,101 @@ gfx_batch_publish(struct xrdp_encoder *self,
 }
 
 /*****************************************************************************/
+/* BACKLOG #91 -- remember the frame ids of this set's captures, per
+ * monitor, so the pump record can say whether xrdp's credit would have
+ * let an ABSENT monitor capture again.
+ *
+ * DIAGNOSTIC: called only while the perf trace is armed, so the shipped
+ * path neither walks the set again nor writes this state. The walk is
+ * over the SET (at most one item per monitor), not over the monitors,
+ * and each item costs one already-shape-checked STARTFRAME peek. */
+static void
+gfx_batch_note_frame_ids(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
+                         const int *set_mon, int set_n)
+{
+    int index;
+    int slot;
+    int mon;
+    int frame_id;
+
+    for (index = 0; index < set_n; index++)
+    {
+        mon = set_mon[index];
+        if (mon < 0 || mon >= CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+        {
+            continue; /* not the batchable shape; it carries no monitor */
+        }
+        frame_id = gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
+                                                set[index]->u.gfx.cmd_bytes);
+        if (frame_id < 1)
+        {
+            continue;
+        }
+        for (slot = XRDP_GFX_CAPTURE_SLOTS - 1; slot > 0; slot--)
+        {
+            self->avc444_mon_frame_id[mon][slot] =
+                self->avc444_mon_frame_id[mon][slot - 1];
+        }
+        self->avc444_mon_frame_id[mon][0] = frame_id;
+    }
+}
+
+/*****************************************************************************/
+/* BACKLOG #91 -- bit m set = the credit frontier xrdp most recently
+ * granted would have left monitor m a free capture slot.
+ *
+ * READ THE DECOMPOSITION THIS SUPPORTS BEFORE USING IT. Against the
+ * pump's own membership mask, a monitor is in exactly one of three
+ * states in a cycle:
+ *
+ *   present                  -- the monitor was encoded this cycle.
+ *   absent AND not permitted -- CREDIT-LIMITED. xrdp's own flow control
+ *                               held it: the producer had no unacked
+ *                               slot left for that monitor under the
+ *                               credit xrdp had granted.
+ *   absent AND permitted     -- NOT credit-limited. The reason is on the
+ *                               PRODUCER side: either the monitor had no
+ *                               damage, or its capture slot was still
+ *                               busy. THIS TRACE CANNOT DISTINGUISH
+ *                               THOSE TWO, and nothing in xrdp can:
+ *                               xorgxrdp has no perf ring anywhere in
+ *                               its module directory, so its own reason
+ *                               is not recorded on this timeline at all.
+ *                               Do not read "permitted" as "the producer
+ *                               chose not to capture".
+ *
+ * A monitor xrdp has never received a frame for gets no bit in either
+ * mask -- it is unknown, not permitted-and-idle.
+ *
+ * The loop IS over monitors, which the set walk cannot replace: the
+ * monitors this answers for are exactly the ones NOT in the set. It is
+ * bounded by the array (16), does XRDP_GFX_CAPTURE_SLOTS integer
+ * compares per monitor, and runs only while the trace is armed.
+ *
+ * Not static -- see xrdp_encoder.h. */
+int
+gfx_batch_credit_mask(const struct xrdp_encoder *self, int credit)
+{
+    int mask;
+    int mon;
+
+    mask = 0;
+    for (mon = 0; mon < CLIENT_MONITOR_DATA_MAXIMUM_MONITORS; mon++)
+    {
+        if (self->avc444_mon_frame_id[mon][0] < 1)
+        {
+            continue; /* xrdp has never seen a frame for this monitor */
+        }
+        if (xrdp_gfx_credit_permits_capture(self->avc444_mon_frame_id[mon],
+                                            XRDP_GFX_CAPTURE_SLOTS, credit))
+        {
+            mask |= 1 << mon;
+        }
+    }
+    return mask;
+}
+
+/*****************************************************************************/
 static void
 gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                   const int *set_mon, int set_n)
@@ -2506,6 +2608,20 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     int index;
     int mon;
     int st;
+    /* BACKLOG #91, on the pump record: bit m = monitor m's children are
+     * in this poll set. Accumulated in the submit pass from the very
+     * array the pump is handed, so the mask cannot disagree with what
+     * was armed. Free, and therefore unconditional -- the record it
+     * rides on is emitted whenever the perf trace is armed, so a field
+     * that were only filled in under a second knob would read as
+     * "no monitors" on a plain trace. */
+    int pump_mon_mask;
+    /* BACKLOG #91, on the pump record: the credit frontier xrdp most
+     * recently granted, and the per-monitor mask derived from it.
+     * -1/0 mean "not computed" -- reached only when the trace is
+     * disarmed, in which case no record is emitted anyway. */
+    int credit;
+    int credit_mask;
 
     g_memset(sub_seq, 0, sizeof(sub_seq));
     g_memset(sub_state, 0, sizeof(sub_state));
@@ -2536,6 +2652,16 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     n_handles = 0;
     kids_armed = 0;
     bad_handle = -1;
+    pump_mon_mask = 0;
+    credit = -1;
+    credit_mask = 0;
+    if (perf_trace_on())
+    {
+        /* the ids this cycle's captures carry, before anything can fail
+         * to submit: a frame the producer sent occupies its capture slot
+         * whether or not xrdp managed to encode it */
+        gfx_batch_note_frame_ids(self, set, set_mon, set_n);
+    }
     /* SUBMIT pass, in fifo order. The sequence counter is handed out HERE,
      * one value per armed monitor, in fifo (= xorgxrdp rotation) order --
      * the same order and the same single global counter as before this
@@ -2586,6 +2712,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         }
         handles[n_handles] = ff;
         handle_mon[n_handles] = mon;
+        pump_mon_mask |= 1 << mon;
         n_handles++;
     }
     PERF_TRACE("subm_end", n_handles, 0);
@@ -2596,10 +2723,29 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         return;
     }
     /* ONE pump over the whole set (D2/D10) */
-    PERF_TRACE("pump_beg", n_handles, 0);
+    if (perf_trace_on())
+    {
+        /* BACKLOG #91: the value the producer actually holds as its
+         * rect_id_ack -- the highest frame id xrdp has passed to
+         * mod_frame_ack, whatever produced it
+         * (xrdp_gfx_credit_frontier via xrdp_mm_emit_credit_frontier,
+         * or the legacy emission). Written by the MAIN thread and read
+         * here on the encoder worker without the mutex: it is one int,
+         * it is read for a trace field only, and a value one ack stale
+         * mis-states at most the cycle it was read in. */
+        credit = self->frame_id_server_sent;
+        credit_mask = gfx_batch_credit_mask(self, credit);
+    }
+    /* c = monitors in this poll set, d = monitors the granted credit
+     * would have permitted to capture, e = that credit. See
+     * gfx_batch_credit_mask() for what (c, d) together may and may not
+     * be read to mean. */
+    PERF_TRACE6("pump_beg", n_handles, 0, pump_mon_mask, credit_mask,
+                credit, 0);
     st = xrdp_ffmpeg_avc444_pump_pairs(handles, n_handles, &bad_handle,
                                        &kids_armed);
-    PERF_TRACE("pump_end", n_handles, kids_armed);
+    PERF_TRACE6("pump_end", n_handles, kids_armed, pump_mon_mask,
+                credit_mask, credit, 0);
     gfx_batch_publish(self, sub_seq, sub_state, sub_reset);
     /* #61e -- the cycle decomposition ran out of names here: the span
      * from pump_end to the first coll_beg was 2.4-2.8

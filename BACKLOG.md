@@ -403,6 +403,21 @@ At m≥2, two issues on top of the m=1 serializer:
      it can, whether the two monitors' encodes genuinely overlap INSIDE
      the pump or serialise within ffmpeg is unknown. Fix: one spare
      field on both records — they already carry six ints and use three.
+   * **BOTH GAPS CLOSED IN CODE 2026-08-07 (owner-approved), not yet
+     exercised on a leg.** Three fields, all on records that already
+     existed, all silent unless `XRDP_PERF_TRACE` is set: `pump_beg`/
+     `pump_end` gained a bitmask of the monitors actually in the poll
+     set (built from the same array the pump is handed) plus a second
+     bitmask of the monitors xrdp's own credit would have permitted to
+     capture, and the credit value itself; `outfirst`/`feedend` gained
+     the monitor index, plumbed onto the encoder handle at creation.
+     CI pins the credit predicate against the producer's own contract
+     (`tests/xrdp/test_avc444_credit_frontier.c`, 3 new tests).
+     **What GAP 1 did NOT get, and the leg must not over-claim it:**
+     absent-and-not-permitted is credit-limited, but absent-and-
+     permitted merges "no damage" with "its capture slot was still
+     busy" and cannot separate them — the reason lives in xorgxrdp,
+     which has no perf ring at all.
    * Only after the gaps: decide whether the fix is admission policy
      (get both monitors into every pump) or something else. Do not
      reach for the window again — raising it improved batching from
