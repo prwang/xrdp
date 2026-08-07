@@ -140,8 +140,15 @@ MECHANISM and its BOUND, nothing more. Consequences:
     handed two ambiguous options for a breaking change to 2017-2018 era
     code). The closed form ceil(RTT/period)+1 stays operator guidance to
     validate per deployment, never a certified table.
-* **PRD FR-FLOW-1 clause 4 ("default chosen with #81's data") needs a
-  matching amendment — owner sign-off required, not yet applied.**
+* **PRD FR-FLOW-1 clause 4: AMENDED 2026-08-07 (owner).** The
+  simulation-chooses-the-default requirement is withdrawn, and the
+  clause's two contradictory formulas are resolved to the measured one,
+  `C + 2·M`. The default stays C = 2, unscaled by monitor count, with
+  the per-screen consequence documented in `gfx.toml(5)` instead —
+  option 3 of the four laid out in
+  `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`,
+  chosen after the window-4 leg showed a multiplier would not fix the
+  two-monitor stall.
 * Dropped with the rescope: "enough RTT points to choose the default",
   and the old-build-under-netem A/B (it would measure TCP as much as
   the frontier — quality gate 5).

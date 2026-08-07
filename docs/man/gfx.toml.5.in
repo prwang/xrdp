@@ -301,22 +301,76 @@ stops capturing new ones. Default: \fB2\fR. Accepted range is \fB1\fR to
 kept. Applies only when \fBeager_slot_ack\fR is enabled; the legacy path is
 unaffected.
 
-Precisely: at the instant a frame is handed to the transport, at most
-\fBwire_window\fR + 2 frames per monitor are unacknowledged by the client.
-The extra two are the capture slots the X server is allowed to fill ahead of
-the acknowledgement it is waiting on.
+.SS What it counts, and why that matters with more than one monitor
+Read this part before setting the value on a multi\(hymonitor session; the
+number does not mean what it appears to mean there.
 
+A "frame" here is \fBone monitor's frame, not one refresh of the desktop\fR.
+The server numbers each captured image with a single counter that advances
+once per monitor, so a desktop spanning M monitors consumes M of these
+numbers every time it refreshes.
+
+\fBwire_window\fR is counted in those numbers and is a single value for the
+whole session \(em it is not per monitor. The capture slots underneath it
+\fIare\fR per monitor. So at the instant a frame is handed to the transport,
+the number of frames the client has not yet acknowledged is at most
+
+.RS
+.nf
+wire_window + 2 x (number of monitors)
+.fi
+.RE
+
+\(em with the default and two monitors, at most 6. The two per monitor are
+the capture slots the X server may fill ahead of the acknowledgement it is
+waiting on, and they are fixed: they are a property of the shared memory the
+two halves of the server exchange, not a setting.
+
+The consequence for an administrator is the part worth remembering:
+\fBadding a monitor divides the window's headroom between the screens.\fR
+The default of 2 gives a single screen two frames of headroom, two screens
+about one each, and three screens less than one each. Nothing in the
+configuration changes and nothing is logged; the same number simply means
+less per screen.
+
+This asymmetry is not a design goal, it is what the code does today, and it
+is documented here rather than hidden: the window predates multi\(hymonitor
+support on this path and counts a quantity that has since become
+per\(hymonitor.
+
+.SS Choosing a value
 This is the ONE end\(hyto\(hyend limit on how much video may be in flight
 between the server and the display, and it is the only knob here whose right
 value the server cannot work out for itself \(em it follows from the network,
 not from the machine. On a link that acknowledges a frame faster than the
 server can produce one, the window is never the limit and the default is
-fine. On a long link it is the limit, and the frame rate cannot exceed
-\fBwire_window\fR + 2 frames per round trip: at 80 ms RTT the default gives
-about 50 frames per second, at 200 ms about 20. Raising it buys frame rate at
-the cost of latency \(em every extra frame in flight is one more frame of
-delay between an action and seeing it, and of memory queued in the server \(em
-so raise it only as far as the round trip demands.
+fine.
+
+On a long link it is the limit, and the frame rate cannot exceed the whole
+bound above per round trip \(em not \fBwire_window\fR alone:
+
+.RS
+.nf
+frames per second <= (wire_window + 2 x monitors) / round trip
+.fi
+.RE
+
+At 80 ms round trip the default gives about 50 frames per second on one
+monitor and about 75 across two \(em but that is the total across all
+screens, so it is still about 37 per screen. At 200 ms, about 20 on one
+monitor and 30 across two.
+
+Raising it buys frame rate at the cost of latency: every extra frame in
+flight is one more frame of delay between an action and seeing it, and one
+more frame of memory queued in the server. At 4K that is roughly 3.3 MB per
+unit. Raise it only as far as the round trip demands.
+
+\fBOn a multi\(hymonitor session, do not expect raising it to cure
+stuttering.\fR It was measured on two monitors: doubling the window made
+long waits rarer but left the typical wait unchanged, and did not change the
+frame rate. On a fast link the limit on a multi\(hymonitor session is the
+server encoding each screen in turn, not this window, and no value here
+addresses that.
 
 When the window is reached the server does not queue the frames it did not
 send; it does not capture them at all, and the damage they would have carried

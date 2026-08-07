@@ -1026,13 +1026,36 @@ reviewed against.
    `credit = min(frame_id_consumed, frame_id_server + 1,
    frame_id_client + C)`, emitted unconditionally whenever it advances.
 4. **C is user configuration, not a PRD constant.** Its correct value
-   depends on the deployment's RTT (frame rate ≤ (C + 2)/RTT). This
-   document requires only: it exists; it is enforced at admission; it
-   has exactly one documented meaning (at most C + 2 frames unacked at
-   send — capture rides ≤ 2 slots above the credit); it has a stated
-   default, chosen with BACKLOG #81's RTT-harness data, that preserves
+   depends on the deployment's RTT **and on the monitor count**: the
+   frame rate cannot exceed `(C + 2·M)/RTT`, and C is counted in frame
+   ids, which advance once per MONITOR rather than once per desktop
+   refresh. This document requires only: it exists; it is enforced at
+   admission; it has exactly one documented meaning (**at most
+   `C + 2·M` frames unacked at send** — capture rides ≤ 2 slots above
+   the credit, per monitor); it has a stated default that preserves
    short-RTT behaviour; and its bound has a test. The RTT → suggested
-   value guidance belongs with the config docs, fed by #81.
+   value guidance belongs with the config docs.
+   > **AMENDED 2026-08-07 (owner directive), twice over.**
+   > (a) The clause said `(C + 2)/RTT` and "at most C + 2 frames" while
+   > the implementation note below it said `C + 2·M`. The measured
+   > bound is `C + 2·M` — 6 at C = 2 with two monitors, and 5 for the
+   > legacy path, four legs each, never exceeded. The monitor-free
+   > forms are struck; a requirement demanding "exactly one documented
+   > meaning" cannot itself carry two.
+   > (b) The clause required the default to be "chosen with BACKLOG
+   > #81's RTT-harness data". **That requirement is withdrawn**: a
+   > netem simulation may verify a mechanism and its bound, but it may
+   > not choose a shipped default or claim validity for wild WAN
+   > environments. The default stays **C = 2**, and it is NOT scaled by
+   > monitor count — measured 2026-08-07: doubling the window at two
+   > monitors made long waits rarer but left the typical wait and the
+   > frame rate unchanged, so the multiplier would have bought a
+   > partial tail improvement in exchange for re-meaning a shipped
+   > default and adding two frames to the bound. The per-screen
+   > consequence is DOCUMENTED instead, in `gfx.toml(5)`. Records:
+   > `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`,
+   > captures `i91_window4_m2_20260807_201346_s20` and
+   > `i80_multimon_strip_20260807_152223_s20`.
 5. **Every queue carries a stated bound in frames and a test**
    (restating amendment clause 2). The egress queue's bound follows
    from 3: ≤ C + 2 frames on `wait_s`.
@@ -1065,11 +1088,29 @@ recorded because quoting "≤ C + 2" without them would be wrong:
   "≤ C + 2·M unacked at send" is a statement about frames that reached
   the transport, and a run of discarded frames relaxes it transiently.
 
-**Shipped default C = 2 is a PLACEHOLDER, not a measured value**
-(`XRDP_GFX_WIRE_WINDOW_DEFAULT`). It matches the legacy
-`frames_in_flight` so short-RTT behaviour is preserved, and clause 4's
-"stated default, chosen with BACKLOG #81's RTT-harness data" is NOT yet
-satisfied. Do not quote 2 as a recommendation.
+**Shipped default C = 2, DECIDED 2026-08-07 (owner), superseding the
+"PLACEHOLDER" wording that stood here** (`XRDP_GFX_WIRE_WINDOW_DEFAULT`).
+It is not a measured optimum and is not claimed as one. What is measured
+is what it is worth: at one monitor C = 2 removes the producer stall
+(0.8 % of cycles waiting over 10 ms, against 16.3 % at C = 1 and 16.4 %
+on the legacy path), and C = 1 reproduces the legacy path exactly. The
+cost is one more frame outstanding than the legacy path allows.
+
+Three things this default is explicitly NOT:
+
+* **Not scaled by monitor count.** Measured: doubling it at two monitors
+  moved cycles stalled over 10 ms from 14.9 % to 8.4 % while the median
+  wait went 4.886 → 4.546 ms against a one-monitor reference of
+  0.015 ms, and the frame period did not move. A multiplier would have
+  re-meant a shipped value and added two frames to the bound for a
+  partial tail improvement.
+* **Not derived from simulation.** A netem harness may verify the
+  mechanism and its bound; it may not choose a shipped default nor
+  claim validity for real WANs.
+* **Not a recommendation for a long link.** On a link where the round
+  trip exceeds a frame period, C is the rate limit and the operator
+  must choose it; `gfx.toml(5)` carries the arithmetic and the
+  per-monitor consequence.
 
 **What C costs, measured 2026-08-03 (BACKLOG #80 step 4; LAN leg in
 `i80_wanpair_20260803_125816_s20`, corrected 40 ms leg in
