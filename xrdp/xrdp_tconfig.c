@@ -427,7 +427,20 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         XRDP_H264_INTRA_REFRESH_FRAMES;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
-    config->avc444_ffmpeg_eager_slot_ack = 0;
+    /* BACKLOG #80: the credit frontier is the DEFAULT ack mechanism
+     * (owner directive, 2026-08-07). It is an extension, not a
+     * replacement: at wire_window 1 it reproduces the legacy gate's
+     * behaviour exactly -- measured identical on frame period, tail,
+     * stall rate and the wire bound -- and at the shipped wire_window 2
+     * it can additionally grant a credit the legacy gate has no
+     * variable to express, because that gate's value is
+     * frame_id_server, which advances only at egress. Widening the
+     * legacy window instead pays the same queue cost and buys none of
+     * it: measured 17.6 % of cycles still stalled at frames_in_flight
+     * = 3, against 2.6-3.9 % here. Records:
+     * PR-demo/mac_bisect_matrix/captures/i80_c1_nonregression_20260807_141752_s20
+     * and .../i80_widen_legacy_20260807_143617_s20. */
+    config->avc444_ffmpeg_eager_slot_ack = 1;
     config->avc444_ffmpeg_emit_thread = 0;
     config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
     {

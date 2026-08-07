@@ -190,6 +190,19 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
      * (aud=1) that matches a real Windows AVC444 stream; see
      * xrdp_ffmpeg_avc444_default_encoder_args */
     ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1:aud=1"), 0);
+    /* BACKLOG #80, owner directive 2026-08-07: with no [avc444_ffmpeg]
+     * table at all, the shipped ack mechanism is the credit frontier at
+     * a wire window of 2. Both halves are asserted here because they are
+     * a pair -- the frontier at a window of 1 is behaviourally the
+     * legacy gate, so the mechanism alone does not describe what ships.
+     * Expected values are the directive, not a reading of the loader.
+     *
+     * NOTE for whoever changes these: the emit thread is deliberately
+     * NOT part of the shipped default (BACKLOG #100 removes it), so it
+     * is asserted OFF beside them rather than left unstated. */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 2);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_emit_thread, 0);
 }
 END_TEST
 
