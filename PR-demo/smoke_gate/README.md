@@ -17,7 +17,18 @@ that passed before the last deployment step counts for nothing.
   KEYTEST_HOST, KEYTEST_CLIENT_DISPLAY.
 - `colorkey.sh` — the in-session colour-key app (one keypress = one damage =
   one GFX frame, tagged with a running count so a withheld tail frame is
-  unambiguous).
+  unambiguous). Keys: `r`/`g`/`b`/`w` flat colour, `e` red-blue chroma
+  stripes, `q` quit — those four plus `e` are what `keytest.sh` drives. `c`
+  and `s` are for INTERACTIVE validation from a real client (Windows UWP,
+  macOS) and are never pressed by the gate: `c` cycles the screen through the
+  eight RGB corners (black red green blue yellow magenta cyan white), one
+  colour per frame, printing the colour name and frame count so a missing or
+  out-of-order frame is nameable; `s` slides a solid block across a
+  contrasting background, one whole-cell hop per frame, so stutter, jumps and
+  tearing are visible by eye. Both animate until a key is pressed, and that
+  key is then acted on. Rates and sizes: `CK_CYCLE_MS` (250), `CK_SLIDE_MS`
+  (40), `CK_SLIDE_STEP` (4 cols), `CK_BLOCK_W`/`CK_BLOCK_H` (default: a tenth
+  of the screen, capped at 40x20 cells).
 
 Box assumptions (env-overridable): tester account, empty password, xrdp on
 127.0.0.1:3389, Xvfb on :99.

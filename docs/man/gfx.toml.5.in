@@ -269,19 +269,29 @@ the client sees only a full\(hysurface repaint from a fresh IDR. Set this to
 
 .TP
 \fBeager_slot_ack\fR = \fItrue\fR | \fIfalse\fR
-EXPERIMENTAL. Applies only when \fBaux_ltr_chain\fR is enabled, and requires a
-matching xorgxrdp. Default: \fBfalse\fR, which is the shipped behaviour
-unchanged.
+Applies only when \fBaux_ltr_chain\fR is enabled, and requires a matching
+xorgxrdp. Default: \fBtrue\fR. Set it to \fBfalse\fR to restore the
+acknowledgement behaviour shipped before this release.
 
 The X server may capture a new frame only into a buffer the encoder has
 finished reading, and it learns that a buffer is free from an acknowledgement
-the server sends. By default that acknowledgement is sent when the frame's
-last byte has been handed to the network, which is several steps after the
-encoder actually finished with the buffer \(em so capture, encode and
-transmission run one after another instead of overlapping. With this enabled,
-the acknowledgement is sent as soon as the encoder has drained the buffer, and
-the flow control that decides how far ahead the server may run is
+the server sends. The older rule sent that acknowledgement when the frame's
+last byte had been handed to the network, which is several steps after the
+encoder actually finished with the buffer \(em so the number it carried could
+never refer to a frame still inside the encoder, whatever the window was set
+to, and capture, encode and transmission ran one after another instead of
+overlapping. With this enabled the acknowledgement is sent as soon as the
+encoder has drained the buffer, and how far ahead the server may run is
 \fBwire_window\fR below.
+
+Setting \fBwire_window\fR = \fB1\fR with this enabled reproduces the older
+rule's behaviour: measured on one monitor at 3840x2400, the two are the same
+within run\(hyto\(hyrun spread on frame period, on the wait for permission to
+capture, and on the number of frames the client may have outstanding. The
+benefit appears at \fBwire_window\fR = \fB2\fR, and it costs one more frame
+outstanding than the older rule allowed. See
+\fIPR\(hydemo/BREAKING_CHANGE_credit_frontier.md\fR in the source tree for the
+measurements and for how to roll back.
 
 .TP
 \fBwire_window\fR = \fI<integer>\fR

@@ -22,6 +22,10 @@ must lose it and 4:4:4 keeps it.
 - `bench/` — reproducible benchmark scripts backing `RESULTS.md`
   (`measure_traffic.sh` + `conv_measure.c`, `bench_encoders.sh`,
   `copy_bandwidth.py`).
+- **`BREAKING_CHANGE_credit_frontier.md`** — what changes for an operator or
+  upstream reviewer when `[avc444_ffmpeg] eager_slot_ack` defaults on (the
+  capture-admission rule), the measurements behind it, its cost of one more
+  frame in flight, and how to get the previous behaviour back.
 
 ## Results (reference outputs in `results/`)
 - `cmp_bars1px.png` — **the decisive frame.** 1px magenta|green stripes at equal

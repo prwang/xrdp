@@ -84,9 +84,14 @@ speed in all four so the comparison is like-for-like:
 | condition | encoder wait | period p50 | withheld p90 | stalled > 10 ms | idle p90 |
 |---|---|---|---|---|---|
 | legacy (2026-08-06) | 16.26 ms | 17.72 ms | 10.569 ms | 16.4 % | 9.129 ms |
-| **frontier, window 2** | 16.46 ms | 17.45 ms | **0.037 ms** | **1.0 %** | **0.002 ms** |
+| **frontier, window 2** | 16.46 ms | 17.45 ms | **0.040 ms** | **0.8 %** | **0.002 ms** |
 | legacy (2026-08-07) | 16.26 ms | 17.64 ms | 10.502 ms | 16.4 % | 8.671 ms |
 | **frontier, window 1** | 16.33 ms | 17.65 ms | 10.697 ms | 16.3 % | 8.943 ms |
+
+The window-2 row is `leg_b1` of `i87_eager_ab_20260806_180910_s20`,
+quoted per leg rather than pooled with its sibling: `leg_b2` of the
+same capture reads 0.047 ms and 0.0 %. Both are quoted here so the
+spread is visible rather than averaged into one number.
 
 This is an intervention result, not an attribution from a single leg:
 one config line changes, the stall appears and disappears. **The term
