@@ -173,6 +173,14 @@ declare -A ARM_XORG_DEB=(
     # in xrdp -- so any difference here would void the pair.
     [x020]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x021]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # x023/x024 (owner-directed 2026-08-07): the non-regression pair.
+    # x023 = credit frontier at wire_window 1, the LEGACY-EQUIVALENT
+    # window (same credit ceiling and same client+3 bound as the
+    # shipped frames_in_flight=2 path); x024 = x023 with emit_thread
+    # off. So x020 vs x023 isolates the ack mechanism and x023 vs x024
+    # isolates the emit thread.
+    [x023]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x024]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     # x022 (BACKLOG #83): same server as x021, different PAYLOAD.
     [x022]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
@@ -237,6 +245,8 @@ declare -A ARM_TAG=(
     # and must not be rebuilt (see PAYLOAD_HASH).
     [x020]=1d5bc0960db8.xx10fa3aa-tf
     [x021]=1d5bc0960db8.xx10fa3aa-tf
+    [x023]=1d5bc0960db8.xx10fa3aa-tf
+    [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
     # payload: same server build, different producer. Comparing it with
     # x021 is a comparison of two payloads on one server, which is

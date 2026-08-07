@@ -71,6 +71,7 @@ stay as "(was #NN)" in each header.
 12. **#96** (was #59) — move the pack off the X server thread
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
+15. **#100** — remove the emit thread (measured 2026-08-07; it buys nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -95,29 +96,32 @@ model, and #98 measured that at 4K the WAN constraint is TCP/byte
 behaviour, not the credit count. Simulation's job here is verifying the
 MECHANISM and its BOUND, nothing more. Consequences:
 
-* The shipped default stays **C = 2** for now, documented as an operator
-  knob rather than a simulation-derived optimum; the closed form
-  ⌈RTT/period⌉ + 1 is guidance to validate per deployment, never a
-  certified table.
-  * **CORRECTION 2026-08-06, and it breaks the justification above:
-    C = 2 is NOT legacy-equivalent.** The legacy gate emits while
-    `client + fif > server` and the value it emits is `frame_id_server`
-    (`xrdp/xrdp_encoder.h:40-44`), so the highest id it can ever
-    acknowledge is `client + fif − 1`; the frontier clamps the credit at
-    `client + C` directly (`:114-130`). At the two capture slots above
-    the credit that is at most `client + 3` for today's `fif = 2` and
-    `client + 4` for `C = 2`. **The legacy-equivalent window is C = 1.**
-    Predicted from the code and then confirmed by the A/B, whose
-    measured maximum distance between a frame and the client's last
-    acknowledgement was exactly 3 on the control arm and 4 on the
-    treatment arm. Shipping C = 2 therefore permits one more frame of
-    queue than today's default — nothing measurable on loopback, one
-    frame of extra latency on a link where a frame takes real time.
-    **Coding rule 2 says the default must reproduce present behaviour,
-    which points at C = 1; the owner's call, and it also changes the
-    PRD amendment drafted in
-    `docs/experiments/prd-amendment-draft-20260806.md`, which uses the
-    equivalence claim.**
+* **The shipped default is UNRESOLVED, and the reason changed on
+  2026-08-07.** Two findings, in order:
+  * **C = 2 is not legacy-equivalent.** Legacy grants credit up to
+    `client + fif - 1` = `client + 1` (`xrdp/xrdp_encoder.h:40-44`); the
+    frontier clamps at `client + C` (`:114-130`). With the two capture
+    slots that is `client + 3` today against `client + 4` at C = 2.
+    Measured: maximum outstanding 3 on legacy, 3 at C = 1, 4 at C = 2.
+    **The legacy-equivalent window is C = 1.**
+  * **But C = 1 reproduces the DEFECT as well as the behaviour.** At
+    matched encoder speed, legacy and the frontier at C = 1 stall
+    identically (withheld p90 10.50 vs 10.70 ms; 16.4 % vs 16.3 % of
+    cycles; worker idle p90 8.67 vs 8.94 ms), while C = 2 removes it
+    (0.037 ms, 1.0 %, 0.002 ms). One config line, stall on and off:
+    **the term that holds the credit is the end-to-end window, not the
+    emission point.** This also closes #80's open attribution question,
+    which the emission-time record could not answer because all three
+    terms tie there.
+  * **So the frontier at C = 1 is a refactor with no gain, and the gain
+    at C = 2 costs one more frame outstanding than the 2017-era path.**
+    That trade must be argued on its merits; "legacy equivalence" cannot
+    carry it. Capture `i80_c1_nonregression_20260807_141752_s20`.
+  * Open, and it is the upstream-facing question: present ONE design
+    with one firm reason (owner, 2026-08-07 — maintainers should not be
+    handed two ambiguous options for a breaking change to 2017-2018 era
+    code). The closed form ceil(RTT/period)+1 stays operator guidance to
+    validate per deployment, never a certified table.
 * **PRD FR-FLOW-1 clause 4 ("default chosen with #81's data") needs a
   matching amendment — owner sign-off required, not yet applied.**
 * Dropped with the rescope: "enough RTT points to choose the default",
@@ -208,6 +212,34 @@ guard while there.
 **Why it matters:** the failure is silent in the direction that counts.
 A swapped pair yields an empty trace, and an empty trace is
 indistinguishable from an idle session unless something asserts identity.
+
+## #100 — the emit thread: remove it (measured 2026-08-07, owner-directed)
+
+**Measured, and it buys nothing.** Same build, same host state, one
+config line apart, one monitor at 3840x2400: with the assembly on its
+own thread the frame period p50 is 17.65 ms; inline it is 17.77 ms — and
+the assembly stage itself is CHEAPER inline (0.230 ms against 0.313 ms),
+which is what the hand-off through a slot and two semaphores costs. The
+p90 moves the other way (26.40 -> 25.77 ms). Everything here is inside
+this host's leg-to-leg spread. Against at most a tenth of a millisecond
+of period it costs a permanent thread, two semaphores, a hand-off slot,
+join logic and a drop counter.
+
+**Owner decision 2026-08-07: if the result is strong, take it and keep
+the feature out of the clean-room upstream version.** The result is
+strong at one monitor.
+
+**Work:** remove `emit_thread` and its machinery, keeping the refactor
+that separated assembly from the encode path (it fixed a real
+use-after-free and is independent of where the work runs). Update the
+config documentation and the tests that name the knob.
+
+**Before removing, one limit stated:** the measurement is single
+monitor, and assembly work scales with monitor count, so the thread
+could matter at m >= 2. Either measure that first or record the removal
+as scoped to what was tested — do not carry the single-monitor result
+across silently (the same caution #80 carries for its per-monitor
+bound). Capture `i80_c1_nonregression_20260807_141752_s20`.
 
 ## #88 (was #61g) — the oracle client's 50–150 ms pauses: unattributed
 
