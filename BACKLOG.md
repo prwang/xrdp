@@ -305,6 +305,27 @@ delivery-loop delay IS the encode in progress, not scheduling slack.
 
 At m≥2, two issues on top of the m=1 serializer:
 
+0. **WHY they disagree — analysed statically 2026-08-07, record
+   `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.**
+   A frame id is ONE MONITOR's frame, not a refresh: the producer's
+   `rect_id` is a scalar incremented once per send, and a send is one
+   monitor's capture (`rdpClientCon.c:3621`, and the driver's own
+   comment at `rdpClientCon.h:120`). The window is denominated in those
+   ids and is session-wide, so at M monitors each screen gets ⌊C/M⌋..
+   ⌈C/M⌉ ids. The capture slots are per monitor and do not divide. The
+   ack that carries the credit has NO monitor field (`xup/xup.c:1257`)
+   while the paint direction does (`rdpClientCon.c:3688`).
+   **Provenance is the asymmetry's cause:** the per-monitor budget was
+   decided on measurement (D13, 1079/1079 sends stuck in one slot); the
+   global window was inherited from a 2017 client capability whose
+   tether the GFX path then cut, and monitor count was never considered.
+   **NOT settled: which term binds at M>=2.** Two models disagree
+   (`client + C` versus `server + 1`), the emission record cannot
+   attribute it, and ONE leg settles it — `wire_window = 4` at two
+   monitors, which is also numerically the "scale C by M" fix. One arm,
+   config only, ~10 min. Also found: the man page never states the
+   window is session-wide, and its frame-rate guidance silently assumes
+   one monitor.
 1. **The ack window is global while the budget is per-monitor.** At
    m=2 the global fif=2 window admits ~1 outstanding per monitor and
    halves the intended depth. The PRD forbids widening the global pool
