@@ -305,6 +305,28 @@ delivery-loop delay IS the encode in progress, not scheduling slack.
 
 At m≥2, two issues on top of the m=1 serializer:
 
+-1. **MEASURED 2026-08-07: scaling the window by monitor count does NOT
+   fix it, so the "scale by M" option is NOT taken.** Owner asked for
+   the leg and made the fix conditional on it zeroing the stall. It does
+   not. At two monitors, one config line apart, four interleaved legs:
+   `wire_window` 2 -> 4 moves cycles stalled over 10 ms from 14.9 % to
+   8.4 %, but the MEDIAN wait is 4.886 -> 4.546 ms against a
+   one-monitor reference of 0.015 ms, and frame period p50 is flat. It
+   moved cycles out of the sub-0.1 ms bucket (25 % -> 12 %) into the
+   1-10 ms band (57 % -> 77 %) — long waits got rarer, waits did not go
+   away. The bound rose to 7-8 as `C + 2*M` predicts, which the
+   pre-registered prediction had already excluded as proving nothing.
+   **So the session-wide window is at most a minor part of the
+   two-monitor residual.** Capture
+   `i91_window4_m2_20260807_201346_s20`.
+   **Candidate for the real cause, named not measured:** at M = 2 one
+   encoder worker serialises both screens (per-monitor period ~28 ms,
+   sends every ~13 ms, encode wait 15-16 ms), so a monitor's credit
+   waits on the OTHER monitor's encode. If so, the withheld metric
+   measures something different at M >= 2 than at M = 1 and no
+   two-monitor number may be attributed to flow control until the wait
+   is split by which monitor the worker was serving. That decomposition
+   is this item's second half and has never been done.
 0. **WHY they disagree — analysed statically 2026-08-07, record
    `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.**
    A frame id is ONE MONITOR's frame, not a refresh: the producer's

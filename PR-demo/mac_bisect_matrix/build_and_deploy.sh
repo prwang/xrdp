@@ -188,6 +188,10 @@ declare -A ARM_XORG_DEB=(
     # producer-limited the way the textflood pair was (margin 0.5x).
     # x027: THE INTERACTIVE ARM -- XFCE desktop, shipped defaults, built
     # from HEAD so what the owner looks at is what actually ships.
+    # x028: frontier at wire_window 4 -- the leg that decides whether the
+    # session-wide window is what limits a monitor at M = 2 (owner,
+    # 2026-08-07). Same image and payload as x022; one config line apart.
+    [x028]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x027]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x026]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x025]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -260,6 +264,7 @@ declare -A ARM_TAG=(
     [x023]=1d5bc0960db8.xx10fa3aa-tf
     [x025]=1d5bc0960db8.xx10fa3aa-tf
     [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
+    [x028]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
     [x027]=821218e54c24.xx10fa3aa-xfce.pc0097388
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
