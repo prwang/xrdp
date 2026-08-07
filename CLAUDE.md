@@ -499,6 +499,46 @@ held the preceding analysis. The owner could not answer it and said so.
 The failure was not the content of the choice — it was that the choice
 was unreadable, and unreadable questions are answered by guessing.
 
+#### ARCHITECTURAL questions do not use the question widget at all (owner directive, 2026-08-06)
+
+**For any decision that shapes the design — a shipped default, whether
+a feature exists, a protocol or contract change, which of several
+architectures to build, what an experiment is allowed to conclude —
+do NOT call `AskUserQuestion`. Write the question out in the
+end-of-turn message as ordinary prose, with its background, and stop.
+The owner types the answer back as text.**
+
+The reason is not style. **The question widget has been observed
+DROPPING CONTENT — the owner reported "the complete message didn't
+appear" on a two-question ask (2026-08-06).** A truncated report is
+recoverable; a truncated *question* is answered against information the
+owner never saw, and on an architectural question that answer then
+becomes the foundation for everything built afterwards. The widget's
+rendering is outside this repository's control, so the mitigation is to
+stop depending on it where the cost of a silent truncation is highest.
+
+What the prose version must contain, and it is the same content the
+widget options were carrying — the format changes, the rigour does not:
+
+* the decision in one plain sentence, stated before any option;
+* the background needed to answer it, in the message, not by reference
+  to an earlier turn the owner may no longer have in view;
+* every option numbered, each stating what it DECIDES, what it COSTS
+  (arm count and wall time whenever hardware time is spent), and what
+  it LEAVES UNANSWERED;
+* a recommendation, with the reason it is the recommendation;
+* an explicit invitation to answer by number or in their own words.
+
+The draft-and-edit procedure applies exactly as above: the question
+text goes into `/work/.turn_draft.md`, is read back, is edited there,
+and only the checked version is sent.
+
+`AskUserQuestion` remains fine for genuinely small, low-stakes,
+reversible choices where a truncated option could not send the project
+anywhere — which file to write to, whether to also run a lint pass.
+When in doubt about which kind a question is, it is architectural: the
+prose form costs one screen of text and never silently loses a clause.
+
 #### The edit pass (owner directive, 2026-08-03)
 
 The three gates below check whether the message is TRUE. Nothing
