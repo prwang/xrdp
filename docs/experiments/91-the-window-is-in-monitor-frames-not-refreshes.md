@@ -184,3 +184,86 @@ the measurement showing that raising it pays the full queue cost and
 returns nothing. A maintainer asking why two window controls exist can
 be answered today without new evidence; that answer should be written
 down before it is asked.
+
+---
+
+# Addendum, same day: what the trace can already answer, and the two gaps
+
+Asked after the window-4 leg: *how would we trace exactly how the two
+encoders serialise, is there enough perf-trace data for a falsifiable
+hypothesis, and does the multimon backlog item plan this correctly?*
+
+## "One worker serialises both screens" was the wrong phrasing
+
+The encoder arms **one poll set over the whole set of children**, so at
+two monitors all four (two views x two screens) can be in flight at
+once. Nothing forces the screens to take turns. What varies is whether
+both actually join a given pump, and that is measurable today from a
+field already in the trace — `kids_armed`, carried on `pump_end`.
+
+| condition | cycles arming all four children |
+|---|---|
+| legacy path | 32.5 % |
+| frontier, wire_window 2 | 39.6 / 39.8 / 41.1 % |
+| frontier, wire_window 4 | 52.0 / 53.1 % |
+
+Monotone in the credit. And the cost asymmetry is what makes it matter:
+a pump covering both monitors takes **~19.9 ms** against **~12.2 ms**
+for one. So a second monitor joining an existing pump costs ~7.7 ms at
+the margin, while missing it costs that monitor a further ~12.2 ms
+cycle of its own. Per-monitor service interval, measured from `absorb`
+records paired by monitor: p50 ~22 ms, p90 36-46 ms.
+
+**So the two-monitor residual is a SET MEMBERSHIP question** — how often
+a screen misses the pump — not serial assembly, and not an encoder that
+can only do one thing at a time.
+
+## What is answerable with no code change
+
+The records already carry the identity needed:
+
+* `pump_end` — how many children were armed for this cycle;
+* `absorb` — (frame id, **monitor**);
+* `coll_beg` / `coll_end` — per monitor;
+* `emit_beg` / `emit_end` — (frame id, **monitor**);
+* `dmg` — surface id, i.e. the monitor.
+
+Set membership, per-monitor service intervals and per-monitor
+collect/emit costs all come out of captures already in the tree. Every
+number in this addendum was computed that way, from
+`i91_window4_m2_20260807_201346_s20` and
+`i80_multimon_strip_20260807_152223_s20`.
+
+## The two gaps, and neither needs a new mechanism
+
+**Gap 1 — nothing records WHY a monitor missed a set.** The candidates
+are: it had no damage, it had no credit, or its capture slot was still
+busy. These have completely different fixes, and today the trace cannot
+tell them apart. **Until this exists, "the window caused the miss" is
+not a falsifiable claim** — which is precisely the state the previous
+round of two-monitor reasoning was in. Fix: one field on an existing
+admission-side record naming the reason. Not a new record, not a new
+sink.
+
+**Gap 2 — `outfirst` and `feedend` carry no monitor index.** They are
+per child and carry a sequence number plus a main/aux flag
+(`xrdp_encoder_ffmpeg.c:743`, `:842`), so a four-child pump cannot be
+split into one screen's children versus the other's. Consequently
+whether the two monitors' encodes genuinely overlap inside the pump, or
+serialise inside ffmpeg or the GPU, is **unknown**. Fix: one spare
+field on each — both records already carry six integers and use three.
+
+## The backlog item was NOT planning this correctly
+
+`#91`'s second half read: *"re-decompose: how much was the ack pacing,
+how much is step 7's whole-set drain, how much is genuinely serial
+assembly."* That framing predates the set pump, and it names assembly
+as a candidate — assembly has since been measured at 0.23-0.33 ms per
+frame, which cannot account for milliseconds. It also predates every
+per-monitor field the trace now carries.
+
+Rewritten to: measure set membership (possible today), close the two
+gaps above (one field each), and only then decide whether the fix is
+admission policy. With the explicit instruction not to reach for the
+window again — raising it moved batching from ~40 % to ~52 % and left
+the wait where it was.

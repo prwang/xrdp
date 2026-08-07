@@ -326,14 +326,27 @@ At m≥2, two issues on top of the m=1 serializer:
    **So the session-wide window is at most a minor part of the
    two-monitor residual.** Capture
    `i91_window4_m2_20260807_201346_s20`.
-   **Candidate for the real cause, named not measured:** at M = 2 one
-   encoder worker serialises both screens (per-monitor period ~28 ms,
-   sends every ~13 ms, encode wait 15-16 ms), so a monitor's credit
-   waits on the OTHER monitor's encode. If so, the withheld metric
-   measures something different at M >= 2 than at M = 1 and no
-   two-monitor number may be attributed to flow control until the wait
-   is split by which monitor the worker was serving. That decomposition
-   is this item's second half and has never been done.
+   **THE MECHANISM, now measured from the SAME captures 2026-08-07 —
+   and "one worker serialises both screens" was the wrong phrasing.**
+   The encoder arms one poll set over the whole set of children, so at
+   M = 2 both monitors CAN encode concurrently — four children in one
+   pump. The measured question is whether they do. Fraction of cycles
+   that armed all four (`kids_armed` on the `pump_end` record):
+
+   | condition | both monitors in one pump |
+   |---|---|
+   | legacy path | 32.5 % |
+   | frontier, wire_window 2 | 39.6 / 39.8 / 41.1 % |
+   | frontier, wire_window 4 | 52.0 / 53.1 % |
+
+   Monotone in the credit, and it is the cost that matters: a pump
+   covering BOTH monitors takes ~19.9 ms against ~12.2 ms for one, so a
+   second monitor joining an existing pump costs ~7.7 ms marginal
+   whereas missing it costs that monitor a whole further ~12.2 ms
+   cycle. Each monitor is served every ~22 ms (p50) with a p90 of
+   36-46 ms. So the two-monitor residual is about **SET MEMBERSHIP** —
+   how often a monitor misses the pump — not about assembly and not
+   about a worker that cannot do two things at once.
 0. **WHY they disagree — analysed statically 2026-08-07, record
    `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.**
    A frame id is ONE MONITOR's frame, not a refresh: the producer's
@@ -355,7 +368,39 @@ At m≥2, two issues on top of the m=1 serializer:
    config only, ~10 min. Also found: the man page never states the
    window is session-wide, and its frame-rate guidance silently assumes
    one monitor.
-1. **The ack window is global while the budget is per-monitor.** At
+1. **THE PLAN, REWRITTEN 2026-08-07 — the old one asked a stale
+   question.** This item's second half used to read "re-decompose: how
+   much was the ack pacing, how much is step 7's whole-set drain, how
+   much is genuinely serial assembly". That framing predates the set
+   pump and names assembly as a candidate; assembly has since been
+   measured at 0.23-0.33 ms per frame, which cannot explain
+   milliseconds. Replace it with the set-membership decomposition
+   above, and note what the trace can and cannot answer today:
+
+   * **Answerable NOW, no code change** — the records already carry
+     what is needed: `pump_end` carries the number of children armed,
+     `absorb` carries (frame id, monitor), and `coll_beg/end` and
+     `emit_beg/end` are per monitor. Set membership, each monitor's own
+     service interval, and per-monitor collect/emit cost are all
+     measurable from captures already in the tree, and the table above
+     was computed that way.
+   * **GAP 1, and it is the load-bearing one: nothing records WHY a
+     monitor missed a set** — no damage, no credit, or its slot still
+     busy. Without it "the window caused the miss" is not falsifiable.
+     Fix: one field on the existing damage or absorb record naming the
+     reason admission was declined. No new mechanism (coding rule 5).
+   * **GAP 2: `outfirst`/`feedend` carry no monitor index**, only a
+     sequence number and a main/aux flag, so a four-child pump cannot
+     be split into "this monitor's children" versus "that one's". Until
+     it can, whether the two monitors' encodes genuinely overlap INSIDE
+     the pump or serialise within ffmpeg is unknown. Fix: one spare
+     field on both records — they already carry six ints and use three.
+   * Only after both gaps: decide whether the fix is admission policy
+     (get both monitors into every pump) or something else. Do not
+     reach for the window again — raising it improved batching from
+     ~40 % to ~52 % and still left the wait where it was.
+
+2. **The ack window is global while the budget is per-monitor.** At
    m=2 the global fif=2 window admits ~1 outstanding per monitor and
    halves the intended depth. The PRD forbids widening the global pool
    (bufferbloat, measured); the spec shape is ≤2 PER MONITOR. Pinned in
