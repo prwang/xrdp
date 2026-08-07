@@ -1427,7 +1427,43 @@ BACKLOG #87, which absorbed the old #70B.)* Full former text of this FR, with th
 invariant proofs, is preserved at commit `0db74f6e`; history pointers
 in NG-9.
 
-### FR-ACK-2: the eager slot-release ack and the assembly (`emit`) split — correctness contract only (2026-08-01; the ship-together requirement RETIRED 2026-08-06)
+### FR-ACK-2: the eager slot-release ack and the assembly (`emit`) split — correctness contract only (2026-08-01; the ship-together requirement RETIRED 2026-08-06; the assembly THREAD REMOVED FROM THE CODE 2026-08-07)
+
+> **THE ASSEMBLY THREAD IS GONE — 2026-08-07, owner decision, BACKLOG
+> #100.** `emit_thread`, its two semaphores, its depth-1 hand-off slot,
+> its join and its unarmed-drop counter were deleted from
+> `xrdp/xrdp_encoder.{c,h}`; the `gfx.toml` key was deleted from the
+> loader, which now warns once and continues if an existing file still
+> carries it. The EGFX assembly runs where it ran with the knob off:
+> inline on the encoder worker, at the end of the batch cycle, through
+> the same `gfx_emit_run_set()` and producing the same bytes.
+>
+> **What decided it.** The A/B the retirement block below asked for was
+> run: same build, same host, one config line apart, one monitor at
+> 3840×2400. The assembly stage is CHEAPER inline — **0.230 ms against
+> 0.313 ms** — because the hand-off through a slot and two semaphores
+> costs more than it saves, and the frame period differs by 0.12 ms at
+> p50 (thread ahead) and 0.63 ms at p90 (inline ahead), both inside the
+> host's leg-to-leg spread. Capture
+> `PR-demo/mac_bisect_matrix/captures/i80_c1_nonregression_20260807_141752_s20`.
+>
+> **Scope of that result, stated because it bounds the removal.** It is
+> a ONE-MONITOR measurement, and assembly work scales with monitor
+> count. Nothing here says the thread would be worthless at m ≥ 2; it
+> says it was worth nothing at m = 1, which is the only geometry
+> measured. If m ≥ 2 ever wants concurrency in assembly, this section
+> is the design that was built and the reasons it was shaped that way —
+> it is retained in full below as that record, not as a description of
+> the shipped code.
+>
+> **What survives in the code, and must not be unpicked.** The
+> SEPARATION of assembly from the encode path: assembly reads only what
+> `collect` snapshotted (`avc444_batch_cw/ch`), never an ffmpeg handle,
+> and the child teardown for the aux-LTR re-key is deferred to the top
+> of the next cycle rather than done inside the emit pass. That
+> separation fixed a real use-after-free — `collect_pair` calls `grow()`
+> which reallocs the very buffer `pair.main_data` points at — and it is
+> independent of which thread the work runs on.
 
 > **THE EMIT-SPLIT REQUIREMENT IS RETIRED AND ITS MEASUREMENTS ARE
 > DELETED — 2026-08-06, owner decision.**

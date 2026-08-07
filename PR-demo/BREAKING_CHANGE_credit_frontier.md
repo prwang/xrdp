@@ -363,11 +363,24 @@ These are limits of the evidence, not caveats about the code. A
 skeptical reviewer should treat the change as unproven on each of these
 points.
 
-1. **One monitor only.** Every measurement is a single 3840×2400
-   display. The bound carries a per-monitor term (`wire_window + 2·M`),
-   so with three monitors the shipped default permits up to
-   2 + 2×3 = 8 unacknowledged frames, against 1 + 2×3 = 7 under the old
-   default. None of the timing results has been reproduced at `M ≥ 2`.
+1. **At two monitors the benefit is halved, not delivered — measured
+   2026-08-07, after the rest of this document was written.** The bound
+   behaves exactly as the per-monitor formula (`wire_window + 2·M`)
+   predicts: measured maxima of 6 for the new default and 5 for the old
+   at two monitors, never exceeded in four legs each, so the new
+   mechanism costs one extra frame there too rather than one per
+   monitor. But the producer stall, which the new mechanism takes to
+   under 1 % of cycles at one monitor, only falls from about 52 % to
+   about 22 % at two. The likely cause is filed but not measured: the
+   window is a single session-wide number while the capture budget is
+   per monitor, so a window of 2 across two screens is about one frame
+   each. **Read every stall and latency claim in this document as a
+   one-monitor claim.** Captures
+   `PR-demo/mac_bisect_matrix/captures/i80_multimon_strip_20260807_152223_s20`
+   and `.../i80_multimon_20260807_151836_s20`. Nothing has been measured
+   at three or more monitors, where the formula gives 2 + 2×3 = 8
+   unacknowledged frames for the new default against 1 + 2×3 = 7 for
+   the old.
 2. **The test client acknowledges a frame before decoding it.** It saves
    the bytes and acks; it does not render. Every acknowledgement latency
    in this document is therefore a floor. A real client acks later, so

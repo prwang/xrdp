@@ -1466,19 +1466,6 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                     "aux_ltr_chain is off: there is no absorb marker on "
                     "this path, so the shipped egress-paced ack stays");
             }
-            /* BACKLOG #70B: the assembler reads a pair the batch path
-             * collected; without aux_ltr_chain there is no such pair
-             * and the knob is refused rather than silently ignored. */
-            self->avc444_emit_thread =
-                self->wm->gfx_config->avc444_ffmpeg_emit_thread &&
-                self->avc444_aux_ltr_chain;
-            if (self->wm->gfx_config->avc444_ffmpeg_emit_thread &&
-                    !self->avc444_aux_ltr_chain)
-            {
-                LOG(LOG_LEVEL_WARNING, "gfx.toml emit_thread is set but "
-                    "aux_ltr_chain is off: the emit pass has no collected "
-                    "pair to assemble on this path, so it stays inline");
-            }
             if (self->avc444_eager_slot_ack)
             {
                 LOG(LOG_LEVEL_INFO, "gfx.toml eager_slot_ack is ON "

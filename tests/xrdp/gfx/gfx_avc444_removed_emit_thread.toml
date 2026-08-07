@@ -1,0 +1,12 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# BACKLOG #100: emit_thread was removed on 2026-08-07. A gfx.toml left
+# in the field still carries it, so the loader must still accept the
+# file, ignore this key, and honour every key around it.
+emit_thread = true
+wire_window = 6
+intra_refresh_frames = 48

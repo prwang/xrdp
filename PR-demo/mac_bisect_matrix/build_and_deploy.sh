@@ -183,6 +183,10 @@ declare -A ARM_XORG_DEB=(
     # widened to 3 via XRDP_GFX_FRAMES_IN_FLIGHT. Answers the reviewer
     # objection "why not just raise the old knob?" -- its gfx.toml body
     # is byte-identical to x020, so the env var is the only difference.
+    # x026: the LEGACY ack path carrying the strip payload, so the
+    # multi-monitor comparison against x022 (frontier + strip) is not
+    # producer-limited the way the textflood pair was (margin 0.5x).
+    [x026]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x025]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x023]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x024]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -252,6 +256,7 @@ declare -A ARM_TAG=(
     [x021]=1d5bc0960db8.xx10fa3aa-tf
     [x023]=1d5bc0960db8.xx10fa3aa-tf
     [x025]=1d5bc0960db8.xx10fa3aa-tf
+    [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
     # payload: same server build, different producer. Comparing it with

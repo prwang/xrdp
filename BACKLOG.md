@@ -71,7 +71,7 @@ stay as "(was #NN)" in each header.
 12. **#96** (was #59) — move the pack off the X server thread
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
-15. **#100** — remove the emit thread (measured 2026-08-07; it buys nothing at one monitor)
+15. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -190,7 +190,26 @@ both landed, and items 1–3 below are CLOSED.**
 
 **Still open:**
 
-1. **Per-monitor caution (owner, 2026-08-03):** the `C + 2·M` bound at
+1. **Per-monitor: MEASURED 2026-08-07, and one half does not
+   generalise.** The `C + 2·M` bound holds at M = 2 exactly — maximum
+   frames outstanding 6 on the frontier at C = 2 and 5 on the legacy
+   path, in four legs each, never exceeded — so the frontier costs ONE
+   more frame than legacy at two monitors, not two, and the excess does
+   not scale with monitor count. But the stall is only HALVED, not
+   removed: 21.5/22.0 % of cycles still wait over 10 ms against
+   50.4/54.4 % on legacy, where at one monitor the same change reached
+   under 1 %. **Likely cause, filed rather than measured:** the
+   frontier's `client + C` term is a single session-wide number while
+   the capture budget is per monitor, so at M = 2 a window of 2 allows
+   about one outstanding frame per screen — exactly the defect #91
+   records for the legacy window, inherited. A leg at `wire_window = 4`
+   would settle it; not run, because making C per-monitor is #91's
+   decision. Captures `i80_multimon_strip_20260807_152223_s20` (readable)
+   and `i80_multimon_20260807_151836_s20` (same result, rates
+   producer-limited at 0.51x). **Consequence: "the frontier removes the
+   producer stall" is a ONE-MONITOR claim and must be written that way
+   upstream.**
+2. **Superseded caution (owner, 2026-08-03), kept for the record:** the `C + 2·M` bound at
    M monitors is UNTESTED — everything measured is single monitor. On
    the return to 2 monitors, re-derive the bound from measurement, not
    multiplication, and only after the single-monitor stall work closes.
@@ -231,33 +250,18 @@ guard while there.
 A swapped pair yields an empty trace, and an empty trace is
 indistinguishable from an idle session unless something asserts identity.
 
-## #100 — the emit thread: remove it (measured 2026-08-07, owner-directed)
+## #100 — the emit thread: REMOVED 2026-08-07 (DONE)
 
-**Measured, and it buys nothing.** Same build, same host state, one
-config line apart, one monitor at 3840x2400: with the assembly on its
-own thread the frame period p50 is 17.65 ms; inline it is 17.77 ms — and
-the assembly stage itself is CHEAPER inline (0.230 ms against 0.313 ms),
-which is what the hand-off through a slot and two semaphores costs. The
-p90 moves the other way (26.40 -> 25.77 ms). Everything here is inside
-this host's leg-to-leg spread. Against at most a tenth of a millisecond
-of period it costs a permanent thread, two semaphores, a hand-off slot,
-join logic and a drop counter.
-
-**Owner decision 2026-08-07: if the result is strong, take it and keep
-the feature out of the clean-room upstream version.** The result is
-strong at one monitor.
-
-**Work:** remove `emit_thread` and its machinery, keeping the refactor
-that separated assembly from the encode path (it fixed a real
-use-after-free and is independent of where the work runs). Update the
-config documentation and the tests that name the knob.
-
-**Before removing, one limit stated:** the measurement is single
-monitor, and assembly work scales with monitor count, so the thread
-could matter at m >= 2. Either measure that first or record the removal
-as scoped to what was tested — do not carry the single-monitor result
-across silently (the same caution #80 carries for its per-monitor
-bound). Capture `i80_c1_nonregression_20260807_141752_s20`.
+The assembly thread, its two semaphores, its depth-1 hand-off slot, its
+join, its unarmed-drop counter and the `gfx.toml emit_thread` key are
+gone; assembly runs inline on the encoder worker through the same
+`gfx_emit_run_set()`. The separation of assembly from the encode path
+(the use-after-free fix) stays. An existing `gfx.toml` carrying the key
+still loads and warns once. **Scoped to one monitor — that is the only
+geometry measured; the thread is not shown to be worthless at m >= 2.**
+Record: `docs/experiments/100-the-emit-thread-bought-nothing.md`;
+capture `i80_c1_nonregression_20260807_141752_s20`; PRD FR-ACK-2 carries
+the design as history.
 
 ## #88 (was #61g) — the oracle client's 50–150 ms pauses: unattributed
 

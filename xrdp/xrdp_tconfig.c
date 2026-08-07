@@ -441,7 +441,6 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
      * PR-demo/mac_bisect_matrix/captures/i80_c1_nonregression_20260807_141752_s20
      * and .../i80_widen_legacy_20260807_143617_s20. */
     config->avc444_ffmpeg_eager_slot_ack = 1;
-    config->avc444_ffmpeg_emit_thread = 0;
     config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
@@ -491,7 +490,18 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             }
             if (et.ok)
             {
-                config->avc444_ffmpeg_emit_thread = et.u.b ? 1 : 0;
+                /* BACKLOG #100: the key is GONE and the EGFX assembly
+                 * always runs inline on the encoder worker. Warned, not
+                 * silently dropped: a deployment that set it true would
+                 * otherwise keep believing assembly is threaded, and
+                 * every other unhonourable value in this file (an out
+                 * of range wire_window, a bad avc_mode) says so out
+                 * loud. Parsing is unaffected -- an existing gfx.toml
+                 * still loads, with this one line in the log. */
+                TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg emit_thread was "
+                      "removed (BACKLOG #100): the EGFX assembly always "
+                      "runs on the encoder worker. The key is ignored; "
+                      "delete it from gfx.toml");
             }
             if (tf.ok)
             {

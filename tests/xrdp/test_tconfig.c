@@ -197,12 +197,11 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
      * legacy gate, so the mechanism alone does not describe what ships.
      * Expected values are the directive, not a reading of the loader.
      *
-     * NOTE for whoever changes these: the emit thread is deliberately
-     * NOT part of the shipped default (BACKLOG #100 removes it), so it
-     * is asserted OFF beside them rather than left unstated. */
+     * The third assertion here used to be the emit thread, off. BACKLOG
+     * #100 removed the thread and the field, so there is nothing left
+     * to assert about it. */
     ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
     ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 2);
-    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_emit_thread, 0);
 }
 END_TEST
 
@@ -384,6 +383,28 @@ START_TEST(test_tconfig_gfx_avc444_wire_window_out_of_range_refused)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_removed_key_still_parses)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+    int rv;
+
+    /* BACKLOG #100: emit_thread was removed on 2026-08-07. The
+     * requirement is a compatibility one, stated when the removal was
+     * authorised: a gfx.toml already in the field that still carries
+     * the key must LOAD, and the keys around it must be honoured -- the
+     * removed key may not swallow its neighbours or fail the file.
+     * (It also logs one warning, which this test cannot observe and
+     * which is not what the requirement is about.) */
+    rv = tconfig_load_gfx(GFXCONF_STUBDIR
+                          "/gfx_avc444_removed_emit_thread.toml",
+                          &gfxconfig);
+    ck_assert_int_eq(rv, 0);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 6);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames, 48);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -426,6 +447,8 @@ make_suite_tconfig_load_gfx(void)
                    test_tconfig_gfx_avc444_wire_window_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_empty_args_fallback);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_removed_key_still_parses);
 
     suite_add_tcase(s, tc_tconfig_load_gfx);
 

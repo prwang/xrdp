@@ -452,7 +452,6 @@ struct xrdp_mm
     int avc444_ltr_rekey_surface_reset; /* emit surface churn (#48)      */
     int avc444_eager_slot_ack; /* ack on absorb, not on egress (#70)     */
     int avc444_wire_window;    /* C, end-to-end wire window (#80)        */
-    int avc444_emit_thread;    /* EGFX assembly on its own thread (#70B) */
     int gfx_delay_autologin;
     int mod_uses_wm_screen_for_gfx;
     /* Whether a working h.264 library is loaded.

@@ -202,10 +202,6 @@ struct xrdp_tconfig_gfx
      * requires the paired xorgxrdp (xup contract 20260731+): an older
      * producer frees the slot with no region-return safety behind it.*/
     int avc444_ffmpeg_eager_slot_ack;
-    /* BACKLOG #70B / PRD FR-ACK-2: run the EGFX assembly on its own
-     * thread, joined after submit(N+1) and before collect(N+1).
-     * Requires aux_ltr_chain (the batch path). Default off. */
-    int avc444_ffmpeg_emit_thread;
     /* BACKLOG #80 / PRD FR-FLOW-1 clause 4: C, the end-to-end window on
      * how far the client may fall behind before xrdp stops admitting
      * captures. In FRAMES. The number a deployment wants is set by its
