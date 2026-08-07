@@ -160,11 +160,27 @@ fi
 [ -z "$SD" ] && { echo "FAIL: no fresh Xorg session"; exit 1; }
 echo "session display=$SD client=$CLI target=$TGT_NAME via :$LPORT"
 if [ "$TARGET" = pod ]; then
+    # The session's X authority file is wherever sesman told the X server
+    # to put it, so ASK THE RUNNING SERVER rather than guessing a path.
+    # Both previous guesses were wrong here and failed the same way, with
+    # "Authorization required, but no authorization protocol specified"
+    # and then "FAIL: no terminal" three minutes later:
+    #   /home/$SU/.Xauthority        -- does not exist; sesman puts it
+    #                                   under /var/run/xrdp/<uid>/
+    #   /var/run/xrdp/$(id -u)/...   -- $(id -u) inside kubectl exec is
+    #                                   ROOT, not the session's owner
+    # Reading it off the Xorg command line is correct whatever the user,
+    # the uid or the layout.
+    SXAUTH=$(t4 "pgrep -a -x Xorg | grep -oE '\-auth [^ ]+' \
+| head -1 | cut -d' ' -f2")
+    [ -z "$SXAUTH" ] && { echo "FAIL: no -auth on the session Xorg"; \
+                          exit 1; }
+    echo "session xauthority=$SXAUTH"
     # three levels of quoting (kubectl exec -> bash -lc -> su -c), so the
     # inner payload is wrapped in DOUBLE quotes: callers pass single
     # quotes of their own (pkill -f 'xterm.*colorkey') and redirections.
     sess() { t4 "su -s /bin/bash $SU -c \"DISPLAY=$SD \
-XAUTHORITY=/home/$SU/.Xauthority $*\""; }
+XAUTHORITY=$SXAUTH $*\""; }
 else
     sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
 fi

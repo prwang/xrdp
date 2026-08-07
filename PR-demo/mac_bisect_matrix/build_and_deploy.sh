@@ -186,6 +186,9 @@ declare -A ARM_XORG_DEB=(
     # x026: the LEGACY ack path carrying the strip payload, so the
     # multi-monitor comparison against x022 (frontier + strip) is not
     # producer-limited the way the textflood pair was (margin 0.5x).
+    # x027: THE INTERACTIVE ARM -- XFCE desktop, shipped defaults, built
+    # from HEAD so what the owner looks at is what actually ships.
+    [x027]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x026]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x025]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x023]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -257,6 +260,7 @@ declare -A ARM_TAG=(
     [x023]=1d5bc0960db8.xx10fa3aa-tf
     [x025]=1d5bc0960db8.xx10fa3aa-tf
     [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
+    [x027]=821218e54c24.xx10fa3aa-xfce.pc0097388
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
     # payload: same server build, different producer. Comparing it with
@@ -316,6 +320,10 @@ declare -A TAG_DEB=(
     # ackslot/ackregion carrying the client frontier and C, and egress
     # carrying the transport's queued KiB from trans::wait_bytes.
     [1d5bc0960db8.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260803024109.1d5bc0960db8_amd64.deb"
+    # x027 (the interactive arm): built from HEAD on 2026-08-07, so it
+    # carries the SHIPPED defaults -- the credit frontier on by default
+    # at wire_window 2, and no emit thread in the binary at all.
+    [821218e54c24.xx10fa3aa]="xrdp-dev_0.10.80+git20260807153324.821218e54c24_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
