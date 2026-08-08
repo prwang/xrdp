@@ -86,3 +86,46 @@ client image is introduced downstream of us.
   with the pipeline idle and credit unused (distance 1 before and
   after, so flow control was not involved). That silence was invisible
   in the log and is why an earlier reading of this fault was wrong.
+
+---
+
+## ADDENDUM — flat-white test, 17:36 UTC: the server's desktop is UNIFORM
+
+The owner set the desktop to flat white with `colorkey_x11` and reported
+**a 33 x 6 black rectangle on the RIGHT screen**.
+
+The server's framebuffer at that moment was scanned pixel by pixel — all
+16.6 million of them. **Non-white pixels: 1045, all of them inside
+x 20..142, y 19..43** — that is `colorkey_x11`'s own text label, which it
+draws at (20, ascent+16). Nothing else on the desktop is anything but
+white:
+
+* both monitors, uniformly white;
+* the 6-row dead band above the left monitor, white;
+* the 6-row dead band below the right monitor, white;
+* no 33 x 6 black rectangle anywhere, at any position.
+
+Recorded as `server_framebuffer_white_1280x361.png` (whole desktop) and
+`server_right_monitor_topleft_400x60.png` (the top-left 400 x 60 of the
+right monitor at full resolution, which is where such a hole would sit
+if it were ours).
+
+**So the black rectangle is introduced downstream of the X framebuffer.**
+That is not yet the same as "the client's fault": downstream includes our
+own capture, damage translation and encode. What it does exclude is the
+desktop contents themselves.
+
+**The dimensions are the two known anomalies multiplied together.** 33 is
+the panel's strut (27 px panel + the 6 px monitor offset); 6 is the
+monitor offset itself, and also the height of each dead band. A 33 x 6
+region is exactly the size of the intersection of those two, which is
+unlikely to be coincidence and is the thread to pull.
+
+**The next test, and it is two seconds:** with the rectangle visible,
+press `b` then `r` in `colorkey_x11`.
+
+* the rectangle stays BLACK through every colour -> it is a region that
+  receives no updates at all. Something is failing to damage, clip or
+  send it, and that is ours.
+* the rectangle changes colour with the rest -> it is being painted and
+  merely displaced, which puts it in the client's composition.
