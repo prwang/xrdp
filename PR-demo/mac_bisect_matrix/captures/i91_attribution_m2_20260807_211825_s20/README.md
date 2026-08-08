@@ -126,3 +126,147 @@ rather than drifted into.
   finding 2 is not such a claim: it is about two encoders within one
   stage, measured by their own per-child records.
 * The test client acknowledges each frame before decoding it.
+
+---
+
+## ADDENDUM 2026-08-08 — finding 2's INTERPRETATION is withdrawn; the encodes DO overlap
+
+The original text above is kept verbatim, wrong claim included, per the
+records rule. What is withdrawn is the sentence *"the encode stack runs
+them one screen at a time"* and everything built on it. The counts it
+rests on are still correct; they simply do not mean that.
+
+**What went wrong.** Finding 2 measured the ORDER of the four
+`outfirst` instants — did one screen's two children both produce output
+before the other's did. That is a statement about completion order. The
+claim made from it was about CONCURRENCY. Those are different
+quantities, and a set of intervals can be completion-ordered while
+overlapping throughout — which is exactly what happened. This is the
+same failure mode `CLAUDE.md` already names: a metric that cannot
+express the unit the claim is made in does not support the claim,
+however clean its number looks.
+
+**The right metric, from the same records, no new run.** A child's
+encode cannot begin before its whole raw frame has been handed over
+(the ffmpeg rawvideo reader needs a complete picture), and `feedend` is
+that instant; `outfirst` is the first byte of the result. So
+`[feedend, outfirst]` per child is the encode window, and two windows
+overlapping means two encodes running at once.
+
+| | leg A | leg B |
+|---|---|---|
+| the two SCREENS' encode windows overlap | **412 / 418** | 94 / 456 |
+| two children of the SAME screen overlap | **836 / 836** | **912 / 912** |
+
+Encodes overlap. In leg A, nearly always. Nothing is serialising them.
+
+**Why leg B's screens mostly do not overlap, when nothing forbids it.**
+The four children are fed concurrently, each at about the same
+1.2–1.3 GB/s, so their inputs complete in proportion to frame size. The
+big screen's picture is 13.8 MB against the small screen's 5.5 MB —
+2.5× — so its input lands 6.9 ms later (leg B p50). The small screen's
+encode takes 5.9 ms. It therefore finishes just before the big screen's
+encode can start, and the two windows miss each other by about a
+millisecond. It is a near-miss produced by frame-size asymmetry, not a
+lock.
+
+**Leg B timeline, milliseconds after `pump_beg`.** Each line is the
+MEDIAN of that instant across the 456 both-screen pumps, so the whole is
+a composite rather than one pump that happened (a single representative
+pump is what `i91_encode_overlap.py` prints, and it looks the same):
+
+```
+ 0.00  four children armed in one poll set; 38.7 MB of raw NV12 queued
+ 3.42  small screen, first child's input complete   -> its encode starts
+ 4.60  small screen, second child's input complete
+ 9.64  small screen, first output   (encode 5.9 ms = 1.61 ms/Mpx)
+10.39  small screen, second output
+11.31  big screen's input complete  -> its encode starts  (stagger 6.9 ms)
+23.51  big screen, first output     (encode 13.2 ms = 1.43 ms/Mpx)
+25.03  big screen, second output
+25.88  pump_end
+```
+
+The timeline closes: 0.85 ms from the last output to `pump_end`.
+
+**The screens are not competing for the encoder.** Cost per megapixel
+for the same screen, when it is alone in the pump versus sharing it
+(leg B, same run, same payload):
+
+| screen | alone in the pump | sharing with the other | change |
+|---|---|---|---|
+| 2560×1440 | 1.609 ms/Mpx (n=158) | 1.644 ms/Mpx (n=912) | +2.2 % |
+| 3840×2400 | 1.414 ms/Mpx (n=158) | 1.431 ms/Mpx (n=912) | +1.2 % |
+
+If a single serial engine were the constraint, sharing would roughly
+double the per-job cost. It adds one to two per cent. *Limit on this
+comparison:* in leg B the two screens' encodes mostly do not overlap,
+so this measures 2 concurrent children against 4 armed but staggered
+ones, not against 4 truly concurrent ones. Leg A has only n=2
+single-screen pumps, so the clean four-concurrent contention number is
+not in this capture.
+
+**The counterfactual, since the near-miss is what the whole picture
+rests on.** Overlap begins when the small screen's encode outlasts the
+stagger: scaling every encode by k, the windows meet at
+k > stagger / encode_small.
+
+| slowdown k | leg B pumps whose screens would overlap |
+|---|---|
+| 1.18 (p50 threshold) | half |
+| 1.5 | 436 / 456 (96 %) |
+| 2.0 | **455 / 456 (100 %)** |
+
+And this is not only arithmetic: **leg A is the natural experiment.** Its
+host state made encode 22–48 % slower per megapixel (2.007 and
+2.113 ms/Mpx against leg B's 1.609 and 1.414) with the stagger
+essentially unchanged (5.9 vs 6.9 ms), and its overlap fraction is 99 %
+instead of 21 %. A slower encoder produces MORE overlap, measured, in
+this capture.
+
+**What the pump is actually spending its time on.** 11.3 ms of a
+25.9 ms pump elapse before the last raw byte reaches a child — 38.7 MB
+of NV12 per pump at about 3.4 GB/s aggregate. The raw-input transfer,
+not the encoder, is what sets when work can start and what the biggest
+single block of the pump is.
+
+**Reproducing all of this:**
+`PR-demo/mac_bisect_matrix/i91_encode_overlap.py leg_B/perf/enc.599`
+(and `leg_A/perf/enc.252`) prints every number above from the rings in
+this capture. No new run is involved and none was made.
+
+**Findings 1 and 3 are unaffected.** Finding 1 never used these records.
+Finding 3's conclusion — no throughput ceiling — is reinforced rather
+than weakened by the per-megapixel table above.
+
+### Limit added 2026-08-08 — the GPU's clocks were not pinned
+
+**Neither leg pinned the GPU's power/clock state (DVFS).** The AMD
+render node was left to scale on its own, so its clocks were free to
+move between the two legs and within each of them. Three consequences,
+in the order they matter:
+
+1. **The 22-48 % per-megapixel difference between the legs has an
+   uncontrolled cause.** "Leg A ran a slower encoder" is what the
+   numbers show; *why* it was slower is not established, and unpinned
+   clocks are the obvious candidate. Leg A therefore supports the
+   DIRECTION of the counterfactual — slower encode, more overlap — and
+   is not a calibrated 1.25x arm. The k-threshold table is per-pump
+   arithmetic and does not depend on it.
+2. **The alone-versus-sharing contention table (+2.2 % / +1.2 %) is
+   within one leg**, so drift between legs cannot reach it, but drift
+   *inside* leg B can. The effect it reports is one to two per cent,
+   which is the size at which clock drift starts to matter. Read it as
+   "nothing resembling a 2x serialisation penalty", not as a
+   two-per-cent measurement.
+3. **What does NOT depend on any of this** is the load-bearing claim:
+   whether two encode windows overlap is a comparison of four instants
+   inside a single pump, spanning tens of milliseconds. Clock drift
+   does not reorder them. The 412/418, 94/456, 912/912 and 836/836
+   counts stand.
+
+The hardware retains its own nondeterministic scheduling regardless —
+a shared engine whose ordering we neither observe nor control. Nothing
+here claims otherwise. The claim is narrower and is what the item
+closes on: **our code does not serialise the two screens**, and the
+input transfer, which is ours, is what staggers them.

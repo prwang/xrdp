@@ -63,7 +63,7 @@ stay as "(was #NN)" in each header.
 4. ~~**#87** — emit-split and eager-ack ratios~~ **CLOSED 2026-08-06**
 5. **#88** (was #61g) — oracle client 50–150 ms pauses
 6. **#90** (was #74) — lever-2 architecture decision
-7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-07**: the screens are armed together and encode one after the other; the wall is below us
+7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-07, conclusion corrected 2026-08-08**: the encodes DO overlap; what staggers them is the raw-input transfer, and that transfer is the biggest block of the pump
 8. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest (consolidated 2026-08-06)
 9. **#93** (was #73; absorbs #97/was #60) — T4 re-establishment and re-runs
 10. **#94** (was #53) — arm a monitor only when its pixels changed
@@ -319,18 +319,54 @@ defaults, and the result is a wall in a component we do not own:
   the field's bias: the credit is sampled after the producer decided, so
   this direction is the one the bias favours; finding 2 is what makes it
   safe to act on.)
-* **When both screens ARE in one pump, their encodes do not overlap** —
-  in **874 of 874** both-screen pumps one screen's children all produced
-  first output before the other's began. The poll set arms four children
-  together and the encode stack still runs them one screen at a time.
+* ~~**When both screens ARE in one pump, their encodes do not overlap**~~
+  — **WITHDRAWN 2026-08-08.** The 874 of 874 count was the ORDER of the
+  four first-output instants, and it was read as a statement about
+  concurrency. Intervals can be completion-ordered and still overlap
+  throughout, which is what they do. Measuring the encode window itself
+  (`feedend` -> `outfirst`, the interval during which the child holds a
+  complete picture and has not yet emitted a result) on the SAME
+  capture: **the two screens' windows overlap in 412 of 418 pumps in
+  leg A** and 94 of 456 in leg B, and the two children of one screen
+  overlap in 912/912 and 836/836. Nothing serialises the encodes.
+* **What staggers the screens is the raw-input transfer.** All four
+  children are fed concurrently at ~1.2-1.3 GB/s each, so their inputs
+  complete in proportion to frame size: the 13.8 MB picture lands
+  6.9 ms after the 5.5 MB one, and in leg B the small screen's 5.9 ms
+  encode just fits inside that gap. A near-miss from frame-size
+  asymmetry, not a lock. Scale every encode by k and the windows meet
+  at k > 1.18 (p50); at k = 2.0, 455 of 456 pumps overlap. Leg A is the
+  natural experiment: 22-48 % slower per megapixel, same stagger, 99 %
+  overlap.
+* **The screens are not competing for the encoder**, and the input
+  transfer is the biggest single block of the pump. Same screen alone
+  in a pump versus sharing it costs +2.2 % / +1.2 % per megapixel; and
+  11.3 ms of a 25.9 ms pump elapse before the last of 38.7 MB of NV12
+  reaches a child (~3.4 GB/s aggregate).
 * **It is not a throughput ceiling.** A both-screen pump is the MOST
   pixel-efficient composition (2.03 ms/Mpx against 2.43 and 3.56 for
-  single-screen pumps), so capacity is not exhausted; the work simply is
-  not concurrent.
+  single-screen pumps), so capacity is not exhausted; the fixed
+  per-pump overhead is being amortised.
+
+**The claim this item closes on, stated at the width the evidence
+supports: OUR CODE does not serialise the two screens.** The pump arms
+every child in one `pollfd` set with one shared deadline and has no
+per-child blocking wait; the encode windows overlap; and what staggers
+the screens is the raw-input transfer, which is also ours. Nothing here
+claims the hardware is deterministic — a shared engine schedules its
+own work in an order we neither observe nor control, and **the GPU's
+clocks were NOT pinned in either leg**, which is the uncontrolled cause
+behind leg A being 22-48 % slower per megapixel. That makes leg A
+evidence for the DIRECTION of the counterfactual, not a calibrated
+1.25x arm, and it means the +2.2 % / +1.2 % contention figures should
+be read as "nothing resembling a 2x serialisation penalty" rather than
+as two-per-cent measurements. The overlap counts themselves compare
+four instants inside one pump and are immune to clock drift.
 
 Record and limits: capture
-`i91_attribution_m2_20260807_211825_s20`. Analysis of why the window
-divides by monitor count:
+`i91_attribution_m2_20260807_211825_s20` (see its 2026-08-08 addendum
+for the withdrawal, the timeline and the DVFS limit). Analysis of why
+the window divides by monitor count:
 `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.
 
 **What was decided along the way and stays decided:** the window is NOT
@@ -338,15 +374,21 @@ scaled by monitor count (measured — it moved batching from ~40 % to
 ~52 % and left the typical wait unchanged), and the per-screen
 consequence is documented in `gfx.toml(5)` instead.
 
-**REOPEN ONLY DELIBERATELY, and only for these two questions.** They are
-work against a component we do not own and must not be drifted into:
-1. Is the serialisation in the encode stack, or in our worker draining
-   one child before looking at the next? The feed instants are now
-   recorded per monitor too, so comparing them against the output
-   instants settles it — one analysis, no new run needed, on the capture
-   above.
-2. If it really is the driver or GPU: whether separate encoder processes
-   per monitor would overlap. That is a design change with its own cost.
+**Question 1 was answered 2026-08-08, from the capture above, no new
+run** — it was the sanctioned "one analysis" and it is what produced the
+withdrawal above. There is no serialisation to locate: the encodes
+overlap, our worker is not draining one child before looking at the
+next, and question 2 (separate encoder processes per monitor) is
+therefore MOOT — it existed only to fix a serialisation that is not
+there. Both are closed rather than left open.
+
+**The one thing this turned up that is worth opening deliberately** —
+and it is a different item, not a reopening of this one: the pump spends
+11.3 of 25.9 ms delivering 38.7 MB of raw NV12 into four pipes. That is
+a copy cost that scales with pixels and monitors, it is the largest
+block of the pump, and unlike the encoder it is entirely ours. Whether
+it can be shortened (fewer bytes, or handed over without the copy) is
+untouched. It is adjacent to #92, which reduces exactly those bytes.
 
 **Still true and unmeasured:** the per-monitor slot budget's
 independence (the original first half of this item) was never
