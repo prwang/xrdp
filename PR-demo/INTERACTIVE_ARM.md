@@ -103,12 +103,13 @@ Record: `captures/i80_onscreen_walk_x027_20260808/`.
 Open a terminal in XFCE (Applications → Terminal Emulator) and run each
 in turn. All are at `/usr/local/bin` in the running pod.
 
-**Caveat, 2026-08-08:** `colorkey.sh`, `codescroll10.sh` and
-`chroma_strip_anim` are baked into the image; **`chroma-probe` and
-`colorkey_x11` were copied into the running pod live** (along with the
-`python3-tk` package `chroma-probe` needs), because rebuilding the image
-would have restarted the arm mid-session. They do not survive a pod
-restart. Folding them into the image is outstanding.
+All of them ship **in the image** as of 2026-08-08, including
+`chroma-probe`'s `python3-tk`. They were briefly copied into a running
+pod by hand, which meant they died with it; `Containerfile` and
+`build_and_deploy.sh` now build and install all three, and the build
+aborts if any probe source is missing. An arm built before that date
+does not have `chroma-probe` or `colorkey_x11` — check with
+`ls /usr/local/bin/` before handing it over.
 
 ### 0. Main/aux pairing — `chroma-probe`
 

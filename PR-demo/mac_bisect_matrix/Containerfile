@@ -37,6 +37,17 @@ COPY textflood.c /src/textflood.c
 RUN cc -O2 -Wall -Wextra -Wno-unused-parameter -o /src/textflood \
         /src/textflood.c $(pkg-config --cflags --libs cairo x11 xext)
 
+# The onscreen probes a human judges the session with. They were being
+# copied into running pods by hand on 2026-08-08, which meant they died
+# with the pod and an arm could not be handed over reproducibly; the
+# missing python3-tk for chroma-probe was found the same way. Built here
+# so the runtime image carries binaries and no toolchain. See
+# PR-demo/README.md for which probe answers which question.
+COPY colorkey_x11.c /src/colorkey_x11.c
+COPY chroma_strip_anim.c /src/chroma_strip_anim.c
+RUN cc -O2 -Wall -Wextra -o /src/colorkey_x11 /src/colorkey_x11.c -lX11 \
+    && cc -O2 -Wall -o /src/chroma_strip_anim /src/chroma_strip_anim.c -lX11
+
 FROM debian:trixie
 
 ARG XRDP_DEB
@@ -52,12 +63,29 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         dbus procps openssl ca-certificates \
         xdotool \
         libcairo2 libx11-6 libxext6 \
+        python3-tk \
     && rm -rf /var/lib/apt/lists/*
+# python3-tk is chroma-probe's ONLY dependency and it is not pulled in by
+# anything else here. Its absence is why chroma-probe could not be started
+# in an arm on 2026-08-08.
 
 # BACKLOG #61b: the textflood payload binary (SESSION_KIND=textflood).
 # Runtime libs only -- the toolchain stays in the builder stage.
 COPY --from=textflood-build /src/textflood /usr/local/bin/textflood
 RUN chmod 755 /usr/local/bin/textflood
+
+# The onscreen probes, so an arm can be handed to a human without
+# copying anything into the running pod:
+#   chroma-probe        AVC444 main/aux pairing (needs python3-tk, above)
+#   colorkey_x11        flow control and motion, in real pixels
+#   chroma_strip_anim   4:4:4 versus 4:2:0
+COPY --from=textflood-build /src/colorkey_x11 /usr/local/bin/colorkey_x11
+COPY --from=textflood-build /src/chroma_strip_anim \
+     /usr/local/bin/chroma_strip_anim
+COPY chroma_probe.py /usr/local/bin/chroma-probe
+RUN chmod 755 /usr/local/bin/colorkey_x11 \
+              /usr/local/bin/chroma_strip_anim \
+              /usr/local/bin/chroma-probe
 
 # Optional full desktop (arm-g class): real content — wallpaper
 # gradients, antialiased text, window chrome — is where the Mac

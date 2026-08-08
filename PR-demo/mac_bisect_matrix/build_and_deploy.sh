@@ -383,15 +383,22 @@ fi
 # that cites it, so it is refused here and re-enabled deliberately with
 # ALLOW_LEGACY_PAYLOAD_REBUILD=1.
 #
-# CONSERVATIVE ON PURPOSE. Only textflood.c enters the build context
-# today, but the hash covers every .c in the payload directory. The
+# CONSERVATIVE ON PURPOSE. The hash covers every .c in the payload
+# directory plus the three onscreen probes, which are also things a
+# human sees and therefore part of what an arm presents. The
 # error direction is "a new tag when the image would have been
 # identical", never "the same tag for a different image".
 PAYLOAD_SRC=()
 while IFS= read -r f; do
     # an unmatched glob comes back as itself; drop it rather than hash it
     [ -f "$f" ] && PAYLOAD_SRC+=("$f")
-done < <(printf '%s\n' "$D"/../textflood/*.c | LC_ALL=C sort)
+done < <({ printf '%s\n' "$D"/../textflood/*.c
+           # the onscreen probes are part of what a session presents, so a
+           # change to one must mint a new tag exactly as a payload change does
+           printf '%s\n' "$D/chroma_probe.py"
+           printf '%s\n' "$D/../smoke_gate/colorkey_x11.c"
+           printf '%s\n' "$D/../win2022_ground_truth/chroma_strip_anim.c"
+         } | LC_ALL=C sort)
 [ "${#PAYLOAD_SRC[@]}" -gt 0 ] || {
     echo "ABORT: no payload sources in PR-demo/textflood"; exit 1; }
 PAYLOAD_HASH=$(
@@ -409,6 +416,17 @@ rm -rf "$BUILD" && mkdir -p "$BUILD"
 cp "$D/entrypoint.sh" "$D/startwm.sh" "$D/banner.sh" "$BUILD/"
 # BACKLOG #61b: textflood is compiled in a builder stage of the image
 cp "$D/../textflood/textflood.c" "$BUILD/"
+# The onscreen probes ship IN THE IMAGE. Copying them into a running pod
+# by hand (2026-08-08) meant they died with it and an arm could not be
+# handed over reproducibly; chroma-probe's python3-tk was missing for the
+# same reason. Every one of these must exist -- a silently absent probe
+# is an arm that cannot be judged.
+for f in "$D/chroma_probe.py" \
+         "$D/../smoke_gate/colorkey_x11.c" \
+         "$D/../win2022_ground_truth/chroma_strip_anim.c"; do
+    [ -f "$f" ] || { echo "ABORT: onscreen probe missing: $f"; exit 1; }
+    cp "$f" "$BUILD/"
+done
 for arm in $ARMS; do
     tag=${ARM_TAG[$arm]}
     # split the payload component off the tag, if it has one
