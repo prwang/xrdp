@@ -1053,7 +1053,7 @@ reviewed against.
    > partial tail improvement in exchange for re-meaning a shipped
    > default and adding two frames to the bound. The per-screen
    > consequence is DOCUMENTED instead, in `gfx.toml(5)`. Records:
-   > `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`,
+   > `docs/experiments/91-the-multimon-window-and-the-shared-pump.md`,
    > captures `i91_window4_m2_20260807_201346_s20` and
    > `i80_multimon_strip_20260807_152223_s20`.
 5. **Every queue carries a stated bound in frames and a test**

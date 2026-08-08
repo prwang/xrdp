@@ -63,7 +63,7 @@ stay as "(was #NN)" in each header.
 4. ~~**#87** — emit-split and eager-ack ratios~~ **CLOSED 2026-08-06**
 5. **#88** (was #61g) — oracle client 50–150 ms pauses
 6. **#90** (was #74) — lever-2 architecture decision
-7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-07, conclusion corrected 2026-08-08**: the encodes DO overlap; what staggers them is the raw-input transfer, and that transfer is the biggest block of the pump
+7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-08** — our code does not serialise the two screens
 8. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest (consolidated 2026-08-06)
 9. **#93** (was #73; absorbs #97/was #60) — T4 re-establishment and re-runs
 10. **#94** (was #53) — arm a monitor only when its pixels changed
@@ -146,7 +146,7 @@ MECHANISM and its BOUND, nothing more. Consequences:
   `C + 2·M`. The default stays C = 2, unscaled by monitor count, with
   the per-screen consequence documented in `gfx.toml(5)` instead —
   option 3 of the four laid out in
-  `docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`,
+  `docs/experiments/91-the-multimon-window-and-the-shared-pump.md`,
   chosen after the window-4 leg showed a multiplier would not fix the
   two-monitor stall.
 * Dropped with the rescope: "enough RTT points to choose the default",
@@ -257,19 +257,6 @@ guard while there.
 A swapped pair yields an empty trace, and an empty trace is
 indistinguishable from an idle session unless something asserts identity.
 
-## #100 — the emit thread: REMOVED 2026-08-07 (DONE)
-
-The assembly thread, its two semaphores, its depth-1 hand-off slot, its
-join, its unarmed-drop counter and the `gfx.toml emit_thread` key are
-gone; assembly runs inline on the encoder worker through the same
-`gfx_emit_run_set()`. The separation of assembly from the encode path
-(the use-after-free fix) stays. An existing `gfx.toml` carrying the key
-still loads and warns once. **Scoped to one monitor — that is the only
-geometry measured; the thread is not shown to be worthless at m >= 2.**
-Record: `docs/experiments/100-the-emit-thread-bought-nothing.md`;
-capture `i80_c1_nonregression_20260807_141752_s20`; PRD FR-ACK-2 carries
-the design as history.
-
 ## #88 (was #61g) — the oracle client's 50–150 ms pauses: unattributed
 
 Host CPU contention is ruled out (run-delay 0.5 % of client CPU, no
@@ -307,92 +294,6 @@ contract (the bufferbloat prohibition applies); the m≥2 arithmetic is
 projected, not measured (#91 owns those numbers). The old "do #61f
 step 1 first" constraint is retired — #61f's measurement showed the
 delivery-loop delay IS the encode in progress, not scheduling slack.
-
-## #91 (was #71, earlier #65) — multimon: CLOSED 2026-08-07, the wall is below us
-
-**Answered and stopped, per the stop rule.** Three attribution fields
-landed (`1fed64c1`), two 20 s legs ran at two monitors on the shipped
-defaults, and the result is a wall in a component we do not own:
-
-* **A screen that misses a pump is not held back by our flow control** —
-  157 of 158 absences had the credit already permitting it. (Read with
-  the field's bias: the credit is sampled after the producer decided, so
-  this direction is the one the bias favours; finding 2 is what makes it
-  safe to act on.)
-* ~~**When both screens ARE in one pump, their encodes do not overlap**~~
-  — **WITHDRAWN 2026-08-08.** The 874 of 874 count was the ORDER of the
-  four first-output instants, and it was read as a statement about
-  concurrency. Intervals can be completion-ordered and still overlap
-  throughout, which is what they do. Measuring the encode window itself
-  (`feedend` -> `outfirst`, the interval during which the child holds a
-  complete picture and has not yet emitted a result) on the SAME
-  capture: **the two screens' windows overlap in 412 of 418 pumps in
-  leg A** and 94 of 456 in leg B, and the two children of one screen
-  overlap in 912/912 and 836/836. Nothing serialises the encodes.
-* **What staggers the screens is the raw-input transfer.** All four
-  children are fed concurrently at ~1.2-1.3 GB/s each, so their inputs
-  complete in proportion to frame size: the 13.8 MB picture lands
-  6.9 ms after the 5.5 MB one, and in leg B the small screen's 5.9 ms
-  encode just fits inside that gap. A near-miss from frame-size
-  asymmetry, not a lock. Scale every encode by k and the windows meet
-  at k > 1.18 (p50); at k = 2.0, 455 of 456 pumps overlap. Leg A is the
-  natural experiment: 22-48 % slower per megapixel, same stagger, 99 %
-  overlap.
-* **The screens are not competing for the encoder**, and the input
-  transfer is the biggest single block of the pump. Same screen alone
-  in a pump versus sharing it costs +2.2 % / +1.2 % per megapixel; and
-  11.3 ms of a 25.9 ms pump elapse before the last of 38.7 MB of NV12
-  reaches a child (~3.4 GB/s aggregate).
-* **It is not a throughput ceiling.** A both-screen pump is the MOST
-  pixel-efficient composition (2.03 ms/Mpx against 2.43 and 3.56 for
-  single-screen pumps), so capacity is not exhausted; the fixed
-  per-pump overhead is being amortised.
-
-**The claim this item closes on, stated at the width the evidence
-supports: OUR CODE does not serialise the two screens.** The pump arms
-every child in one `pollfd` set with one shared deadline and has no
-per-child blocking wait; the encode windows overlap; and what staggers
-the screens is the raw-input transfer, which is also ours. Nothing here
-claims the hardware is deterministic — a shared engine schedules its
-own work in an order we neither observe nor control, and **the GPU's
-clocks were NOT pinned in either leg**, which is the uncontrolled cause
-behind leg A being 22-48 % slower per megapixel. That makes leg A
-evidence for the DIRECTION of the counterfactual, not a calibrated
-1.25x arm, and it means the +2.2 % / +1.2 % contention figures should
-be read as "nothing resembling a 2x serialisation penalty" rather than
-as two-per-cent measurements. The overlap counts themselves compare
-four instants inside one pump and are immune to clock drift.
-
-Record and limits: capture
-`i91_attribution_m2_20260807_211825_s20` (see its 2026-08-08 addendum
-for the withdrawal, the timeline and the DVFS limit). Analysis of why
-the window divides by monitor count:
-`docs/experiments/91-the-window-is-in-monitor-frames-not-refreshes.md`.
-
-**What was decided along the way and stays decided:** the window is NOT
-scaled by monitor count (measured — it moved batching from ~40 % to
-~52 % and left the typical wait unchanged), and the per-screen
-consequence is documented in `gfx.toml(5)` instead.
-
-**Question 1 was answered 2026-08-08, from the capture above, no new
-run** — it was the sanctioned "one analysis" and it is what produced the
-withdrawal above. There is no serialisation to locate: the encodes
-overlap, our worker is not draining one child before looking at the
-next, and question 2 (separate encoder processes per monitor) is
-therefore MOOT — it existed only to fix a serialisation that is not
-there. Both are closed rather than left open.
-
-**The one thing this turned up that is worth opening deliberately** —
-and it is a different item, not a reopening of this one: the pump spends
-11.3 of 25.9 ms delivering 38.7 MB of raw NV12 into four pipes. That is
-a copy cost that scales with pixels and monitors, it is the largest
-block of the pump, and unlike the encoder it is entirely ours. Whether
-it can be shortened (fewer bytes, or handed over without the copy) is
-untouched. It is adjacent to #92, which reduces exactly those bytes.
-
-**Still true and unmeasured:** the per-monitor slot budget's
-independence (the original first half of this item) was never
-decomposed, and nothing here speaks to three or more monitors.
 
 ## #92 (was #72, earlier #66/#63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (CONSOLIDATED 2026-08-06)
 
@@ -613,3 +514,5 @@ are in git history.
 | **#82** the unreproduced 26.7 ms x015 encoder wait | RETIRED 2026-08-06. Third independent null: the wait is EQUAL at frames-in-flight 1 and 2 (16.21/16.31 vs 16.16/16.20 ms, interleaved, same sitting). The period difference is the worker idling on a withheld credit — 0.58/0.79 ms against 3.76/4.98 ms once the one session-startup bracket per leg is excluded, which closes 97.6 % of the period gap — #79's defect, fixed by #80. The ~26 ms condition was then seen live on BOTH A/B arms at once, so it is a host state, not a frames-in-flight property. | capture `i82_x015_rerun_20260806_181825_s20` |
 | **#83** a faster benchmark producer | DONE 2026-08-06. `--scroll strip` (default off) takes the payload 16.2 -> 4.5 ms/frame deployed; FR-BENCH-1 margin 1.05x -> 3.94x and acceptance met (producer p90 5.8 ms below pipeline p10 15.75 ms). The control is the more useful result: a 3.6x faster producer did NOT change the pipeline's rate, so the textflood series was pipeline-limited, not producer-clocked. | capture `i83_strip_payload_20260806_182340_s20` |
 | **#87** emit-split and eager-ack ratios | CLOSED 2026-08-06. Emit split RETIRED unrun — the stage is 0.333 ms at 4K against the 6.39 ms its requirement rested on, which came from a build with two per-frame log writes inside the timed bracket; PRD FR-ACK-2's table, projection and ship-together clause deleted. The eager-ack half was measured in #80's merged A/B. | [`87-the-emit-split-was-measuring-its-own-logger.md`](docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md) |
+| **#91** multimon window + m≥2 serial cost | CLOSED 2026-08-08. Three answers: the window divides by monitor count (a frame id is one monitor's frame, and the window is session-wide); widening it does not fix the two-monitor stall, so the default is NOT scaled by M and the per-screen consequence is documented in `gfx.toml(5)`; and **our code does not serialise the two screens** — the encodes overlap, and what staggers them is our own raw-input transfer. Carries one retraction, and one question left open rather than answered: what sets the rate at which the ffmpeg children take their input. | [`91-the-multimon-window-and-the-shared-pump.md`](docs/experiments/91-the-multimon-window-and-the-shared-pump.md) |
+| **#100** remove the emit thread | DONE 2026-08-07. The assembly thread, its two semaphores, its depth-1 hand-off slot, its join, its unarmed-drop counter and the `gfx.toml emit_thread` key are gone; assembly runs inline on the encoder worker. The separation of assembly from the encode path (the use-after-free fix) stays, and an old `gfx.toml` still loads with one warning. **Scoped to one monitor** — the thread is not shown to be worthless at m >= 2. | [`100-the-emit-thread-bought-nothing.md`](docs/experiments/100-the-emit-thread-bought-nothing.md) |
