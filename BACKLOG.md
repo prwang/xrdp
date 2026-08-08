@@ -446,14 +446,12 @@ change deleting the chroma encode ever had. This is a BYTE lever. It
 cannot show up as rate on loopback by construction, and whether it
 converts to rate on a bandwidth-limited link is the next measurement.
 
-**OPEN, needs an owner decision (RED).** The chroma guarantee was
-exceeded by one frame: 1022 ms against the configured 1000. The decision
-exists only AT a frame, so the achievable bound is `chroma_refresh_ms`
-plus one frame interval. Either correct the stated bound or fire the
-guarantee one frame early -- the second is a prediction in a decision
-function whose selling point is that it has none. The unit test could
-not have caught this: its fixture uses 20 ms frames and 20 divides 1000,
-so a frame lands exactly on the bound.
+**The one-frame guarantee overshoot is SETTLED (owner, 2026-08-08):
+state the achievable bound, add no heuristic.** The delivered bound is
+`chroma_refresh_ms` plus one frame interval; an administrator who wants
+a hard 1000 ms at 40 fps asks for 975. Wording corrected in PRD
+FR-H264-9 and in both config comments; no code changed; the unit test
+gained a case whose frame gaps do not divide the bound.
 
 The five questions above, answered:
 

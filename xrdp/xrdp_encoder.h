@@ -141,8 +141,8 @@ xrdp_gfx_credit_frontier(int frame_id_consumed, int frame_id_server,
  * TWO TRIGGERS, and the first is a promise to the user rather than a
  * heuristic:
  *
- *   the GUARANTEE  chroma detail is restored at least every
- *                  refresh_ms, whatever the screen is doing. Without
+ *   the GUARANTEE  the first frame at or after refresh_ms carries
+ *                  chroma, whatever the screen is doing. Without
  *                  this, one animating window in a corner starves the
  *                  whole screen of chroma detail for as long as it
  *                  runs -- a static document beside a spinning cube
@@ -160,6 +160,16 @@ xrdp_gfx_credit_frontier(int frame_id_consumed, int frame_id_server,
  * trusting a comment. Damage geometry would also have been defensible
  * -- the server already computes it -- but timing alone is enough here
  * and needs nothing.
+ *
+ * THE BOUND THIS DELIVERS, stated exactly (corrected 2026-08-08 after
+ * a fleet run measured 1022 ms against a configured 1000). It is
+ * "the FIRST FRAME AT OR AFTER refresh_ms carries chroma", not
+ * "no more than refresh_ms passes". Those differ by up to one frame
+ * interval, because this function is only ever consulted when a frame
+ * exists and there is no way to send chroma between frames. The owner
+ * chose to state that rather than predict the next frame's arrival:
+ * a prediction would be the first heuristic in a decision whose whole
+ * selling point is that it has none.
  *
  * @param refresh_ms     chroma_refresh_ms; <= 0 DISABLES the feature
  *                       and the aux view is always sent (today's

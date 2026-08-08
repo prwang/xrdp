@@ -2548,8 +2548,22 @@ pipeline has.
 **The user-facing guarantee, and it is the requirement — the motion
 signal is an implementation detail underneath it:**
 
-> Chroma detail is restored at least every `chroma_refresh_ms`,
+> The FIRST FRAME AT OR AFTER `chroma_refresh_ms` carries chroma,
 > whatever the screen is doing.
+
+*Wording corrected 2026-08-08 on the owner's ruling, after the first
+fleet run measured a worst chroma gap of 1022 ms against a configured
+1000. The earlier wording — "chroma detail is restored at least every
+`chroma_refresh_ms`" — promised a hard ceiling the mechanism cannot
+deliver: the decision exists only AT a frame, and there is no way to send
+chroma between frames, so once the interval expires the earliest chroma
+can go is the next frame. **The bound an administrator gets is
+`chroma_refresh_ms` + one frame interval**, about 25 ms of headroom at
+40 fps; an administrator who needs a hard 1000 ms there asks for 975. The
+alternative — firing one frame early by predicting the next frame's
+arrival from the last inter-frame gap — was rejected: it would be the
+first heuristic in a decision function whose selling point is that it has
+none.*
 
 Without that bound the policy has a defect the owner named on
 2026-08-08 and which applies to *every* global motion signal: one
@@ -2568,7 +2582,7 @@ silently clamped:
 
 | key | meaning | default |
 |---|---|---|
-| `chroma_refresh_ms` | the guarantee above. **0 disables the feature.** | 0 |
+| `chroma_refresh_ms` | the guarantee above. The bound delivered is this value **plus one frame interval**. **0 disables the feature.** | 0 |
 | `chroma_idle_ms` | how long the pipeline must be quiet before chroma is sent again. Also bounds the aux RATE: aux cannot be sent more often than once per this interval, so 100 ms clamps chroma to at most 10 per second while the main view runs at whatever rate it needs. 0 means the guarantee is the only trigger. | 0 |
 
 Deliberately NOT a fraction of the screen. Post-compression size is not
@@ -2714,17 +2728,18 @@ FR-FLOW/BACKLOG #98 measured that on a limited link `fps = link_rate /
 frame_bytes` holds within 3 %; that predicts the saving converts to rate
 on a WAN, and predicting is all this run supports.
 
-**RED, open: the guarantee is exceeded by one frame.** Chroma went
-missing for a maximum of 1022 ms against the configured 1000. The
-decision exists only AT a frame, so the achievable bound is
-`chroma_refresh_ms` + one frame interval. The requirement wording above
-("at least every `chroma_refresh_ms`") therefore overstates what the
-mechanism can deliver, and the choice between correcting the wording and
-firing the guarantee one frame early is open. Note that
-`tests/xrdp/test_avc444_chroma_due.c` could not have caught this: its
-fixture uses 20 ms frames, 20 divides 1000, so a frame lands exactly on
-the bound. Every assertion in it is correct and the fixture still hides
-the effect.
+**The guarantee is exceeded by one frame — RESOLVED 2026-08-08 by
+correcting the stated bound (owner's ruling).** Chroma went missing for a
+maximum of 1022 ms against the configured 1000, because the decision
+exists only AT a frame. The requirement wording above now states what the
+mechanism delivers, and no code changed. `tests/xrdp/test_avc444_chroma_due.c`
+gained `test_chroma_due_bound_is_refresh_plus_one_frame`, which drives
+six frame rates none of which divides 1000 and pins the bound in both
+regimes — `ceil(refresh/gap)*gap` while frames arrive faster than the
+settle threshold, and simply `gap` once they arrive slower than it. The
+older case could not have caught this: its fixture uses 20 ms frames, 20
+divides 1000, so a frame lands exactly on the bound. Every assertion in
+it is correct and the fixture still hides the effect.
 
 ## 8.9 AVC444 wire serialization
 

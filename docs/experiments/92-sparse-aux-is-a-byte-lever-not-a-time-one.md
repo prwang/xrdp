@@ -144,6 +144,27 @@ feature promises:
 Either way the fixture gains a case with a frame gap that does not divide
 the bound, and that is a separate, announced change to the test.
 
+### RESOLVED 2026-08-08 — option 1, the owner's ruling
+
+**Accepted: state the achievable bound, add no heuristic.** The delivered
+guarantee is now written as "the FIRST FRAME AT OR AFTER
+`chroma_refresh_ms` carries chroma", and the bound an administrator gets
+is `chroma_refresh_ms` + one frame interval — about 25 ms of headroom at
+40 fps. The owner's note: a system administrator who wants a hard second
+can ask for 975 ms. No code changed; PRD FR-H264-9, the `gfx.toml` key
+comment and the decision function's own documentation were corrected.
+
+The test gained `test_chroma_due_bound_is_refresh_plus_one_frame`,
+announced as its own change. It drives six frame rates, none of which
+divides 1000, and pins the bound in **both** regimes: while frames arrive
+faster than the settle threshold the worst gap is `refresh` rounded up to
+a multiple of the frame gap; once they arrive slower than it, every frame
+is already a settle and the worst gap is simply the frame gap. The second
+regime was missing from the first draft of that test and it went red at
+a 300 ms frame gap — 1200 expected against 300 measured. The rule was
+incomplete, not the code. Worth recording: a fixture with a single frame
+rate could not have shown either the overshoot or this.
+
 ## Status
 
 The server-side implementation is complete and green in CI (207/207,

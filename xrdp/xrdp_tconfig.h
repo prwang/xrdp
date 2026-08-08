@@ -48,8 +48,10 @@
  * 4:4:4 when it settles. TWO keys, and the first is the one that
  * matters to a human:
  *
- *   chroma_refresh_ms  the GUARANTEE. Chroma detail is restored at
- *                      least this often, whatever the screen is doing.
+ *   chroma_refresh_ms  the GUARANTEE, and read the next paragraph for
+ *                      its exact shape: the FIRST FRAME AT OR AFTER
+ *                      this interval carries chroma, whatever the
+ *                      screen is doing.
  *                      0 DISABLES the whole feature -- the aux view is
  *                      sent on every frame, which is today's behaviour
  *                      exactly.
@@ -61,6 +63,18 @@
  *                      while the main view runs at whatever rate it
  *                      needs. 0 means the refresh bound is the only
  *                      trigger.
+ *
+ * WHAT chroma_refresh_ms REALLY BOUNDS, corrected 2026-08-08 after the
+ * first fleet run measured 1022 ms against a configured 1000 (owner
+ * ruling: state the achievable bound rather than add a heuristic).
+ * The decision exists only AT A FRAME -- there is no mechanism to send
+ * chroma between frames -- so once the interval expires, the earliest
+ * chroma can go is the next frame. The bound an administrator gets is
+ *
+ *      chroma_refresh_ms + one frame interval
+ *
+ * which at 40 fps is about 25 ms of headroom. Set the value with that
+ * in mind: if a hard 1000 ms is wanted at 40 fps, ask for 975.
  *
  * Deliberately NOT a fraction of the screen: post-compression size is
  * not a function of damaged area, so an area threshold is a number no

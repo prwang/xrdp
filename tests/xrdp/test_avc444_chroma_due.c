@@ -151,6 +151,103 @@ START_TEST(test_chroma_due_gap_never_exceeds_the_bound)
 END_TEST
 
 /*****************************************************************************/
+/* THE SAME PROPERTY WITH A FRAME GAP THAT DOES NOT DIVIDE THE BOUND,
+ * and it is a different number.
+ *
+ * ADDED 2026-08-08, announced as its own change, after the first fleet
+ * run measured a worst chroma gap of 1022 ms against a configured 1000
+ * (capture i92_sparse_aux_ab_20260808_211023_s20). The test above did
+ * not and could not catch that: it drives frames exactly 20 ms apart,
+ * 20 divides 1000, so a frame lands EXACTLY on the bound and the
+ * overshoot is unreachable in that fixture. Every assertion in it is
+ * correct and derived from the specification -- the fixture chose a
+ * frame gap that hides the effect. A test can be right in every line
+ * and still be unable to fail.
+ *
+ * WHAT THE GUARANTEE ACTUALLY PROMISES, per the owner's ruling of
+ * 2026-08-08 (option 1: state the achievable bound rather than predict
+ * the next frame's arrival, which would be the first heuristic in a
+ * decision whose selling point is that it has none):
+ *
+ *   the FIRST FRAME AT OR AFTER refresh_ms carries chroma
+ *
+ * so the gap between chroma frames can reach refresh_ms plus one frame
+ * interval, and no further. The expected values below are derived from
+ * the two trigger rules by hand, not read off the implementation, and
+ * there are TWO regimes because there are two triggers:
+ *
+ *   frames FASTER than idle_ms   nothing ever settles, so only the
+ *                                guarantee sends chroma. Chroma last
+ *                                went at time T, a multiple of GAP;
+ *                                the next one is the first multiple of
+ *                                GAP at or after T + REFRESH_MS. So the
+ *                                gap is REFRESH_MS ROUNDED UP to a
+ *                                multiple of GAP.
+ *   frames SLOWER than idle_ms   every frame is already a settle, so
+ *                                every frame carries chroma and the gap
+ *                                is simply GAP.
+ *
+ * The second regime is in this test because the first draft of it left
+ * it out and the case at GAP = 300 went red: 1200 expected against 300
+ * measured. The rule was incomplete, not the code -- exactly the kind
+ * of thing a fixture with only one frame rate cannot show.
+ */
+START_TEST(test_chroma_due_bound_is_refresh_plus_one_frame)
+{
+    /* frame gaps chosen so NONE of them divides 1000 -- which is the
+     * whole point of this case -- and spanning both regimes: 3..70 are
+     * faster than the 100 ms settle threshold, 300 is slower */
+    static const int gaps[] = { 3, 7, 24, 30, 70, 300 };
+    unsigned int g;
+
+    for (g = 0; g < sizeof(gaps) / sizeof(gaps[0]); g++)
+    {
+        int gap = gaps[g];
+        /* by hand, from the two rules above */
+        int expect = (gap >= IDLE_MS)
+                     ? gap
+                     : ((REFRESH_MS + gap - 1) / gap) * gap;
+        long long now = 0;
+        long long last_aux = -1;
+        long long prev_frame = -1;
+        long long prev_aux = -1;
+        long long worst = 0;
+
+        while (now <= 60000)
+        {
+            if (xrdp_gfx_chroma_due(REFRESH_MS, IDLE_MS, now, last_aux,
+                                    prev_frame))
+            {
+                if (prev_aux >= 0 && now - prev_aux > worst)
+                {
+                    worst = now - prev_aux;
+                }
+                prev_aux = now;
+                last_aux = now;
+            }
+            prev_frame = now;
+            now += gap;
+        }
+        ck_assert_int_eq((int)worst, expect);
+        /* the bound holds in BOTH regimes */
+        ck_assert_int_le((int)worst, REFRESH_MS + gap);
+        /* and in the motion regime it is strictly ABOVE REFRESH_MS,
+         * which is the whole finding: "at least every refresh_ms" was
+         * never what the mechanism could deliver */
+        if (gap < IDLE_MS && REFRESH_MS % gap != 0)
+        {
+            ck_assert_int_gt((int)worst, REFRESH_MS);
+        }
+    }
+    /* worked examples, so a reader can check the rule without running
+     * anything: at 24 ms frames the worst gap is 1008 (42 frames), and
+     * at 70 ms it is 1050 (15 frames) */
+    ck_assert_int_eq(((REFRESH_MS + 23) / 24) * 24, 1008);
+    ck_assert_int_eq(((REFRESH_MS + 69) / 70) * 70, 1050);
+}
+END_TEST
+
+/*****************************************************************************/
 /* THE SETTLE, and the rate clamp that follows from it.
  *
  * Derivation from the requirement: aux is sent when the pipeline has
@@ -244,6 +341,7 @@ make_suite_avc444_chroma_due(void)
     tcase_add_test(tc, test_chroma_due_disabled_sends_aux_every_frame);
     tcase_add_test(tc, test_chroma_due_guarantee_holds_under_unbroken_motion);
     tcase_add_test(tc, test_chroma_due_gap_never_exceeds_the_bound);
+    tcase_add_test(tc, test_chroma_due_bound_is_refresh_plus_one_frame);
     tcase_add_test(tc, test_chroma_due_settle_clamps_aux_to_the_idle_interval);
     tcase_add_test(tc, test_chroma_due_aux_rate_is_bounded_by_the_idle_interval);
     tcase_add_test(tc, test_chroma_due_without_idle_only_the_guarantee_fires);
