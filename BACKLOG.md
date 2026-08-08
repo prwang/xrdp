@@ -293,11 +293,41 @@ Reproduction `tools/vmsplice_pipe_bench.c` (no session, no GPU, no
 xrdp); evidence and the full mechanism in
 `PR-demo/mac_bisect_matrix/captures/i103_pipe_handover_20260808/`.
 
-**OPEN, needs the owner:** proving the in-situ counterfactual needs
-`fs/pipe-user-pages-soft` raised on the HOST -- it is read-only from
-inside the container and the change is host-wide. Until then the
-container handicap is stated wherever an absolute fleet number is
-quoted, and not corrected for.
+**MEASURED 2026-08-08, after the owner raised the host sysctl to 262144
+pages (1 GiB).** Container root now gets its 1 MiB pipe -- verified
+inside arm x030, where the default pipe went 8192 -> 65536 and the
+resize succeeds. Re-running the SAME four legs on the SAME arm with no
+code change:
+
+  segment          before (8 KiB)        after (1 MiB)
+  feed             7.50/7.99/9.05/8.52   1.95/2.05/1.86/1.96
+  encode          13.90/14.08/13.80/13.95  14.05/14.36/13.84/13.83
+  drain            1.03/1.16/1.17/1.21   0.38/9.89*/0.38/0.38
+  CYCLE           23.82/24.62/24.79/24.46  17.99/27.91*/17.02/17.11
+
+**The frame period fell 24.5 -> 17.0 ms, 41 fps to 59, from a host
+sysctl and nothing else.** The encode is invariant across all eight legs
+(13.80-14.36 ms), which is the control proving the change hit only the
+two segments that cross a pipe. (*leg a2 is an outlier, see the capture
+README -- its drain was 26x every other leg and its chroma encode ran
+22.7 ms; quarantined, not averaged.)
+
+**CONSEQUENCE, and it is the expensive part: every archived fleet number
+in this tree was taken with clamped pipes.** Comparing a future run to an
+archived one is invalid unless the archive is re-measured -- the box got
+~7 ms/frame faster at 3840x2400 for reasons unrelated to any xrdp
+change. Ratios WITHIN an archived capture stand; absolute numbers across
+the sysctl boundary do not.
+
+**STILL OPEN:** (a) the two-line check-and-log on `F_SETPIPE_SZ`, so a
+clamped pipe is never again invisible; (b) whether the sysctl change is
+made permanent on the host (it is a live `sysctl -w`, lost on reboot) --
+if not, every future measurement must re-verify the pipe size before
+being trusted; (c) re-measuring the archived baselines that later work
+will be compared against.
+
+Records: `captures/i103_pipe_handover_20260808/` (mechanism),
+`captures/i92_sparse_aux_ab_20260808_233519_s20/` (the before/after).
 
 ## #102 — a client displaces one screen by 33 px until it is minimised and restored (filed 2026-08-08, owner-reported; DOCUMENT ONLY, owner decision)
 

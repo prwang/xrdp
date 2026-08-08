@@ -1,0 +1,83 @@
+=== capture: captures/i92_sparse_aux_ab_20260808_233519_s20
+
+=== DID THE FEATURE APPLY? (this decides whether any rate below means anything) ===
+
+  Each row is one leg. "chroma frames" is how many frames carried the
+  aux (chroma) view; "luma only" is how many shipped the luma view alone.
+  "refresh_ms on the wire" is chroma_refresh_ms read out of the running
+  binary's own trace records, not out of the config file.
+
+  leg    cfg     chroma luma-only     share refresh_ms
+  ----------------------------------------------------
+  a1     OFF          0         0        -% no records
+  a2     OFF          0         0        -% no records
+  b1     ON          18       979      1.8%       1000
+  b2     ON          18       972      1.8%       1000
+
+=== THE GUARANTEE: how long did chroma ever go missing? ===
+
+  The requirement is "chroma detail is restored at least every
+  chroma_refresh_ms, whatever the screen is doing". These are the
+  wall-clock gaps between consecutive frames that carried chroma.
+  A max above the configured bound is a RED result whatever the rate says.
+
+  leg    cfg      gaps   mean ms       p50       p99       MAX
+  ------------------------------------------------------------
+  a1     OFF         0         -         -         -         -
+  a2     OFF         0         -         -         -         -
+  b1     ON         17     956.4    1008.3    1015.8    1015.8
+  b2     ON         17     956.4    1008.3    1017.9    1017.9
+
+=== HOW MANY ENCODER CHILDREN THE PUMP ARMED PER CYCLE ===
+
+  Two children per damaged monitor is the normal case (luma and chroma);
+  one means that cycle skipped chroma and did not wait for that child.
+  This is the same skip seen from the other side of the mechanism.
+
+  a1     OFF  {2: 942}
+  a2     OFF  {2: 608}
+  b1     ON   {1: 979, 2: 18}
+  b2     ON   {1: 972, 2: 18}
+
+=== RED: THE GUARANTEE WAS EXCEEDED ===
+
+  * leg_b1: chroma went missing for 1015.8 ms against a 1000 ms guarantee -- 15.8 ms over, which is about one frame interval (16.9 ms), because the decision exists only AT a frame and the first frame at or after the bound is the earliest chroma can go
+  * leg_b2: chroma went missing for 1017.9 ms against a 1000 ms guarantee -- 17.9 ms over, which is about one frame interval (17.0 ms), because the decision exists only AT a frame and the first frame at or after the bound is the earliest chroma can go
+
+  The rate below is still reported: it is what this build actually did.
+  It is not evidence that the bound is met.
+
+=== THE RATE ===
+
+  "frame interval" is the wall-clock gap between consecutive FRAMES
+  handed to the transport (one egress record each) -- the same quantity
+  e_gate_run.sh prints as its send-to-send gap, and it agrees with it
+  to within 0.2 ms. "period" is pump_beg to pump_beg, one encoder worker
+  cycle. "pump" is the part of that cycle spent waiting for the ffmpeg
+  children to finish encoding -- the segment a second encode is paid in.
+  "writes/frame" is how many network writes one frame took: a luma-only
+  frame carries one PDU where a full frame carries two.
+
+  leg  cfg   frames  mean ms      p50      p90      p99    period     pump   wr/fr
+  ----------------------------------------------------------------------------------
+  a1   OFF      942   17.887   17.740   19.537   26.092    17.985   16.380    4.00
+  a2   OFF      607   27.720   27.641   30.217   32.590    27.908   26.301    4.00
+  b1   ON       996   16.915   16.807   18.280   21.866    17.021   16.074    3.02
+  b2   ON       990   17.044   16.936   18.442   22.322    17.114   16.168    3.02
+
+=== WHAT IT BOUGHT ===
+
+  *** NO RATIO IS REPORTED. A condition's own two legs disagree by more
+  *** than 15 %, so its mean describes neither of them:
+  ***   control: legs 17.9 and 27.7 ms differ by 55 %
+
+  The per-leg numbers are in the table above and the cycle decomposition
+  below; read the disagreeing legs there and find out what happened to
+  the slow one before comparing anything.
+
+  Per-leg frame interval: control 17.887 / 27.720 | treatment 16.915 / 17.044
+
+  Bytes per frame are reported anyway, because they are a property of
+  what was ENCODED rather than of how fast the host was: control 3.469 MB
+  against treatment 1.925 MB, a 44.5 % reduction; the per-leg spread there is
+  control 3.452 / 3.485 | treatment 1.926 / 1.924.

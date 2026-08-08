@@ -1,0 +1,66 @@
+target=pod server=xrdp-x030-f9fb57b7-m7dkb arm=x030 port=40046 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i92_sparse_aux_ab_20260808_233519_s20/leg_a2
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 0 lines, xrdp.log 5 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 543: 1907362 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 2115697126 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 854 lines, mark was 0); taking it whole
+perf_trace_lines: 8504 records rendered, 13379 stage brackets left in the ring file, 0 outside the run window
+trace span: 19s for a 20s run
+=== #45 gate run: x030, oracle client, 20s ===
+image:    localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260808210040.7b550f6ae87f
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = #intra_refresh_framesstaysat240--thevalueeveryarchived
+#intra_refresh_frames_auxisdeliberatelyNOTset:absentmeans"follow
+#intra_refresh_frames",sotheauxviewcutsevery240AUXpictures.
+240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 608 over 16.8 s
+send-to-send gap: mean 27.7 ms  p50 28 ms  p90 30 ms  p99 31 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1137 of 1281 session frames — inside this leg): mean 16.1 ms  p50 15.8 ms  p90 18.4 ms
+FR-BENCH-1 margin = pipeline mean 27.7 ms / producer mean 16.1 ms = 1.73x
+         PRODUCER-LIMITED at 1.73x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.73x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 608 damage records
+36.12 sends/s = 36.12 pairs/s per monitor (1 monitor)
+surface 0 own period: n=608 mean 27.7 ms  p50 28.0 ms
+damage coverage: surface 0: 608
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 608   kids_armed: 2:608 (100%)
+
+E5 GATE: baseline 18.5 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 27.7 ms  ->  0.67x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    608 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x030
+image:  localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531
+gfx:    sha256:b5398151575c6318
+key:    localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531|b5398151575c6318
+when:   2026-08-08T21:07:26Z
+window: 3s at 1920x1080, 36225090 bytes
+  ASSERT VERDICT: PASS -- 6 checks clean, 1 NOT APPLICABLE to this capture (read the SKIP line above)
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x030.cert
+producer stamps archived: /work/PR-demo/mac_bisect_matrix/captures/i92_sparse_aux_ab_20260808_233519_s20/leg_a2/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i92_sparse_aux_ab_20260808_233519_s20/leg_a2

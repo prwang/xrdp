@@ -1,0 +1,52 @@
+=== #45 gate run: x030, oracle client, 20s ===
+image:    localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033
+package: xrdp-dev 0.10.80+git20260808210040.7b550f6ae87f
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = textflood
+refresh:  intra_refresh_frames = #intra_refresh_framesstaysat240--thevalueeveryarchived
+#intra_refresh_frames_auxisdeliberatelyNOTset:absentmeans"follow
+#intra_refresh_frames",sotheauxviewcutsevery240AUXpictures.
+240
+#TherunnerPINS-gtointra_refresh_framesitself(D7)andappends
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 997 over 16.8 s
+send-to-send gap: mean 16.9 ms  p50 17 ms  p90 18 ms  p99 20 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 1114 of 1265 session frames — inside this leg): mean 16.2 ms  p50 15.9 ms  p90 18.4 ms
+FR-BENCH-1 margin = pipeline mean 16.9 ms / producer mean 16.2 ms = 1.04x
+         PRODUCER-LIMITED at 1.04x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.04x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 997 damage records
+59.17 sends/s = 59.17 pairs/s per monitor (1 monitor)
+surface 0 own period: n=997 mean 16.9 ms  p50 17.0 ms
+damage coverage: surface 0: 997
+         one monitor, one surface — this is the single-monitor control (BACKLOG #64)
+cycles: 997   kids_armed: 1:979 (98%)  2:18 (2%)
+
+E5 GATE: baseline 18.5 ms mean per send (SAME payload — see E5_BASE_MS)
+         measured 16.9 ms  ->  1.09x
+         under 1.5x: RED. The stop rule applies: attribute the remainder (capture, vmsplice feed, NUT demux, LTR rewrite, EGFX assembly) before anything ships
+
+=== E4 — poll-set size the worker actually armed ===
+    979 kids_armed=1
+     18 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x030
+image:  localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531
+gfx:    sha256:b5398151575c6318
+key:    localhost/xrdp-bisect:7b550f6ae87f.xx10fa3aa-tf.p2fde5531|b5398151575c6318
+when:   2026-08-08T21:07:26Z
+window: 3s at 1920x1080, 36225090 bytes
+  ASSERT VERDICT: PASS -- 6 checks clean, 1 NOT APPLICABLE to this capture (read the SKIP line above)
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x030.cert

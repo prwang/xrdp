@@ -504,6 +504,61 @@ def main():
     n = avg(on, 'frame_ms_mean')
     print('=== WHAT IT BOUGHT ===')
     print()
+
+    # A CONDITION WHOSE OWN TWO LEGS DISAGREE HAS NO MEAN WORTH TAKING.
+    # Added 2026-08-08 after this script computed "1.343x" from a
+    # control condition whose legs were 17.9 and 27.7 ms -- a 55 %
+    # spread. The ratio was an artefact of one sick leg and would have
+    # been reported as the treatment's effect. The interleave exists to
+    # BRACKET drift; when the bracket is this wide it has caught
+    # something, and averaging across it hides exactly what it caught.
+    spread_limit = 15.0
+    disagree = []
+    for name, rs in (('control', off), ('treatment', on)):
+        vals = [r['frame_ms_mean'] for r in rs]
+        if len(vals) > 1 and min(vals) > 0:
+            spread = 100.0 * (max(vals) - min(vals)) / min(vals)
+            if spread > spread_limit:
+                disagree.append('%s: legs %s ms differ by %.0f %%'
+                                % (name,
+                                   ' and '.join(fmt(v, 1) for v in vals),
+                                   spread))
+    if disagree:
+        print('  *** NO RATIO IS REPORTED. A condition\'s own two legs '
+              'disagree by more')
+        print('  *** than %.0f %%, so its mean describes neither of '
+              'them:' % spread_limit)
+        for dline in disagree:
+            print('  ***   ' + dline)
+        print()
+        print('  The per-leg numbers are in the table above and the '
+              'cycle decomposition')
+        print('  below; read the disagreeing legs there and find out '
+              'what happened to')
+        print('  the slow one before comparing anything.')
+        print()
+        print('  Per-leg frame interval: control %s | treatment %s'
+              % (' / '.join(fmt(r['frame_ms_mean']) for r in off),
+                 ' / '.join(fmt(r['frame_ms_mean']) for r in on)))
+        print()
+        bo2 = avg(off, 'bytes_per_frame')
+        bn2 = avg(on, 'bytes_per_frame')
+        if bo2 == bo2 and bn2 == bn2:
+            print('  Bytes per frame are reported anyway, because they '
+                  'are a property of')
+            print('  what was ENCODED rather than of how fast the host '
+                  'was: control %s MB'
+                  % fmt(bo2 / 1e6))
+            print('  against treatment %s MB, a %s %% reduction; the '
+                  'per-leg spread there is'
+                  % (fmt(bn2 / 1e6), fmt(100.0 * (1.0 - bn2 / bo2), 1)))
+            print('  control %s | treatment %s.'
+                  % (' / '.join(fmt(r['bytes_per_frame'] / 1e6)
+                                for r in off),
+                     ' / '.join(fmt(r['bytes_per_frame'] / 1e6)
+                                for r in on)))
+        return 0
+
     print('  Every figure is the mean of that condition\'s TWO '
           'interleaved legs, so')
     print('  host drift across the sitting is bracketed rather than '
