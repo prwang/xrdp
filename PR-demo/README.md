@@ -70,6 +70,12 @@ realistic payload rather than a diagnostic pattern.
   the uprobe scripts for the X-server side, and its `gfx.toml` variants.
 * **`bench/`** — encoder and conversion throughput measurements backing
   `RESULTS.md`; no live session needed.
+* **`mac_bisect_matrix/x264_keyint_probe.c`** — asks libx264 what
+  keyframe interval xrdp's linked-library H.264 path actually gets,
+  under the presets `gfx.toml` ships. It never sets `i_keyint_max`, so
+  the answer is the library default; measured 250. Exists because the
+  ffmpeg path's scheduled refresh interval should be compared against
+  what xrdp has always done, not against a number from memory.
 * **`lib/`** — shared helpers: `capture_codec.sh` asserts the negotiated GFX
   codec from the xrdp log so a harness fails fast instead of validating the
   wrong codec; `show_img.sh` displays an image fullscreen in the session.

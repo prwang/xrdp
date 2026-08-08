@@ -2355,6 +2355,46 @@ Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed
 - **Verify, never assume:** at a scheduled index the slice MUST parse as `slice_type == I`. A P where intra was expected is a loud failure of the same class as an aux P with LT1 unseeded — never a silent emit. Four verification layers, in the order they run — only the last is onscreen: (1) the pure-C DPB simulator (`tests/xrdp/test_avc444_ltr.c`) replays the cut sequence in 1-context and 2-context modes and reports `missing_ref`/`overflow`/range violations without any decoder; (2) byte-exact goldens from `ltr_splice_ref.py`; (3) a **runtime** observed-vs-scheduled check in the rewriter, which is the only layer that runs before the client sees the picture, and fails the pair rather than shipping it; (4) wire captures from the fleet/T4 audited by `tools/avc444_ltr_wire_audit.py`. These structural checks are the WHOLE verification of I3 — the invariant is invisible onscreen in the success case (bounded and unbounded depth decode to identical pixels over a lossless pipe), so no amount of watching a healthy screen confirms it. Client-side risk must be stated precisely (corrected 2026-07-28 after conflating two boundaries): the bitstream fully determines reference structure, so a client cannot read a dependency across a cut that the server did not emit. The cut's only NOVEL wire element is a mid-stream non-IDR I slice — nri=3, the mmco6 self-mark/slot-replacement, the explicit rplm and the per-view frame_num stride already ship on every picture today and render correctly on mstsc/macOS/xfreerdp. A decoder that mishandled it would corrupt or wedge AT THE CUT CADENCE — a distinctive, immediately visible signature covered by the ordinary smoke gate. The separate, owner-blocked onscreen observation belongs to the **re-key boundary** (real IDR + epoch restart at the frame_num-wrap re-key): whether a 2-context client re-initialises its aux decoder at the epoch change is decoder-lifecycle behaviour, unprovable from the bitstream. Finally, containment CAN be made observable by injecting the divergence in the client harness: an oracle-client run that corrupts/drops exactly one P and measures pixel re-convergence — heals within **≤ `intra_refresh_frames` + 1 pairs** (241 at the default) measured from the injected corruption, and persists indefinitely on a `-g 30000` control — turns I3 into a measured recovery time with a discriminating control.
 - The aux-child respawn path is then dead code for this purpose and MUST be removed; a mid-stream main IDR ceases to exist by construction. **Removed 2026-07-29** (`a0d9e773`), together with `ltr_aux_fresh`. If LT1 were ever unseeded mid-chain the aux rewrite refuses the packet and the pair fails loudly — the correct mechanism, in the right place. Respawning would restart that child's frame index while the main child keeps counting, de-phasing the shared schedule: one fault made permanent. **Consequence to keep in view:** with the reset gone, the frame_num-wrap re-key is now the ONLY wrap protection (it used to be masked by the GOP IDR resetting the shared counter). `xrdp_ffmpeg_avc444_ltr_counter_cap()` and its "re-key unreachable" warning modelled that reset and became FALSE exactly at the D7 target of `-g 240`; both were deleted rather than adjusted, and the guard now lives where the mechanism is, as `test_ltr_cut_midstream_idr_keeps_chain`.
 
+**Where 240 came from, recorded 2026-08-08 because it was not written
+down and the number had begun to be quoted as though it were derived.**
+The 2026-07-28 measurement tested three intervals — 240, 60 and 15 —
+over a **180-frame** run. At 240 the only intra picture in that run is
+frame 0, so the refresh never fired and the 240 column reads 294 KB,
+identical to unrefreshed. The value that became the default is the one
+whose cost was measured by not exercising it. The real cost came later
+and separately: **+1.84 %** over 1688 pairs with 8 cuts (2026-07-29),
+against the ≈ +4 % this FR predicted.
+
+**What justifies it, on the evidence available (owner ruling,
+2026-08-08).** Not a derivation — a convention, and the *same*
+convention the rest of xrdp already ships. **x264's `i_keyint_max`
+defaults to 250 and `xrdp_encoder_x264.c` never overrides it**
+(measured 2026-08-08 by calling `x264_param_default_preset` directly:
+250 under `ultrafast`/`zerolatency` and under `veryfast`/`zerolatency`
+alike; the encoder sets threads, geometry, fps, RC method, VBV and
+profile, and nothing else). So the linked-library H.264 path has been
+emitting a **real IDR** — a full DPB flush — every 250 pictures for
+years, without complaint. Our scheduled refresh at 240 is within 4 % of
+that cadence and is strictly gentler: a non-IDR I that flushes nothing.
+`xrdp_encoder_openh264.c` likewise never sets an intra period and
+inherits its library default, which was not verifiable on this box (the
+OpenH264 headers are not installed) and is therefore not quoted here.
+
+**The honest limit on the justification, stated so it is not
+rediscovered.** The refresh insures against divergence — a decoder or
+rewrite bug carried forward by the P chain — and **no instance has ever
+been observed on this path**. Of the three sources this FR names, "a
+frame the client skips under load" has no mechanism on EGFX (surface
+commands arrive over TCP, in order, and are applied), and "a rewrite
+bug" has historically been *systematic* rather than transient (the Mac
+AVC444v2 blackout, the cyan bleed — both recurred every frame, and a
+periodic intra would have masked neither). D8's fault injection
+measures recovery GIVEN a corruption; the RATE of corruptions is the
+term that decides whether the premium is worth paying, and it has never
+been measured because the event has never been seen. The interval is
+therefore kept as cheap conventional insurance matching the x264 path,
+and **not** presented as a derived quantity.
+
 **Invariant this exists to enforce (I3).** Direct reference age in the LTR topology is always exactly one picture, so "staleness" is *transitive dependency depth*: the distance back to the last picture in that view coded without a reference. A pure P chain leaves it unbounded, meaning any encoder/decoder divergence (client decoder bug, a rewrite bug, a frame the client skips under load) persists until reconnect. The refresh interval N is precisely the bound, and it must be bounded in **both** views — a main-only refresh does not bound aux. Note this is about *divergence containment*, not loss recovery and not seeking: an RDP stream is live and never seeks, and a fresh connection always builds a new encoder that opens with a real IDR.
 
 **Retained from the original FR.** Bounded deadlines remain the safety net, unchanged:
@@ -2512,27 +2552,41 @@ threshold rather than one past it. Non-vacuity demonstrated: changing
 one `>=` to `>` turns four of the seven red, with the worst chroma gap
 becoming 1020 ms against the 1000 ms bound.
 
-**OPEN BLOCKER, and it is why the encoder does not yet act on this.**
-The paired intra refresh (FR-H264-6, D7) gives both children the
-identical FRAME-INDEXED schedule `expr:not(mod(n,N))`, where `n` is
-that child's own input frame index. Skipping aux frames makes the aux
-child's `n` diverge from the main child's, so scheduled cuts stop
-landing on the same picture ordinal in both views and wire-audit checks
-A2-A4 fail by construction. Three candidate resolutions, none free, all
-requiring a decision before code:
+**HOW THE INTRA REFRESH WORKS UNDER SPARSE AUX (decided 2026-08-08,
+owner ruling; this replaces the blocker recorded when FR-H264-9 was
+first written).** Skipping aux frames makes the aux child's input index
+diverge from the main child's, so the two views' scheduled cuts stop
+coinciding. The resolution is the one FR-H264-6 already anticipated in
+its 1:1-pairing caveat and BACKLOG #45 D12: **each child keeps a
+frame-indexed schedule on ITS OWN input index, and the two intervals
+are two separate integers.**
 
-1. **Re-key the aux chain on resume** (the #48 mechanism already
-   exists). Costs an IDR every time chroma resumes — up to ten per
-   second at `chroma_idle_ms = 100`, which could easily exceed what
-   skipping saves.
-2. **Drive the schedule by time rather than frame index**
-   (`expr:gte(t,...)`), so both children cut at the same instant
-   whatever their frame counts. Changes the rewriter's
-   observed-versus-requested ordinal contract.
-3. **Feed the aux child a repeat picture** to keep `n` in lockstep, and
-   simply not send its PDU. Preserves the schedule and the chain, saves
-   the wire bytes, but keeps the pack and encode cost — which is most
-   of the win.
+  * `intra_refresh_frames` — the main view, in main pictures.
+  * `intra_refresh_frames_aux` — the aux view, in **aux** pictures.
+
+No time anywhere, no derived value, no coupling between them. Nothing
+in the rewriter changes and no argv mechanism changes, because each
+child is already keyed on its own index.
+
+**A3 does not apply to sparse aux (owner ruling, 2026-08-08).** The
+wire-audit check `intra_ord['main'] == intra_ord['aux']` compares view
+ordinals, and under sparse aux "the same view ordinal" is not a
+meaningful comparison — main ordinal 240 and aux ordinal 240 are
+different moments. **A3 remains in force whenever the aux cadence is
+1:1**, which is the shipped default. Every other check is per view and
+is unaffected: A2 (`ordinal % N == 0` in its own view), A4, A5, A6, A7.
+Verified against `tools/avc444_ltr_wire_audit.py` rather than assumed —
+`intra_ord[view]` is built by enumerating that view's own picture list.
+
+**Consequence, documented rather than engineered around.** With the
+interval counted in aux pictures, the aux view's self-heal bound in
+wall-clock stretches when aux is sparse: under continuous motion aux
+emits one picture per `chroma_refresh_ms`, so the worst case is
+`intra_refresh_frames_aux x chroma_refresh_ms`. The main view is
+unaffected — it still receives every frame. This is accepted: the
+insurance being stretched is against an event never observed (see
+FR-H264-6), and chroma divergence is the same class of degradation this
+feature already trades away by design.
 
 **Acceptance criteria (unchanged from BACKLOG #92 except where this
 requirement sharpens them):** default OFF reproduces today's behaviour
