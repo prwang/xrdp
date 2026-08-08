@@ -1921,6 +1921,238 @@ START_TEST(test_ltr_dpb_scheduled_paired_cut_both_modes)
 END_TEST
 
 /*****************************************************************************/
+START_TEST(test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes)
+{
+    /* BACKLOG #92 / PRD FR-H264-9, at the DPB level and in BOTH client
+     * decode modes (one interleaved decoder, and one decoder per view).
+     *
+     * The sparse-aux cadence sends chroma on only some frames, and the
+     * owner's decision (2026-08-08) is that each view then keeps its
+     * OWN intra refresh interval, counted in its OWN pictures: two
+     * plain integers, no time anywhere. This test asserts the two
+     * consequences of that decision that a reader is entitled to be
+     * suspicious of.
+     *
+     * ONE: a skipped chroma frame breaks nothing. The aux long-term
+     * slot LT1 keeps the last chroma picture across any number of
+     * luma-only frames, so the next aux P still resolves to the
+     * previous aux picture in both decode modes, and no slot is ever
+     * evicted or left unresolved.
+     *
+     * TWO: the aux interval bounds a chain of AUX pictures, not of
+     * frames. That is the price of the design and it is asserted here
+     * rather than left in prose: with chroma on every tenth frame and
+     * an aux interval of 4 aux pictures, the aux prediction chain is
+     * 3 pictures deep but spans 40 frames of wall time, while the main
+     * chain of 23 pictures spans 23 frames.
+     *
+     * The scenario: 400 consecutive frames. Every frame carries luma;
+     * every tenth frame also carries chroma. The main view cuts every
+     * 24 main pictures, the aux view every 4 aux pictures. */
+    struct ltr_run_stats st;
+    struct ltr_seq_ctx c;
+    const int n_frames = 400;
+    const int aux_every = 10;
+    const int main_cut_period = 24;
+    const int aux_cut_period = 4;
+    int main_pics;
+    int aux_pics;
+    int main_cuts;
+    int aux_cuts;
+    int depth[2];
+    int worst[2];
+    int n;
+    int k;
+    int i;
+
+    memset(&c, 0, sizeof(c));
+    n = 0;
+    main_pics = 0;
+    aux_pics = 0;
+    main_cuts = 0;
+    aux_cuts = 0;
+    /* frame 0: the stream-start main IDR, and the aux seed I that puts
+     * the first chroma picture in LT1 */
+    ltr_emit_main_idr(&c, n, &g_aus[n]);
+    n++;
+    main_pics++;
+    ltr_emit_aux(&c, n, &g_aus[n]);
+    n++;
+    aux_pics++;
+    for (k = 1; k < n_frames; k++)
+    {
+        if (k % main_cut_period == 0)
+        {
+            ltr_emit_main_cut_i(&c, n, &g_aus[n]);
+            main_cuts++;
+        }
+        else
+        {
+            ltr_emit_main_p(&c, n, &g_aus[n]);
+        }
+        n++;
+        main_pics++;
+        if (k % aux_every != 0)
+        {
+            continue;   /* luma-only frame: no chroma picture at all */
+        }
+        if ((k / aux_every) % aux_cut_period == 0)
+        {
+            ltr_emit_aux_cut_i(&c, n, &g_aus[n]);
+            aux_cuts++;
+        }
+        else
+        {
+            ltr_emit_aux(&c, n, &g_aus[n]);
+        }
+        n++;
+        aux_pics++;
+    }
+    /* the generator produced the stream that was described, counted by
+     * hand from the parameters above: 400 main pictures, one per
+     * frame; 40 aux pictures, one per tenth frame (frames 0, 10, ...,
+     * 390); main cuts at main ordinals 24, 48, ..., 384 = 16 of them;
+     * aux cuts at aux ordinals 4, 8, ..., 36 = 9 of them (ordinal 0 is
+     * the seed I, emitted above and not counted as a cut). */
+    ck_assert_int_eq(main_pics, n_frames);
+    ck_assert_int_eq(aux_pics, n_frames / aux_every);
+    ck_assert_int_eq(main_cuts, (n_frames - 1) / main_cut_period);
+    ck_assert_int_eq(aux_cuts, (n_frames / aux_every - 1) / aux_cut_period);
+    ck_assert_int_eq(n, main_pics + aux_pics);
+    ck_assert_int_le(n, LTR_MAX_TEST_AUS);
+
+    ltr_run_both_modes(g_aus, n, &st);
+
+    /* Every P resolves to its own view's previous picture, identically
+     * in the interleaved and the per-view decode -- ltr_run_both_modes
+     * asserts that for each one; the count here is so a generator that
+     * silently stopped emitting cannot pass. Main: 400 pictures, less
+     * the stream-start IDR, less 16 cuts = 383. Aux: 40 pictures, less
+     * the seed I, less 9 cuts = 30. */
+    ck_assert_int_eq(st.p_slices_checked,
+                     (main_pics - 1 - main_cuts) + (aux_pics - 1 - aux_cuts));
+    ck_assert_int_eq(st.p_slices_checked, 413);
+    /* ONE: nothing was lost across the luma-only frames */
+    ck_assert_int_eq(st.one_ctx.window_evictions, 0);
+    ck_assert_int_eq(st.one_ctx.missing_ref, 0);
+    ck_assert_int_eq(st.aux_only.window_evictions, 0);
+    ck_assert_int_eq(st.aux_only.missing_ref, 0);
+    /* exactly one IDR in the whole stream, at the start: a skipped
+     * chroma frame must never provoke a decoder reset */
+    for (i = 1; i < n; i++)
+    {
+        ck_assert_int_eq(g_aus[i].is_idr, 0);
+    }
+
+    /* TWO: each view's chain is bounded by ITS OWN interval, in ITS
+     * OWN pictures */
+    depth[0] = -1;
+    depth[1] = -1;
+    worst[0] = 0;
+    worst[1] = 0;
+    for (i = 0; i < n; i++)
+    {
+        int v = g_aus[i].view;
+
+        if (!g_aus[i].slice_p)
+        {
+            depth[v] = 0;
+        }
+        else
+        {
+            ck_assert_int_ge(depth[v], 0);
+            depth[v]++;
+            if (depth[v] > worst[v])
+            {
+                worst[v] = depth[v];
+            }
+        }
+    }
+    ck_assert_int_eq(worst[0], main_cut_period - 1);
+    ck_assert_int_eq(worst[1], aux_cut_period - 1);
+    /* and the consequence stated in pictures is restated in FRAMES,
+     * because that is the unit the cost is paid in: an aux chain 3
+     * pictures deep is 30 frames of wall time at this cadence, plus
+     * the 10 frames to the next chroma picture -- 40 -- against 23
+     * frames for the main chain. A future change that makes the aux
+     * interval a count of FRAMES would fail this line. */
+    ck_assert_int_eq(worst[1] * aux_every, 30);
+    ck_assert_int_eq(aux_cut_period * aux_every, 40);
+    ck_assert_int_gt(aux_cut_period * aux_every, main_cut_period);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_ltr_schedule_aux_has_its_own_period)
+{
+    /* BACKLOG #92 / FR-H264-9: the rewriter's OBSERVED-vs-REQUESTED
+     * check must consult the AUX child's interval for the aux view,
+     * not the main child's. Before this change there was one shared
+     * refresh_period and the aux view was judged against the main
+     * number, which under the sparse-aux cadence is a different count
+     * of different pictures.
+     *
+     * The cut vector sequence's intra pictures sit at MAIN view
+     * ordinals 0, 2, 4 and (as a mid-stream IDR) 5, and at AUX view
+     * ordinals 0 and 2. Those positions are a property of the recorded
+     * bitstreams, declared in the .kind column of ltr_cut_seq[], and
+     * every expectation below is read off that column. */
+    struct xrdp_h264_ltr_state st;
+    static unsigned char buf[8192];
+    int k;
+
+    /* THE DISCRIMINATING CASE. Main interval 2 fits the main view's
+     * I, P, I, P, I. Aux interval 3 does NOT fit the aux view: it
+     * expects a cut at aux ordinals 0 and 3, and the recorded aux
+     * ordinal 2 is an intra picture where a P was scheduled. So the
+     * pair at k = 5 must be REFUSED -- and it can only be refused by
+     * a rewriter that used 3 for the aux view, because the main
+     * interval of 2 expects a cut exactly there and would accept it. */
+    memset(&st, 0, sizeof(st));
+    st.refresh_period = 2;
+    st.refresh_period_aux = 3;
+    for (k = 0; k <= 4; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+    ck_assert_int_ne(ltr_cut_feed(&st, 5, buf, (int)sizeof(buf), NULL), 0);
+    /* a rejected packet leaves the aux ordinal where it was */
+    ck_assert_int_eq(st.pic_index[1], 2);
+
+    /* AND THE COMPATIBILITY CASE, which is what ships by default: an
+     * aux interval equal to the main one reproduces the paired
+     * behaviour exactly -- accepted through aux ordinal 3, refused at
+     * aux ordinal 4 where the schedule says a cut is due and the
+     * recorded picture is a P. */
+    memset(&st, 0, sizeof(st));
+    st.refresh_period = 2;
+    st.refresh_period_aux = 2;
+    for (k = 0; k <= 8; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+    ck_assert_int_ne(ltr_cut_feed(&st, 9, buf, (int)sizeof(buf), NULL), 0);
+
+    /* AND THE UNDECLARED CASE: a zero aux interval means "the runner
+     * declared only one number", and the aux view falls back to it.
+     * Byte-for-byte the behaviour of every state that existed before
+     * this field did, which is what keeps the golden vectors and the
+     * unscheduled diagnostic arms working. */
+    memset(&st, 0, sizeof(st));
+    st.refresh_period = 2;
+    st.refresh_period_aux = 0;
+    for (k = 0; k <= 8; k++)
+    {
+        ck_assert_int_eq(ltr_cut_feed(&st, k, buf, (int)sizeof(buf),
+                                      NULL), 0);
+    }
+    ck_assert_int_ne(ltr_cut_feed(&st, 9, buf, (int)sizeof(buf), NULL), 0);
+}
+END_TEST
+
+/*****************************************************************************/
 Suite *
 make_suite_avc444_ltr(void)
 {
@@ -1955,7 +2187,10 @@ make_suite_avc444_ltr(void)
     tcase_add_test(tc, test_ltr_cut_nonidr_i_accepted_both_views);
     tcase_add_test(tc, test_ltr_cut_midstream_idr_keeps_chain);
     tcase_add_test(tc, test_ltr_schedule_observed_vs_requested);
+    tcase_add_test(tc, test_ltr_schedule_aux_has_its_own_period);
     tcase_add_test(tc, test_ltr_dpb_scheduled_paired_cut_both_modes);
+    tcase_add_test(tc,
+                   test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes);
     suite_add_tcase(s, tc);
     return s;
 }

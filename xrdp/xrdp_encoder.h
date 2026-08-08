@@ -409,7 +409,30 @@ struct xrdp_encoder
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain  */
     int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)    */
     int avc444_intra_refresh_frames; /* scheduled refresh (FR-H264-6)    */
+    int avc444_intra_refresh_frames_aux; /* the aux view's own (#92)     */
     int avc444_ltr_rekey_surface_reset; /* 0 = mask the churn (#48)     */
+    /* BACKLOG #92 / PRD FR-H264-9 -- the sparse-aux cadence: send the
+     * AVC444 aux (chroma) view only when the screen has settled, and at
+     * least every avc444_chroma_refresh_ms whatever it is doing.
+     * 0 DISABLES the feature and the aux view goes on every frame,
+     * which is byte-for-byte the behaviour that shipped before it.
+     * avc444_chroma_idle_ms is how long the pipeline must have been
+     * quiet to count as settled, and is also the aux RATE clamp.
+     * Both come from gfx.toml, both are already refused-if-out-of-range
+     * by the loader, and both are forced to 0 unless aux_ltr_chain is
+     * on -- the skip lives in submit/pump/collect, which is that path. */
+    int avc444_chroma_refresh_ms;
+    int avc444_chroma_idle_ms;
+    /* Per-monitor sparse-aux clocks, in the encoder worker's monotonic
+     * milliseconds, owned and read only by the encoder worker thread.
+     * avc444_last_aux_ms is when this monitor last sent chroma (-1 =
+     * never, so the first frame of a session always carries it) and
+     * avc444_prev_frame_ms is when this monitor last submitted anything
+     * at all, which is what "the pipeline has been quiet" is measured
+     * against. Per monitor rather than global so that one animating
+     * screen cannot hold chroma back on a still one. */
+    long long avc444_last_aux_ms[16];
+    long long avc444_prev_frame_ms[16];
     /* aux_ltr_chain re-key (BACKLOG #48): when the shared frame_num
      * counter hits the threshold the encoder pair is destroyed, and the
      * NEXT frame for that monitor rebuilds the client's decoder by

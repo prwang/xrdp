@@ -2347,23 +2347,28 @@ Cost at 3840×2400 (180 frames, nvenc): throughput unchanged (52 fps unrefreshed
 
 **Requirement (replaces the prohibition).** The runner MUST drive intra refresh by schedule, not by respawn:
 
-- Both children are spawned with an **identical frame-indexed** `-force_key_frames` schedule, so the refresh indices are deterministic and known before submission (this also makes the future `main‖aux` parallel submit race-free — see FR-PROC-7). **This assumes 1:1 main/aux pairing**: both children see the same frame indices. FR-PROC-7's sparse aux cadence breaks that assumption and must re-derive the aux schedule from the aux child's own frame index — so it may not land first (BACKLOG #45 D12, #40).
-- **The interval is `intra_refresh_frames`** (gfx.toml key; C field `avc444_ffmpeg_intra_refresh_frames`), **default 240**, accepted range **[24, 4096]** — refused by the loader and clamped by the runner outside it — effective only when `aux_ltr_chain = true`. There is deliberately **no 0/off value**: an off switch would keep the deleted aux-respawn path alive as a shadow fallback, and a silent degradation path is exactly what the strict-honesty rule forbids. **`-g` is set EQUAL to `intra_refresh_frames`** in the child argv, retiring the `-g 30000` interim: GOP boundaries then coincide with scheduled indices, so every intra picture is a scheduled one whatever shape the backend gives it, and "unscheduled mid-stream IDR" ceases to be a reachable state rather than merely a rare one.
+- Each child is spawned with a **frame-indexed** `-force_key_frames` schedule keyed on **its own input index**, so the refresh indices are deterministic and known before submission (this also makes the future `main‖aux` parallel submit race-free — see FR-PROC-7). With 1:1 main/aux pairing — the shipped default — the two intervals are equal and both children see the same frame indices, so a cut lands on the same picture ordinal in both views, which is what the wire audit's A3 check asserts. **IMPLEMENTED 2026-08-08 (#92):** the sparse-aux cadence of FR-H264-9 breaks that assumption deliberately, and it is met by giving the aux view its own interval counted in aux pictures rather than by deriving anything (BACKLOG #45 D12, #40 — the D12 note predicted exactly this and it is what was built). A3 does not apply under a sparse cadence, by definition: the ordinals cannot coincide.
+- **The intervals are `intra_refresh_frames` and `intra_refresh_frames_aux`** (gfx.toml keys; C fields `avc444_ffmpeg_intra_refresh_frames` / `..._aux`), **two independent integers with no time in either**, **default 250 each**, accepted range **[24, 4096]** — refused by the loader and clamped by the runner outside it — effective only when `aux_ltr_chain = true`. The main one counts MAIN pictures and the aux one counts AUX pictures, so under a sparse cadence the same number is a different amount of wall time in each view; that is the intended and documented cost, not an oversight. **`intra_refresh_frames_aux` absent means "follow `intra_refresh_frames`"**, so every gfx.toml written before the key existed — including every fleet arm, which say 240 — keeps meaning exactly what it meant; taking the shipped default instead would de-phase the two views on the 1:1 path and start failing the wire audit on tables nobody edited. There is deliberately **no 0/off value** for either: an off switch would keep the deleted aux-respawn path alive as a shadow fallback, and a silent degradation path is exactly what the strict-honesty rule forbids. **`-g` is set EQUAL to that child's interval** in its argv, retiring the `-g 30000` interim: GOP boundaries then coincide with scheduled indices, so every intra picture is a scheduled one whatever shape the backend gives it, and "unscheduled mid-stream IDR" ceases to be a reachable state rather than merely a rare one.
 - The rewriter converts the scheduled intra picture of **both** views into a **paired cut**: main → non-IDR I self-marking LT0, aux → non-IDR I self-marking LT1, **no IDR and no DPB flush anywhere**. Either child shape is acceptable input (nvenc's non-IDR I or VAAPI's IDR) because the rewriter relabels the header; what matters is only that the picture is intra-coded. *Parameter sets are NOT repeated at a cut* (revised 2026-07-28; **implemented and made unambiguous 2026-07-29, BACKLOG #45 D18**): a non-IDR I is not a decoder entry point, an RDP stream never seeks, and EGFX is reliable, so a repeated SPS/PPS costs bytes at every refresh and buys nothing — **measured: 206 B per cut on the VAAPI shape** (SPS 29 + PPS 4 + SEI 173, arm-o capture). An earlier wording of this clause said child-emitted parameter sets still pass through on the main view, which cannot both hold on VAAPI, whose cut IS a child IDR carrying them. Resolved: at a CONVERTED cut the child's SPS/PPS/SEI are DROPPED; at a real epoch entry they pass through unchanged. Guarded — only a set proven BYTE-IDENTICAL to the one already on the wire may be dropped, and a CHANGED set fails the packet, because swallowing a changed SPS is silent whole-picture corruption. The AUD is not a parameter set and still ships on every frame (Windows shape).
 - **IMPLEMENTED 2026-07-29** (xrdp `9653bd1f` + `a0d9e773`; BACKLOG #45 steps 1-4). Both shapes are accepted, in both views, and the mid-stream main IDR is converted instead of flushing. Three things worth carrying forward from the implementation: (a) the EMITTER needed no change at all — the existing non-IDR arm of `slice_ltr_rewrite()` already produces the exact required bytes for both new shapes and is view-agnostic, so the work was input-parse and walker state only; (b) the reject at `:2128` was the SMALL half — three walker-level gates keyed on `ntype == 5` rather than on the picture being intra, so fixing only the slice-level reject would still have refused an nvenc aux cut and would not have seeded LT1 from one; (c) `convert_intra` is decided ONCE per picture (in a bounded pre-scan, because the parameter-set decision must be made before the first NAL is emitted) and every slice of a multi-slice picture must agree with it or the packet fails. **Original survey (2026-07-28), for the record:** a non-IDR I fell into the `B/SP/SI or non-IDR I` reject at `:2128`, and a mid-stream IDR on the main view was accepted but reset the shared counter to 0 and cleared `aux_seeded` (`:2447`, `:2527`) — precisely the flush this FR abolishes. Supporting both is the substance of the work, not a detail: the two backends genuinely differ, so a build that handles only nvenc's shape is broken on VAAPI and vice versa. The conversion mechanism itself already exists and is proven in production — `to_seed_i` performs exactly this IDR → self-marking non-IDR I relabel for the aux seed; it must be generalised to the main view.
 - The session's **first** picture remains a real IDR (the decoder's entry point and the origin of LT0).
 - **Verify, never assume:** at a scheduled index the slice MUST parse as `slice_type == I`. A P where intra was expected is a loud failure of the same class as an aux P with LT1 unseeded — never a silent emit. Four verification layers, in the order they run — only the last is onscreen: (1) the pure-C DPB simulator (`tests/xrdp/test_avc444_ltr.c`) replays the cut sequence in 1-context and 2-context modes and reports `missing_ref`/`overflow`/range violations without any decoder; (2) byte-exact goldens from `ltr_splice_ref.py`; (3) a **runtime** observed-vs-scheduled check in the rewriter, which is the only layer that runs before the client sees the picture, and fails the pair rather than shipping it; (4) wire captures from the fleet/T4 audited by `tools/avc444_ltr_wire_audit.py`. These structural checks are the WHOLE verification of I3 — the invariant is invisible onscreen in the success case (bounded and unbounded depth decode to identical pixels over a lossless pipe), so no amount of watching a healthy screen confirms it. Client-side risk must be stated precisely (corrected 2026-07-28 after conflating two boundaries): the bitstream fully determines reference structure, so a client cannot read a dependency across a cut that the server did not emit. The cut's only NOVEL wire element is a mid-stream non-IDR I slice — nri=3, the mmco6 self-mark/slot-replacement, the explicit rplm and the per-view frame_num stride already ship on every picture today and render correctly on mstsc/macOS/xfreerdp. A decoder that mishandled it would corrupt or wedge AT THE CUT CADENCE — a distinctive, immediately visible signature covered by the ordinary smoke gate. The separate, owner-blocked onscreen observation belongs to the **re-key boundary** (real IDR + epoch restart at the frame_num-wrap re-key): whether a 2-context client re-initialises its aux decoder at the epoch change is decoder-lifecycle behaviour, unprovable from the bitstream. Finally, containment CAN be made observable by injecting the divergence in the client harness: an oracle-client run that corrupts/drops exactly one P and measures pixel re-convergence — heals within **≤ `intra_refresh_frames` + 1 pairs** (241 at the default) measured from the injected corruption, and persists indefinitely on a `-g 30000` control — turns I3 into a measured recovery time with a discriminating control.
 - The aux-child respawn path is then dead code for this purpose and MUST be removed; a mid-stream main IDR ceases to exist by construction. **Removed 2026-07-29** (`a0d9e773`), together with `ltr_aux_fresh`. If LT1 were ever unseeded mid-chain the aux rewrite refuses the packet and the pair fails loudly — the correct mechanism, in the right place. Respawning would restart that child's frame index while the main child keeps counting, de-phasing the shared schedule: one fault made permanent. **Consequence to keep in view:** with the reset gone, the frame_num-wrap re-key is now the ONLY wrap protection (it used to be masked by the GOP IDR resetting the shared counter). `xrdp_ffmpeg_avc444_ltr_counter_cap()` and its "re-key unreachable" warning modelled that reset and became FALSE exactly at the D7 target of `-g 240`; both were deleted rather than adjusted, and the guard now lives where the mechanism is, as `test_ltr_cut_midstream_idr_keeps_chain`.
 
-**Where 240 came from, recorded 2026-08-08 because it was not written
-down and the number had begun to be quoted as though it were derived.**
-The 2026-07-28 measurement tested three intervals — 240, 60 and 15 —
-over a **180-frame** run. At 240 the only intra picture in that run is
-frame 0, so the refresh never fired and the 240 column reads 294 KB,
-identical to unrefreshed. The value that became the default is the one
-whose cost was measured by not exercising it. The real cost came later
-and separately: **+1.84 %** over 1688 pairs with 8 cuts (2026-07-29),
-against the ≈ +4 % this FR predicted.
+**Where 240 came from, and why the default is now 250 (owner decision,
+2026-08-08).** Recorded because the number had begun to be quoted as
+though it were derived, and it was not. The 2026-07-28 measurement
+tested three intervals — 240, 60 and 15 — over a **180-frame** run. At
+240 the only intra picture in that run is frame 0, so the refresh never
+fired and the 240 column reads 294 KB, identical to unrefreshed. The
+value that became the default is the one whose cost was measured by not
+exercising it. The real cost came later and separately: **+1.84 %** over
+1688 pairs with 8 cuts (2026-07-29), against the ≈ +4 % this FR
+predicted. **The default was moved 240 → 250 on 2026-08-08** so that the
+number matches the one xrdp's linked-library H.264 path has always used
+(next paragraph), leaving nothing in the tree that a reviewer has to
+take on faith. The change costs 4 % of the refresh cost — about 0.07 %
+of bytes on the measured corpus.
 
 **What justifies it, on the evidence available (owner ruling,
 2026-08-08).** Not a derivation — a convention, and the *same*
@@ -2374,8 +2379,9 @@ defaults to 250 and `xrdp_encoder_x264.c` never overrides it**
 alike; the encoder sets threads, geometry, fps, RC method, VBV and
 profile, and nothing else). So the linked-library H.264 path has been
 emitting a **real IDR** — a full DPB flush — every 250 pictures for
-years, without complaint. Our scheduled refresh at 240 is within 4 % of
-that cadence and is strictly gentler: a non-IDR I that flushes nothing.
+years, without complaint. Our scheduled refresh is now **the same 250**
+and is strictly gentler: a non-IDR I that flushes nothing and keeps both
+long-term chains alive, against a full DPB flush.
 `xrdp_encoder_openh264.c` likewise never sets an intra period and
 inherits its library default, which was not verifiable on this box (the
 OpenH264 headers are not installed) and is therefore not quoted here.
@@ -2485,13 +2491,51 @@ Open before the default can change: the scheduled-paired-refresh work of the rev
 
 ---
 
-### FR-H264-9 (PROPOSED, not implemented): 4:2:0 while the screen is in motion, 4:4:4 when it settles
+### FR-H264-9 (IMPLEMENTED in the server, not yet measured on a fleet arm): 4:2:0 while the screen is in motion, 4:4:4 when it settles
 
-**Status: the DECISION LOGIC and its configuration are implemented and
-unit-tested; the encoder does not yet act on them.** Specified
-2026-08-08 on the owner's ruling (option "B + refresh bound"). Default
-OFF: with `chroma_refresh_ms` absent or 0 the aux view is sent on every
-frame, which is byte-for-byte today's behaviour.
+**Status 2026-08-08: the whole server-side path is built and green in
+CI — the decision function, its configuration, the encoder skip, the
+two independent refresh schedules, and the luma-only wire framing.**
+Specified 2026-08-08 on the owner's ruling (option "B + refresh
+bound"). Default OFF: with `chroma_refresh_ms` absent or 0 the aux view
+is sent on every frame, which is byte-for-byte today's behaviour. What
+is NOT yet done is everything that needs hardware: the fleet arm, the
+throughput A/B, and the onscreen judgement of what an alternating
+stream looks like on a real client.
+
+**How the skip is implemented, end to end.** One decision per monitor
+per frame in the encoder worker's submit pass
+(`gfx_avc444_aux_due()`), then:
+
+  * `xrdp_ffmpeg_avc444_submit_pair()` is called with a **NULL aux
+    picture**. The aux child is not fed — no picture, no sequence
+    entry — so its input index does not advance, which is what makes
+    `intra_refresh_frames_aux` a count of aux pictures.
+  * `xrdp_ffmpeg_avc444_pump_pairs()` does not arm that child in the
+    poll set and does not wait for it: a luma-only frame reports
+    `kids_armed = 1` where a chroma frame reports 2. Feeding nothing
+    and still waiting would have stalled every skipped frame until the
+    pair deadline; the unit test counts the armed children so that
+    mistake cannot pass.
+  * `xrdp_ffmpeg_avc444_collect_pair()` pops and rewrites only the
+    main view and returns the pair with `aux_data` NULL and
+    `aux_len` 0. **The aux long-term reference LT1 is untouched** and
+    still holds the last chroma picture, which is what the next aux
+    P-slice predicts from — skipping a frame shortens no prediction
+    chain and needs no re-seed. The frame_num re-key check still runs,
+    because the shared counter advanced with the main picture.
+  * `gfx_wiretosurface1_avc444()` emits the **LC=1 luma PDU alone** and
+    returns it as the command's last PDU instead of queueing it ahead
+    of an LC=2. That is what the AVC444 `LC` field is for: the client
+    updates luma and keeps the chroma it already has. No new wire
+    element is introduced.
+
+Per-monitor clocks, not global: one animating screen must not hold
+chroma back on a still one. The clocks are wrap-free monotonic
+milliseconds read with `clock_gettime(CLOCK_MONOTONIC)`, deliberately
+not `g_get_elapsed_ms()`, whose 32-bit value wraps every 49.7 days —
+at the wrap every elapsed time would go negative, read as "not due",
+and the session would lose chroma permanently.
 
 **Purpose.** The AVC444 aux view carries the chroma detail and is
 **44.8 % of the bytes** (measured from wire dumps: main P 2.09 MB, aux
@@ -2542,15 +2586,55 @@ signature. Damage geometry would also have been defensible — the server
 already computes it, and using it grants no new access — but timing
 alone suffices here and needs nothing.
 
-**Verification.** `tests/xrdp/test_avc444_chroma_due.c`, seven cases
-whose expected values are derived from this specification by hand and
-never read off the implementation, including: OFF sends aux on every
-frame; the gap between chroma frames never exceeds the bound across 60 s
-of unbroken 50 fps motion; the aux rate is bounded by the idle interval
-for every frame gap from 1 to 500 ms; and both triggers fire AT their
-threshold rather than one past it. Non-vacuity demonstrated: changing
-one `>=` to `>` turns four of the seven red, with the worst chroma gap
-becoming 1020 ms against the 1000 ms bound.
+**Verification, in the order the escalation ladder runs it.** All of it
+is CI; none of it needs a client, a GPU or a session.
+
+1. **The decision function** — `tests/xrdp/test_avc444_chroma_due.c`,
+   seven cases whose expected values are derived from this
+   specification by hand and never read off the implementation,
+   including: OFF sends aux on every frame; the gap between chroma
+   frames never exceeds the bound across 60 s of unbroken 50 fps
+   motion; the aux rate is bounded by the idle interval for every frame
+   gap from 1 to 500 ms; and both triggers fire AT their threshold
+   rather than one past it. Non-vacuity demonstrated: changing one
+   `>=` to `>` turns four of the seven red, with the worst chroma gap
+   becoming 1020 ms against the 1000 ms bound.
+2. **The client's decode topology, in both shapes** —
+   `test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes`
+   replays 400 frames with chroma on every fourth, main cutting every
+   24 main pictures and aux every 4 aux pictures, through the pure-C
+   DPB simulator in **1-context** (one interleaved decoder, the mstsc
+   shape) and **2-context** (one decoder per view, the macOS shape).
+   Every P resolves to its own view's previous picture in both modes,
+   no long-term slot is evicted or left unresolved across the
+   luma-only frames, and there is exactly one IDR in the whole stream.
+   It also asserts the cost in the unit it is paid in: the aux chain
+   is 3 pictures deep but 40 frames wide, against 23 frames for main.
+3. **The rewriter's schedule check** —
+   `test_ltr_schedule_aux_has_its_own_period` proves the aux view is
+   judged against the AUX child's interval and not the main child's,
+   by a case that is accepted under the old shared-period logic and
+   must be refused under the new one; plus the compatibility case (aux
+   interval equal to main reproduces the paired behaviour exactly) and
+   the undeclared case (a zero aux interval falls back to the main
+   one, byte-for-byte the behaviour of every state that existed before
+   the field did).
+4. **The real encoder** —
+   `test_ffmpeg_sparse_aux_independent_schedules_live` drives **two
+   real ffmpeg children** through the real rewriter for 200 frames
+   with chroma on every fourth: a skipped frame returns no aux
+   bitstream (not a stale copy of the previous frame's, which is the
+   failure that would look right on screen and be a pairing fault on
+   the wire), the pump arms one child instead of two, the main view
+   cuts 9 times on main ordinals and the aux view 3 times on **aux**
+   ordinals — a factor of three apart, so neither child can have been
+   spawned with the other's number — and nothing after the first
+   picture is an IDR. Gated on `XRDP_TEST_FFMPEG_PATH`; run
+   2026-08-08 against `/usr/bin/ffmpeg`, 207/207 pass.
+5. **Configuration** — `test_tconfig_gfx_avc444_sparse_aux` and its
+   out-of-range sibling, including the back-compatibility property
+   that a table setting only `intra_refresh_frames` gets an aux
+   interval equal to it.
 
 **HOW THE INTRA REFRESH WORKS UNDER SPARSE AUX (decided 2026-08-08,
 owner ruling; this replaces the blocker recorded when FR-H264-9 was
@@ -2589,13 +2673,19 @@ FR-H264-6), and chroma divergence is the same class of degradation this
 feature already trades away by design.
 
 **Acceptance criteria (unchanged from BACKLOG #92 except where this
-requirement sharpens them):** default OFF reproduces today's behaviour
-exactly; the decision logic is pure and unit-tested (**met**); smoke
-gate PASS before any measurement; wire audit A1-A7 PASS in **both**
-regimes; the client tolerates an alternating stream, verified on the
-macOS and Windows clients before any rate is quoted; the E5-2 pair
-re-run and DECOMPOSED, not just rated; and a still-screen visual check
-that subpixel-AA text is 4:4:4 sharp.
+requirement sharpens them), with what is met so far:**
+
+| criterion | state 2026-08-08 |
+|---|---|
+| default OFF reproduces today's behaviour exactly | **met** — `chroma_refresh_ms` defaults to 0, is forced to 0 unless `aux_ltr_chain` is on, and the aux interval follows the main one when unset, so no existing table changes meaning |
+| the decision logic is pure and unit-tested | **met** — no pixel reaches it; seven cases |
+| the decode topology survives skipped chroma in both client shapes | **met** — the DPB simulator, 1-context and 2-context |
+| the two refresh schedules are independent and each counted in its own view | **met** — rewriter test plus a live two-child ffmpeg run |
+| smoke gate PASS before any measurement | not yet — needs the deb and the arm |
+| wire audit A1–A7 PASS in **both** regimes (A3 exempted under a sparse cadence, above) | not yet — needs a capture |
+| the client tolerates an alternating stream, on the macOS and Windows clients, before any rate is quoted | **not yet, and it is the one that cannot be answered offline** |
+| the throughput pair re-run and DECOMPOSED, not just rated | not yet |
+| a still-screen visual check that subpixel-AA text is 4:4:4 sharp | not yet |
 
 ## 8.9 AVC444 wire serialization
 

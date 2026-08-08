@@ -207,17 +207,40 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
 #define XRDP_H264_LTR_FRAME_NUM_REKEY_MAX XRDP_H264_LTR_FRAME_NUM_REKEY
 #define XRDP_H264_LTR_FRAME_NUM_REKEY_MIN 64
 
-/* Scheduled paired intra refresh (PRD FR-H264-6, gfx.toml
- * intra_refresh_frames): the number of pictures between scheduled cuts
- * in EACH view. Both children are spawned with the identical
- * frame-indexed -force_key_frames schedule, so a cut lands on the same
- * picture ordinal in both views. There is deliberately NO 0/off value
- * (#45 D6): an off switch would keep the deleted aux-respawn path alive
- * as a shadow fallback. The loader REFUSES an out-of-range value (the
- * default stands) and the runner CLAMPS independently. */
-#define XRDP_H264_INTRA_REFRESH_FRAMES 240
+/* Scheduled intra refresh (PRD FR-H264-6, gfx.toml
+ * intra_refresh_frames / intra_refresh_frames_aux): the number of
+ * pictures between scheduled cuts, counted SEPARATELY IN EACH VIEW off
+ * that view's own child input index. Two plain integers and no time
+ * anywhere (owner directive 2026-08-08). When the aux view is sent with
+ * every frame -- the shipped default -- the two intervals are equal and
+ * a cut therefore lands on the same picture ordinal in both views, which
+ * is what the wire audit's A3 check asserts. Under the sparse-aux
+ * cadence (FR-H264-9) the aux child sees fewer pictures, so its cuts are
+ * spaced further apart in wall time and the ordinals no longer coincide;
+ * A3 does not apply there, by definition.
+ *
+ * WHY 250, and why the same number for both. xrdp's linked-library
+ * H.264 path (xrdp_encoder_x264.c) never sets i_keyint_max, so it takes
+ * libx264's default of 250 pictures -- measured, not looked up, with
+ * PR-demo/mac_bisect_matrix/x264_keyint_probe.c under every preset
+ * gfx.toml ships. That path has emitted a real IDR (a full DPB flush)
+ * every 250 pictures for years. Matching the number keeps this backend's
+ * cadence identical to the one xrdp already had, and ours is the gentler
+ * of the two: a converted non-IDR I that flushes nothing and keeps both
+ * long-term chains alive. Measured cost on the code-scroll corpus:
+ * +1.84 % of bytes (PRD FR-H264-6). The previous default was 240, which
+ * was picked to be convenient to test and was never derived.
+ *
+ * There is deliberately NO 0/off value (#45 D6): an off switch would
+ * keep the deleted aux-respawn path alive as a shadow fallback. The
+ * loader REFUSES an out-of-range value (the default stands) and the
+ * runner CLAMPS independently. */
+#define XRDP_H264_INTRA_REFRESH_FRAMES 250
 #define XRDP_H264_INTRA_REFRESH_FRAMES_MIN 24
 #define XRDP_H264_INTRA_REFRESH_FRAMES_MAX 4096
+/* The aux view's own interval, in AUX pictures. Equal to the main
+ * default, so with the sparse-aux feature off nothing changes. */
+#define XRDP_H264_INTRA_REFRESH_FRAMES_AUX XRDP_H264_INTRA_REFRESH_FRAMES
 
 struct xrdp_h264_ltr_state
 {
@@ -226,18 +249,24 @@ struct xrdp_h264_ltr_state
     int frame_num;      /* shared counter: value for the NEXT picture */
     int started;        /* a main IDR has been rewritten              */
     int aux_seeded;     /* LT1 occupied (first aux converted)         */
-    /* scheduled paired refresh (FR-H264-6). refresh_period is the
-     * requested interval, set by the runner from
-     * intra_refresh_frames; pic_index counts pictures per view since
-     * the epoch entry. The rewriter compares OBSERVED against
-     * REQUESTED at every picture and fails the pair on a mismatch --
-     * a silently skipped cut must never ship. Per view rather than per
-     * pair so a future sparse-aux cadence (FR-PROC-7, #40) can keep
-     * its own schedule without changing this check.
+    /* scheduled refresh (FR-H264-6). refresh_period is the interval the
+     * MAIN child was spawned with, set by the runner from
+     * intra_refresh_frames; pic_index counts pictures per view since the
+     * epoch entry. The rewriter compares OBSERVED against REQUESTED at
+     * every picture and fails the pair on a mismatch -- a silently
+     * skipped cut must never ship.
      * refresh_period 0 means "no schedule declared", which only the
      * unit tests and the non-scheduled diagnostic arms use; the runner
      * always sets it when aux_ltr_chain is on. */
     int refresh_period;
+    /* the interval the AUX child was spawned with, from
+     * intra_refresh_frames_aux. The two children count their own input
+     * indices, so under the sparse-aux cadence (FR-H264-9) the aux view
+     * needs its own number rather than a share of the main one.
+     * 0 means "not declared separately" and the aux view is then checked
+     * against refresh_period, which is exactly the 1:1 behaviour that
+     * shipped before this field existed. */
+    int refresh_period_aux;
     int pic_index[2];
     /* #75: reusable output buffer for the rewrite, grown on demand and
      * released by xrdp_h264_ltr_state_free(). A picture-sized malloc

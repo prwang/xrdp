@@ -432,36 +432,44 @@ largest single lever for meeting it without dropping resolution — but
 they are separate decisions, and the owner is weighing this item's
 priority against the tier ladder now.
 
-**Open questions to settle BEFORE implementing:**
+**IN PROGRESS.** Design and server implementation are done and green in
+CI (2026-08-08); the spec is PRD FR-H264-9 and the record of what was
+decided and why lives there, not here. What remains is hardware: the
+arm, the throughput A/B, and the onscreen judgement.
 
-1. **What is "in motion"?** A cheap, deterministic signal — damaged
-   area per cycle, or consecutive damaged cycles above a threshold. It
-   must not flap: 420/444 oscillation is visible chroma breathing on
-   static text.
-2. **How does the settle transition avoid a visible pop?** The aux
-   chain is an LTR chain (#44/#45): resuming after a gap needs its own
-   intra, or the chain must survive the motion window unreferenced.
-   Interacts with `intra_refresh_frames` and wire-audit ratchets A1–A7.
-3. **Does the client tolerate an alternating stream?** The EGFX
-   capability is negotiated once. Verify on Mac and Windows clients
-   first — this is the class of change that produced the wrong-colour
-   bisect.
-4. **Is the win real?** Predicted: ~45 % off the encode segment,
-   roughly half the pack. Measure with textflood and the period
-   decomposition, same pair, same box — no rate number without the
-   decomposition.
-5. **Does the old blocker still bind?** The entry used to say "blocked
-   by #71 — FR-PROC-7's preemption signal needs the fifo non-empty at
-   pop time, which needs #70/#71 concurrency first". That was written
-   before #80's frontier changed the admission mechanics; whether it
-   still holds is a question to answer by reading, not a fact to carry.
+The five questions above, answered:
 
-**Acceptance criteria:** motion detector is pure logic with unit tests
-under `tests/`; default OFF (absent/invalid config reproduces today's
-behaviour exactly); smoke gate PASS before any measurement; wire audit
-A1–A7 PASS in both regimes; the E5-2 pair re-run and DECOMPOSED, not
-just rated; a still-screen visual check that subpixel-AA text is 4:4:4
-sharp.
+1. **What is "in motion"?** Settled by owner ruling as option
+   "B + refresh bound": two configured TIMES and no pixel signal at
+   all. `chroma_refresh_ms` is a guarantee (chroma restored at least
+   this often, whatever the screen is doing) and `chroma_idle_ms` is
+   how long the pipeline must be quiet before chroma is sent, which
+   also clamps the aux rate. Flapping is bounded by construction
+   rather than by a hysteresis heuristic.
+2. **How does the settle transition avoid a visible pop?** Structurally
+   there is nothing to re-seed: LT1 keeps the last chroma picture
+   across any number of luma-only frames, so the next aux P predicts
+   from it. Proved in the DPB simulator in both client decode shapes.
+   Whether it *looks* like a pop is question 3's territory and is
+   still open.
+3. **Does the client tolerate an alternating stream?** STILL OPEN, and
+   it is the one that cannot be answered offline. A luma-only frame is
+   an LC=1 PDU with no LC=2 behind it, which is exactly what the LC
+   field is for, but "spec-legal" is not "renders correctly on
+   VideoToolbox" — that is the distinction the wrong-colour bisect was
+   made of.
+4. **Is the win real?** Not measured. Next step.
+5. **Does the old blocker still bind?** No: the skip lives in
+   submit/pump/collect, which is the batch path #70B already
+   restructured, and needs nothing from FR-PROC-7's preemption signal.
+
+**Remaining acceptance criteria** (the met ones and the full table are
+in PRD FR-H264-9): smoke gate PASS on the arm before any measurement;
+wire audit A1–A7 PASS in both regimes, with A3 exempt under a sparse
+cadence by owner ruling; the client tolerates an alternating stream on
+the macOS and Windows clients **before any rate is quoted**; the
+throughput pair re-run and DECOMPOSED, not just rated; a still-screen
+visual check that subpixel-AA text is 4:4:4 sharp.
 
 ## #93 (was #73; absorbs #97/was #60) — T4 re-establishment and re-runs
 

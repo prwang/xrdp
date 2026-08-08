@@ -342,6 +342,75 @@ START_TEST(test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_sparse_aux)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* BACKLOG #92 / PRD FR-H264-9. Defaults first, and they are what
+     * makes this feature safe to land: a table that mentions none of
+     * these keys must produce the behaviour that shipped before them --
+     * the two intra intervals equal, and the sparse cadence OFF so the
+     * aux (chroma) view accompanies every frame. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx.toml", &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_AUX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux,
+                     gfxconfig.avc444_ffmpeg_intra_refresh_frames);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_refresh_ms, 0);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_idle_ms, 0);
+
+    /* THE BACK-COMPATIBILITY PROPERTY, and the reason this key does
+     * not simply carry the shipped default: a table that sets only
+     * intra_refresh_frames -- which is every gfx.toml written before
+     * #92, and all of the fleet arms -- must get an aux interval EQUAL
+     * TO IT. Anything else de-phases the two views on the 1:1 path,
+     * where a cut is required to land on the same picture ordinal in
+     * both, and the wire audit would start failing on configurations
+     * nobody edited. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_intra_refresh.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames, 48);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux, 48);
+
+    /* in-range values are honoured verbatim, and the two intervals are
+     * INDEPENDENT: 48 main pictures and 96 aux pictures, not one number
+     * shared or derived */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_sparse_aux.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames, 48);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux, 96);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_refresh_ms, 1000);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_idle_ms, 100);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
+START_TEST(test_tconfig_gfx_avc444_sparse_aux_out_of_range_refused)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+
+    /* Same contract as every other bounded integer in this table: out
+     * of range is REFUSED and the default stands, never clamped. It
+     * matters more here than usual, because each of these three typos
+     * would silently cost bandwidth rather than fail loudly -- a
+     * 5 ms chroma guarantee is chroma on every frame plus the decision
+     * overhead, and an 8-picture aux interval multiplies the refresh
+     * cost the interval exists to bound. */
+    tconfig_load_gfx(GFXCONF_STUBDIR "/gfx_avc444_sparse_aux_bad.toml",
+                     &gfxconfig);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux,
+                     gfxconfig.avc444_ffmpeg_intra_refresh_frames);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_intra_refresh_frames_aux,
+                     XRDP_H264_INTRA_REFRESH_FRAMES_AUX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_refresh_ms,
+                     XRDP_GFX_CHROMA_REFRESH_MS_DEFAULT);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_chroma_idle_ms,
+                     XRDP_GFX_CHROMA_IDLE_MS_DEFAULT);
+    /* the rest of the table still parsed */
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_aux_ltr_chain, 1);
+}
+END_TEST
+
 START_TEST(test_tconfig_gfx_avc444_wire_window)
 {
     struct xrdp_tconfig_gfx gfxconfig;
@@ -441,6 +510,10 @@ make_suite_tconfig_load_gfx(void)
                    test_tconfig_gfx_avc444_intra_refresh);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_sparse_aux);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_sparse_aux_out_of_range_refused);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_wire_window);
     tcase_add_test(tc_tconfig_load_gfx,

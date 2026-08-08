@@ -274,6 +274,23 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         self->avc444_ltr_rekey_frame_num = mm->avc444_ltr_rekey_frame_num;
         self->avc444_intra_refresh_frames =
             mm->avc444_intra_refresh_frames;
+        self->avc444_intra_refresh_frames_aux =
+            mm->avc444_intra_refresh_frames_aux;
+        /* BACKLOG #92 / FR-H264-9 */
+        self->avc444_chroma_refresh_ms = mm->avc444_chroma_refresh_ms;
+        self->avc444_chroma_idle_ms = mm->avc444_chroma_idle_ms;
+        {
+            int ci;
+            for (ci = 0; ci < 16; ci++)
+            {
+                /* -1 = "nothing has happened on this monitor yet", so
+                 * its first frame carries chroma and is not judged
+                 * against a zero timestamp that would read as an
+                 * hour-old idle screen */
+                self->avc444_last_aux_ms[ci] = -1;
+                self->avc444_prev_frame_ms[ci] = -1;
+            }
+        }
         /* cache the EGFX surface origins the re-key reset re-maps with;
          * mirrors xrdp_mm_egfx_create_surfaces (BACKLOG #48) */
         {
@@ -1243,7 +1260,11 @@ out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
  * The AVC444 emitter pairs an LC=1 luma PDU with an LC=2 chroma PDU inside one
  * GFX frame, so the wire matches a real Windows AVC444v2 server (luma-first
  * bootstrap; chroma always deferred as an LC=2 P-slice) while staying atomic per
- * frame. v1 vs v2 is selected by the codec id, not by LC. Unit tested. */
+ * frame. v1 vs v2 is selected by the codec id, not by LC.
+ * Under the sparse-aux cadence (BACKLOG #92 / FR-H264-9) a frame may carry the
+ * LC=1 PDU ALONE. That is what LC is for: the client updates luma and keeps the
+ * chroma it already has. Nothing in this function changes for it. Unit tested.
+ */
 int
 out_RFX_AVC444_BITMAP_STREAM_view(struct xrdp_egfx_rect *dst_rect,
                                   struct stream *s,
@@ -1465,12 +1486,19 @@ avc444_debug_dump(unsigned long long seq, int twidth, int theight,
         g_file_write(fd, (const char *)pair->main_data, pair->main_len);
         g_file_close(fd);
     }
-    g_snprintf(path, sizeof(path), "%s/%06llu_aux.264", dir, seq);
-    fd = g_file_open_ex(path, 0, 1, 1, 1);
-    if (fd >= 0)
+    /* #92: a luma-only frame has no aux bitstream. No file is written
+     * rather than an empty one, so that a gap in the dump's aux
+     * numbering is visible as what it is -- a frame that carried no
+     * chroma -- instead of looking like a truncated write. */
+    if (pair->aux_data != NULL && pair->aux_len > 0)
     {
-        g_file_write(fd, (const char *)pair->aux_data, pair->aux_len);
-        g_file_close(fd);
+        g_snprintf(path, sizeof(path), "%s/%06llu_aux.264", dir, seq);
+        fd = g_file_open_ex(path, 0, 1, 1, 1);
+        if (fd >= 0)
+        {
+            g_file_write(fd, (const char *)pair->aux_data, pair->aux_len);
+            g_file_close(fd);
+        }
     }
     n = g_snprintf(meta, sizeof(meta),
                    "seq=%llu surf=%dx%d coded=%dx%d nrects=%d rects=",
@@ -1733,6 +1761,7 @@ xrdp_avc444_cfg_from_encoder(const struct xrdp_encoder *self,
     cfg->aux_ltr_chain = self->avc444_aux_ltr_chain;
     cfg->ltr_rekey_frame_num = self->avc444_ltr_rekey_frame_num;
     cfg->intra_refresh_frames = self->avc444_intra_refresh_frames;
+    cfg->intra_refresh_frames_aux = self->avc444_intra_refresh_frames_aux;
     cfg->fault_aux_delay = self->avc444_fault_aux_delay;
     cfg->fault_strip_mmco = self->avc444_fault_strip_mmco;
     g_strncpy(cfg->path, self->avc444_path, sizeof(cfg->path) - 1);
@@ -1975,7 +2004,10 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
     int aux_offset;
     struct stream ls;
     struct stream *s;
-    struct stream *rv;
+    /* NULL until this command's LAST PDU is built -- normally the
+     * LC=2 chroma view, but the LC=1 luma view itself when chroma
+     * was not due this frame (BACKLOG #92) */
+    struct stream *rv = NULL;
     int enc_rv;
     int bitmap_data_length;
     int need;
@@ -2288,28 +2320,50 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
             }
             self->avc444_surface_reset_pending[mon_index] = 0;
         }
-        if (gfx_send_done(self, enc, (int)(s_luma->end - s_luma->data), 0,
-                          s_luma->data, 0, 0, 0) != 0)
+        if (pair.aux_len < 1)
+        {
+            /* BACKLOG #92 / FR-H264-9: chroma was not due for this
+             * monitor on this frame, so this gfx frame is the luma PDU
+             * and nothing else. LC=1 means exactly that on the wire --
+             * "this bitstream is the luma view, the chroma view is not
+             * present" -- so a conforming client updates luma and keeps
+             * the chroma it already has, which is the whole feature.
+             * The PDU is RETURNED rather than queued as a non-last
+             * enc_done, because with no LC=2 PDU behind it, it is this
+             * command's last one. */
+            rv = s_luma;
+        }
+        else if (gfx_send_done(self, enc,
+                               (int)(s_luma->end - s_luma->data), 0,
+                               s_luma->data, 0, 0, 0) != 0)
         {
             free_stream(s_luma);
             g_free(s->data);
             g_free(d_rects);
             return NULL;
         }
-        g_free(s_luma); /* ->data now owned by the queued enc_done */
+        else
+        {
+            g_free(s_luma); /* ->data now owned by the queued enc_done */
+        }
     }
-    s->p = s->data;
-    if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects, num_rects_d,
-                                          pair.aux_data, pair.aux_len,
-                                          2) != 0)
+    if (rv == NULL)
     {
-        g_free(s->data);
-        g_free(d_rects);
-        return NULL;
+        s->p = s->data;
+        if (out_RFX_AVC444_BITMAP_STREAM_view(&dst_rect, s, d_rects,
+                                              num_rects_d,
+                                              pair.aux_data, pair.aux_len,
+                                              2) != 0)
+        {
+            g_free(s->data);
+            g_free(d_rects);
+            return NULL;
+        }
+        bitmap_data_length = (int)(s->end - s->data);
+        rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id,
+                                        pixel_format, &dst_rect, s->data,
+                                        bitmap_data_length);
     }
-    bitmap_data_length = (int)(s->end - s->data);
-    rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id, pixel_format,
-                                    &dst_rect, s->data, bitmap_data_length);
     g_free(s->data);
     g_free(d_rects);
     if (do_rekey && rv != NULL)
@@ -2357,6 +2411,71 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         self->avc444_surface_reset_pending[mon_index] = 1;
     }
     return rv;
+}
+
+/*****************************************************************************/
+/* Wrap-free monotonic milliseconds for the sparse-aux clocks. NOT
+ * g_get_elapsed_ms(): that returns a 32-bit unsigned that wraps every
+ * 49.7 days, and at the wrap every "now - last" below would go hugely
+ * negative, which xrdp_gfx_chroma_due() would read as "not due" and the
+ * session would lose chroma for good. The sibling runner
+ * (xrdp_encoder_ffmpeg.c) computes its deadlines the same way. */
+static long long
+enc_now_ms(void)
+{
+    struct timespec ts;
+
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+/*****************************************************************************/
+/* BACKLOG #92 / PRD FR-H264-9 -- is the AVC444 aux (chroma) view due for
+ * this monitor on this frame? Decides ONLY from two clocks: when this
+ * monitor last carried chroma, and when it last submitted anything.
+ * Nothing about the PIXELS is consulted -- no damaged-area fraction, no
+ * post-compression size, no entropy -- both because those are numbers an
+ * administrator cannot reason about and because a server that inspects
+ * what the user is looking at to decide how to encode it is a question
+ * this project does not want to have to answer (owner, 2026-08-08).
+ *
+ * Returns nonzero to send chroma. Updates the monitor's clocks, so it
+ * must be called exactly once per monitor per submitted frame. */
+static int
+gfx_avc444_aux_due(struct xrdp_encoder *self, int mon)
+{
+    long long now;
+    int due;
+
+    if (mon < 0 || mon >= 16 || self->avc444_chroma_refresh_ms <= 0)
+    {
+        return 1;   /* feature off: chroma on every frame, as before */
+    }
+    now = enc_now_ms();
+    due = xrdp_gfx_chroma_due(self->avc444_chroma_refresh_ms,
+                              self->avc444_chroma_idle_ms, now,
+                              self->avc444_last_aux_ms[mon],
+                              self->avc444_prev_frame_ms[mon]);
+    if (gfx_enc_trace_on())
+    {
+        /* one record per monitor per frame, on the perf ring rather
+         * than in log.c (coding rule 5). Fields: monitor, whether
+         * chroma went with this frame, ms since this monitor last
+         * carried chroma, ms since its previous frame, and the bound
+         * the guarantee is being held to. */
+        PERF_TRACE6("auxdue", mon, due,
+                    self->avc444_last_aux_ms[mon] < 0
+                    ? -1 : (int)(now - self->avc444_last_aux_ms[mon]),
+                    self->avc444_prev_frame_ms[mon] < 0
+                    ? -1 : (int)(now - self->avc444_prev_frame_ms[mon]),
+                    self->avc444_chroma_refresh_ms, 0);
+    }
+    self->avc444_prev_frame_ms[mon] = now;
+    if (due)
+    {
+        self->avc444_last_aux_ms[mon] = now;
+    }
+    return due;
 }
 
 /*****************************************************************************/
@@ -2687,7 +2806,15 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
             continue;
         }
         seq = self->avc444_seq++;
-        if (xrdp_ffmpeg_avc444_submit_pair(ff, info.main_view, info.aux_view,
+        /* BACKLOG #92 / FR-H264-9: a NULL aux view means "chroma is not
+         * due this frame" -- the aux child is not fed, not armed in the
+         * pump set and not waited for, and the emit pass ships the LC=1
+         * luma PDU alone. With chroma_refresh_ms at its default of 0
+         * this is always info.aux_view and nothing about the cycle
+         * changes. */
+        if (xrdp_ffmpeg_avc444_submit_pair(ff, info.main_view,
+                                           gfx_avc444_aux_due(self, mon)
+                                           ? info.aux_view : NULL,
                                            info.nv12_bytes, seq)
                 != XRDP_FFMPEG_PAIR_READY)
         {

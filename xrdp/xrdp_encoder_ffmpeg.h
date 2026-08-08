@@ -116,22 +116,30 @@ struct xrdp_ffmpeg_avc444_config
     /* keeps the wrap out of decoder sight.   */
     /* Lower it to exercise the boundary in a */
     /* test arm (BACKLOG #48).                */
-    int intra_refresh_frames;       /* aux_ltr_chain: scheduled paired      */
-    /* intra refresh interval in pictures     */
-    /* per view (gfx.toml                     */
+    int intra_refresh_frames;       /* aux_ltr_chain: scheduled intra       */
+    /* refresh interval for the MAIN view, in */
+    /* that child's own pictures (gfx.toml    */
     /* intra_refresh_frames, PRD FR-H264-6).  */
     /* Clamped by the runner to               */
     /* [XRDP_H264_INTRA_REFRESH_FRAMES_MIN,   */
     /*  ..._MAX]. No off value (#45 D6).      */
+    int intra_refresh_frames_aux;   /* the same for the AUX view, in AUX    */
+    /* pictures (gfx.toml                     */
+    /* intra_refresh_frames_aux). A separate  */
+    /* integer because each child keys its    */
+    /* schedule off its own input index, and  */
+    /* under the sparse-aux cadence           */
+    /* (FR-H264-9) the aux child is fed fewer */
+    /* pictures than the main one.            */
     int intra_refresh_schedule;     /* RUNNER-INTERNAL: the interval to     */
-    /* actually put on both children's argv   */
+    /* actually put on THIS child's argv      */
     /* (-force_key_frames + -g), or 0 for no  */
-    /* schedule. Separate from the knob above */
-    /* because the aux child's config has     */
-    /* aux_ltr_chain cleared, so build_argv   */
-    /* cannot key the schedule off that flag  */
-    /* -- and a schedule on the main child    */
-    /* only would de-phase the pair.          */
+    /* schedule. Separate from the knobs      */
+    /* above because the aux child's config   */
+    /* has aux_ltr_chain cleared, so          */
+    /* build_argv cannot key the schedule off */
+    /* that flag -- and a child with no       */
+    /* schedule at all would never cut.       */
     int fault_strip_mmco;           /* DIAGNOSTIC: MMCO -> sliding window   */
     /* (xrdp_h264_sanitize_hrd); the 2026-  */
     /* 07-27 matrix convicted SPS HRD alone */
@@ -321,8 +329,20 @@ xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
  * submit until that handle's collect returns. On a non-zero return from
  * pump_pairs, *bad_handle is the index of the handle whose child failed
  * -- tear THAT one down, not an arbitrary one. *kids_armed is the number
- * of children armed in the set (2 per handle), which is the quantity E4
- * asserts.
+ * of children armed in the set, which is the quantity E4 asserts: 2 per
+ * handle normally, 1 for a handle whose aux was skipped.
+ *
+ * BACKLOG #92 / FR-H264-9 -- SPARSE AUX. Passing aux_nv12 == NULL to
+ * submit_pair means "chroma is not due this frame": the aux child is not
+ * fed, not armed in the poll set, not waited for and not popped, and
+ * collect_pair returns the pair with aux_data NULL and aux_len 0. The
+ * caller then emits the LC=1 luma PDU alone, which is what the AVC444
+ * wire format's LC field exists for. Nothing else changes -- the aux
+ * child stays alive, its long-term reference LT1 still holds the last
+ * chroma picture, and the next aux picture predicts from it. The aux
+ * child's input index does not advance on a skipped frame, which is why
+ * intra_refresh_frames_aux is a count of AUX pictures and is a separate
+ * integer from intra_refresh_frames.
  */
 int
 xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,

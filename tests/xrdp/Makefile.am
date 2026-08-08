@@ -39,6 +39,8 @@ EXTRA_DIST = \
   gfx/gfx_avc444_rekey_bad.toml \
   gfx/gfx_avc444_intra_refresh.toml \
   gfx/gfx_avc444_intra_refresh_bad.toml \
+  gfx/gfx_avc444_sparse_aux.toml \
+  gfx/gfx_avc444_sparse_aux_bad.toml \
   gfx/gfx_avc444_rekey_nochurn.toml \
   gfx/gfx_avc444_rekey_churn.toml \
   gfx/gfx_avc444_wire_window.toml \

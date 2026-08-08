@@ -1413,6 +1413,9 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_frame_num;
             cfg.intra_refresh_frames =
                 self->wm->gfx_config->avc444_ffmpeg_intra_refresh_frames;
+            cfg.intra_refresh_frames_aux =
+                self->wm->gfx_config->
+                avc444_ffmpeg_intra_refresh_frames_aux;
             if (cfg.fault_strip_mmco)
             {
                 LOG(LOG_LEVEL_WARNING, "gfx.toml fault_strip_mmco is ON: "
@@ -1446,6 +1449,36 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 (pres == XRDP_FFMPEG_PROBE_OK) && cfg.aux_ltr_chain;
             self->avc444_ltr_rekey_frame_num = cfg.ltr_rekey_frame_num;
             self->avc444_intra_refresh_frames = cfg.intra_refresh_frames;
+            self->avc444_intra_refresh_frames_aux =
+                cfg.intra_refresh_frames_aux;
+            /* BACKLOG #92 / FR-H264-9: the sparse-aux cadence. Like the
+             * eager ack it exists only on the aux_ltr_chain path -- the
+             * skip is implemented in submit/pump/collect, which no other
+             * architecture uses -- so it is refused rather than silently
+             * ignored when that path is off. */
+            self->avc444_chroma_refresh_ms =
+                self->avc444_aux_ltr_chain
+                ? self->wm->gfx_config->avc444_ffmpeg_chroma_refresh_ms
+                : 0;
+            self->avc444_chroma_idle_ms =
+                self->wm->gfx_config->avc444_ffmpeg_chroma_idle_ms;
+            if (self->wm->gfx_config->avc444_ffmpeg_chroma_refresh_ms > 0 &&
+                    !self->avc444_aux_ltr_chain)
+            {
+                LOG(LOG_LEVEL_WARNING, "gfx.toml chroma_refresh_ms is set "
+                    "but aux_ltr_chain is off: the aux view can only be "
+                    "skipped on that path, so chroma stays on every "
+                    "frame");
+            }
+            if (self->avc444_chroma_refresh_ms > 0)
+            {
+                LOG(LOG_LEVEL_INFO, "gfx.toml chroma_refresh_ms is ON "
+                    "(BACKLOG #92): the AVC444 aux (chroma) view is sent "
+                    "when the screen settles and at least every %d ms "
+                    "whatever it is doing; settle threshold %d ms",
+                    self->avc444_chroma_refresh_ms,
+                    self->avc444_chroma_idle_ms);
+            }
             self->avc444_ltr_rekey_surface_reset =
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
             /* BACKLOG #70: only the batch path publishes an absorb
@@ -1478,9 +1511,10 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                 LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "
                     "EXPERIMENTAL FR-H264-8 aux-refs-aux via long-term "
                     "reference slots (leaf architecture bypassed); "
-                    "scheduled paired intra refresh every %d pictures "
-                    "per view, re-key at frame_num %d",
+                    "scheduled intra refresh every %d main pictures and "
+                    "every %d aux pictures, re-key at frame_num %d",
                     self->avc444_intra_refresh_frames,
+                    self->avc444_intra_refresh_frames_aux,
                     self->avc444_ltr_rekey_frame_num);
             }
             if (pres == XRDP_FFMPEG_PROBE_OK)

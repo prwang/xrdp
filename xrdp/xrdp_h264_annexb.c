@@ -2840,7 +2840,6 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                     rv = 1;
                     break;
                 }
-                if (st->refresh_period > 0 && st->started)
                 {
                     /* OBSERVED vs REQUESTED (FR-H264-6): the child was
                      * spawned with a frame-indexed -force_key_frames
@@ -2853,15 +2852,30 @@ ltr_rewrite_walk(unsigned char *data, int *len, int cap,
                      * picture arriving OFF schedule is equally a
                      * mismatch: it is either an unscheduled GOP IDR
                      * (which D7 makes unreachable) or a de-phased
-                     * child, and both invalidate the depth bound. */
+                     * child, and both invalidate the depth bound.
+                     *
+                     * Each view is checked against ITS OWN child's
+                     * interval: under the sparse-aux cadence
+                     * (FR-H264-9) the aux child is fed fewer pictures
+                     * than the main one, so its schedule is a different
+                     * number of a different view's pictures. An aux
+                     * interval of 0 means the runner declared only one,
+                     * and the aux view is then checked against it --
+                     * the 1:1 behaviour that shipped before. */
+                    int period;
                     int expect_intra;
 
-                    expect_intra = (st->pic_index[view] %
-                                    st->refresh_period) == 0;
-                    if (expect_intra != intra_seen)
+                    period = (view == 1 && st->refresh_period_aux > 0)
+                             ? st->refresh_period_aux
+                             : st->refresh_period;
+                    if (period > 0 && st->started)
                     {
-                        rv = 1;
-                        break;
+                        expect_intra = (st->pic_index[view] % period) == 0;
+                        if (expect_intra != intra_seen)
+                        {
+                            rv = 1;
+                            break;
+                        }
                     }
                 }
                 if (view == 0 && !st->started && ntype != 5)

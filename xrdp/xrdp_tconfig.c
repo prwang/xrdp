@@ -425,6 +425,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         XRDP_H264_LTR_FRAME_NUM_REKEY;
     config->avc444_ffmpeg_intra_refresh_frames =
         XRDP_H264_INTRA_REFRESH_FRAMES;
+    config->avc444_ffmpeg_intra_refresh_frames_aux =
+        XRDP_H264_INTRA_REFRESH_FRAMES_AUX;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
     /* BACKLOG #80: the credit frontier is the DEFAULT ack mechanism
@@ -464,6 +466,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t lc = toml_bool_in(avc, "aux_ltr_chain");
             toml_datum_t rk = toml_int_in(avc, "ltr_rekey_frame_num");
             toml_datum_t ir = toml_int_in(avc, "intra_refresh_frames");
+            toml_datum_t ia = toml_int_in(avc,
+                                          "intra_refresh_frames_aux");
             toml_datum_t rs = toml_bool_in(avc,
                                            "ltr_rekey_surface_reset");
             toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
@@ -642,6 +646,57 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                     TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
                           "intra_refresh_frames is set but aux_ltr_chain "
                           "is OFF: the scheduled refresh is inert");
+                }
+            }
+            {
+                /* the aux view's own interval, counted in AUX
+                 * pictures. Same contract as the main one: out of
+                 * range is REFUSED here and the runner clamps
+                 * independently.
+                 *
+                 * ABSENT (or refused) means FOLLOW THE MAIN INTERVAL,
+                 * not "take the shipped default". Every gfx.toml
+                 * written before this key existed sets only
+                 * intra_refresh_frames -- the fleet arms all say 240 --
+                 * and pinning the aux view to 250 behind their backs
+                 * would de-phase the two views on the 1:1 path, where
+                 * a cut is required to land on the same picture
+                 * ordinal in both. Following the main number keeps
+                 * every existing table meaning exactly what it meant. */
+                int aux_set = 0;
+
+                if (ia.ok)
+                {
+                    if (ia.u.i < XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+                            ia.u.i > XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+                    {
+                        TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                              "intra_refresh_frames_aux %lld out of range "
+                              "[%d,%d]; following intra_refresh_frames "
+                              "(%d) instead",
+                              (long long)ia.u.i,
+                              XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+                              XRDP_H264_INTRA_REFRESH_FRAMES_MAX,
+                              config->avc444_ffmpeg_intra_refresh_frames);
+                    }
+                    else
+                    {
+                        config->avc444_ffmpeg_intra_refresh_frames_aux =
+                            (int)ia.u.i;
+                        aux_set = 1;
+                    }
+                    if (!config->avc444_ffmpeg_aux_ltr_chain)
+                    {
+                        TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                              "intra_refresh_frames_aux is set but "
+                              "aux_ltr_chain is OFF: the scheduled "
+                              "refresh is inert");
+                    }
+                }
+                if (!aux_set)
+                {
+                    config->avc444_ffmpeg_intra_refresh_frames_aux =
+                        config->avc444_ffmpeg_intra_refresh_frames;
                 }
             }
             if (fa.ok)

@@ -1,0 +1,20 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# Every value below is outside its range and the loader must REFUSE
+# each one -- keeping the default for the two chroma times, and
+# following intra_refresh_frames for the aux interval -- while the rest
+# of the table still parses. Refusing rather than clamping matters: a typo that
+# silently became "chroma every 16 ms" would turn the feature into a
+# bandwidth regression nobody asked for, and a typo that silently
+# became "cut every 24 aux pictures" would multiply the refresh cost.
+#
+# below XRDP_H264_INTRA_REFRESH_FRAMES_MIN (24)
+intra_refresh_frames_aux = 8
+# below XRDP_GFX_CHROMA_REFRESH_MS_MIN (16)
+chroma_refresh_ms = 5
+# above XRDP_GFX_CHROMA_IDLE_MS_MAX (60000)
+chroma_idle_ms = 99999

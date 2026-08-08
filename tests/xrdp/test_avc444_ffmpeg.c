@@ -690,6 +690,13 @@ START_TEST(test_avc444_cfg_from_encoder_carries_every_field)
     enc.avc444_strip_pic_struct = 1;
     enc.avc444_aux_ltr_chain = 1;
     enc.avc444_ltr_rekey_frame_num = 536;
+    /* BACKLOG #92: the aux view's own refresh interval. Distinct from
+     * the main one on purpose -- if this hop dropped it, the aux child
+     * would silently be spawned with the main child's schedule and the
+     * sparse cadence would cut chroma far more often than configured,
+     * with nothing anywhere to say so. */
+    enc.avc444_intra_refresh_frames = 48;
+    enc.avc444_intra_refresh_frames_aux = 96;
     enc.avc444_fault_aux_delay = 1;
     enc.avc444_fault_strip_mmco = 1;
     snprintf(enc.avc444_path, sizeof(enc.avc444_path), "/opt/x/ffmpeg");
@@ -717,6 +724,12 @@ START_TEST(test_avc444_cfg_from_encoder_carries_every_field)
     /* THE bug: settable everywhere except where it mattered */
     ck_assert_int_eq(cfg.ltr_rekey_frame_num, 536);
     ck_assert_int_ne(cfg.ltr_rekey_frame_num, defaults.ltr_rekey_frame_num);
+    /* two independent intervals, both carried, neither derived from
+     * the other */
+    ck_assert_int_eq(cfg.intra_refresh_frames, 48);
+    ck_assert_int_eq(cfg.intra_refresh_frames_aux, 96);
+    ck_assert_int_ne(cfg.intra_refresh_frames_aux,
+                     defaults.intra_refresh_frames_aux);
 }
 END_TEST
 
@@ -915,6 +928,205 @@ START_TEST(test_ffmpeg_scheduled_paired_cut_live)
 }
 END_TEST
 
+/* BACKLOG #92 / PRD FR-H264-9 -- the sparse-aux cadence, driven
+ * through TWO REAL ffmpeg children and the real rewriter.
+ *
+ * What it asserts, and each one is a separate way the feature could be
+ * wrong:
+ *
+ *  1. A frame submitted with no aux picture comes back with no aux
+ *     bitstream -- aux_data NULL and aux_len 0 -- and does NOT come
+ *     back with the PREVIOUS frame's chroma, which is the failure mode
+ *     that would look fine on screen and be a pairing fault on the
+ *     wire.
+ *  2. The cycle does not stall. The aux child is not armed and not
+ *     waited for, so the pump returns on the main child alone; if the
+ *     skip were implemented by feeding nothing and still waiting, this
+ *     test would hang until the pair deadline and fail.
+ *  3. The two intra refresh schedules are INDEPENDENT and each is
+ *     counted in its OWN child's pictures. Main cuts on main ordinals,
+ *     aux cuts on AUX ordinals -- which land at completely different
+ *     frames once chroma is sparse. The rewriter's observed-vs-
+ *     requested check would fail the pair if either child were spawned
+ *     with the other's number, so a long clean run is itself the
+ *     proof; the counts below make a silently-unscheduled child fail
+ *     too.
+ *  4. Nothing is an IDR after the first picture: a skipped chroma
+ *     frame must not provoke a decoder reset.
+ *
+ * The parameters are chosen so the two schedules cannot be confused
+ * for each other: chroma on every 4th frame, main cutting every 24
+ * main pictures, aux cutting every 24 AUX pictures = every 96 frames.
+ * It only runs with XRDP_TEST_FFMPEG_PATH set (see have_ffmpeg). */
+START_TEST(test_ffmpeg_sparse_aux_independent_schedules_live)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_conv *conv;
+    struct xrdp_avc444_encoded_pair pair;
+    struct xrdp_ffmpeg_avc444 *handles[1];
+    unsigned char *xrgb;
+    int w = 128;
+    int h = 96;
+    int stride = w * 4;
+    /* 24 is XRDP_H264_INTRA_REFRESH_FRAMES_MIN; asking for less would
+     * be clamped and the test would silently measure something else */
+    const int main_period = 24;
+    const int aux_period = 24;
+    const int aux_every = 4;
+    const int frames = 200;
+    int aux_ordinal = 0;
+    int aux_frames = 0;
+    int luma_only_frames = 0;
+    int main_intra = 0;
+    int aux_intra = 0;
+    int idr_after_first = 0;
+    int bad_handle;
+    int kids_armed;
+    int armed_with_aux = 0;
+    int armed_without_aux = 0;
+    int i;
+    int rc;
+    static const char *const ltr_args[] =
+    {
+        "-c:v", "libx264", "-preset", "veryfast", "-tune", "zerolatency",
+        "-refs", "1", "-bf", "0",
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1:weightp=0"
+    };
+    const int nargs = (int)(sizeof(ltr_args) / sizeof(ltr_args[0]));
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    {
+        struct xrdp_encoder e;
+        char saved_path[256];
+
+        memset(&e, 0, sizeof(e));
+        e.avc444_chroma_align = cfg.chroma_align;
+        e.avc444_aux_ltr_chain = 1;
+        e.avc444_ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
+        e.avc444_intra_refresh_frames = main_period;
+        e.avc444_intra_refresh_frames_aux = aux_period;
+        g_strncpy(saved_path, cfg.path, sizeof(saved_path) - 1);
+        g_strncpy(e.avc444_path, saved_path, sizeof(e.avc444_path) - 1);
+        xrdp_avc444_cfg_from_encoder(&e, &cfg);
+        ck_assert_int_eq(cfg.intra_refresh_frames, main_period);
+        ck_assert_int_eq(cfg.intra_refresh_frames_aux, aux_period);
+    }
+    cfg.encoder_args.count = nargs;
+    for (i = 0; i < nargs; i++)
+    {
+        snprintf(cfg.encoder_args.arg[i], sizeof(cfg.encoder_args.arg[i]),
+                 "%s", ltr_args[i]);
+    }
+    xrgb = (unsigned char *)malloc(stride * h);
+    ck_assert_ptr_ne(xrgb, NULL);
+    conv = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(conv, NULL);
+    enc = xrdp_ffmpeg_avc444_create(&cfg, w, h);
+    ck_assert_ptr_ne(enc, NULL);
+    handles[0] = enc;
+    for (i = 0; i < frames; i++)
+    {
+        int want_aux = (i % aux_every) == 0;
+
+        fill_yuv444_mostly_static(xrgb, w, h, i);
+        ck_assert_int_eq(xrdp_avc444_conv_update(conv, xrgb, w, w, h), 0);
+        ck_assert_int_eq(
+            xrdp_ffmpeg_avc444_submit_pair(enc, conv->main_nv12,
+                                           want_aux ? conv->aux_nv12 : NULL,
+                                           conv->nv12_size,
+                                           (unsigned long long)i),
+            XRDP_FFMPEG_PAIR_READY);
+        bad_handle = -1;
+        kids_armed = 0;
+        rc = xrdp_ffmpeg_avc444_pump_pairs(handles, 1, &bad_handle,
+                                           &kids_armed);
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_int_eq(bad_handle, -1);
+        /* assertion 2, made countable: a chroma frame arms both
+         * children, a luma-only frame arms exactly one */
+        if (want_aux)
+        {
+            ck_assert_int_eq(kids_armed, 2);
+            armed_with_aux++;
+        }
+        else
+        {
+            ck_assert_int_eq(kids_armed, 1);
+            armed_without_aux++;
+        }
+        memset(&pair, 0, sizeof(pair));
+        rc = xrdp_ffmpeg_avc444_collect_pair(enc, (unsigned long long)i,
+                                             &pair);
+        ck_assert_int_eq(rc, XRDP_FFMPEG_PAIR_READY);
+        ck_assert_ptr_ne((void *)pair.main_data, NULL);
+        ck_assert_int_gt(pair.main_len, 0);
+        if (!want_aux)
+        {
+            /* assertion 1: nothing, not a stale copy of last frame's */
+            ck_assert_ptr_eq((void *)pair.aux_data, NULL);
+            ck_assert_int_eq(pair.aux_len, 0);
+            luma_only_frames++;
+        }
+        else
+        {
+            ck_assert_ptr_ne((void *)pair.aux_data, NULL);
+            ck_assert_int_gt(pair.aux_len, 0);
+            aux_frames++;
+        }
+        /* assertion 4 */
+        if (i > 0 && ff_first_vcl_type(pair.main_data, pair.main_len) == 5)
+        {
+            idr_after_first++;
+        }
+        if (want_aux &&
+                ff_first_vcl_type(pair.aux_data, pair.aux_len) == 5)
+        {
+            idr_after_first++;
+        }
+        /* assertion 3: each view cuts on ITS OWN ordinals */
+        if (ff_first_vcl_is_intra(pair.main_data, pair.main_len))
+        {
+            main_intra++;
+            ck_assert_int_eq(i % main_period, 0);
+        }
+        if (want_aux &&
+                ff_first_vcl_is_intra(pair.aux_data, pair.aux_len))
+        {
+            aux_intra++;
+            ck_assert_int_eq(aux_ordinal % aux_period, 0);
+        }
+        if (want_aux)
+        {
+            aux_ordinal++;
+        }
+    }
+    /* Counted by hand from the parameters, not read off a run.
+     * 200 frames: chroma on frames 0, 4, ..., 196 = 50 of them, and
+     * 150 luma-only. Main cuts at main ordinals 0, 24, ..., 192 =
+     * 1 + 199/24 = 9 intra pictures. Aux cuts at AUX ordinals 0, 24
+     * and 48 -- which are frames 0, 96 and 192 -- so 1 + 49/24 = 3.
+     * The two counts differ by a factor of three, which is the point:
+     * a rewriter that gave either child the other's number could not
+     * produce both. */
+    ck_assert_int_eq(aux_frames, frames / aux_every);
+    ck_assert_int_eq(luma_only_frames, frames - frames / aux_every);
+    ck_assert_int_eq(armed_with_aux, aux_frames);
+    ck_assert_int_eq(armed_without_aux, luma_only_frames);
+    ck_assert_int_eq(main_intra, 1 + (frames - 1) / main_period);
+    ck_assert_int_eq(aux_intra, 1 + (frames / aux_every - 1) / aux_period);
+    ck_assert_int_eq(main_intra, 9);
+    ck_assert_int_eq(aux_intra, 3);
+    ck_assert_int_eq(idr_after_first, 0);
+    xrdp_ffmpeg_avc444_delete(enc);
+    xrdp_avc444_conv_delete(conv);
+    free(xrgb);
+}
+END_TEST
+
 /* BACKLOG #45 E4, at the unit level: ONE thread drives FOUR views
  * concurrently. Two encoder handles stand in for two damaged monitors;
  * each handle owns two children (main + aux). One submit pass, ONE
@@ -1100,6 +1312,7 @@ make_suite_avc444_ffmpeg(void)
     tcase_add_test(tc, test_ffmpeg_encode_pair);
     tcase_add_test(tc, test_ffmpeg_ltr_rekey_cycle);
     tcase_add_test(tc, test_ffmpeg_scheduled_paired_cut_live);
+    tcase_add_test(tc, test_ffmpeg_sparse_aux_independent_schedules_live);
     tcase_add_test(tc, test_ffmpeg_pump_set_four_views_one_thread);
     tcase_add_test(tc, test_avc444_cfg_from_encoder_carries_every_field);
     tcase_add_test(tc, test_ffmpeg_encode_single);

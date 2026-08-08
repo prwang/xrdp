@@ -156,6 +156,14 @@ struct xrdp_ffmpeg_avc444
     struct xrdp_h264_ltr_state ltr;
     int rekey_pending;
 
+    /* BACKLOG #92 / FR-H264-9 (sparse aux): set by submit_pair to say
+     * whether THIS cycle handed the aux child a picture. When it is 0
+     * the aux child was not fed, is not armed in the poll set, is not
+     * waited for, and is not popped at collect -- the pair comes back
+     * with aux_len 0 and the caller emits the LC=1 luma PDU alone.
+     * Always 1 when chroma_refresh_ms is 0, which is the default. */
+    int aux_submitted;
+
     char errline[512];
     int errline_len;
 
@@ -232,6 +240,7 @@ xrdp_ffmpeg_avc444_config_default(struct xrdp_ffmpeg_avc444_config *cfg)
     cfg->aux_ltr_chain = 0;
     cfg->ltr_rekey_frame_num = XRDP_H264_LTR_FRAME_NUM_REKEY;
     cfg->intra_refresh_frames = XRDP_H264_INTRA_REFRESH_FRAMES;
+    cfg->intra_refresh_frames_aux = XRDP_H264_INTRA_REFRESH_FRAMES_AUX;
     cfg->fault_strip_mmco = 0;
     cfg->fault_aux_delay = 0;
     cfg->use_dump_extra = 0;  /* static administrator policy (gfx.toml
@@ -1483,7 +1492,7 @@ xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
                                int nv12_size,
                                unsigned long long desktop_sequence)
 {
-    if (self == NULL || main_nv12 == NULL || aux_nv12 == NULL ||
+    if (self == NULL || main_nv12 == NULL ||
             nv12_size != self->nv12_size || self->flushing ||
             !self->cfg.aux_ltr_chain || self->leaf == NULL)
     {
@@ -1507,6 +1516,17 @@ xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
     }
     self->pairs_submitted++;
     self->trace_out_seen = 0;
+    /* BACKLOG #92 / FR-H264-9: aux_nv12 NULL means "chroma is not due
+     * this frame". The aux child is simply not fed -- no picture, no
+     * sequence entry -- so it has nothing outstanding and pump_pairs
+     * will not arm it. Its input index therefore does not advance,
+     * which is exactly what makes intra_refresh_frames_aux a count of
+     * AUX pictures. */
+    self->aux_submitted = (aux_nv12 != NULL);
+    if (!self->aux_submitted)
+    {
+        return XRDP_FFMPEG_PAIR_READY;
+    }
     if (in_iov_push(self->leaf, aux_nv12, nv12_size) != 0 ||
             seq_push(self->leaf, desktop_sequence) != 0)
     {
@@ -1563,8 +1583,16 @@ xrdp_ffmpeg_avc444_pump_pairs(struct xrdp_ffmpeg_avc444 **handles,
         }
         owner[nkids] = i;
         kids[nkids++] = handles[i];
-        owner[nkids] = i;
-        kids[nkids++] = handles[i]->leaf;
+        /* #92: a handle whose aux was not fed this cycle contributes
+         * ONE child to the poll set, not two. Arming the aux child
+         * anyway would make the set wait for a picture nobody
+         * submitted, until the shared deadline killed the whole
+         * cycle. */
+        if (handles[i]->aux_submitted)
+        {
+            owner[nkids] = i;
+            kids[nkids++] = handles[i]->leaf;
+        }
     }
     *kids_armed = nkids;
     /* ONE deadline for the whole set (D3): a per-child budget would cost
@@ -1576,7 +1604,8 @@ xrdp_ffmpeg_avc444_pump_pairs(struct xrdp_ffmpeg_avc444 **handles,
         for (i = 0; i < n_handles; i++)
         {
             if (pk_available(handles[i]) < 1 ||
-                    pk_available(handles[i]->leaf) < 1)
+                    (handles[i]->aux_submitted &&
+                     pk_available(handles[i]->leaf) < 1))
             {
                 ready = 0;
             }
@@ -1629,7 +1658,8 @@ xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    if (in_iov_pending(self) || in_iov_pending(self->leaf))
+    if (in_iov_pending(self) ||
+            (self->aux_submitted && in_iov_pending(self->leaf)))
     {
         /* output implies the child consumed its input; borrowed
          * segments must never outlive this call (FR-PROC-6) */
@@ -1637,7 +1667,8 @@ xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
             "pair return; restarting encoder");
         return XRDP_FFMPEG_PAIR_ERROR;
     }
-    if (pk_available(self) < 1 || pk_available(self->leaf) < 1)
+    if (pk_available(self) < 1 ||
+            (self->aux_submitted && pk_available(self->leaf) < 1))
     {
         return XRDP_FFMPEG_PAIR_ERROR;
     }
@@ -1668,43 +1699,61 @@ xrdp_ffmpeg_avc444_collect_pair(struct xrdp_ffmpeg_avc444 *self,
     }
     result->main_data = self->main_buf;
     result->main_len = self->main_len;
-    /* #45 step 4: there is no aux respawn here any more. A main-view cut
-     * no longer empties the DPB, so LT1 cannot go missing mid-chain; if
-     * it ever does, the aux rewrite below refuses the packet ("aux P
-     * with LT1 unseeded") and the pair fails loudly. Respawning the aux
-     * child instead would restart that child's frame index while the
-     * main child keeps counting, de-phasing the shared schedule -- one
-     * fault made permanent. */
-    if (pop_single(self->leaf, &ltr_result) != 0)
+    if (!self->aux_submitted)
     {
-        return XRDP_FFMPEG_PAIR_ERROR;
+        /* BACKLOG #92 / FR-H264-9: chroma was not due this frame. The
+         * aux child was never fed, so there is nothing to pop and
+         * nothing to rewrite; the pair ships as a luma-only frame and
+         * the caller emits the LC=1 PDU alone. The aux long-term
+         * reference LT1 is untouched and still holds the last chroma
+         * picture, which is what the NEXT aux P-slice predicts from --
+         * skipping a frame shortens no prediction chain and needs no
+         * re-seed. The re-key check below still runs: the shared
+         * frame_num counter advanced with the main picture, and a wrap
+         * is no less fatal on a luma-only frame. */
+        result->aux_data = NULL;
+        result->aux_len = 0;
     }
-    if (ltr_result.desktop_sequence != desktop_sequence)
+    else
     {
-        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux picture sequence "
-            "mismatch (got %llu want %llu); restarting encoder",
-            (unsigned long long)ltr_result.desktop_sequence,
-            (unsigned long long)desktop_sequence);
-        return XRDP_FFMPEG_PAIR_ERROR;
+        /* #45 step 4: there is no aux respawn here any more. A main-view
+         * cut no longer empties the DPB, so LT1 cannot go missing
+         * mid-chain; if it ever does, the aux rewrite below refuses the
+         * packet ("aux P with LT1 unseeded") and the pair fails loudly.
+         * Respawning the aux child instead would restart that child's
+         * frame index while the main child keeps counting, de-phasing
+         * its schedule -- one fault made permanent. */
+        if (pop_single(self->leaf, &ltr_result) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        if (ltr_result.desktop_sequence != desktop_sequence)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux picture sequence "
+                "mismatch (got %llu want %llu); restarting encoder",
+                (unsigned long long)ltr_result.desktop_sequence,
+                (unsigned long long)desktop_sequence);
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        budget = xrdp_h264_ltr_growth_budget(ltr_result.main_data,
+                                             ltr_result.main_len);
+        if (grow(&self->aux_buf, &self->aux_cap,
+                 ltr_result.main_len + budget) != 0)
+        {
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        memcpy(self->aux_buf, ltr_result.main_data, ltr_result.main_len);
+        self->aux_len = ltr_result.main_len;
+        if (xrdp_h264_ltr_rewrite_aux(self->aux_buf, &self->aux_len,
+                                      self->aux_cap, &self->ltr) != 0)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain aux "
+                "rewrite failed; refusing to ship the pair");
+            return XRDP_FFMPEG_PAIR_ERROR;
+        }
+        result->aux_data = self->aux_buf;
+        result->aux_len = self->aux_len;
     }
-    budget = xrdp_h264_ltr_growth_budget(ltr_result.main_data,
-                                         ltr_result.main_len);
-    if (grow(&self->aux_buf, &self->aux_cap,
-             ltr_result.main_len + budget) != 0)
-    {
-        return XRDP_FFMPEG_PAIR_ERROR;
-    }
-    memcpy(self->aux_buf, ltr_result.main_data, ltr_result.main_len);
-    self->aux_len = ltr_result.main_len;
-    if (xrdp_h264_ltr_rewrite_aux(self->aux_buf, &self->aux_len,
-                                  self->aux_cap, &self->ltr) != 0)
-    {
-        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_ltr_chain aux "
-            "rewrite failed; refusing to ship the pair");
-        return XRDP_FFMPEG_PAIR_ERROR;
-    }
-    result->aux_data = self->aux_buf;
-    result->aux_len = self->aux_len;
     if (self->ltr.frame_num >= self->cfg.ltr_rekey_frame_num &&
             !self->rekey_pending)
     {
@@ -1941,11 +1990,37 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
             ? XRDP_H264_INTRA_REFRESH_FRAMES_MIN
             : XRDP_H264_INTRA_REFRESH_FRAMES_MAX;
     }
-    /* the schedule reaches BOTH children through this runner-internal
+    if (self->cfg.intra_refresh_frames_aux < 1)
+    {
+        /* "not declared" -- FOLLOW THE MAIN INTERVAL. Silent and
+         * deliberate: it is the value that makes a caller which never
+         * heard of this field behave exactly as it did before the
+         * field existed, which is every gfx.toml written before #92
+         * and every direct-config caller in tests/. */
+        self->cfg.intra_refresh_frames_aux = self->cfg.intra_refresh_frames;
+    }
+    else if (self->cfg.intra_refresh_frames_aux <
+             XRDP_H264_INTRA_REFRESH_FRAMES_MIN ||
+             self->cfg.intra_refresh_frames_aux >
+             XRDP_H264_INTRA_REFRESH_FRAMES_MAX)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: intra_refresh_frames_aux %d "
+            "out of range [%d,%d]; clamped",
+            self->cfg.intra_refresh_frames_aux,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN,
+            XRDP_H264_INTRA_REFRESH_FRAMES_MAX);
+        self->cfg.intra_refresh_frames_aux =
+            self->cfg.intra_refresh_frames_aux <
+            XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            ? XRDP_H264_INTRA_REFRESH_FRAMES_MIN
+            : XRDP_H264_INTRA_REFRESH_FRAMES_MAX;
+    }
+    /* the schedule reaches EACH child through this runner-internal
      * field: the aux child's config has aux_ltr_chain cleared, so
-     * build_argv cannot key off that flag, and a schedule on the main
-     * child alone would de-phase the pair. spawn_second_child copies it
-     * verbatim. */
+     * build_argv cannot key off that flag, and a child with no schedule
+     * would never cut. spawn_second_child fills in the AUX interval,
+     * which is a separate integer counted in that child's own pictures
+     * (owner directive 2026-08-08 -- two frame counters, no time). */
     if (self->cfg.aux_ltr_chain)
     {
         self->cfg.intra_refresh_schedule = self->cfg.intra_refresh_frames;
@@ -1955,8 +2030,11 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
      * spawn_second_child; recomputing it here would silently unschedule
      * exactly one of the two children. */
     /* the rewriter checks OBSERVED against REQUESTED with the same
-     * number the children were spawned with -- one source of truth */
+     * numbers the children were spawned with -- one source of truth per
+     * view. refresh_period_aux stays 0 unless this handle owns an aux
+     * child, so a plain single-view handle is unaffected. */
     self->ltr.refresh_period = self->cfg.intra_refresh_schedule;
+    self->ltr.refresh_period_aux = 0;
     self->in_fd = -1;
     self->out_fd = -1;
     self->err_fd = -1;
@@ -2028,9 +2106,19 @@ spawn_second_child(struct xrdp_ffmpeg_avc444 *self)
     leaf_cfg.sanitize_hrd = 0;
     leaf_cfg.strip_pic_struct = 0;
     leaf_cfg.strip_sei = 0;
-    /* the identical frame-indexed schedule (step 2): 1:1 pairing means
-     * a cut must land on the same picture ordinal in both views */
-    leaf_cfg.intra_refresh_schedule = self->cfg.intra_refresh_schedule;
+    /* the AUX child's own frame-indexed schedule, counted in ITS input
+     * pictures. With the sparse-aux cadence off the two intervals are
+     * equal, so a cut lands on the same picture ordinal in both views
+     * exactly as before (step 2, and what the wire audit's A3 check
+     * asserts). With it on the aux child is fed fewer pictures, so the
+     * same ordinal is a later wall-clock instant -- which is why this
+     * is a separate integer rather than a share of the main one. */
+    leaf_cfg.intra_refresh_schedule = self->cfg.aux_ltr_chain
+                                      ? self->cfg.intra_refresh_frames_aux
+                                      : self->cfg.intra_refresh_schedule;
+    /* the rewriter must check the aux view against the number the aux
+     * child was actually spawned with */
+    self->ltr.refresh_period_aux = leaf_cfg.intra_refresh_schedule;
     if (!self->cfg.aux_ltr_chain)
     {
         if (leaf_cfg.encoder_args.count + 4 > XRDP_AVC444_MAX_ENC_ARGS)

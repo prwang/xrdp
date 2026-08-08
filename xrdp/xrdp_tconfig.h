@@ -188,12 +188,21 @@ struct xrdp_tconfig_gfx
      * animation; the MAX is a ceiling, since a higher value would let
      * a decoder meet the frame_num wrap. */
     int avc444_ffmpeg_ltr_rekey_frame_num;
-    /* scheduled paired intra refresh interval, in pictures per view
-     * (PRD FR-H264-6; gfx.toml [avc444_ffmpeg] intra_refresh_frames).
+    /* scheduled intra refresh interval for the MAIN (luma) view, in
+     * that child's own pictures (PRD FR-H264-6; gfx.toml
+     * [avc444_ffmpeg] intra_refresh_frames).
      * Default XRDP_H264_INTRA_REFRESH_FRAMES, range
      * [MIN,MAX] refused by the loader and clamped by the runner,
      * effective only when aux_ltr_chain is on. No off value (#45 D6). */
     int avc444_ffmpeg_intra_refresh_frames;
+    /* the same for the AUX (chroma) view, in AUX pictures (gfx.toml
+     * intra_refresh_frames_aux). Two separate integers rather than one
+     * shared interval, because under the sparse-aux cadence
+     * (FR-H264-9) the aux child is fed fewer pictures than the main one
+     * and each child keys its schedule off its own input index. Same
+     * default and same range, so with the sparse cadence off the two
+     * views cut on the same ordinals exactly as before. */
+    int avc444_ffmpeg_intra_refresh_frames_aux;
     /* Emit the EGFX surface delete/create/map teardown at a re-key.
      * Default 0 -- MASKED. The re-key exists only to keep the shared
      * frame_num counter away from its 2^16 wrap, and the encoder

@@ -447,8 +447,14 @@ struct xrdp_mm
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window     */
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain   */
     int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)     */
-    int avc444_intra_refresh_frames; /* scheduled paired refresh interval */
-    /*                                  (PRD FR-H264-6, #45)             */
+    int avc444_intra_refresh_frames; /* main-view scheduled refresh, in   */
+    /*                                  main pictures (FR-H264-6, #45)    */
+    int avc444_intra_refresh_frames_aux; /* the same for the aux view, in */
+    /*                                  aux pictures (FR-H264-9, #92)     */
+    int avc444_chroma_refresh_ms; /* sparse aux: the chroma GUARANTEE,   */
+    /*                               0 = feature off (FR-H264-9, #92)    */
+    int avc444_chroma_idle_ms;    /* sparse aux: settle threshold and    */
+    /*                               the aux rate clamp (FR-H264-9)      */
     int avc444_ltr_rekey_surface_reset; /* emit surface churn (#48)      */
     int avc444_eager_slot_ack; /* ack on absorb, not on egress (#70)     */
     int avc444_wire_window;    /* C, end-to-end wire window (#80)        */

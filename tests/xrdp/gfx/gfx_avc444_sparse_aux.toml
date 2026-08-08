@@ -1,0 +1,19 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+aux_ltr_chain = true
+# BACKLOG #92 / PRD FR-H264-9: the sparse-aux cadence. The two intra
+# refresh intervals are SEPARATE integers -- main counts main pictures,
+# aux counts aux pictures -- so a table that sets only one of them must
+# leave the other at its default, and a table that sets both must be
+# honoured verbatim. Both values here are in range [24,4096].
+intra_refresh_frames = 48
+intra_refresh_frames_aux = 96
+# The chroma guarantee and the settle threshold, the owner's deployed
+# values (2026-08-08): chroma restored at least once a second whatever
+# the screen is doing, and sent 100 ms after the pipeline goes quiet --
+# which also clamps chroma to at most 10 per second.
+chroma_refresh_ms = 1000
+chroma_idle_ms = 100
