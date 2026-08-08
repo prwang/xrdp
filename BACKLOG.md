@@ -222,17 +222,35 @@ both landed, and items 1–3 below are CLOSED.**
    multiplication, and only after the single-monitor stall work closes.
    (Findings (a) two-token clamp and (b) unclamped `NOT_DISPLAYED` are
    accepted as-is until a later test rejects them.)
-2. **Whether `eager_slot_ack` may default ON.** The A/B is now the
-   evidence it was waiting for and nothing regressed, but the flag is
-   ANDed with `aux_ltr_chain`, which is EXPERIMENTAL and default-off —
-   so flipping this alone is a no-op in a default install and a live
-   change only for operators already on the experimental path. Every
-   measurement to date used the oracle client, which acknowledges a
-   frame BEFORE decoding it, so the mechanism has never seen a realistic
-   acknowledgement time. Recommendation: fold the flip into
-   `aux_ltr_chain`'s acceptance gate rather than deciding it separately.
-   Owner sign-off required either way (PRD: no default change without
-   it).
+2. **Whether `eager_slot_ack` may default ON.** Still open, but the
+   objection that blocked it is now answered. The flag is ANDed with
+   `aux_ltr_chain`, which is EXPERIMENTAL and default-off, so flipping
+   this alone is a no-op in a default install and a live change only for
+   operators already on the experimental path. Recommendation stands:
+   fold the flip into `aux_ltr_chain`'s acceptance gate rather than
+   deciding it separately. Owner sign-off required either way (PRD: no
+   default change without it).
+   - **The "never seen a realistic acknowledgement time" objection is
+     RESOLVED, 2026-08-08.** An owner onscreen walk on x027 put the
+     frontier in front of a real client that acknowledges after decoding
+     and presenting: ack latency p50 **68 ms** (one monitor) and **53 ms**
+     (two), against ~9 ms for the oracle client. The window filled and
+     its bound held exactly — distance reached 4 on **173** frames at
+     M = 1 and 6 on **73** frames at M = 2, against 1 frame in 953 for
+     the oracle client on loopback. Zero encoder restarts, sequence
+     mismatches, parser errors or pair timeouts. Owner's visual verdict:
+     no lag. Record:
+     `PR-demo/mac_bisect_matrix/captures/i80_onscreen_walk_x027_20260808/`.
+   - **The two-monitor half is the more valuable one:** the `C + 2·M`
+     bound was previously measured only against the oracle client, where
+     the wire barely approaches it. This is the first time the wire was
+     actually made to carry it.
+   - **What is still owed before "qualified" is written anywhere:** the
+     visual half is PARTIAL — the owner reported no lag on the payload
+     they ran, not the full six checks across both clients at both
+     sizes; and the client PRODUCT is not recorded in the session log, so
+     "both clients" is not evidenced. The criterion itself, both halves,
+     is now written down in `PR-demo/INTERACTIVE_ARM.md`.
 
 ## #99 — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 

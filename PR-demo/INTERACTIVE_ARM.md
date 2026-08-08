@@ -59,10 +59,77 @@ Both clients: connect **once per size**. A reconnect to an existing
 session reuses the negotiated geometry, so the size you asked for on the
 second connection may not be the size you get.
 
-## The three things to look at
+## The acceptance criterion has two halves, and only one is yours
+
+Written 2026-08-08, after the first walk, because the doc previously said
+what to look at and never what a pass is.
+
+**Your half — the outcome.** The six checks below, on BOTH clients
+(Windows UWP and macOS), at BOTH sizes (1920×1080 and 2560×1440),
+connecting fresh per size.
+
+**The server's half — the premise, which no client-side observation can
+see.** Every fleet measurement of this mechanism used the oracle client,
+which acknowledges a frame BEFORE decoding it, so the frontier's
+`frame_id_client + C` term — how far ahead of the client we may run —
+has never been exercised. A real client acknowledges after decoding and
+presenting. Whether that actually happened during your walk is read off
+the server's ring, not the screen:
+
+* acknowledgement latency realistically late (the oracle client's is
+  ~9 ms; a real client's should be several times that);
+* the window actually reached — frames at distance `wire_window + 2×M`
+  and just below it must be a real fraction, not a handful;
+* zero encoder restarts, sequence mismatches, parser errors or pair
+  timeouts for the whole walk.
+
+Run it with `PR-demo/mac_bisect_matrix/i80_ack_latency.py` over the arm's
+perf ring, passing the monitor count from the session log.
+
+**The rule that ties them: a clean visual walk is evidence ONLY if the
+trace shows the window was exercised.** If nothing looked wrong and the
+distance histogram sits at 1–2, the walk proved the client was fast, not
+that the frontier is safe, and it has to be repeated under something
+slower.
+
+First result, 2026-08-08: premise half PASSED (ack p50 68 ms and 53 ms;
+the bound reached 173 times at one monitor and 73 times at two, held
+exactly in both; zero faults). Visual half PARTIAL — the owner reported
+no lag on the payload they ran, not the full six across both clients.
+Record: `captures/i80_onscreen_walk_x027_20260808/`.
+
+## What to look at
 
 Open a terminal in XFCE (Applications → Terminal Emulator) and run each
-in turn. All three are installed in the image at `/usr/local/bin`.
+in turn. All are at `/usr/local/bin` in the running pod.
+
+**Caveat, 2026-08-08:** `colorkey.sh`, `codescroll10.sh` and
+`chroma_strip_anim` are baked into the image; **`chroma-probe` and
+`colorkey_x11` were copied into the running pod live** (along with the
+`python3-tk` package `chroma-probe` needs), because rebuilding the image
+would have restarted the arm mid-session. They do not survive a pod
+restart. Folding them into the image is outstanding.
+
+### 0. Main/aux pairing — `chroma-probe`
+
+The instrument for the thing `aux_ltr_chain` actually changes, and the
+one to run first. Luma and chroma carry independent clocks: the numerals
+and rulers are white on black (pure luma), the timed patches are
+equiluminant (pure chroma). Top left, a numeral N counting 1..8 beside a
+patch of palette hue N, painted by the same repaint; the eight-swatch
+reference palette beside it; a second clock stepping once per 8 s; named
+colour bars with 1 px red/blue stripe pairs; a never-repainted static
+zone bottom left; a bouncing block bottom right.
+
+* **Pass:** the numeral inside the patch and the palette index agree,
+  continuously, for two minutes; the slow clock agrees; the static zone
+  never changes; the block's hue stays inside its luma outline.
+* A persistent disagreement of k means chroma is k frames behind luma —
+  a pairing fault, and a hard fail.
+* The static zone changing means the fault is not confined to where
+  damage flows.
+
+Escape quits.
 
 ### 1. Colour keys — `colorkey.sh`
 
@@ -79,7 +146,12 @@ write, so it is exactly one frame, and the screen shows a running count.
   not washed out to grey. Flat colours look identical at 4:2:0 and
   4:4:4; these stripes do not, so this is the chroma check.
 
-### 2. Eight-colour cycle and sliding block — same app, keys `c` and `s`
+### 2. Eight-colour cycle and sliding block — `colorkey_x11`, keys `c` and `s`
+
+**Use `colorkey_x11`, not the shell version, for anything about motion.**
+The shell app draws through a terminal and can only address character
+cells, so its block hops ~24 px; `colorkey_x11` owns the pixels and steps
+8 px per frame at 25 fps. Same keys.
 
 * **`c`** walks the full screen through black, red, green, blue, yellow,
   magenta, cyan, white, one colour per frame, naming the colour and the

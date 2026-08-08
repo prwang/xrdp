@@ -499,6 +499,40 @@ held the preceding analysis. The owner could not answer it and said so.
 The failure was not the content of the choice — it was that the choice
 was unreadable, and unreadable questions are answered by guessing.
 
+#### ONSCREEN turns: the draft is DELIVERED INTO THE SESSION, not only to the chat (owner directive, 2026-08-08)
+
+**Whenever a turn asks the owner to do anything inside a live remote
+session — run an app, press keys, judge a pattern, report what a
+client shows — the final message must also be written into the test
+rig, in the home directory of the account the owner logs in as, as
+`.turn_draft_<YYYYmmdd-HHMMSS>.md`.** Do it as the last step of the
+turn, after the edit pass, with the exact text that ships.
+
+*Why.* The owner is full-screen in an RDP client on another machine.
+Reading the chat means leaving the thing under test, and instructions
+that live only in the chat window cost a context switch per sentence.
+The owner's words: *"I can't see your message while I'm testing and
+have to jump back and forth between this chat window and fullscreen
+rdp."*
+
+The mechanics, and each one is load-bearing:
+
+* **The home of the LOGIN USER, not root's.** In the container fleet
+  that is `tester` inside the arm's pod, reached with `kubectl cp`,
+  not a path on this box. Getting this wrong puts the file somewhere
+  the owner's file manager and terminal cannot see.
+* **Readable by that user.** `chown` it to them after copying; a
+  root-owned 600 file in their home is the same as not delivering it.
+* **TIMESTAMPED, never overwritten.** A session accumulates
+  instructions and their order is information. `.turn_draft.md` at the
+  repo root is still the one working file the gates run against; the
+  copies in the rig are a dated series.
+* **It is the SAME text, verbatim.** Not a summary, not a shortened
+  "just the commands" version. If the message was worth the edit pass,
+  the person acting on it gets all of it.
+* **Say in the chat message where it landed**, so the owner knows to
+  look without being told twice.
+
 #### ARCHITECTURAL questions do not use the question widget at all (owner directive, 2026-08-06)
 
 **For any decision that shapes the design — a shipped default, whether
@@ -759,6 +793,30 @@ and not the one that would answer a bigger question you were not asked.
   single-configuration pass proves only that configuration: the smoke gate
   runs multiple session sizes because a real encoder bug (ffmpeg probesize
   hold) passed every 1920×1080 run while freezing every 1024×768 login.
+- **An onscreen task hands over BOTH the app and the instructions.**
+  Installing a visual probe into an arm is half the job: the turn's
+  message goes into the login user's home in that arm as
+  `.turn_draft_<YYYYmmdd-HHMMSS>.md` (see the onscreen-turn rule under
+  the turn pre-flight section), because the owner is full-screen in a
+  client and cannot read the chat while testing.
+- **`PR-demo/README.md` is the INVENTORY, and it is the first thing to
+  read before hunting for a demo or writing a new one (owner directive,
+  2026-08-08).** It indexes every onscreen probe, payload and harness in
+  the folder, with the question each one answers and how to launch it.
+  Anything a human looks at gets a row **in the same commit that adds
+  it** — an unlisted probe does not exist.
+  - *Why:* the folder had a README describing exactly one demo and
+    nothing else, so `chroma_probe.py` — an onscreen instrument filed
+    among two dozen offline log analysers in `mac_bisect_matrix/` — took
+    several rounds to find while the owner sat waiting in a live
+    session. Searching by file type made it worse: an "X app" was
+    assumed to be a compiled Xlib binary, which structurally excluded
+    the tkinter one.
+  - The corollary for a turn: **name which probe answers the question
+    asked, and say plainly when none of them does.** They are not
+    interchangeable — pairing faults, flow control, and 4:4:4-versus-
+    4:2:0 are three different instruments — and handing over the wrong
+    one costs a whole testing session.
 - This is our own **dev branch**. The upstream PR against `devel` needs a
   separate clean-room pass — reviewable commit slices plus written rationale —
   and does **not** necessarily carry `PR-demo/` as-is; treat that folder as the
