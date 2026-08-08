@@ -129,3 +129,46 @@ press `b` then `r` in `colorkey_x11`.
   send it, and that is ours.
 * the rectangle changes colour with the rest -> it is being painted and
   merely displaced, which puts it in the client's composition.
+
+---
+
+## ADDENDUM 2 — the black region survives every colour, and the damage trace says why
+
+Owner: the 33 x 6 rectangle **stays black** through white, blue and red.
+
+The first reading of that ("a region we never paint, therefore ours to
+fix") is WRONG, and the damage trace is what corrects it. Every `dmg`
+record carries its surface and bounding box; over 4000 recent events:
+
+| surface | events | full-monitor damage `(0,0,3840,2160)` |
+|---|---|---|
+| 0 — right monitor | 1153 | **61 times** |
+| 1 — left monitor | 2847 | present |
+
+The right monitor's entire area is damaged and re-sent repeatedly. The
+boxes are surface-local (surface 1 sits at desktop y = 6 yet reports
+y1 = 0), so both surfaces are covered corner to corner.
+
+**So the only regions that CAN stay black are those no surface covers.**
+The desktop is 7680 x 2166; surface 0 covers desktop y 0..2159 and
+surface 1 covers y 6..2165. Two strips belong to neither:
+
+* y 0..5, x 0..3839 — above the left monitor
+* y 2160..2165, x 3840..7679 — below the right monitor
+
+Both exactly **6 px tall**, matching the measured height, and both exist
+solely because the client declares its second monitor 6 px lower. The X
+desktop IS painted there (verified white in addendum 1); it is simply
+never transmitted, so the client shows its initialised canvas.
+
+**Unresolved: the bands are 3840 px wide, not 33.** Either the visible
+rectangle is a fragment of one, or the 6 is coincidence. The
+distinguishing question, asked and not yet answered, is whether it
+touches the bottom edge of the right screen (the band below the right
+monitor), the top edge (the other band, which should not be visible
+there and would be a client placement error), or floats free (neither
+band, model wrong).
+
+**Certain regardless:** the 6-px bands are real, are never transmitted,
+and are caused entirely by the client-declared misalignment. Aligning
+the two displays removes them.
