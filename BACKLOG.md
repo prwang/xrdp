@@ -71,7 +71,8 @@ stay as "(was #NN)" in each header.
 12. **#96** (was #59) — move the pack off the X server thread
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
-15. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
+15. **#102** — on connect the surfaces are mapped 2-3 s before the framebuffer is resized (filed 2026-08-08, owner-reported; NOT ours)
+16. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -251,6 +252,55 @@ both landed, and items 1–3 below are CLOSED.**
      sizes; and the client PRODUCT is not recorded in the session log, so
      "both clients" is not evidenced. The criterion itself, both halves,
      is now written down in `PR-demo/INTERACTIVE_ARM.md`.
+
+## #102 — on CONNECT the surfaces are mapped before the framebuffer is resized (filed 2026-08-08, owner-reported)
+
+**Owner report:** a width fault at fullscreen on a two-monitor
+connection, which "disappears when there is a resize". Reproduced from
+the arm's own log; **not ours** — `git diff devel..HEAD` changes ZERO
+lines of the resize/monitor plumbing in `xrdp_mm.c`, `xrdp_egfx.c` or
+`xrdp_wm.c`, and `libxrdp_init_display_size_description` is
+byte-identical to `devel`. This is stock ordering.
+
+**The defect.** On a RESIZE the framebuffer is resized first and the
+surfaces are mapped ~10 ms later. On a CONNECT the order is inverted and
+the gap is seconds, because the EGFX surfaces are created during
+capability negotiation — before login, before `lib_mod_connect`, before
+xrdp has spoken to the X server at all:
+
+| event | on a resize | on a connect |
+|---|---|---|
+| framebuffer resized | first | **2.1-2.8 s later** |
+| surfaces mapped | +0.01 s | first |
+
+Measured on x027, three connects: 2.69 s, 2.13 s, 2.80 s between
+`create_surfaces` and `memory_allocation_complete`.
+
+**Why it shows as a WIDTH fault.** The primary surface is mapped at
+`left 3840` while the framebuffer is still the session's previous size —
+3824 wide in the observed case — so for those seconds the PRIMARY
+monitor's entire surface addresses a region of the framebuffer that does
+not exist. Trigger: reconnect with a layout WIDER than the session
+currently has. It clears when the pending resize lands, and any later
+resize also clears it, which is exactly the owner's "disappears when
+there is a resize".
+
+**Open question, not yet investigated:** whether surface creation can be
+deferred until after the backend is connected, or the client told the
+OLD geometry first and re-reset after the resize. Both are protocol-
+visible changes to connection setup and need care.
+
+**Related, and separate:** the same session shows the client declaring
+its second monitor 6 px lower (`top 6`), giving a 7680x2166 desktop with
+six-row bands belonging to no monitor. That is client-supplied and xrdp
+reproduces it correctly, but it is silent — one warning when monitors
+are not edge-aligned would make it a five-second diagnosis. Not filed as
+work pending owner sign-off.
+
+**Coverage gap this exposes:** every two-monitor rig in this tree builds
+perfectly aligned dummy outputs and connects once, so neither the
+misalignment nor the reconnect-wider ordering is a shape any automated
+test here produces.
 
 ## #99 — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 
