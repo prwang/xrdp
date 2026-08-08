@@ -71,7 +71,7 @@ stay as "(was #NN)" in each header.
 12. **#96** (was #59) — move the pack off the X server thread
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
-15. **#102** — on connect the surfaces are mapped 2-3 s before the framebuffer is resized (filed 2026-08-08, owner-reported; NOT ours)
+15. **#102** — a client displaces one screen by 33 px until minimise+restore (filed 2026-08-08; DOCUMENT ONLY by owner ruling, below #92)
 16. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
@@ -253,81 +253,83 @@ both landed, and items 1–3 below are CLOSED.**
      "both clients" is not evidenced. The criterion itself, both halves,
      is now written down in `PR-demo/INTERACTIVE_ARM.md`.
 
-## #102 — on CONNECT the surfaces are mapped before the framebuffer is resized (filed 2026-08-08, owner-reported)
+## #102 — a client displaces one screen by 33 px until it is minimised and restored (filed 2026-08-08, owner-reported; DOCUMENT ONLY, owner decision)
 
-**Owner report:** a width fault at fullscreen on a two-monitor
-connection, which "disappears when there is a resize". Reproduced from
-the arm's own log; **not ours** — `git diff devel..HEAD` changes ZERO
-lines of the resize/monitor plumbing in `xrdp_mm.c`, `xrdp_egfx.c` or
-`xrdp_wm.c`, and `libxrdp_init_display_size_description` is
-byte-identical to `devel`. This is stock ordering.
+**Owner ruling 2026-08-08: option 1 — record it and move on. This is
+below #92 (4:2:0 in motion) and nothing here is to be worked before it.**
 
-**The defect.** On a RESIZE the framebuffer is resized first and the
-surfaces are mapped ~10 ms later. On a CONNECT the order is inverted and
-the gap is seconds, because the EGFX surfaces are created during
-capability negotiation — before login, before `lib_mod_connect`, before
-xrdp has spoken to the X server at all:
+**The symptom.** Two monitors, 3840x2160 each, side by side on the
+owner's client. The left screen's content is drawn about **33 px to the
+right** of where it belongs: a 33 px black strip down the far left of
+the left screen, and 33 px spilling onto the right screen. It persists
+from connect. It is NOT cleared by a full-screen repaint. It IS cleared
+by minimising and restoring the client window.
 
-| event | on a resize | on a connect |
-|---|---|---|
-| framebuffer resized | first | **2.1-2.8 s later** |
-| surfaces mapped | +0.01 s | first |
+**NOT the monitor misalignment, and the earlier derivation is
+WITHDRAWN.** The client had also been declaring its second monitor 6 px
+lower, giving a 7680x2166 desktop with two 6-px strips covered by no
+surface. That was real and produced its own artefacts, and "33 = 27 px
+panel + 6 px offset" looked convincing. **The owner aligned the displays
+and reconnected: the 6 px is gone, the 33 px stays.** The layout is now
+textbook — screen 7680x2160, monitors at +3840+0 and +0+0, surfaces
+mapped to match, no gaps — and the fault is unchanged. The arithmetic
+coincidence was a coincidence; the panel is also now 43 px tall rather
+than 27, so neither term survives.
 
-Measured on x027, three connects: 2.69 s, 2.13 s, 2.80 s between
-`create_surfaces` and `memory_allocation_complete`.
+**What is ruled out, each by measurement rather than argument:**
+* *Our pixels.* The X framebuffer was scanned pixel by pixel with the
+  desktop set flat white: 1045 non-white pixels, all of them
+  `colorkey_x11`'s own text label. No hole anywhere.
+* *Failing to send it.* Damage bounding boxes are traced per surface;
+  the right monitor received full-monitor damage `(0,0,3840,2160)` 61
+  times in one 4000-event window.
+* *Stale pixels.* A full-screen repaint does not clear it.
+* *Flow control.* The stall during the minimise was 258.7 s with the
+  credit unused — distance 1 before and after.
+* *Encoder geometry.* All four children `coded 3840x2160 generation 1`.
+* *Our arithmetic.* The normalisation is exactly derivable from the
+  client's declared layout, and **no value we send is 33, on any axis.**
 
-**Why it shows as a WIDTH fault.** The primary surface is mapped at
-`left 3840` while the framebuffer is still the session's previous size —
-3824 wide in the observed case — so for those seconds the PRIMARY
-monitor's entire surface addresses a region of the framebuffer that does
-not exist. Trigger: reconnect with a layout WIDER than the session
-currently has. It clears when the pending resize lands, and any later
-resize also clears it, which is exactly the owner's "disappears when
-there is a resize".
+**The one remaining server-side anomaly, and the leading hypothesis:**
+on CONNECT the EGFX surfaces are created during capability negotiation
+— before login, before `lib_mod_connect`, before xrdp has spoken to the
+X server at all — so the framebuffer is resized **2.1-2.8 s later**
+(measured across three connects: 2.69, 2.13, 2.80 s). On a RESIZE the
+order is the other way round and the gap is 0.01 s. If the client fixes
+its canvas layout during that window it fixes it against a framebuffer
+that does not exist yet, and a minimise/restore is exactly the event
+that makes it revisit. **Unproven: when a client computes its canvas
+layout is not observable from this side.**
 
-**Open question, not yet investigated:** whether surface creation can be
-deferred until after the backend is connected, or the client told the
-OLD geometry first and re-reset after the resize. Both are protocol-
-visible changes to connection setup and need care.
+**NOT OURS as far as can be checked:** `git diff devel..HEAD` changes
+zero lines touching the resize/monitor plumbing in `xrdp_mm.c`,
+`xrdp_egfx.c`, `xrdp_wm.c`, and
+`libxrdp_init_display_size_description` is byte-identical to `devel`.
 
-**UPGRADED 2026-08-08: the fault is PERSISTENT, not transient, and the
-pixels are not the problem.** The owner ran a full-screen repaint
-(`colorkey_x11`, which repaints every pixel of the desktop in one write)
-and the wedge SURVIVED it; only minimising and restoring the client
-clears it. That rules out stale pixels: a full repaint would have
-overwritten them. So the content we send is right and the client is
-placing it wrong, persistently, from connect until something makes it
-recompute its layout. The 2.1-2.8 s window above is the leading
-candidate for when it decides wrongly -- unproven, because when a client
-computes its canvas layout is not observable from this side.
+**If this is ever picked up, the experiment that decides it** is the
+ground-truth rig (`PR-demo/win2022_ground_truth/`): put the same layout
+in front of a stock Windows Server 2022 host and diff its
+`RESET_GRAPHICS` and surface mappings against ours. If Microsoft's
+server produces the same shape and the client renders it correctly
+there, the difference is ours and is the bug.
 
-Evidence collected while the fault was on screen:
-`captures/i102_wedge_live_20260808/` -- every server-side quantity
-checked and correct (screen 7680x2166, stride exactly 4 x 7680, outputs
-at +3840+0 and +0+6, surfaces mapped to match, four encoder children all
-coded 3840x2160). **The decisive artifact is missing and is not
-obtainable from this side: a screenshot of the CLIENT.**
+**Two free improvements found along the way, neither done:**
+1. **Suppression is invisible in release builds.** A client can stop all
+   display output indefinitely and xrdp logs nothing —
+   `xrdp_rdp_process_suppress` (`libxrdp/xrdp_rdp.c:1474`) logs only at
+   `LOG_DEVEL`. Measured here: 258.7 s of total silence, unlogged. This
+   caused a wrong reading of the fault. One INFO line each way.
+2. **No adjacency or gap validation exists.** Monitor sizes and the
+   encompassing box are checked; nothing rejects or warns about a layout
+   leaving interior strips covered by no monitor. One warning line.
 
-**Also found while chasing this, and worth its own fix:** a client can
-suppress all display output indefinitely and a RELEASE build of xrdp
-logs nothing -- `xrdp_rdp_process_suppress` (`libxrdp/xrdp_rdp.c:1474`)
-logs only at `LOG_DEVEL`. Measured: 258.7 s of complete silence, encoder
-pipeline idle, credit unused (distance 1 before and after, so flow
-control was NOT involved). Invisible in the log, and it caused a wrong
-reading of this fault. One INFO line on entering and leaving suppression
-would fix it.
+**Coverage gap this exposed, and it is the durable lesson:** every
+two-monitor rig in this tree builds perfectly aligned dummy outputs and
+connects once. Neither a misaligned arrangement nor a
+reconnect-into-a-wider-layout is a shape any automated test here can
+produce, which is why a human at a real client found both in minutes.
 
-**Related, and separate:** the same session shows the client declaring
-its second monitor 6 px lower (`top 6`), giving a 7680x2166 desktop with
-six-row bands belonging to no monitor. That is client-supplied and xrdp
-reproduces it correctly, but it is silent — one warning when monitors
-are not edge-aligned would make it a five-second diagnosis. Not filed as
-work pending owner sign-off.
-
-**Coverage gap this exposes:** every two-monitor rig in this tree builds
-perfectly aligned dummy outputs and connects once, so neither the
-misalignment nor the reconnect-wider ordering is a shape any automated
-test here produces.
+Evidence: `captures/i102_wedge_live_20260808/`.
 
 ## #99 — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 

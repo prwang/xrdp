@@ -172,3 +172,41 @@ band, model wrong).
 **Certain regardless:** the 6-px bands are real, are never transmitted,
 and are caused entirely by the client-declared misalignment. Aligning
 the two displays removes them.
+
+---
+
+## ADDENDUM 3 — displays aligned: the 6 px is gone, the 33 px STAYS
+
+The owner aligned the two displays in the client and reconnected.
+Verified on the session at 17:50:
+
+```
+Screen 0: current 7680 x 2160          (was 7680 x 2166)
+rdp0 connected primary 3840x2160+3840+0
+rdp1 connected         3840x2160+0+0    (was +0+6)
+
+client raw layout   monitor 0  left 0     top 0  right 3839  bottom 2159
+                    monitor 1  left -3840 top 0  right -1    bottom 2159
+surfaces mapped     id 0 -> left 3840 top 0 ;  id 1 -> left 0 top 0
+```
+
+A textbook layout: no offset, no gaps, no strip belonging to no monitor.
+
+**The 33 px displacement is unchanged.** It is still there from connect
+and still cleared only by minimising and restoring the client.
+
+**So the "33 = 27 px panel + 6 px monitor offset" derivation in addendum
+1 is WITHDRAWN.** It fitted the number exactly and it was a coincidence.
+Two things falsify it: the 6 is now zero and the fault is identical, and
+the panel is now **43 px** tall rather than 27, so neither term of that
+sum survives contact with the aligned layout.
+
+Everything ruled out earlier still stands — our pixels, our damage, our
+encoder geometry, our arithmetic, flow control. What is left is the
+connect-ordering window (surfaces mapped 2.1-2.8 s before the
+framebuffer is resized) and the client's own layout computation, and
+distinguishing those requires knowing when the client decides, which is
+not observable from this side.
+
+**Owner ruling: option 1 — document and move on.** The item is below #92
+(4:2:0 in motion) and no further work is authorised on it.
