@@ -73,6 +73,7 @@ test_xrdp_SOURCES = \
     test_avc444_multimon.c \
     test_avc444_emit_split.c \
     test_avc444_credit_frontier.c \
+    test_avc444_chroma_due.c \
     test_bitmap_load.c
 
 test_xrdp_CFLAGS = \

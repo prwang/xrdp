@@ -44,6 +44,36 @@
 #define XRDP_GFX_WIRE_WINDOW_MIN 1
 #define XRDP_GFX_WIRE_WINDOW_MAX 64
 
+/* BACKLOG #92 / PRD FR-H264-9: 4:2:0 while the screen is in motion,
+ * 4:4:4 when it settles. TWO keys, and the first is the one that
+ * matters to a human:
+ *
+ *   chroma_refresh_ms  the GUARANTEE. Chroma detail is restored at
+ *                      least this often, whatever the screen is doing.
+ *                      0 DISABLES the whole feature -- the aux view is
+ *                      sent on every frame, which is today's behaviour
+ *                      exactly.
+ *   chroma_idle_ms     when the screen settles, how long the pipeline
+ *                      must have been quiet before the aux view is sent
+ *                      again. It also bounds the aux RATE: aux cannot
+ *                      be sent more often than once per this interval,
+ *                      so 100 ms clamps chroma to <= 10 per second
+ *                      while the main view runs at whatever rate it
+ *                      needs. 0 means the refresh bound is the only
+ *                      trigger.
+ *
+ * Deliberately NOT a fraction of the screen: post-compression size is
+ * not a function of damaged area, so an area threshold is a number no
+ * administrator can reason about (owner, 2026-08-08). Both of these are
+ * times, and both trade the same way -- lower is sharper and costs
+ * bandwidth. */
+#define XRDP_GFX_CHROMA_REFRESH_MS_DEFAULT 0
+#define XRDP_GFX_CHROMA_REFRESH_MS_MIN 16
+#define XRDP_GFX_CHROMA_REFRESH_MS_MAX 60000
+#define XRDP_GFX_CHROMA_IDLE_MS_DEFAULT 0
+#define XRDP_GFX_CHROMA_IDLE_MS_MIN 0
+#define XRDP_GFX_CHROMA_IDLE_MS_MAX 60000
+
 /* nc stands for new config */
 struct xrdp_tconfig_gfx_x264_param
 {
@@ -222,6 +252,13 @@ struct xrdp_tconfig_gfx
      * shipped default, and until it has run no measured number exists
      * to put here. */
     int avc444_ffmpeg_wire_window;
+
+    /* BACKLOG #92 / PRD FR-H264-9 -- see the defaults above for what
+     * each one promises. chroma_refresh_ms == 0 disables the feature
+     * and reproduces today's behaviour exactly; that is the shipped
+     * default, so an absent or invalid config changes nothing. */
+    int avc444_ffmpeg_chroma_refresh_ms;
+    int avc444_ffmpeg_chroma_idle_ms;
 };
 
 static const char *const rdpbcgr_connection_type_names[] =

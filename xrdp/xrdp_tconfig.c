@@ -442,6 +442,12 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
      * and .../i80_widen_legacy_20260807_143617_s20. */
     config->avc444_ffmpeg_eager_slot_ack = 1;
     config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
+    /* BACKLOG #92: OFF by default -- the aux view is sent on every
+     * frame, which is byte-for-byte today's behaviour. */
+    config->avc444_ffmpeg_chroma_refresh_ms =
+        XRDP_GFX_CHROMA_REFRESH_MS_DEFAULT;
+    config->avc444_ffmpeg_chroma_idle_ms =
+        XRDP_GFX_CHROMA_IDLE_MS_DEFAULT;
     {
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
@@ -465,6 +471,8 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
             toml_datum_t es = toml_bool_in(avc, "eager_slot_ack");
             toml_datum_t et = toml_bool_in(avc, "emit_thread");
             toml_datum_t ww = toml_int_in(avc, "wire_window");
+            toml_datum_t cr = toml_int_in(avc, "chroma_refresh_ms");
+            toml_datum_t ci = toml_int_in(avc, "chroma_idle_ms");
             if (es.ok)
             {
                 config->avc444_ffmpeg_eager_slot_ack = es.u.b ? 1 : 0;
@@ -486,6 +494,47 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                 else
                 {
                     config->avc444_ffmpeg_wire_window = (int)ww.u.i;
+                }
+            }
+            /* BACKLOG #92 / PRD FR-H264-9. Same contract as
+             * wire_window: an out of range value is REFUSED with a log
+             * line and the default stands, never silently clamped. The
+             * default for both is 0, i.e. the feature is OFF and the
+             * aux view is sent on every frame exactly as today. */
+            if (cr.ok)
+            {
+                if (cr.u.i != 0 &&
+                        (cr.u.i < XRDP_GFX_CHROMA_REFRESH_MS_MIN ||
+                         cr.u.i > XRDP_GFX_CHROMA_REFRESH_MS_MAX))
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "chroma_refresh_ms %lld out of range [%d,%d] "
+                          "(0 disables); keeping the default %d",
+                          (long long)cr.u.i,
+                          XRDP_GFX_CHROMA_REFRESH_MS_MIN,
+                          XRDP_GFX_CHROMA_REFRESH_MS_MAX,
+                          config->avc444_ffmpeg_chroma_refresh_ms);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_chroma_refresh_ms = (int)cr.u.i;
+                }
+            }
+            if (ci.ok)
+            {
+                if (ci.u.i < XRDP_GFX_CHROMA_IDLE_MS_MIN ||
+                        ci.u.i > XRDP_GFX_CHROMA_IDLE_MS_MAX)
+                {
+                    TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg "
+                          "chroma_idle_ms %lld out of range [%d,%d]; "
+                          "keeping the default %d", (long long)ci.u.i,
+                          XRDP_GFX_CHROMA_IDLE_MS_MIN,
+                          XRDP_GFX_CHROMA_IDLE_MS_MAX,
+                          config->avc444_ffmpeg_chroma_idle_ms);
+                }
+                else
+                {
+                    config->avc444_ffmpeg_chroma_idle_ms = (int)ci.u.i;
                 }
             }
             if (et.ok)

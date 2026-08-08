@@ -130,6 +130,75 @@ xrdp_gfx_credit_frontier(int frame_id_consumed, int frame_id_server,
 }
 
 /**
+ * BACKLOG #92 / PRD FR-H264-9 -- must the aux (chroma) view be sent for
+ * a frame arriving now?
+ *
+ * AVC444 sends a 4:2:0 main view plus an aux view carrying the chroma
+ * detail. The aux view is 44.8 % of the bytes and a whole second pack
+ * and encode, and it is least perceptible while the screen is moving.
+ * This decides, per frame, whether to pay for it.
+ *
+ * TWO TRIGGERS, and the first is a promise to the user rather than a
+ * heuristic:
+ *
+ *   the GUARANTEE  chroma detail is restored at least every
+ *                  refresh_ms, whatever the screen is doing. Without
+ *                  this, one animating window in a corner starves the
+ *                  whole screen of chroma detail for as long as it
+ *                  runs -- a static document beside a spinning cube
+ *                  would never get 4:4:4 text (owner, 2026-08-08).
+ *   the SETTLE     the pipeline has been quiet for idle_ms, so the
+ *                  screen has stopped moving and this is the frame to
+ *                  spend chroma on. This also bounds the aux RATE: aux
+ *                  cannot be sent more often than once per idle_ms,
+ *                  while the main view runs at whatever rate it needs.
+ *
+ * IT NEVER RECEIVES A PIXEL. Every argument is a timestamp or a
+ * configured interval. That is deliberate and it is the point: a
+ * reviewer settles the question "is the server inspecting the user's
+ * screen?" by reading this signature, not by auditing a body or
+ * trusting a comment. Damage geometry would also have been defensible
+ * -- the server already computes it -- but timing alone is enough here
+ * and needs nothing.
+ *
+ * @param refresh_ms     chroma_refresh_ms; <= 0 DISABLES the feature
+ *                       and the aux view is always sent (today's
+ *                       behaviour, and the shipped default)
+ * @param idle_ms        chroma_idle_ms; <= 0 means the guarantee is the
+ *                       only trigger
+ * @param now_ms         this frame's arrival
+ * @param last_aux_ms    when the aux view was last sent; < 0 if never
+ * @param prev_frame_ms  the previous frame's arrival; < 0 if none
+ * @return 1 to send the aux view with this frame, 0 to send main only
+ */
+static inline int
+xrdp_gfx_chroma_due(int refresh_ms, int idle_ms, long long now_ms,
+                    long long last_aux_ms, long long prev_frame_ms)
+{
+    if (refresh_ms <= 0)
+    {
+        return 1;               /* feature off */
+    }
+    if (last_aux_ms < 0)
+    {
+        return 1;               /* nothing has carried chroma yet */
+    }
+    if (now_ms - last_aux_ms >= refresh_ms)
+    {
+        return 1;               /* the guarantee */
+    }
+    if (prev_frame_ms < 0)
+    {
+        return 1;               /* first frame of the session */
+    }
+    if (idle_ms > 0 && now_ms - prev_frame_ms >= idle_ms)
+    {
+        return 1;               /* the screen settled */
+    }
+    return 0;
+}
+
+/**
  * BACKLOG #91 -- would the credit xrdp last granted leave this monitor a
  * free capture slot?
  *

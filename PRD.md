@@ -2445,6 +2445,104 @@ Open before the default can change: the scheduled-paired-refresh work of the rev
 
 ---
 
+### FR-H264-9 (PROPOSED, not implemented): 4:2:0 while the screen is in motion, 4:4:4 when it settles
+
+**Status: the DECISION LOGIC and its configuration are implemented and
+unit-tested; the encoder does not yet act on them.** Specified
+2026-08-08 on the owner's ruling (option "B + refresh bound"). Default
+OFF: with `chroma_refresh_ms` absent or 0 the aux view is sent on every
+frame, which is byte-for-byte today's behaviour.
+
+**Purpose.** The AVC444 aux view carries the chroma detail and is
+**44.8 % of the bytes** (measured from wire dumps: main P 2.09 MB, aux
+P 1.69 MB per picture), plus a whole second full-frame pack and a
+second encode. Chroma detail is least perceptible while the screen is
+moving, and that is also when the frame period is longest. Dropping the
+aux view under motion is therefore the largest single byte lever the
+pipeline has.
+
+**The user-facing guarantee, and it is the requirement — the motion
+signal is an implementation detail underneath it:**
+
+> Chroma detail is restored at least every `chroma_refresh_ms`,
+> whatever the screen is doing.
+
+Without that bound the policy has a defect the owner named on
+2026-08-08 and which applies to *every* global motion signal: one
+animating window in a corner keeps the whole pipeline busy, so a static
+document beside it would never receive 4:4:4 text for as long as the
+animation runs. Per-region chroma does not rescue it — the aux view is
+one H.264 frame from one encoder and a region list only says where to
+apply a decoded view, so narrowing the region list saves no bytes and
+narrowing the encode changes the coded frame size and breaks the LTR
+chain's geometry (FR-H264-8). The decision is necessarily per frame,
+and the bound is what makes that acceptable.
+
+**Configuration** — `gfx.toml [avc444_ffmpeg]`, both times in
+milliseconds, both refused-with-a-log-line if out of range, never
+silently clamped:
+
+| key | meaning | default |
+|---|---|---|
+| `chroma_refresh_ms` | the guarantee above. **0 disables the feature.** | 0 |
+| `chroma_idle_ms` | how long the pipeline must be quiet before chroma is sent again. Also bounds the aux RATE: aux cannot be sent more often than once per this interval, so 100 ms clamps chroma to at most 10 per second while the main view runs at whatever rate it needs. 0 means the guarantee is the only trigger. | 0 |
+
+Deliberately NOT a fraction of the screen. Post-compression size is not
+a function of damaged area, so an area threshold is a number no
+administrator can reason about (owner, 2026-08-08). Both keys are
+times, and both trade the same way: lower is sharper and costs
+bandwidth.
+
+**The decision function MUST never receive a pixel.**
+`xrdp_gfx_chroma_due()` (`xrdp/xrdp_encoder.h`) takes two configured
+intervals and three timestamps, and nothing else. This is a
+requirement, not an implementation note: a reviewer settles the
+question "is the server inspecting the user's screen?" by reading the
+signature. Damage geometry would also have been defensible — the server
+already computes it, and using it grants no new access — but timing
+alone suffices here and needs nothing.
+
+**Verification.** `tests/xrdp/test_avc444_chroma_due.c`, seven cases
+whose expected values are derived from this specification by hand and
+never read off the implementation, including: OFF sends aux on every
+frame; the gap between chroma frames never exceeds the bound across 60 s
+of unbroken 50 fps motion; the aux rate is bounded by the idle interval
+for every frame gap from 1 to 500 ms; and both triggers fire AT their
+threshold rather than one past it. Non-vacuity demonstrated: changing
+one `>=` to `>` turns four of the seven red, with the worst chroma gap
+becoming 1020 ms against the 1000 ms bound.
+
+**OPEN BLOCKER, and it is why the encoder does not yet act on this.**
+The paired intra refresh (FR-H264-6, D7) gives both children the
+identical FRAME-INDEXED schedule `expr:not(mod(n,N))`, where `n` is
+that child's own input frame index. Skipping aux frames makes the aux
+child's `n` diverge from the main child's, so scheduled cuts stop
+landing on the same picture ordinal in both views and wire-audit checks
+A2-A4 fail by construction. Three candidate resolutions, none free, all
+requiring a decision before code:
+
+1. **Re-key the aux chain on resume** (the #48 mechanism already
+   exists). Costs an IDR every time chroma resumes — up to ten per
+   second at `chroma_idle_ms = 100`, which could easily exceed what
+   skipping saves.
+2. **Drive the schedule by time rather than frame index**
+   (`expr:gte(t,...)`), so both children cut at the same instant
+   whatever their frame counts. Changes the rewriter's
+   observed-versus-requested ordinal contract.
+3. **Feed the aux child a repeat picture** to keep `n` in lockstep, and
+   simply not send its PDU. Preserves the schedule and the chain, saves
+   the wire bytes, but keeps the pack and encode cost — which is most
+   of the win.
+
+**Acceptance criteria (unchanged from BACKLOG #92 except where this
+requirement sharpens them):** default OFF reproduces today's behaviour
+exactly; the decision logic is pure and unit-tested (**met**); smoke
+gate PASS before any measurement; wire audit A1-A7 PASS in **both**
+regimes; the client tolerates an alternating stream, verified on the
+macOS and Windows clients before any rate is quoted; the E5-2 pair
+re-run and DECOMPOSED, not just rated; and a still-screen visual check
+that subpixel-AA text is 4:4:4 sharp.
+
 ## 8.9 AVC444 wire serialization
 
 ### FR-WIRE-0
