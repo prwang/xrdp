@@ -290,6 +290,33 @@ deferred until after the backend is connected, or the client told the
 OLD geometry first and re-reset after the resize. Both are protocol-
 visible changes to connection setup and need care.
 
+**UPGRADED 2026-08-08: the fault is PERSISTENT, not transient, and the
+pixels are not the problem.** The owner ran a full-screen repaint
+(`colorkey_x11`, which repaints every pixel of the desktop in one write)
+and the wedge SURVIVED it; only minimising and restoring the client
+clears it. That rules out stale pixels: a full repaint would have
+overwritten them. So the content we send is right and the client is
+placing it wrong, persistently, from connect until something makes it
+recompute its layout. The 2.1-2.8 s window above is the leading
+candidate for when it decides wrongly -- unproven, because when a client
+computes its canvas layout is not observable from this side.
+
+Evidence collected while the fault was on screen:
+`captures/i102_wedge_live_20260808/` -- every server-side quantity
+checked and correct (screen 7680x2166, stride exactly 4 x 7680, outputs
+at +3840+0 and +0+6, surfaces mapped to match, four encoder children all
+coded 3840x2160). **The decisive artifact is missing and is not
+obtainable from this side: a screenshot of the CLIENT.**
+
+**Also found while chasing this, and worth its own fix:** a client can
+suppress all display output indefinitely and a RELEASE build of xrdp
+logs nothing -- `xrdp_rdp_process_suppress` (`libxrdp/xrdp_rdp.c:1474`)
+logs only at `LOG_DEVEL`. Measured: 258.7 s of complete silence, encoder
+pipeline idle, credit unused (distance 1 before and after, so flow
+control was NOT involved). Invisible in the log, and it caused a wrong
+reading of this fault. One INFO line on entering and leaving suppression
+would fix it.
+
 **Related, and separate:** the same session shows the client declaring
 its second monitor 6 px lower (`top 6`), giving a 7680x2166 desktop with
 six-row bands belonging to no monitor. That is client-supplied and xrdp
