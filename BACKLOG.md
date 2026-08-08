@@ -72,7 +72,8 @@ stay as "(was #NN)" in each header.
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 15. **#102** — a client displaces one screen by 33 px until minimise+restore (filed 2026-08-08; DOCUMENT ONLY by owner ruling, below #92)
-16. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
+16. **#103** — the raw-frame pipe is clamped to 8 KiB in this container; every absolute fleet number carries ~5 ms of it (filed 2026-08-08)
+17. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -252,6 +253,51 @@ both landed, and items 1–3 below are CLOSED.**
      sizes; and the client PRODUCT is not recorded in the session log, so
      "both clients" is not evidenced. The criterion itself, both halves,
      is now written down in `PR-demo/INTERACTIVE_ARM.md`.
+
+## #103 — the raw-frame pipe is clamped to 8 KiB in this container, and every fleet number carries it (filed 2026-08-08)
+
+**Two separate things, and only the first is xrdp's.**
+
+**(a) The unchecked `F_SETPIPE_SZ`.** `spawn_child()` asks for a 1 MiB
+input pipe and does not look at the answer
+(`xrdp/xrdp_encoder_ffmpeg.c`, "best effort"). When it is refused the
+pipe stays at the kernel minimum of 8192 bytes, a 13.82 MB picture then
+crosses in 1688 round trips instead of 14, and the handover costs
+**5.8 ms instead of 0.68** -- silently. Two lines to check the granted
+size and log when it is far below what was asked. Worth doing: an
+invisible 5 ms per frame at 4K is exactly what a log line is for.
+
+**(b) The measurement environment, which is the bigger finding.** This
+dev box is an Incus unprivileged container whose `uid_map` is `0 1000 1`
+-- **container root is host uid 1000**, an ordinary host account -- and
+the pods inherit it. `fs/pipe-user-pages-soft` is 64 MiB of pipe buffers
+per host user, host-wide; over it, pipes are clamped and the resize is
+refused unless the caller is `capable(CAP_SYS_RESOURCE)` **in the
+initial** user namespace, which container root never is. A bare-metal
+xrdp running as real root is exempt from the rule entirely, so this is
+NOT what a normal deployment sees.
+
+Consequence: every fleet measurement in this tree was taken with 8 KiB
+pipes. **A/B ratios are unaffected** -- both legs shared it -- but
+**absolute numbers carry ~5 ms per frame at 3840x2400 that a normally
+privileged deployment would not pay.** Projected, not measured: the
+24.5 ms period would be near 19 ms.
+
+Proved inside arm x030, same pod and same binary, differing only in uid:
+container root (host 1000) gets 8 KiB and 5.84 ms; `tester` (host
+1001000) gets 1 MiB and 0.68 ms. memcpy of the same bytes is 0.29 ms, so
+a pipe with a normal size costs 2.3x a copy -- reasonable, and **not** a
+bottleneck at 0.68 ms of a frame.
+
+Reproduction `tools/vmsplice_pipe_bench.c` (no session, no GPU, no
+xrdp); evidence and the full mechanism in
+`PR-demo/mac_bisect_matrix/captures/i103_pipe_handover_20260808/`.
+
+**OPEN, needs the owner:** proving the in-situ counterfactual needs
+`fs/pipe-user-pages-soft` raised on the HOST -- it is read-only from
+inside the container and the change is host-wide. Until then the
+container handicap is stated wherever an absolute fleet number is
+quoted, and not corrected for.
 
 ## #102 — a client displaces one screen by 33 px until it is minimised and restored (filed 2026-08-08, owner-reported; DOCUMENT ONLY, owner decision)
 

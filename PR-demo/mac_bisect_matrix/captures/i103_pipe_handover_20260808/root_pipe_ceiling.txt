@@ -1,0 +1,8 @@
+  ask    4096 -> rv     4096  got    4096  ok
+  ask    8192 -> rv     8192  got    8192  ok
+  ask   16384 -> rv       -1  got    8192  Operation not permitted
+  ask   32768 -> rv       -1  got    8192  Operation not permitted
+  ask   65536 -> rv       -1  got    8192  Operation not permitted
+  ask  131072 -> rv       -1  got    8192  Operation not permitted
+  ask  262144 -> rv       -1  got    8192  Operation not permitted
+  ask 1048576 -> rv       -1  got    8192  Operation not permitted

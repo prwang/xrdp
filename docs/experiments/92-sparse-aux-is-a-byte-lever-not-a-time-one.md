@@ -160,6 +160,52 @@ for the child.
 Which leaves exactly one place the time is spent, and it is inside one
 process: read 8.8 ms, then encode 13.9 ms, on one thread.
 
+### ADDENDUM 2026-08-08 — most of the 8-9 ms feed is a container artefact, not xrdp
+
+The owner's follow-up: 2 GB/s is slow for a copy; can the handover be
+reproduced independently, outside xrdp and xorgxrdp? It can, and the
+answer changes what the feed segment means.
+
+`tools/vmsplice_pipe_bench.c` reproduces just the handover — a parent
+that `vmsplice`s a buffer into a pipe exactly as `feed_vmsplice()` does
+and a forked child that reads and discards it. Run **inside arm x030**,
+same pod, same binary, same 13.82 MB picture, differing only in uid:
+
+| runs as | maps to host uid | pipe granted | handover |
+|---|---|---|---|
+| container root — what xrdp runs as | **1000** | **8 KiB**, resize REFUSED | **5.84 ms** |
+| `tester` | 1001000 | 1 MiB, granted | **0.68 ms** |
+
+memcpy of the same bytes: **0.29 ms**. So the pipe mechanism with a
+normal pipe costs 2.3× a copy and is **not** a bottleneck; clamped to
+8 KiB it costs 20× and a picture crosses in 1688 round trips instead of
+14.
+
+**The cause is this box's containerisation, not the code.** It is an
+Incus unprivileged container whose `uid_map` is `0 1000 1` — container
+root is host uid 1000, an ordinary host account — and the pods inherit
+it. `fs/pipe-user-pages-soft` is 64 MiB of pipe buffers per host user,
+host-wide; over it, pipes are clamped to the kernel minimum and
+`F_SETPIPE_SZ` is refused unless the caller is `capable(CAP_SYS_RESOURCE)`
+**in the initial** user namespace, which container root never is. A
+bare-metal xrdp running as real root is exempt from the rule entirely.
+
+**So the feed segment above is inflated.** The 7.5–9.1 ms measured
+in situ is consistent with the clamped mechanism (5.8–7.1 ms) plus
+ffmpeg's own work; on a normally privileged host it would be near
+0.7 ms. **The A/B in this record is unaffected** — both conditions shared
+the handicap — but the absolute period of 24.5 ms contains roughly 5 ms
+that a normal deployment would not pay, which would put it near 19 ms.
+Projected, not measured: proving it needs the host sysctl raised, which
+is outside this container.
+
+**And it changes the ranking of the levers below.** "Remove the copy" was
+listed as the big one on the strength of an 8–9 ms feed. At 0.68 ms with
+a working pipe, the copy is 2.8 % of a frame and the case for
+re-architecting the handover is much weaker than these numbers first
+suggested. Filed as BACKLOG #103; evidence in
+`PR-demo/mac_bisect_matrix/captures/i103_pipe_handover_20260808/`.
+
 **What the prize would be, if the serialisation could be broken.**
 Arithmetic on the measured segments, not a measurement: with the feed of
 the next picture running entirely concurrently with the encode of this

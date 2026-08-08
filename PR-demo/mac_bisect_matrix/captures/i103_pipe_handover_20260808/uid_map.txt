@@ -1,0 +1,6 @@
+         0       1000          1
+         1    1000001  999999999
+CapEff:	000001ffffffffff
+CapBnd:	000001ffffffffff
+container=lxc (Incus), userns user:[4026532770]
+pipe-user-pages-soft = 16384 pages = 64 MiB, read-only from here

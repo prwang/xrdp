@@ -1,0 +1,31 @@
+payload 13824000 bytes (13.82 MB), 30 iterations, uid 0
+A pipe resize refused with EPERM means this uid is over
+fs/pipe-user-pages-soft; the limit is PER USER and host wide, so a busy
+box can push every new pipe down to the kernel minimum. xrdp asks for
+1 MiB and does not check the answer.
+
+BASELINE -- what one thread on this box can copy
+  memcpy, same buffer, same size               45.96 GB/s    0.301 ms
+
+THE SHIPPED MECHANISM -- vmsplice into a 1 MiB pipe, swept over what the
+READER asks for per read() call. xrdp's side is identical in every row;
+only the child changes.
+  vmsplice, reader takes 32 KiB at a time       2.15 GB/s    6.416 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  vmsplice, reader takes 64 KiB at a time       2.46 GB/s    5.621 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  vmsplice, reader takes 256 KiB at a time      2.14 GB/s    6.455 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  vmsplice, reader takes 1 MiB at a time        2.45 GB/s    5.654 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+
+DOES THE PIPE SIZE MATTER? Same reader chunk (32 KiB), different pipes.
+  vmsplice, default pipe (64 KiB)               2.69 GB/s    5.143 ms  pipe    8 KiB   1688 round trips
+  vmsplice, 256 KiB pipe                        2.48 GB/s    5.573 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  vmsplice, 1 MiB pipe (what xrdp asks for)     2.51 GB/s    5.510 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  vmsplice, 8 MiB pipe requested                2.31 GB/s    5.989 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+
+IS THE ZERO-COPY SIDE BUYING ANYTHING? Same pipe and same reader, but the
+writer uses an ordinary write() instead of vmsplice.
+  write(), 1 MiB pipe, reader 32 KiB            2.72 GB/s    5.084 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+  write(), 1 MiB pipe, reader 1 MiB             2.69 GB/s    5.145 ms  pipe    8 KiB   1688 round trips  <-- RESIZE REFUSED
+
+Read every figure against the memcpy baseline of 45.96 GB/s: a handover
+through a pipe costs at least one copy, so that is the ceiling, and the
+gap between it and a row is what the pipe machinery costs.

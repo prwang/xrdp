@@ -1,0 +1,31 @@
+payload 13824000 bytes (13.82 MB), 10 iterations, uid 1000
+A pipe resize refused with EPERM means this uid is over
+fs/pipe-user-pages-soft; the limit is PER USER and host wide, so a busy
+box can push every new pipe down to the kernel minimum. xrdp asks for
+1 MiB and does not check the answer.
+
+BASELINE -- what one thread on this box can copy
+  memcpy, same buffer, same size               48.00 GB/s    0.288 ms
+
+THE SHIPPED MECHANISM -- vmsplice into a 1 MiB pipe, swept over what the
+READER asks for per read() call. xrdp's side is identical in every row;
+only the child changes.
+  vmsplice, reader takes 32 KiB at a time      14.91 GB/s    0.927 ms  pipe 1024 KiB     14 round trips
+  vmsplice, reader takes 64 KiB at a time      15.29 GB/s    0.904 ms  pipe 1024 KiB     14 round trips
+  vmsplice, reader takes 256 KiB at a time     27.02 GB/s    0.512 ms  pipe 1024 KiB     14 round trips
+  vmsplice, reader takes 1 MiB at a time       19.57 GB/s    0.707 ms  pipe 1024 KiB     14 round trips
+
+DOES THE PIPE SIZE MATTER? Same reader chunk (32 KiB), different pipes.
+  vmsplice, default pipe (64 KiB)              15.43 GB/s    0.896 ms  pipe   64 KiB    211 round trips
+  vmsplice, 256 KiB pipe                       17.47 GB/s    0.791 ms  pipe  256 KiB     53 round trips
+  vmsplice, 1 MiB pipe (what xrdp asks for)    16.62 GB/s    0.832 ms  pipe 1024 KiB     14 round trips
+  vmsplice, 8 MiB pipe requested               19.22 GB/s    0.719 ms  pipe   64 KiB    211 round trips  <-- RESIZE REFUSED
+
+IS THE ZERO-COPY SIDE BUYING ANYTHING? Same pipe and same reader, but the
+writer uses an ordinary write() instead of vmsplice.
+  write(), 1 MiB pipe, reader 32 KiB            7.32 GB/s    1.888 ms  pipe 1024 KiB     14 round trips
+  write(), 1 MiB pipe, reader 1 MiB             6.37 GB/s    2.171 ms  pipe 1024 KiB     14 round trips
+
+Read every figure against the memcpy baseline of 48.00 GB/s: a handover
+through a pipe costs at least one copy, so that is the ceiling, and the
+gap between it and a row is what the pipe machinery costs.

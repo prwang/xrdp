@@ -1,0 +1,3 @@
+default   F_GETPIPE_SZ = 8192
+set 1MiB  rv = -1 errno = Operation not permitted
+after     F_GETPIPE_SZ = 8192
