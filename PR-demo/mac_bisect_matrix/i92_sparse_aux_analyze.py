@@ -206,6 +206,66 @@ def analyse_leg(legdir):
     out['overlap_pct'] = (100.0 * out['overlap_ms'] / out['aux_encode_ms']
                           if out['aux_encode_ms'] else float('nan'))
 
+    # WHERE THE WHOLE CYCLE GOES, from the MAIN child's point of view.
+    # Asked 2026-08-08: "is the main encoder capable of accepting faster
+    # and waiting less?" -- i.e. would letting xrdp run further ahead
+    # (more frames in flight) fill idle time and raise the rate? That is
+    # only answerable if the cycle is fully accounted for, so these four
+    # segments are built to SUM to it, and the residual is printed.
+    #
+    #   feed     pump_beg -> feedend: the raw picture going into the
+    #            child's 1 MiB pipe. xrdp's side is vmsplice -- page
+    #            references, near-free -- so the elapsed time here is
+    #            the CHILD's read() copying, not xrdp waiting.
+    #   encode   feedend -> outfirst: the child holds a whole picture
+    #            and produces the first encoded byte.
+    #   drain    outfirst -> pump_end: xrdp reading the rest of it.
+    #   between  pump_end -> next pump_beg: collect, the LTR rewrite,
+    #            emit, slot release.
+    order = sorted(wmain)
+    feed = []
+    enc = []
+    drain = []
+    between = []
+    cyc = []
+    pbeg = [r[0] for r in recs if r[1] == 'pump_beg']
+    pend = [r[0] for r in recs if r[1] == 'pump_end']
+    ncyc = min(len(pbeg), len(pend), len(order))
+    for i in range(ncyc):
+        a0, a1 = wmain[order[i]]
+        feed.append((a0 - pbeg[i]) / 1e6)
+        enc.append((a1 - a0) / 1e6)
+        drain.append((pend[i] - a1) / 1e6)
+        if i + 1 < ncyc:
+            between.append((pbeg[i + 1] - pend[i]) / 1e6)
+            cyc.append((pbeg[i + 1] - pbeg[i]) / 1e6)
+    out['seg_feed_ms'] = mean(feed)
+    out['seg_encode_ms'] = mean(enc)
+    out['seg_drain_ms'] = mean(drain)
+    out['seg_between_ms'] = mean(between)
+    out['seg_cycle_ms'] = mean(cyc)
+    out['seg_residual_ms'] = (out['seg_cycle_ms'] - out['seg_feed_ms']
+                              - out['seg_encode_ms'] - out['seg_drain_ms']
+                              - out['seg_between_ms'])
+
+    # DID THE WORKER EVER HAVE NOTHING TO ENCODE? If it did, the
+    # producer is the limit and nothing xrdp does downstream matters.
+    # Reported as a COUNT above a threshold rather than a mean: the
+    # session-start wait is seconds long and would swamp any average.
+    waits = []
+    open_t = None
+    for t, n, _ in [(t, n, f) for t, n, f in recs
+                    if n in ('wait_beg', 'wait_end')]:
+        if n == 'wait_beg':
+            open_t = t
+        elif open_t is not None:
+            waits.append((t - open_t) / 1e6)
+            open_t = None
+    out['waits'] = len(waits)
+    out['waits_over_1ms'] = sum(1 for w in waits if w > 1.0)
+    out['wait_p50_ms'] = pct(waits, 50)
+    out['wait_p99_ms'] = pct(waits, 99)
+
     # how many children the pump armed. 2 per monitor normally; 1 for a
     # monitor whose chroma was skipped. This is the skip visible from
     # the OTHER side of the mechanism.
@@ -461,6 +521,71 @@ def main():
           'the chroma')
     print('    encode could ever have saved from the wait.')
     print()
+    print('=== WHERE THE WHOLE CYCLE GOES, and whether there is idle to '
+          'reclaim ===')
+    print()
+    print('  The four segments are built to SUM to the cycle, and the '
+          'residual is')
+    print('  printed so a decomposition that does not close cannot be '
+          'read as one.')
+    print('    feed     the raw picture going into the child\'s 1 MiB '
+          'pipe. xrdp\'s')
+    print('             side is vmsplice -- page references, near-free '
+          '-- so this')
+    print('             elapsed time is the CHILD copying it in, not '
+          'xrdp waiting.')
+    print('    encode   the child holds a whole picture and produces '
+          'the first')
+    print('             encoded byte.')
+    print('    drain    xrdp reading the rest of the encoded frame.')
+    print('    between  collect, the reference rewrite, emit, slot '
+          'release.')
+    print()
+    print('  %-4s %-4s %8s %8s %8s %9s %8s %8s %9s'
+          % ('leg', 'cfg', 'feed', 'encode', 'drain', 'between', 'sum',
+             'cycle', 'residual'))
+    print('  ' + '-' * 76)
+    for r in res:
+        tot = (r['seg_feed_ms'] + r['seg_encode_ms'] + r['seg_drain_ms']
+               + r['seg_between_ms'])
+        print('  %-4s %-4s %8s %8s %8s %9s %8s %8s %9s'
+              % (r['dir'].replace('leg_', ''), r['cfg'],
+                 fmt(r['seg_feed_ms']), fmt(r['seg_encode_ms']),
+                 fmt(r['seg_drain_ms']), fmt(r['seg_between_ms']),
+                 fmt(tot), fmt(r['seg_cycle_ms']),
+                 fmt(r['seg_residual_ms'])))
+    print()
+    print('  Times the encoder worker had NOTHING TO ENCODE. If this is '
+          'not ~zero,')
+    print('  the producer is the limit and nothing downstream of it '
+          'matters. Counted')
+    print('  above a threshold rather than averaged: the wait before the '
+          'payload')
+    print('  starts drawing is seconds long and would swamp any mean.')
+    print()
+    for r in res:
+        print('    %-4s %-4s %d waits, %d of them over 1 ms; p50 %s ms, '
+              'p99 %s ms'
+              % (r['dir'].replace('leg_', ''), r['cfg'], r['waits'],
+                 r['waits_over_1ms'], fmt(r['wait_p50_ms'], 4),
+                 fmt(r['wait_p99_ms'], 4)))
+    print()
+    fl = [max(r['seg_feed_ms'], r['seg_encode_ms']) + r['seg_drain_ms']
+          + r['seg_between_ms'] for r in res]
+    cy = [r['seg_cycle_ms'] for r in res]
+    print('  ARITHMETIC, NOT A MEASUREMENT: if the feed of the next '
+          'picture ran')
+    print('  entirely concurrently with the encode of this one, the '
+          'cycle floor')
+    print('  would be max(feed, encode) + drain + between = %s ms '
+          'against the'
+          % ' / '.join(fmt(x, 1) for x in fl))
+    print('  measured %s ms. That is the whole prize available to any '
+          'amount of'
+          % ' / '.join(fmt(x, 1) for x in cy))
+    print('  pipelining, and it is bounded below by the encode alone.')
+    print()
+
     bo = avg(off, 'bytes_per_frame')
     bn = avg(on, 'bytes_per_frame')
     if bo == bo and bn == bn:

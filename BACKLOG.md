@@ -437,6 +437,24 @@ priority against the tier ladder now.
 (2026-08-08). The spec is PRD FR-H264-9; the measurement is
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
 
+**Why the rate did not move, answered from the archived rings with no
+new run (owner's question, 2026-08-08).** The cycle closes to within
+0.003 ms on all four legs: feed 7.5-9.1 ms (the CHILD copying a 13.82 MB
+picture in through a 1 MiB pipe -- xrdp's vmsplice side is page
+references and near-free) + encode 13.8-14.1 + drain 1.0-1.2 + between
+0.8-1.4. The worker had nothing to encode on 1-3 cycles out of ~690 per
+leg, median wait 1.2 MICROseconds. **There is no idle for a deeper
+pipeline to fill, and xrdp's frames-in-flight knob cannot reach the
+feed anyway**: the child is one ffmpeg process at `-async_depth 1`, so
+it cannot read frame N+1 while encoding N, and a deeper xrdp-side
+pipeline can only pre-fill 1 MiB of a 13.82 MB picture (~0.6 ms of a
+24.5 ms cycle). The prize if feed and encode were overlapped is
+15.7-16.6 ms against 24.5 -- about 1.5x -- and reaching it needs a
+change to how the child is fed or how many threads it has, not a knob.
+Candidates, each unmeasured and each its own item: a larger input pipe
+(bounded at ~0.6 ms), shared memory instead of a pipe, or letting the
+child overlap read and encode.
+
 **What the A/B found: 43.8 % of the bytes, and zero milliseconds.** The
 frame interval is unchanged (24.09 -> 24.49 ms, inside the spread
 between the two control legs) because the chroma encode already runs

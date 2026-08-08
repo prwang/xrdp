@@ -138,6 +138,57 @@ treatment: on the ON legs the 18 frames that *did* carry chroma show the
 same 93–96 % overlap, so the mechanism is unchanged and it is the
 opportunity that was never there.
 
+## Where the whole cycle goes, and whether a deeper pipeline could help
+
+Asked 2026-08-08: with the chroma view gone, is the main encoder able to
+accept frames faster and wait less — i.e. would letting xrdp run further
+ahead raise the rate? The four segments below are built to **sum** to the
+cycle, and the residual is printed, so a decomposition that does not
+close cannot be read as one.
+
+| leg | config | feed | encode | drain | between | sum | cycle | residual |
+|---|---|---|---|---|---|---|---|---|
+| a1 | OFF | 7.497 | 13.898 | 1.030 | 1.398 | 23.823 | 23.820 | −0.003 |
+| a2 | OFF | 7.987 | 14.081 | 1.160 | 1.391 | 24.618 | 24.619 | +0.001 |
+| b1 | ON | 9.054 | 13.803 | 1.172 | 0.762 | 24.791 | 24.790 | −0.001 |
+| b2 | ON | 8.515 | 13.950 | 1.211 | 0.783 | 24.459 | 24.462 | +0.003 |
+
+* **feed** — the raw picture going into the child's 1 MiB pipe. One
+  picture at 3840×2400 is **13.82 MB**, or 13.2 pipefuls. xrdp's side is
+  `vmsplice`, which moves page references and is near-free, so the
+  elapsed time here is the **child's `read()` copying the frame in** at
+  1.5–1.8 GB/s — not xrdp waiting.
+* **encode** — the child holds a whole picture and produces its first
+  encoded byte. On this VAAPI arm that includes uploading the frame to
+  the GPU.
+* **drain** — xrdp reading the rest of the encoded frame.
+* **between** — collect, the reference rewrite, emit, slot release.
+
+**There is no idle to reclaim.** The encoder worker had nothing to encode
+on 1–3 occasions per leg out of ~690, and every one of those but the
+session-start wait is under a millisecond; the median wait is **1.2
+microseconds**. The fifo always has a frame. The child is busy 90–92 % of
+the cycle, and the remaining 8–10 % is xrdp's own drain and rewrite.
+
+**Arithmetic, not a measurement:** if the feed of the next picture ran
+entirely concurrently with the encode of this one, the cycle floor would
+be `max(feed, encode) + drain + between` = **15.7–16.6 ms** against the
+measured 23.8–24.8. That is the whole prize available to any amount of
+pipelining, and it is bounded below by the encode alone at 13.9 ms.
+
+**But xrdp's frames-in-flight knob cannot collect it.** Submitting frame
+N+1 earlier does not make the child read it earlier: the child is one
+ffmpeg process running `-async_depth 1 -bf 0`, so it cannot read N+1
+while encoding N. A deeper pipeline can only pre-fill the pipe, which
+holds 1 MiB of the 13.82 MB picture — 7.6 % of the feed, ≈0.6 ms of a
+24.5 ms cycle.
+
+One observation without a story attached: the treatment legs' feed is
+~1 ms *longer* than the control's (9.05/8.52 against 7.50/7.99) while
+their "between" is ~0.6 ms shorter. A plausible mechanism is that with
+two children the poll loop wakes more often and tops the main child's
+pipe up more frequently, but that is not measured and is not claimed.
+
 ## RED — the guarantee was exceeded by one frame
 
 | leg | chroma gaps | mean ms | p50 | p99 | **max** |

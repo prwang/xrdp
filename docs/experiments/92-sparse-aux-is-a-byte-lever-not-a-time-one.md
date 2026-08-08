@@ -81,6 +81,80 @@ establishes that it does not serialise one screen's two views either. The
 poll set is doing its job, and a consequence of it doing its job is that
 removing one of two concurrent encodes buys no time.
 
+## Would a deeper pipeline help? No — there is no idle to fill
+
+Asked by the owner on 2026-08-08, once the null was in: this is an
+encoder-latency-dominated pipeline, so would letting xrdp run further
+ahead (more frames in flight) keep the encoder busier and raise the rate?
+
+Answered from the archived rings, with no new run. The four segments
+below are built to **sum** to the cycle, and the residual is printed, so
+a decomposition that does not close cannot be read as one.
+
+| leg | feed | encode | drain | between | sum | cycle | residual |
+|---|---|---|---|---|---|---|---|
+| a1 control | 7.497 | 13.898 | 1.030 | 1.398 | 23.823 | 23.820 | −0.003 |
+| a2 control | 7.987 | 14.081 | 1.160 | 1.391 | 24.618 | 24.619 | +0.001 |
+| b1 treatment | 9.054 | 13.803 | 1.172 | 0.762 | 24.791 | 24.790 | −0.001 |
+| b2 treatment | 8.515 | 13.950 | 1.211 | 0.783 | 24.459 | 24.462 | +0.003 |
+
+* **feed** — the raw picture entering the child's 1 MiB pipe. One picture
+  at 3840×2400 is 13.82 MB, or 13.2 pipefuls. xrdp's side is `vmsplice`,
+  which moves page references and is near-free, so this elapsed time is
+  the **child's `read()` copying the frame in**, at 1.5–1.8 GB/s.
+* **encode** — the child holds a whole picture and emits its first
+  encoded byte; on this VAAPI arm that includes the upload to the GPU.
+* **drain** — xrdp reading the rest of the encoded frame.
+* **between** — collect, the reference rewrite, emit, slot release.
+
+**The direct answer: no. The encoder is not waiting, and it cannot accept
+faster.** Two independent readings say so.
+
+1. **The worker never has nothing to encode.** Across ~690 cycles per
+   leg, 1 to 3 waits exceed a millisecond and every one of those but the
+   session-start wait is under two. The median wait is **1.2
+   microseconds**. The fifo always holds a frame, so the producer is not
+   the limit and xrdp is not idling for want of work.
+2. **The cycle is fully accounted for by work.** Feed + encode + drain +
+   between closes to within 0.003 ms on all four legs. There is no
+   unexplained gap for a deeper pipeline to occupy. The child is busy
+   90–92 % of the cycle; the rest is xrdp's own drain and rewrite.
+
+**What the prize would be, if the serialisation could be broken.**
+Arithmetic on the measured segments, not a measurement: with the feed of
+the next picture running entirely concurrently with the encode of this
+one, the cycle floor is `max(feed, encode) + drain + between` =
+**15.7–16.6 ms** against the measured 23.8–24.8 — about 1.5×, and bounded
+below by the encode alone at 13.9 ms.
+
+**xrdp's frames-in-flight knob cannot collect it, and this is the load-
+bearing point.** Submitting frame N+1 earlier does not make the child
+*read* it earlier. The child is one ffmpeg process with `-async_depth 1
+-bf 0` — deliberately, because a deeper encoder pipeline is what
+`pair_timeout_ms` exists to catch — so it cannot read N+1 while encoding
+N. A deeper xrdp-side pipeline can only pre-fill the pipe, which holds
+1 MiB of a 13.82 MB picture: 7.6 % of the feed, ≈0.6 ms of a 24.5 ms
+cycle, ≈2.5 %.
+
+So the 8–9 ms feed is not latency to be hidden by running ahead. It is a
+**copy**, performed by the same thread that then encodes. The levers that
+could actually reach it are of a different kind, and each is its own
+item, unmeasured here:
+
+* a larger input pipe (`F_SETPIPE_SZ` is set to 1 MiB best-effort);
+  bounded above by ~0.6 ms as computed, so small;
+* removing the copy — handing the child shared memory instead of a pipe,
+  which is a change to how the encoder is invoked, not a knob;
+* letting the child overlap read and encode (`-async_depth` > 1, or an
+  encoder thread), which trades the one-in/one-out cadence the runner and
+  its timeout are built on.
+
+One observation recorded without a story: the treatment legs' feed is
+~1 ms *longer* than the control's (9.05/8.52 against 7.50/7.99) while
+their "between" is ~0.6 ms shorter. A plausible mechanism is that with
+two children the poll loop wakes more often and tops the main child's
+pipe up more frequently. Not measured, not claimed.
+
 ## What this does NOT say, stated because the temptation is obvious
 
 * **Nothing about a bandwidth-limited link, which is the case the feature

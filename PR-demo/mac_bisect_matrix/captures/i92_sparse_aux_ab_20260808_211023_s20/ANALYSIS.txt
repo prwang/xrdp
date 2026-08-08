@@ -96,6 +96,41 @@
     chroma one had finished -- which is all that deleting the chroma
     encode could ever have saved from the wait.
 
+=== WHERE THE WHOLE CYCLE GOES, and whether there is idle to reclaim ===
+
+  The four segments are built to SUM to the cycle, and the residual is
+  printed so a decomposition that does not close cannot be read as one.
+    feed     the raw picture going into the child's 1 MiB pipe. xrdp's
+             side is vmsplice -- page references, near-free -- so this
+             elapsed time is the CHILD copying it in, not xrdp waiting.
+    encode   the child holds a whole picture and produces the first
+             encoded byte.
+    drain    xrdp reading the rest of the encoded frame.
+    between  collect, the reference rewrite, emit, slot release.
+
+  leg  cfg      feed   encode    drain   between      sum    cycle  residual
+  ----------------------------------------------------------------------------
+  a1   OFF     7.497   13.898    1.030     1.398   23.823   23.820    -0.003
+  a2   OFF     7.987   14.081    1.160     1.391   24.618   24.619     0.001
+  b1   ON      9.054   13.803    1.172     0.762   24.791   24.790    -0.001
+  b2   ON      8.515   13.950    1.211     0.783   24.459   24.462     0.003
+
+  Times the encoder worker had NOTHING TO ENCODE. If this is not ~zero,
+  the producer is the limit and nothing downstream of it matters. Counted
+  above a threshold rather than averaged: the wait before the payload
+  starts drawing is seconds long and would swamp any mean.
+
+    a1   OFF  713 waits, 1 of them over 1 ms; p50 0.0018 ms, p99 0.0029 ms
+    a2   OFF  690 waits, 2 of them over 1 ms; p50 0.0014 ms, p99 0.0024 ms
+    b1   ON   684 waits, 1 of them over 1 ms; p50 0.0012 ms, p99 0.0031 ms
+    b2   ON   695 waits, 3 of them over 1 ms; p50 0.0012 ms, p99 0.0050 ms
+
+  ARITHMETIC, NOT A MEASUREMENT: if the feed of the next picture ran
+  entirely concurrently with the encode of this one, the cycle floor
+  would be max(feed, encode) + drain + between = 16.3 / 16.6 / 15.7 / 15.9 ms against the
+  measured 23.8 / 24.6 / 24.8 / 24.5 ms. That is the whole prize available to any amount of
+  pipelining, and it is bounded below by the encode alone.
+
   BYTES PER FRAME on the wire (the oracle dump, which saves every
   encoded payload the client received, divided by the frames in the leg)
     chroma every frame (control) : 3.468 MB/frame
