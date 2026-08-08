@@ -266,6 +266,37 @@ def analyse_leg(legdir):
     out['wait_p50_ms'] = pct(waits, 50)
     out['wait_p99_ms'] = pct(waits, 99)
 
+    # WHICH TERM OF THE CREDIT ACTUALLY BINDS. The producer captures
+    # only when xrdp grants it a frame id, and that credit is
+    #     min(frame_id_consumed, frame_id_server + 1, frame_id_client + C)
+    # -- the children have absorbed it / one frame of pipeline inventory
+    # / the end-to-end wire window. Asking which of the three is the
+    # minimum is how "would turning a flow-control knob raise the rate?"
+    # is answered without turning one. The ackslot record carries all
+    # three plus C, so this is read off the wire, not inferred.
+    #
+    # Ties are counted as ties, deliberately: if two terms are equal,
+    # relaxing either ALONE changes nothing, and reporting one of them
+    # as "the binder" would point at a knob that cannot move anything.
+    ack = [r for r in recs if r[1] == 'ackslot']
+    bind = {}
+    head = {}
+    for _, _, f in ack:
+        server, consumed, client, wwin = f[1], f[2], f[3], f[4]
+        terms = {'absorbed': consumed,
+                 'inventory': server + 1,
+                 'wire': client + wwin}
+        lo = min(terms.values())
+        key = '+'.join(sorted(k for k, v in terms.items() if v == lo))
+        bind[key] = bind.get(key, 0) + 1
+        h = (client + wwin) - (server + 1)
+        head[h] = head.get(h, 0) + 1
+    out['acks'] = len(ack)
+    out['credit_binder'] = dict(sorted(bind.items(),
+                                       key=lambda kv: -kv[1]))
+    out['wire_headroom'] = dict(sorted(head.items()))
+    out['wire_window'] = sorted({f[4] for _, _, f in ack})
+
     # how many children the pump armed. 2 per monitor normally; 1 for a
     # monitor whose chroma was skipped. This is the skip visible from
     # the OTHER side of the mechanism.
@@ -573,6 +604,33 @@ def main():
     fl = [max(r['seg_feed_ms'], r['seg_encode_ms']) + r['seg_drain_ms']
           + r['seg_between_ms'] for r in res]
     cy = [r['seg_cycle_ms'] for r in res]
+    print('  WHICH FLOW-CONTROL TERM ACTUALLY HOLDS THE PRODUCER BACK')
+    print()
+    print('  The producer captures only when xrdp grants it a frame id, '
+          'and that')
+    print('  credit is the smallest of three things: the frame the '
+          'encoder children')
+    print('  have absorbed, one past the last frame that left for the '
+          'transport')
+    print('  ("one frame of pipeline inventory"), and the last frame the '
+          'client')
+    print('  acknowledged plus the configured wire window C. Ties are '
+          'counted AS')
+    print('  ties: if two terms are equal, relaxing either one alone '
+          'moves nothing.')
+    print()
+    for r in res:
+        print('    %-4s %-4s C=%s  %s'
+              % (r['dir'].replace('leg_', ''), r['cfg'],
+                 ','.join(str(x) for x in r['wire_window']),
+                 r['credit_binder']))
+    print()
+    print('    headroom the wire window had above the binding value '
+          '(frames):')
+    for r in res:
+        print('      %-4s %-4s %s' % (r['dir'].replace('leg_', ''),
+                                      r['cfg'], r['wire_headroom']))
+    print()
     print('  ARITHMETIC, NOT A MEASUREMENT: if the feed of the next '
           'picture ran')
     print('  entirely concurrently with the encode of this one, the '

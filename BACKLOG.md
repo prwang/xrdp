@@ -437,6 +437,15 @@ priority against the tier ladder now.
 (2026-08-08). The spec is PRD FR-H264-9; the measurement is
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
 
+**Which flow-control knob would even be the one to turn: none of them.**
+On EVERY ack of every leg, `frame_id_consumed` and `frame_id_server + 1`
+are exactly equal and are the credit's minimum; the wire window
+`frame_id_client + C` has a frame of headroom it never uses on
+99.3-99.9 % of acks. So raising `wire_window` cannot move anything here,
+and relaxing either tied term alone would move nothing either. The
+capture is not on the critical path -- the worker's median wait for
+something to encode is 1.2 MICROseconds.
+
 **Why the rate did not move, answered from the archived rings with no
 new run (owner's question, 2026-08-08).** The cycle closes to within
 0.003 ms on all four legs: feed 7.5-9.1 ms (the CHILD copying a 13.82 MB

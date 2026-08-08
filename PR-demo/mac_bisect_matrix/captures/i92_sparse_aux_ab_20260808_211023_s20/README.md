@@ -170,6 +170,15 @@ session-start wait is under a millisecond; the median wait is **1.2
 microseconds**. The fifo always has a frame. The child is busy 90–92 % of
 the cycle, and the remaining 8–10 % is xrdp's own drain and rewrite.
 
+**Which flow-control term binds:** on every ack of every leg,
+`frame_id_consumed` and `frame_id_server + 1` are **exactly equal** and
+are the minimum; the wire window `frame_id_client + C` has a frame of
+headroom it never uses (99.3–99.9 % of acks). Raising `wire_window`
+therefore cannot move anything here — C = 2 is already one more than the
+pipeline can use — and relaxing either of the tied terms alone would
+move nothing either. The capture is not on the critical path: the
+worker's median wait for something to encode is 1.2 microseconds.
+
 **Arithmetic, not a measurement:** if the feed of the next picture ran
 entirely concurrently with the encode of this one, the cycle floor would
 be `max(feed, encode) + drain + between` = **15.7–16.6 ms** against the

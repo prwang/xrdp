@@ -120,6 +120,46 @@ faster.** Two independent readings say so.
    unexplained gap for a deeper pipeline to occupy. The child is busy
    90–92 % of the cycle; the rest is xrdp's own drain and rewrite.
 
+### Which flow-control term actually holds the producer back
+
+The producer captures only when xrdp grants it a frame id, and that
+credit is `min(frame_id_consumed, frame_id_server + 1,
+frame_id_client + C)` — the children have absorbed it / one frame of
+pipeline inventory / the end-to-end wire window. Which of the three is
+the minimum answers "would turning a flow-control knob raise the rate?"
+without turning one. Read off the `ackslot` record, which carries all
+three plus C. Ties are counted **as ties**, because if two terms are
+equal, relaxing either one alone moves nothing.
+
+| leg | C | binding term(s) |
+|---|---|---|
+| a1 control | 2 | absorbed **and** inventory, tied, on 706 of 711 acks; all three tied on the other 5 |
+| a2 control | 2 | tied on 682 of 688; all three on 6 |
+| b1 treatment | 2 | tied on 681 of 682; all three on 1 |
+| b2 treatment | 2 | tied on 691 of 692; all three on 1 |
+
+`frame_id_consumed − (frame_id_server + 1)` is **0 on every single ack**
+in every leg. The two terms are not merely often equal; they are always
+equal, which follows from the pipeline being strictly one frame at a
+time — the children absorb frame N, it is encoded, it egresses, and only
+then is N+1 admitted.
+
+**The wire window is never the sole binder and has a frame of headroom it
+never uses** (`(client + C) − (server + 1)` is 1 on 99.3–99.9 % of acks).
+So raising `wire_window` on this link cannot move anything; C = 2 is
+already one more than the pipeline can use. That is consistent with #80's
+finding that on loopback the client is not the limit, arrived at
+independently.
+
+**And the capture already overlaps the encode.** The worker's median wait
+for something to encode is 1.2 microseconds, so by the time a cycle ends
+the next frame is already in the fifo. The producer is not on the
+critical path; it is waiting for the credit, and the credit is waiting
+for the child.
+
+Which leaves exactly one place the time is spent, and it is inside one
+process: read 8.8 ms, then encode 13.9 ms, on one thread.
+
 **What the prize would be, if the serialisation could be broken.**
 Arithmetic on the measured segments, not a measurement: with the feed of
 the next picture running entirely concurrently with the encode of this

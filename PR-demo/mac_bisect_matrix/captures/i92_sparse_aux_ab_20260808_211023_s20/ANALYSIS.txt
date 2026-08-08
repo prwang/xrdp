@@ -125,6 +125,26 @@
     b1   ON   684 waits, 1 of them over 1 ms; p50 0.0012 ms, p99 0.0031 ms
     b2   ON   695 waits, 3 of them over 1 ms; p50 0.0012 ms, p99 0.0050 ms
 
+  WHICH FLOW-CONTROL TERM ACTUALLY HOLDS THE PRODUCER BACK
+
+  The producer captures only when xrdp grants it a frame id, and that
+  credit is the smallest of three things: the frame the encoder children
+  have absorbed, one past the last frame that left for the transport
+  ("one frame of pipeline inventory"), and the last frame the client
+  acknowledged plus the configured wire window C. Ties are counted AS
+  ties: if two terms are equal, relaxing either one alone moves nothing.
+
+    a1   OFF  C=2  {'absorbed+inventory': 706, 'absorbed+inventory+wire': 5}
+    a2   OFF  C=2  {'absorbed+inventory': 682, 'absorbed+inventory+wire': 6}
+    b1   ON   C=2  {'absorbed+inventory': 681, 'absorbed+inventory+wire': 1}
+    b2   ON   C=2  {'absorbed+inventory': 691, 'absorbed+inventory+wire': 1}
+
+    headroom the wire window had above the binding value (frames):
+      a1   OFF  {0: 5, 1: 706}
+      a2   OFF  {0: 6, 1: 682}
+      b1   ON   {0: 1, 1: 681}
+      b2   ON   {0: 1, 1: 691}
+
   ARITHMETIC, NOT A MEASUREMENT: if the feed of the next picture ran
   entirely concurrently with the encode of this one, the cycle floor
   would be max(feed, encode) + drain + between = 16.3 / 16.6 / 15.7 / 15.9 ms against the
