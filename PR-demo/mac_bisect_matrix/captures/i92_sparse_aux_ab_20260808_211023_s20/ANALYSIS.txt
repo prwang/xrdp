@@ -1,0 +1,104 @@
+=== capture: captures/i92_sparse_aux_ab_20260808_211023_s20
+
+=== DID THE FEATURE APPLY? (this decides whether any rate below means anything) ===
+
+  Each row is one leg. "chroma frames" is how many frames carried the
+  aux (chroma) view; "luma only" is how many shipped the luma view alone.
+  "refresh_ms on the wire" is chroma_refresh_ms read out of the running
+  binary's own trace records, not out of the config file.
+
+  leg    cfg     chroma luma-only     share refresh_ms
+  ----------------------------------------------------
+  a1     OFF          0         0        -% no records
+  a2     OFF          0         0        -% no records
+  b1     ON          18       665      2.6%       1000
+  b2     ON          18       676      2.6%       1000
+
+=== THE GUARANTEE: how long did chroma ever go missing? ===
+
+  The requirement is "chroma detail is restored at least every
+  chroma_refresh_ms, whatever the screen is doing". These are the
+  wall-clock gaps between consecutive frames that carried chroma.
+  A max above the configured bound is a RED result whatever the rate says.
+
+  leg    cfg      gaps   mean ms       p50       p99       MAX
+  ------------------------------------------------------------
+  a1     OFF         0         -         -         -         -
+  a2     OFF         0         -         -         -         -
+  b1     ON         17     958.4    1006.8    1022.0    1022.0
+  b2     ON         17     959.2    1008.9    1021.2    1021.2
+
+=== HOW MANY ENCODER CHILDREN THE PUMP ARMED PER CYCLE ===
+
+  Two children per damaged monitor is the normal case (luma and chroma);
+  one means that cycle skipped chroma and did not wait for that child.
+  This is the same skip seen from the other side of the mechanism.
+
+  a1     OFF  {2: 712}
+  a2     OFF  {2: 689}
+  b1     ON   {1: 665, 2: 18}
+  b2     ON   {1: 676, 2: 18}
+
+=== RED: THE GUARANTEE WAS EXCEEDED ===
+
+  * leg_b1: chroma went missing for 1022.0 ms against a 1000 ms guarantee -- 22.0 ms over, which is about one frame interval (24.6 ms), because the decision exists only AT a frame and the first frame at or after the bound is the earliest chroma can go
+  * leg_b2: chroma went missing for 1021.2 ms against a 1000 ms guarantee -- 21.2 ms over, which is about one frame interval (24.3 ms), because the decision exists only AT a frame and the first frame at or after the bound is the earliest chroma can go
+
+  The rate below is still reported: it is what this build actually did.
+  It is not evidence that the bound is met.
+
+=== THE RATE ===
+
+  "frame interval" is the wall-clock gap between consecutive FRAMES
+  handed to the transport (one egress record each) -- the same quantity
+  e_gate_run.sh prints as its send-to-send gap, and it agrees with it
+  to within 0.2 ms. "period" is pump_beg to pump_beg, one encoder worker
+  cycle. "pump" is the part of that cycle spent waiting for the ffmpeg
+  children to finish encoding -- the segment a second encode is paid in.
+  "writes/frame" is how many network writes one frame took: a luma-only
+  frame carries one PDU where a full frame carries two.
+
+  leg  cfg   frames  mean ms      p50      p90      p99    period     pump   wr/fr
+  ----------------------------------------------------------------------------------
+  a1   OFF      711   23.667   23.470   26.588   29.763    23.820   22.425    4.00
+  a2   OFF      689   24.505   24.301   27.430   30.523    24.619   23.228    4.00
+  b1   ON       682   24.627   24.607   27.081   29.089    24.790   24.029    3.03
+  b2   ON       694   24.342   24.120   26.549   29.621    24.462   23.676    3.03
+
+=== WHAT IT BOUGHT ===
+
+  Every figure is the mean of that condition's TWO interleaved legs, so
+  host drift across the sitting is bracketed rather than folded in.
+
+  frame interval
+    chroma every frame (control) : 24.086 ms  (41.5 frames/s)
+    chroma only when settled     : 24.485 ms  (40.8 frames/s)
+    ratio                        : 0.984x
+    per-leg spread: control 23.667 / 24.505 | treatment 24.627 / 24.342
+
+  wait for the ffmpeg children to encode a frame
+    control 22.826 ms -> treatment 23.853 ms  (0.957x)
+
+  WHY -- the two encodes overlap, so the chroma one was never on the
+  critical path. A child cannot start until its whole raw picture has
+  arrived, so its encode window is [feedend, outfirst]; these are those
+  windows, paired by child and sequence number.
+
+    leg  cfg     luma enc  chroma enc     overlap   luma on
+    ------------------------------------------------------------
+    a1   OFF     13.90 ms    11.96 ms  11.87 ms 99.2%   1.12 ms
+    a2   OFF     14.08 ms    12.08 ms  11.85 ms 98.1%   0.88 ms
+    b1   ON      13.80 ms    12.13 ms  11.65 ms 96.1%   0.60 ms
+    b2   ON      13.95 ms    12.51 ms  11.68 ms 93.3%   0.74 ms
+
+    "overlap" is how much of the chroma encode ran at the same time as
+    the luma one; "luma on" is how long the luma encode ran after the
+    chroma one had finished -- which is all that deleting the chroma
+    encode could ever have saved from the wait.
+
+  BYTES PER FRAME on the wire (the oracle dump, which saves every
+  encoded payload the client received, divided by the frames in the leg)
+    chroma every frame (control) : 3.468 MB/frame
+    chroma only when settled     : 1.948 MB/frame
+    reduction                    : 43.8 %
+    per-leg spread: control 3.469 / 3.468 | treatment 1.950 / 1.945

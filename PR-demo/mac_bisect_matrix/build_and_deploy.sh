@@ -193,6 +193,12 @@ declare -A ARM_XORG_DEB=(
     # 2026-08-07). Same image and payload as x022; one config line apart.
     # x029 (#91): the three attribution fields. Shipped defaults, two
     # monitors, strip payload -- the arm the two approved legs run on.
+    # x030 (#92): the SAME xorgxrdp as every textflood arm from x014 on.
+    # The sparse-aux cadence is entirely inside xrdp -- the producer still
+    # captures and packs both views on every frame; what changes is
+    # whether xrdp feeds the aux one to an encoder. A different producer
+    # here would void the comparison against the archived numbers.
+    [x030]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x029]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x028]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x027]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
@@ -269,6 +275,10 @@ declare -A ARM_TAG=(
     [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
     [x028]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
     [x029]=1fed64c16a89.xx10fa3aa-tf.pc0097388
+    # x030 (#92): a NEW image -- this is the first arm carrying the
+    # sparse-aux implementation. The payload suffix moves too, because
+    # the onscreen probes joined the payload set on 2026-08-08.
+    [x030]=7b550f6ae87f.xx10fa3aa-tf.p2fde5531
     [x027]=821218e54c24.xx10fa3aa-xfce.pc0097388
     [x024]=1d5bc0960db8.xx10fa3aa-tf
     # x022 carries the STRIP-RENDER payload, so its tag must name the
@@ -334,6 +344,10 @@ declare -A TAG_DEB=(
     # at wire_window 2, and no emit thread in the binary at all.
     [1fed64c16a89.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260807211642.1fed64c16a89_amd64.deb"
     [821218e54c24.xx10fa3aa]="xrdp-dev_0.10.80+git20260807153324.821218e54c24_amd64.deb"
+    # x030 (#92): the sparse-aux implementation -- the aux view skipped
+    # in submit/pump/collect, the luma-only LC=1 framing, and the aux
+    # view's own intra refresh interval. Built from HEAD on 2026-08-08.
+    [7b550f6ae87f.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260808210040.7b550f6ae87f_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

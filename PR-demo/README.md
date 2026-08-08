@@ -70,6 +70,13 @@ realistic payload rather than a diagnostic pattern.
   the uprobe scripts for the X-server side, and its `gfx.toml` variants.
 * **`bench/`** — encoder and conversion throughput measurements backing
   `RESULTS.md`; no live session needed.
+* **`mac_bisect_matrix/i92_sparse_aux_ab.sh`** + `i92_sparse_aux_analyze.py`
+  — the BACKLOG #92 A/B: does dropping the AVC444 chroma view in motion
+  buy anything? ONE arm, two configurations of its gfx.toml
+  (`chroma_refresh_ms` 0 against 1000), interleaved off/on/off/on so
+  host drift is bracketed rather than folded in. The analyser checks
+  that the feature APPLIED before it will print a rate, and reports the
+  chroma guarantee's worst gap as a red result in its own right.
 * **`mac_bisect_matrix/x264_keyint_probe.c`** — asks libx264 what
   keyframe interval xrdp's linked-library H.264 path actually gets,
   under the presets `gfx.toml` ships. It never sets `i_keyint_max`, so

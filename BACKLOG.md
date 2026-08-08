@@ -432,10 +432,28 @@ largest single lever for meeting it without dropping resolution — but
 they are separate decisions, and the owner is weighing this item's
 priority against the tier ladder now.
 
-**IN PROGRESS.** Design and server implementation are done and green in
-CI (2026-08-08); the spec is PRD FR-H264-9 and the record of what was
-decided and why lives there, not here. What remains is hardware: the
-arm, the throughput A/B, and the onscreen judgement.
+**IN PROGRESS.** Server implementation done and green in CI, arm x030
+(port 40046) deployed and certified, first fleet A/B measured
+(2026-08-08). The spec is PRD FR-H264-9; the measurement is
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
+
+**What the A/B found: 43.8 % of the bytes, and zero milliseconds.** The
+frame interval is unchanged (24.09 -> 24.49 ms, inside the spread
+between the two control legs) because the chroma encode already runs
+almost entirely inside the luma encode -- 98-99 % overlap, with the luma
+encode outlasting it by only ~1 ms, which is the whole opportunity a
+change deleting the chroma encode ever had. This is a BYTE lever. It
+cannot show up as rate on loopback by construction, and whether it
+converts to rate on a bandwidth-limited link is the next measurement.
+
+**OPEN, needs an owner decision (RED).** The chroma guarantee was
+exceeded by one frame: 1022 ms against the configured 1000. The decision
+exists only AT a frame, so the achievable bound is `chroma_refresh_ms`
+plus one frame interval. Either correct the stated bound or fire the
+guarantee one frame early -- the second is a prediction in a decision
+function whose selling point is that it has none. The unit test could
+not have caught this: its fixture uses 20 ms frames and 20 divides 1000,
+so a frame lands exactly on the bound.
 
 The five questions above, answered:
 

@@ -2491,7 +2491,7 @@ Open before the default can change: the scheduled-paired-refresh work of the rev
 
 ---
 
-### FR-H264-9 (IMPLEMENTED in the server, not yet measured on a fleet arm): 4:2:0 while the screen is in motion, 4:4:4 when it settles
+### FR-H264-9 (IMPLEMENTED; measured on a fleet arm 2026-08-08 — a BYTE lever, not a time one): 4:2:0 while the screen is in motion, 4:4:4 when it settles
 
 **Status 2026-08-08: the whole server-side path is built and green in
 CI — the decision function, its configuration, the encoder skip, the
@@ -2684,8 +2684,47 @@ requirement sharpens them), with what is met so far:**
 | smoke gate PASS before any measurement | not yet — needs the deb and the arm |
 | wire audit A1–A7 PASS in **both** regimes (A3 exempted under a sparse cadence, above) | not yet — needs a capture |
 | the client tolerates an alternating stream, on the macOS and Windows clients, before any rate is quoted | **not yet, and it is the one that cannot be answered offline** |
-| the throughput pair re-run and DECOMPOSED, not just rated | not yet |
+| the throughput pair re-run and DECOMPOSED, not just rated | **met** — see below; the decomposition is what explains the result |
 | a still-screen visual check that subpixel-AA text is 4:4:4 sharp | not yet |
+
+**MEASURED 2026-08-08, arm x030, one monitor at 3840x2400, textflood,
+oracle client. One arm, two configurations of one gfx.toml, interleaved
+off/on/off/on.** Record:
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`;
+capture `PR-demo/mac_bisect_matrix/captures/i92_sparse_aux_ab_20260808_211023_s20`.
+
+| | chroma every frame | chroma when settled | ratio |
+|---|---|---|---|
+| frame interval | 24.086 ms (41.5 fps) | 24.485 ms (40.8 fps) | 0.984x |
+| wait for the ffmpeg children | 22.826 ms | 23.853 ms | 0.957x |
+| **bytes per frame on the wire** | **3.468 MB** | **1.948 MB** | **-43.8 %** |
+
+**43.8 % of the bytes and zero milliseconds, and the reason is
+structural.** The chroma encode takes 12.0 ms and 98-99 % of it runs
+concurrently with the 13.9 ms luma encode; the luma encode outlasts it by
+only 0.6-1.1 ms, and that is the entire amount deleting the chroma encode
+could have taken off the wait. The pump waits for the later of the two,
+not for their sum. This is #91's finding from the other side: the poll
+set does not serialise the two views, and a consequence of it not doing
+so is that removing one of two concurrent encodes buys no time.
+
+**The feature is therefore a bandwidth lever and must be sold as one.**
+On loopback a byte saving cannot appear as rate by construction.
+FR-FLOW/BACKLOG #98 measured that on a limited link `fps = link_rate /
+frame_bytes` holds within 3 %; that predicts the saving converts to rate
+on a WAN, and predicting is all this run supports.
+
+**RED, open: the guarantee is exceeded by one frame.** Chroma went
+missing for a maximum of 1022 ms against the configured 1000. The
+decision exists only AT a frame, so the achievable bound is
+`chroma_refresh_ms` + one frame interval. The requirement wording above
+("at least every `chroma_refresh_ms`") therefore overstates what the
+mechanism can deliver, and the choice between correcting the wording and
+firing the guarantee one frame early is open. Note that
+`tests/xrdp/test_avc444_chroma_due.c` could not have caught this: its
+fixture uses 20 ms frames, 20 divides 1000, so a frame lands exactly on
+the bound. Every assertion in it is correct and the fixture still hides
+the effect.
 
 ## 8.9 AVC444 wire serialization
 

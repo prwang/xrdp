@@ -25,9 +25,15 @@ Usage: avc444_ltr_wire_audit.py [--annexb] [--assert] [--intra-refresh N]
   check below is evaluated and named, and the tool exits non-zero on
   the first violated one. Without --assert the tool only prints (the
   descriptive mode every earlier capture was read with).
-  --intra-refresh N: the scheduled paired-cut period the stream was
-  encoded with (gfx.toml intra_refresh_frames). Enables the schedule
-  and chain-depth assertions, which cannot be checked without it.
+  --intra-refresh N: the scheduled cut period of the MAIN view, in main
+  pictures (gfx.toml intra_refresh_frames). Enables the schedule and
+  chain-depth assertions, which cannot be checked without it.
+  --intra-refresh-aux M: the same for the AUX view, in AUX pictures
+  (gfx.toml intra_refresh_frames_aux). Defaults to N, which is what the
+  loader does when the key is absent. It is a separate number because
+  under the sparse-aux cadence (BACKLOG #92 / PRD FR-H264-9) the aux
+  child is fed fewer pictures than the main one, so the same ordinal is
+  a different moment in each view.
   --allow-idr K: tolerate K mid-stream IDRs (only a frame_num-wrap
   re-key may legitimately produce one; default 0).
 
@@ -40,6 +46,20 @@ The assertions, and why each one has teeth:
   A3 cuts are PAIRED                main and aux cut at the SAME view
                                     ordinals -- one view refreshing
                                     alone desynchronises the pair.
+                                    SKIPPED, not failed, when the
+                                    capture shows a SPARSE AUX CADENCE
+                                    (fewer aux pictures than main): the
+                                    two views then have different
+                                    numbers of pictures and "the same
+                                    ordinal" is not a comparison that
+                                    means anything. Owner ruling,
+                                    2026-08-08. The sparseness is read
+                                    off the BITSTREAM -- the picture
+                                    counts -- not off a flag, so a
+                                    config typo cannot buy the
+                                    exemption, and A3 keeps full force
+                                    at 1:1, which is the shipped
+                                    default.
   A4 no scheduled cut is skipped    every scheduled ordinal inside the
                                     captured window carries an intra in
                                     BOTH views (the observed-vs-
@@ -406,12 +426,18 @@ def audit_annexb(path, label, max_pics):
           'encoder (chain stays off; leaf topology used).')
     return 1
 
-def assert_gate(sps, pics, refresh, allow_idr):
+def assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None):
     """Evaluate the #45 wire assertions. Returns a list of
     (name, ok, detail) in check order -- nothing is skipped silently:
     a check that cannot run without --intra-refresh says so and
-    counts as a FAIL, because the gate was asked for."""
+    counts as a FAIL, because the gate was asked for.
+
+    ok is True (pass), False (violated) or None (NOT APPLICABLE to this
+    capture, with the reason in detail). None exists for exactly one
+    check, A3, and only under a sparse aux cadence -- see below."""
     out = []
+    if refresh_aux is None:
+        refresh_aux = refresh
     own_slot = {'main': 0, 'aux': 1}
     per_view = {'main': [s for s in pics if s['view'] == 'main'],
                 'aux': [s for s in pics if s['view'] == 'aux']}
@@ -438,23 +464,49 @@ def assert_gate(sps, pics, refresh, allow_idr):
         unscheduled = None
     else:
         unscheduled = {}
+        period = {'main': refresh, 'aux': refresh_aux}
         for view, ords in intra_ord.items():
-            unscheduled[view] = [o for o in ords if o % refresh != 0]
+            unscheduled[view] = [o for o in ords if o % period[view] != 0]
         bad = sum(len(v) for v in unscheduled.values())
         out.append(('A2 intra only on a scheduled index', bad == 0,
                     'unscheduled intra: main %s aux %s'
                     % (unscheduled['main'][:8], unscheduled['aux'][:8])))
 
-    # A3 -- paired cuts (independent of the period)
-    out.append(('A3 cuts are paired across views',
-                intra_ord['main'] == intra_ord['aux'],
-                'main intra ordinals %s ... aux %s'
-                % (intra_ord['main'][:8], intra_ord['aux'][:8])))
+    # A3 -- paired cuts (independent of the period).
+    #
+    # NOT APPLICABLE under a sparse aux cadence (owner ruling,
+    # 2026-08-08, BACKLOG #92 / PRD FR-H264-9). When the aux view is
+    # sent on only some frames, the two views hold different numbers of
+    # pictures and "main ordinal k" and "aux ordinal k" are different
+    # moments -- comparing the two ordinal lists is not a check that can
+    # be passed or failed, it is a category error. It is skipped rather
+    # than deleted, and skipped LOUDLY, because at 1:1 -- which is what
+    # ships -- one view refreshing alone really does desynchronise the
+    # pair and A3 is the only thing on the wire that would catch it.
+    #
+    # The sparseness is decided from the CAPTURE, by counting pictures
+    # in each view, never from a config flag: a gfx.toml typo must not
+    # be able to buy an exemption from a wire check.
+    n_main = len(per_view['main'])
+    n_aux = len(per_view['aux'])
+    if n_aux < n_main:
+        out.append(('A3 cuts are paired across views', None,
+                    'NOT APPLICABLE: sparse aux cadence on the wire -- '
+                    '%d aux pictures against %d main (%.1f%%), so the '
+                    'two views\' ordinals are different moments. '
+                    'main intra ordinals %s ... aux %s'
+                    % (n_aux, n_main, 100.0 * n_aux / max(n_main, 1),
+                       intra_ord['main'][:8], intra_ord['aux'][:8])))
+    else:
+        out.append(('A3 cuts are paired across views',
+                    intra_ord['main'] == intra_ord['aux'],
+                    'main intra ordinals %s ... aux %s'
+                    % (intra_ord['main'][:8], intra_ord['aux'][:8])))
 
     if refresh is not None:
         missing = {}
         for view, sel in per_view.items():
-            want = range(0, len(sel), refresh)
+            want = range(0, len(sel), period[view])
             missing[view] = [o for o in want
                              if o not in set(intra_ord[view])]
         nmiss = sum(len(v) for v in missing.values())
@@ -508,26 +560,37 @@ def assert_gate(sps, pics, refresh, allow_idr):
                     depth += 1
                     worst = max(worst, depth)
             deep[view] = worst
-        ok = all(v <= refresh for v in deep.values())
+        ok = all(deep[v] <= period[v] for v in deep)
         out.append(('A7 chain depth <= intra_refresh_frames', ok,
-                    'worst depth: main %d aux %d (bound %d)'
-                    % (deep['main'], deep['aux'], refresh)))
+                    'worst depth: main %d (bound %d) aux %d (bound %d)'
+                    % (deep['main'], refresh, deep['aux'], refresh_aux)))
     return out
 
 
-def run_assert_gate(sps, pics, refresh, allow_idr):
-    checks = assert_gate(sps, pics, refresh, allow_idr)
+def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None):
+    checks = assert_gate(sps, pics, refresh, allow_idr, refresh_aux)
     print('=== ASSERT GATE (BACKLOG #45 step 0) ===')
     failed = 0
+    skipped = 0
     for name, ok, detail in checks:
-        print('  %-40s %-4s  %s' % (name, 'PASS' if ok else 'FAIL', detail))
-        if not ok:
+        word = 'SKIP' if ok is None else ('PASS' if ok else 'FAIL')
+        print('  %-40s %-4s  %s' % (name, word, detail))
+        if ok is None:
+            skipped += 1
+        elif not ok:
             failed += 1
     print()
     if failed:
         print('ASSERT VERDICT: FAIL -- %d of %d checks violated'
               % (failed, len(checks)))
         return 1
+    if skipped:
+        # named in the verdict line, so a skipped check can never be
+        # read as a clean sweep by someone skimming for "PASS"
+        print('ASSERT VERDICT: PASS -- %d checks clean, %d NOT APPLICABLE '
+              'to this capture (read the SKIP line above)'
+              % (len(checks) - skipped, skipped))
+        return 0
     print('ASSERT VERDICT: PASS -- %d checks, all clean' % len(checks))
     return 0
 
@@ -537,6 +600,7 @@ def main():
     annexb = False
     do_assert = False
     refresh = None
+    refresh_aux = None
     allow_idr = 0
     rest = []
     i = 0
@@ -551,6 +615,11 @@ def main():
             refresh = int(argv[i])
             if refresh < 1:
                 sys.exit('--intra-refresh must be >= 1')
+        elif a == '--intra-refresh-aux':
+            i += 1
+            refresh_aux = int(argv[i])
+            if refresh_aux < 1:
+                sys.exit('--intra-refresh-aux must be >= 1')
         elif a == '--allow-idr':
             i += 1
             allow_idr = int(argv[i])
@@ -653,13 +722,15 @@ def main():
         print('VERDICT: PROBLEMS -- ' + '; '.join(problems))
         if do_assert:
             print()
-            sys.exit(run_assert_gate(sps, pics, refresh, allow_idr) or 1)
+            sys.exit(run_assert_gate(sps, pics, refresh, allow_idr,
+                                             refresh_aux) or 1)
         sys.exit(1)
     print('VERDICT: both views are inter-coded from their OWN previous '
           'picture (main<-LT0, aux<-LT1); no cross-view prediction.')
     if do_assert:
         print()
-        sys.exit(run_assert_gate(sps, pics, refresh, allow_idr))
+        sys.exit(run_assert_gate(sps, pics, refresh, allow_idr,
+                                      refresh_aux))
 
 
 if __name__ == '__main__':

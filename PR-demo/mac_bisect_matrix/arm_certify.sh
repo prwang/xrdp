@@ -45,7 +45,22 @@ SECS=${CERT_SECS:-3}
 # how long the session may take to come up before the encoder sees a
 # frame; NOT part of the certified window (see the wait loop below)
 LOGIN_GRACE=${CERT_LOGIN_GRACE:-30}
-REFRESH=${E_REFRESH:-240}
+# The intra refresh intervals the audit checks OBSERVED cuts against.
+# READ FROM THE ARM'S OWN gfx.toml, not hardcoded: the shipped default
+# moved 240 -> 250 on 2026-08-08, and a certifier that assumed 240 would
+# check an arm running 250 against the wrong schedule and call a correct
+# stream broken. E_REFRESH still overrides, for reproducing an old run.
+# The aux interval follows the main one when the key is absent, exactly
+# as the loader does (BACKLOG #92).
+arm_toml_int()
+{
+    sed -n "s/^ *$1 *= *\\([0-9][0-9]*\\).*/\\1/p" \
+        "$D/gfx/$ARM.toml" 2>/dev/null | head -1
+}
+REFRESH=${E_REFRESH:-$(arm_toml_int intra_refresh_frames)}
+REFRESH=${REFRESH:-250}
+REFRESH_AUX=${E_REFRESH_AUX:-$(arm_toml_int intra_refresh_frames_aux)}
+REFRESH_AUX=${REFRESH_AUX:-$REFRESH}
 CLI=${E_DISPLAY:-:94}
 ORACLE_BIN=${E_ORACLE_BIN:-/opt/freerdp-vaapi/bin/xfreerdp}
 CRED=${E_CRED_FILE:-/root/.oracle_cred}
@@ -169,7 +184,8 @@ BYTES=$(stat -c %s "$DUMP")
     echo
     echo "=== wire audit (--assert) ==="
     python3 "$D/../../tools/avc444_ltr_wire_audit.py" --assert \
-        --intra-refresh "$REFRESH" "$DUMP" "$ARM deploy certification" \
+        --intra-refresh "$REFRESH" --intra-refresh-aux "$REFRESH_AUX" \
+        "$DUMP" "$ARM deploy certification" \
         2>&1 | tail -25
     WA=$?
     echo "wire audit exit: $WA"
@@ -179,7 +195,8 @@ BYTES=$(stat -c %s "$DUMP")
     echo
     echo "=== COVERAGE LIMIT OF A ${SECS}s WINDOW — read this ==="
     echo "A ${SECS}s window holds roughly 100 frames. The scheduled intra"
-    echo "refresh is every $REFRESH frames, so this certification"
+    echo "refresh is every $REFRESH main pictures and every $REFRESH_AUX"
+    echo "aux pictures, so this certification"
     echo "typically contains NO scheduled cut, and asserts A2 (intra only"
     echo "on a scheduled index), A3 (cuts paired across views) and A4 (no"
     echo "scheduled cut skipped) VACUOUSLY. What it does prove on real"
@@ -193,6 +210,14 @@ BYTES=$(stat -c %s "$DUMP")
     echo "test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window"
     echo "to chase A2-A4 -- that is the 10x tax this file exists to"
     echo "remove, and CI already pins the logic byte-exactly."
+    echo
+    echo "If A3 reads SKIP above, this arm is running the SPARSE AUX"
+    echo "cadence (BACKLOG #92): the aux view is sent on only some"
+    echo "frames, so the two views hold different numbers of pictures"
+    echo "and comparing their ordinals is not a check that can pass or"
+    echo "fail. Owner ruling, 2026-08-08. The audit decides that from"
+    echo "the PICTURE COUNTS in the capture, never from a config flag,"
+    echo "and A3 keeps full force at 1:1 -- which is what ships."
 } > "$CERT.tmp" 2>&1
 
 if grep -q "ASSERT VERDICT: PASS" "$CERT.tmp" \
