@@ -65,6 +65,11 @@
 /* fixed input+output framing (~40 tokens) plus up to XRDP_AVC444_MAX_ENC_ARGS
  * verbatim encoder tokens, with headroom */
 #define FF_MAX_ARGV 128
+/* how large an input pipe the feeder asks the kernel for, so one
+ * vmsplice moves a large batch of page references instead of a small
+ * one (FR-PROC-6). The kernel may refuse and grant less -- see the
+ * check in spawn_child(). */
+#define FF_IN_PIPE_BYTES (1024 * 1024)
 #define FF_READ_CHUNK 65536
 #define FF_MAX_INFLIGHT_PAIRS 8
 /* borrowed input segments queued for the vmsplice feeder */
@@ -494,6 +499,8 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     int outpipe[2];
     int errpipe[2];
     int pid;
+    int got_pipe;
+    int picture_bytes;
     char *argv[FF_MAX_ARGV];
     char num_store[192];
 
@@ -566,9 +573,47 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     fcntl(outpipe[0], F_SETFD, FD_CLOEXEC);
     fcntl(errpipe[0], F_SETFL, O_NONBLOCK);
     fcntl(errpipe[0], F_SETFD, FD_CLOEXEC);
-    /* enlarge the input pipe (best effort) so vmsplice moves fewer,
-     * larger batches of page references (FR-PROC-6) */
-    fcntl(inpipe[1], F_SETPIPE_SZ, 1024 * 1024);
+    /* Enlarge the input pipe so vmsplice moves fewer, larger batches of
+     * page references (FR-PROC-6) -- and CHECK WHAT THE KERNEL ACTUALLY
+     * GAVE US. This request is refused, silently, for a caller that is
+     * over fs/pipe-user-pages-soft and is not CAP_SYS_RESOURCE-capable
+     * in the INITIAL user namespace; the pipe then stays at the kernel
+     * minimum of two pages. Measured 2026-08-08 (BACKLOG #103) inside an
+     * unprivileged container whose root maps to an ordinary host uid: an
+     * 8192-byte pipe carried a 13.8 MB picture in 1688 round trips
+     * instead of 14 and cost 7.5 ms of a 24.5 ms frame at 3840x2400.
+     * xrdp does not change system settings -- not a sysctl, not a
+     * capability -- so the only correct response is to be loud about it
+     * and let the administrator decide. */
+    fcntl(inpipe[1], F_SETPIPE_SZ, FF_IN_PIPE_BYTES);
+    got_pipe = fcntl(inpipe[1], F_GETPIPE_SZ);
+    if (got_pipe < 0)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_SIZE_UNKNOWN monitor "
+            "%d: asked for a %d byte encoder input pipe and could not "
+            "read back what was granted (%s)", cfg->monitor_index,
+            (int)FF_IN_PIPE_BYTES, g_get_strerror());
+    }
+    else if (got_pipe < FF_IN_PIPE_BYTES)
+    {
+        picture_bytes = cw * ch + cw * (ch / 2);
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_TOO_SMALL monitor %d: "
+            "asked the kernel for a %d byte encoder input pipe, it "
+            "granted %d. One %dx%d NV12 picture is %d bytes, so every "
+            "frame now crosses this pipe in %d writes instead of %d and "
+            "the encoder feed will be slow.", cfg->monitor_index,
+            (int)FF_IN_PIPE_BYTES, got_pipe, cw, ch, picture_bytes,
+            (picture_bytes + got_pipe - 1) / got_pipe,
+            (picture_bytes + (int)FF_IN_PIPE_BYTES - 1)
+            / (int)FF_IN_PIPE_BYTES);
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_TOO_SMALL monitor %d: "
+            "this is a host limit on this uid, not an xrdp setting. The "
+            "administrator can raise fs/pipe-user-pages-soft, or give "
+            "the server CAP_SYS_RESOURCE in the initial user namespace. "
+            "xrdp will not change a system setting on its own. Any "
+            "performance measurement taken in this state is not valid.",
+            cfg->monitor_index);
+    }
     *in_fd = inpipe[1];
     *out_fd = outpipe[0];
     *err_fd = errpipe[0];

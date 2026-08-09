@@ -356,6 +356,53 @@ MARK_P=$(srv 'sudo wc -l < /var/log/xrdp.log 2>/dev/null \
 MARK_P=${MARK_P:-0}
 echo "log marks: session-xorg $MARK_X lines, xrdp.log $MARK_P lines"
 
+# --- ENCODER INPUT PIPE GUARD (BACKLOG #103) -----------------------------
+# xrdp asks the kernel for a 1 MiB input pipe per encoder child so one
+# vmsplice hands over a large batch of page references (FR-PROC-6). A uid
+# that is over the HOST's fs/pipe-user-pages-soft and is not
+# CAP_SYS_RESOURCE-capable in the initial user namespace is refused and
+# the pipe stays at two pages. That is not a small effect and it is not
+# visible in any rate: measured 2026-08-08 in this fleet, an 8192-byte
+# pipe carried each 13.8 MB picture in 1688 writes instead of 14 and cost
+# 7.5 ms of a 24.5 ms frame at 3840x2400 -- 41 fps where the same build
+# and the same config did 59 with the sysctl raised.
+#
+# xrdp does not and must not change a system setting to fix this (owner
+# directive, 2026-08-09). It logs PIPE_TOO_SMALL instead, and THIS is the
+# harness half of that rule: a run in the clamped state is not a valid
+# measurement, so the gate refuses it and asks the owner to act.
+#
+# Read over the WHOLE log, not this run's window: the children are
+# spawned when the SESSION starts, which on a warm pod happened during an
+# earlier leg and would be behind the mark.
+pipe_warn_count()
+{
+    srv 'sudo grep -ac PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || grep -ac PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || true' 2>/dev/null | tr -d ' \r' | tail -1
+}
+PIPE_N=$(pipe_warn_count)
+PIPE_N=${PIPE_N:-0}
+if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
+    srv 'sudo grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || true' > "$OUT/pipe_too_small.txt" 2>/dev/null
+    echo "*** $SRV_NAME logged PIPE_TOO_SMALL $PIPE_N times BEFORE this" \
+         "run started ***"
+    sed -n '1,2p' "$OUT/pipe_too_small.txt"
+    if [ "${E_ALLOW_TINY_PIPE:-0}" != 1 ]; then
+        fail "the encoder input pipe on $SRV_NAME is smaller than xrdp
+asked for, so this box is not in a state where a timing number means
+anything (BACKLOG #103). OWNER ACTION: raise fs/pipe-user-pages-soft on
+the HOST, or give the server CAP_SYS_RESOURCE in the initial user
+namespace, then re-run. The full lines are in $OUT/pipe_too_small.txt.
+E_ALLOW_TINY_PIPE=1 runs anyway and stamps every result INVALID -- use it
+only to reproduce an old clamped capture on purpose."
+    fi
+    echo "E_ALLOW_TINY_PIPE=1: running anyway; the VERDICT will be" \
+         "stamped INVALID"
+fi
+
 # A COLD session, by default: xrdp reconnects to an EXISTING session, and
 # a fleet pod that has been up for hours may have one whose scrolling
 # xterm is long dead -- a 25 s control run on such a session produced 28
@@ -582,6 +629,17 @@ else
     srv_cat "$XLOG" | tail -n +$((MARK_X + 1)) > "$OUT/session-xorg.log"
 fi
 srv_cat /var/log/xrdp.log | tail -n +$((MARK_P + 1)) > "$OUT/xrdp.log"
+# Ask again now the run is over: on a COLD pod the session this run
+# created is the FIRST to spawn encoder children, so the pre-run check
+# above had nothing to find. Same count, same command, after the fact.
+PIPE_N=$(pipe_warn_count)
+PIPE_N=${PIPE_N:-0}
+if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null && [ ! -s "$OUT/pipe_too_small.txt" ]
+then
+    srv 'sudo grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+        || true' > "$OUT/pipe_too_small.txt" 2>/dev/null
+fi
 # --- the per-frame trace, from the ring the sink writes ------------------
 # BACKLOG #61h: GFX_TRACE / ACK_TRACE records are no longer log.c lines --
 # they were ~12 unbuffered writes per frame on the xrdp main thread, on the
@@ -674,6 +732,29 @@ ${FREEZE_AT:+, FREEZE LEG at +${FREEZE_AT}s} ==="
     echo "payload:  SESSION_KIND = $(cat "$OUT/deployed_session_kind.txt")"
     echo "refresh:  intra_refresh_frames = \
 $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
+    # Same rule as the freeze banner below: a run whose encoder input
+    # pipe was clamped must never be readable as an ordinary one, so it
+    # is stated here, above every number it contaminates.
+    if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
+        echo "pipe:     *** ENCODER INPUT PIPE TOO SMALL — THIS RUN IS"
+        echo "          NOT A VALID MEASUREMENT (BACKLOG #103) ***"
+        echo "          xrdp asked the kernel for a 1 MiB input pipe per"
+        echo "          encoder child and was given less, $PIPE_N times."
+        echo "          Each raw picture then crosses the pipe in"
+        echo "          hundreds of small writes instead of a few large"
+        echo "          ones; on this fleet that alone was 7.5 ms of a"
+        echo "          24.5 ms frame at 3840x2400. Every rate below is"
+        echo "          depressed by an amount that has nothing to do"
+        echo "          with the build or the config under test."
+        echo "          OWNER ACTION: raise fs/pipe-user-pages-soft on"
+        echo "          the HOST, or give the server CAP_SYS_RESOURCE in"
+        echo "          the initial user namespace. xrdp will not change"
+        echo "          a system setting itself (owner directive,"
+        echo "          2026-08-09). Lines: pipe_too_small.txt"
+    else
+        echo "pipe:     encoder input pipe as asked, 1 MiB (no"
+        echo "          PIPE_TOO_SMALL in $SRV_NAME's xrdp log)"
+    fi
     # A freeze leg must never be readable as an ordinary one. Say so here,
     # in the VERDICT, above every number it contaminates.
     if [ -n "$FREEZE_AT" ]; then
@@ -1073,3 +1154,15 @@ fi
 
 echo
 echo "evidence: $OUT"
+
+# A clamped pipe found only AFTER the run (cold pod: this run's session
+# was the first to spawn children) still invalidates it, and a caller
+# that chains legs must not read this leg as good. The evidence is kept
+# and the banner is in the VERDICT -- the exit code is what stops the
+# next leg. A red result stays red.
+if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
+    echo "EXIT NONZERO: the encoder input pipe was clamped; this run is" \
+         "not a valid measurement (BACKLOG #103). See the pipe: banner" \
+         "in $OUT/VERDICT.txt for the owner action." >&2
+    exit 3
+fi

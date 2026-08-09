@@ -93,11 +93,40 @@ host where the resize succeeds.
   the host, which is the owner's call — the sysctl is read-only from
   inside and changing it is host-wide.
 
-## The one code change this justifies
+  **Superseding note, 2026-08-08 (added the same day; the projection
+  above is kept as written).** The owner raised the host sysctl to
+  262144 pages (1 GiB) and the same four legs were re-run on the same arm
+  with no code change. The projection of "near 19 ms" was pessimistic:
+  the frame period measured **17.0 ms**, from 24.5 — 41 fps to 59. The
+  feed segment went 8.5–9.1 → 1.9–2.1 ms and the drain 1.0–1.2 → 0.38 ms,
+  while the encode stayed 13.80–14.36 ms across all eight legs, which is
+  the control showing the sysctl touched only the two segments that cross
+  a pipe. Evidence:
+  `captures/i92_sparse_aux_ab_20260808_233519_s20/`. One leg (a2) is
+  quarantined there as an outlier, not averaged.
+
+## The one code change this justifies — LANDED 2026-08-09
 
 Not a redesign: **check the return value and say something.** A silent
 5 ms/frame at 4K is the kind of thing that should never be invisible, and
-the check is two lines. Whether to go further — the frame is already in
+the check is two lines.
+
+**Owner ruling, 2026-08-09, which decided the shape of it:** *"I don't
+think xrdp is the place to try modify system settings. It should warn
+loud in the logs anyway with external ffmpeg enabled but found a tiny
+pipe, add also to our test procedure to watch for that log, request
+owner's action (and results invalid) when the pipe is tiny."*
+
+So xrdp changes nothing and reports. `spawn_child()` now reads the
+granted size back with `F_GETPIPE_SZ` and, when it is below the 1 MiB
+requested, logs `PIPE_TOO_SMALL` at WARNING with the requested size, the
+granted size, the NV12 picture size, and the number of writes each
+picture now costs against the number it should — for the 8192 measured
+here, "1688 writes instead of 14". The harness watches for that token:
+`arm_certify.sh` fails certification, `e_gate_run.sh` refuses the run
+(before it, on a warm pod) or stamps the VERDICT invalid and exits
+non-zero (after it, on a cold one). PRD FR-PROC-6 clause 4 and
+FR-BENCH-2. Whether to go further — the frame is already in
 shared memory and is being copied back out of a pipe purely because
 ffmpeg's raw input is a stream — is an architectural question, and at
 0.68 ms with a working pipe the case for it is much weaker than these

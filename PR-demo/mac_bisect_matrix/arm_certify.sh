@@ -162,6 +162,26 @@ kubectl -n "$NS" exec "$POD" -- bash -lc \
     "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
      || break; sleep 1; done" >/dev/null 2>&1
 
+# --- ENCODER INPUT PIPE GUARD (BACKLOG #103) ---------------------------
+# The certification is what says "this deployed pair is fit to measure",
+# and an arm whose encoder children could not get the input pipe xrdp
+# asked for is not. xrdp asks the kernel for 1 MiB per child so one
+# vmsplice hands over a large batch of page references; a uid over the
+# HOST's fs/pipe-user-pages-soft, without CAP_SYS_RESOURCE in the initial
+# user namespace, is refused and gets two pages instead. Measured
+# 2026-08-08 on this fleet: 1688 writes per 13.8 MB picture instead of
+# 14, 7.5 ms of a 24.5 ms frame at 3840x2400, 41 fps against 59 for the
+# same build and config once the host limit was raised.
+#
+# xrdp does not and must not change a system setting to fix that (owner
+# directive, 2026-08-09) -- it logs PIPE_TOO_SMALL, and the harness
+# refuses. Catching it HERE, at deploy, is what stops a whole matrix of
+# measurements being spent in a state where no number means anything.
+PIPE_HITS=$(kubectl -n "$NS" exec "$POD" -- bash -lc \
+    'sudo grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null \
+     || grep -a PIPE_TOO_SMALL /var/log/xrdp.log 2>/dev/null || true' \
+    2>/dev/null | head -4)
+
 DUMP=$(ls -S /tmp/oracle_avc_s*.bin 2>/dev/null | head -1)
 if [ -z "$DUMP" ]; then
     # keep the evidence: a no-dump certification is a red result about
@@ -181,6 +201,29 @@ BYTES=$(stat -c %s "$DUMP")
     echo "key:    $KEY"
     echo "when:   $(date -u +%Y-%m-%dT%H:%M:%SZ)"
     echo "window: ${SECS}s at $SIZE, $BYTES bytes"
+    echo
+    echo "=== encoder input pipe (BACKLOG #103) ==="
+    if [ -n "$PIPE_HITS" ]; then
+        echo "PIPE VERDICT: TOO SMALL — this arm is NOT fit to measure."
+        echo "xrdp asked the kernel for a 1 MiB input pipe per encoder"
+        echo "child and was given less, so every raw picture crosses it"
+        echo "in hundreds of small writes instead of a few large ones."
+        echo "On this fleet that alone was 7.5 ms of a 24.5 ms frame at"
+        echo "3840x2400 — 41 fps where the same build and config did 59"
+        echo "once the host limit was raised. It depresses every rate by"
+        echo "an amount that has nothing to do with what is under test."
+        echo
+        echo "OWNER ACTION REQUIRED: raise fs/pipe-user-pages-soft on the"
+        echo "HOST, or give the server CAP_SYS_RESOURCE in the initial"
+        echo "user namespace, then re-certify. xrdp will not change a"
+        echo "system setting itself (owner directive, 2026-08-09)."
+        echo
+        printf '%s\n' "$PIPE_HITS"
+    else
+        echo "PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log"
+        echo "after ${SECS}s of real encoding, so every encoder child got"
+        echo "the 1 MiB input pipe xrdp asked for."
+    fi
     echo
     echo "=== wire audit (--assert) ==="
     python3 "$D/../../tools/avc444_ltr_wire_audit.py" --assert \
@@ -221,13 +264,22 @@ BYTES=$(stat -c %s "$DUMP")
 } > "$CERT.tmp" 2>&1
 
 if grep -q "ASSERT VERDICT: PASS" "$CERT.tmp" \
-        && grep -q "VERDICT: PASS" "$CERT.tmp"; then
+        && grep -q "VERDICT: PASS" "$CERT.tmp" \
+        && grep -q "PIPE VERDICT: OK" "$CERT.tmp"; then
     mv "$CERT.tmp" "$CERT"
     echo "CERTIFIED: $ARM -> $CERT"
     exit 0
 fi
 mv "$CERT.tmp" "$CERT.FAILED"
 echo "NOT CERTIFIED: $ARM — see $CERT.FAILED" >&2
-echo "  the arm encodes non-conforming or undecodable bytes; do not" >&2
-echo "  measure it. A red result stays red." >&2
+if grep -q "PIPE VERDICT: TOO SMALL" "$CERT.FAILED"; then
+    echo "  the encoder input pipe is smaller than xrdp asked for, so no" >&2
+    echo "  timing number from this arm would mean anything. This one" >&2
+    echo "  needs the OWNER: raise fs/pipe-user-pages-soft on the host," >&2
+    echo "  or grant CAP_SYS_RESOURCE in the initial user namespace." >&2
+    echo "  xrdp does not change system settings (2026-08-09)." >&2
+else
+    echo "  the arm encodes non-conforming or undecodable bytes; do not" >&2
+    echo "  measure it. A red result stays red." >&2
+fi
 exit 1

@@ -319,12 +319,36 @@ archived one is invalid unless the archive is re-measured -- the box got
 change. Ratios WITHIN an archived capture stand; absolute numbers across
 the sysctl boundary do not.
 
-**STILL OPEN:** (a) the two-line check-and-log on `F_SETPIPE_SZ`, so a
-clamped pipe is never again invisible; (b) whether the sysctl change is
-made permanent on the host (it is a live `sysctl -w`, lost on reboot) --
-if not, every future measurement must re-verify the pipe size before
-being trusted; (c) re-measuring the archived baselines that later work
-will be compared against.
+**(a) DONE 2026-08-09 — and the owner set its shape: "I don't think xrdp
+is the place to try modify system settings. It should warn loud in the
+logs anyway ... add also to our test procedure to watch for that log,
+request owner's action (and results invalid) when the pipe is tiny."**
+So xrdp changes nothing and reports: `spawn_child()` reads the granted
+size back with `F_GETPIPE_SZ` and logs `PIPE_TOO_SMALL` at WARNING with
+the requested size, the granted size, the NV12 picture size, and the
+writes per picture it now costs against the 14 it should
+(`xrdp/xrdp_encoder_ffmpeg.c`). The harness half: `arm_certify.sh` reads
+the arm's log after its 3 s of encoding and a `PIPE VERDICT: TOO SMALL`
+is NOT CERTIFIED; `e_gate_run.sh` checks before the run (warm pod, refuse
+early) and after it (cold pod, this run's session was the first to spawn
+children), banners `VERDICT.txt` above every number it contaminates,
+archives the lines as `pipe_too_small.txt`, and exits non-zero.
+`E_ALLOW_TINY_PIPE=1` runs anyway and stamps the result invalid; it
+suppresses nothing. Specified as PRD FR-PROC-6 clause 4 (server) and
+FR-BENCH-2 (harness). No unit test: the new code is a `F_GETPIPE_SZ`
+read, a comparison and a log line, with no pure logic to pin — the
+branch was exercised by hand against a kernel forced to refuse (granted
+65536, printed "211 writes instead of 14") and against the 8192 the
+container gave on 2026-08-08 (printed "1688 writes instead of 14"), and
+`make check` stays 208/208 with no `PIPE_TOO_SMALL` in the CI log, which
+is the negative case.
+
+**STILL OPEN:** (b) whether the sysctl change is made permanent on the
+host (it is a live `sysctl -w`, lost on reboot) -- with (a) landed this
+is now self-announcing rather than silent: a reboot that loses it makes
+the next certification fail with the owner action printed. (c)
+re-measuring the archived baselines that later work will be compared
+against.
 
 Records: `captures/i103_pipe_handover_20260808/` (mechanism),
 `captures/i92_sparse_aux_ab_20260808_233519_s20/` (the before/after).

@@ -786,7 +786,24 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
    (FR-CAPTURE-6 amendment): unsplice'd input at wait end is an error and
    replaces the child.
 4. The pipe capacity is raised best-effort via `F_SETPIPE_SZ` to reduce
-   syscall count; failure to raise it is not an error.
+   syscall count; failure to raise it is not an error — **but it is never
+   silent** (owner directive, 2026-08-09). `spawn_child()` reads the
+   granted size back with `F_GETPIPE_SZ` and, when it is below the
+   requested `FF_IN_PIPE_BYTES`, logs `PIPE_TOO_SMALL` at WARNING with the
+   requested size, the granted size, the NV12 picture size, and the number
+   of writes each picture now costs against the number it should. **xrdp
+   does not change a system setting to fix this** — not a sysctl, not a
+   capability — it reports and lets the administrator decide.
+   *Why this is load-bearing rather than tidiness:* the kernel refuses the
+   resize for a caller over `fs/pipe-user-pages-soft` that is not
+   `CAP_SYS_RESOURCE`-capable in the **initial** user namespace, and the
+   pipe then stays at two pages. Measured 2026-08-08 (BACKLOG #103) in an
+   unprivileged container whose root maps to an ordinary host uid: 1688
+   writes per 13.8 MB picture instead of 14, **7.5 ms of a 24.5 ms frame
+   at 3840x2400**, 41 fps against 59 for the same build and config once
+   the host limit was raised. An invisible 30 % of the frame period is
+   exactly what a log line is for. The harness half of the rule — who
+   greps for that line and what happens when it is found — is FR-BENCH-2.
 5. Page-aligned segments take the kernel's reference path (true zero-copy);
    unaligned tails fall back to an in-kernel copy — still never a
    user-space copy.
@@ -1360,6 +1377,46 @@ overlap" T4 run convicts the producer, not the pipeline; and the PRD's
 `capture ‖ encode = YES for m = 1` row is CONDITIONAL on this contract
 holding, which its 1600×912 evidence satisfied and 4K does not.
 Tracked under the linear chain **BACKLOG #70 → #87 (was #70B, via #89) → #91 (was #71) → #92 (was #72) → #93 (was #73)** (renumbered three times, last 2026-08-06; earlier chain forms and this paragraph's history at commit `0db74f6e`).
+
+### FR-BENCH-2: A measurement taken with a clamped encoder input pipe is not a measurement (owner directive, 2026-08-09)
+
+The server half of this is FR-PROC-6 clause 4: when the kernel grants
+less input pipe than xrdp asked for, xrdp says so at WARNING with the
+token `PIPE_TOO_SMALL` and changes no system setting. **This clause is
+the harness half: the test procedure watches for that line, refuses the
+run, and asks the owner to act.** Both halves are required, because a
+warning nobody greps is the same as no warning.
+
+1. **`arm_certify.sh` reads the arm's own `/var/log/xrdp.log` after its
+   3 s of real encoding** and prints a `PIPE VERDICT:` line into the
+   certificate. `TOO SMALL` means **NOT CERTIFIED** — the same hard stop
+   as non-conforming bytes, because a certificate is the statement "this
+   deployed pair is fit to measure" and an arm that could not get its
+   pipes is not. The certificate is reprinted by every gate run, so the
+   pipe state travels with every number the arm ever produces.
+2. **`e_gate_run.sh` checks twice: before the run and after it.** Before,
+   because a warm pod carries the warning from an earlier session's
+   children and the run can be refused before spending the wall time.
+   After, because on a cold pod the session this run created is the first
+   to spawn any child, so there was nothing to find beforehand. Either
+   way the whole log is read, never this run's window.
+3. **A clamped run is stamped, not hidden.** The `pipe:` banner sits at
+   the top of `VERDICT.txt`, above every number it contaminates — the
+   same treatment as a freeze leg — the offending lines are archived as
+   `pipe_too_small.txt`, and the gate exits non-zero so a chained leg
+   cannot read the run as good.
+4. **`E_ALLOW_TINY_PIPE=1` converts the pre-run hard stop into a stamped
+   invalid run, and nothing else.** It exists for deliberately
+   reproducing an archived clamped capture. It does not suppress the
+   banner, the archived lines, or the non-zero exit. An override that
+   made a red result green would be the fallback-masking this project's
+   strict-honesty rule forbids.
+
+*Why the threshold is "anything below what was asked" and not a tuned
+one:* the shipped code requests `FF_IN_PIPE_BYTES` because it wants that
+much; any shortfall is off-design, and the severity is already carried by
+the writes-per-picture figure inside the warning itself. One token, one
+rule, no arithmetic duplicated between the server and the harness.
 
 ### FR-TRACE-1: The perf tracer must not be able to perturb what it measures (owner directive, 2026-08-01)
 

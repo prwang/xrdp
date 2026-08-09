@@ -44,11 +44,30 @@ construction, and the tester always knows which arm is on screen.
 - `k8s/*.yaml` — namespace + one Deployment per arm (privileged, `/dev/dri`
   hostPath, `hostPort` pinned to `hostIP 127.0.0.1`).
 - `build_and_deploy.sh` — build → import into k3s → apply → roll → wait.
+- `arm_certify.sh` — run once per deploy, from `build_and_deploy.sh`:
+  3 s of real payload through the arm, then the wire audit and the
+  black-frame decode on those bytes, plus the **encoder input pipe
+  guard** (BACKLOG #103 / PRD FR-BENCH-2). It reads the arm's own
+  `/var/log/xrdp.log` for the `PIPE_TOO_SMALL` line xrdp emits when the
+  kernel gives it less input pipe than it asked for, and a
+  `PIPE VERDICT: TOO SMALL` is **NOT CERTIFIED** — an arm whose children
+  could not get their pipes cannot produce a timing number that means
+  anything, and it needs the owner to raise `fs/pipe-user-pages-soft` on
+  the host. The certificate is reprinted by every gate run, so both
+  verdicts travel with every number the arm produces.
 - `e_gate_run.sh` — the acceptance-gate runner (E2/E3/E4/E5 in one
   offscreen dual-monitor session). `E_TARGET=pod` (default) measures a
   fleet arm; `E_TARGET=ssh` measures a real box over an ssh port-forward
   with the client side still here — see
   `../t4_profile/E5-2_T4_PROTOCOL.md`.
+  It runs the same **encoder input pipe guard** twice: before the run, so
+  a warm pod carrying the warning from an earlier session is refused
+  before the wall time is spent, and after it, because on a cold pod this
+  run's session is the first to spawn any child. A clamped run gets a
+  banner at the top of `VERDICT.txt` above every number it contaminates,
+  its lines archived as `pipe_too_small.txt`, and a non-zero exit so a
+  chained leg cannot read it as good. `E_ALLOW_TINY_PIPE=1` runs anyway
+  and stamps the result invalid — it suppresses nothing.
 - `e52_flood_analyze.py` — where the frame interval goes, per arm: service
   split, per-monitor period, the `last=1 → next own dmg` wait that says
   whether the pipeline was full, `kids_armed` histogram, ack path.
@@ -77,6 +96,16 @@ construction, and the tester always knows which arm is on screen.
   symlink to `/dev/console` (recreate after reboot if missing).
 - Pods reuse the host `tester` password via its shadow hash in root-only
   `/etc/xrdp-matrix/tester.hash` (written by `build_and_deploy.sh`).
+- **`fs/pipe-user-pages-soft` must be large enough on the HOST**, and it
+  is not a fleet setting — this LXC's root maps to host uid 1000, so
+  every pod's xrdp counts against that one host account's 64 MiB default.
+  Over it, the kernel refuses `F_SETPIPE_SZ` and each encoder child gets
+  a two-page input pipe; measured 2026-08-08 that alone was 7.5 ms of a
+  24.5 ms frame at 3840x2400 (BACKLOG #103). The owner raised it to
+  262144 pages the same day, with `sysctl -w` — **which is lost on
+  reboot**. Nothing here re-applies it and xrdp will not touch a system
+  setting; what happens instead is that `arm_certify.sh` fails the next
+  certification and prints the owner action.
 - GPU: AMD render node `/dev/dri/renderD128`, shared by all arms and the
   host instance (VAAPI contexts are independent; fine at banner frame
   rates).
