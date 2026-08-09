@@ -182,9 +182,50 @@ Two consequences:
   `FF_IN_PIPE_MIN_BYTES` with this table beside it. 64 KiB is also the
   kernel's default pipe size, so every box that is not in the clamped
   state already satisfies it.
-* **1 MiB is not arbitrary either, but it is a ceiling rather than a
-  requirement**: it is the default value of `fs/pipe-max-size`, the
-  largest pipe an unprivileged process can obtain on a stock kernel.
+* **1 MiB is not arbitrary either, but it is a wish rather than a
+  requirement — and it is NOT an architectural ceiling.** *(Corrected
+  the same day, after the owner asked whether 1 MiB is really a ceiling
+  or just this container's configuration. It is the latter, and the
+  first version of this paragraph called it a ceiling.)* `fcntl(2)`
+  defines `fs/pipe-max-size` as the limit *"an unprivileged process"*
+  may set, and says plainly that **a privileged process
+  (`CAP_SYS_RESOURCE`) can override the limit**; a host may also tune
+  the sysctl either way. 1048576 is the kernel's compiled-in default and
+  is what this box reads, but a bare-metal xrdp running as real root
+  could ask for more.
+  **Above 1 MiB is untested and cannot be tested here** — container root
+  has no `CAP_SYS_RESOURCE` in the initial user namespace, and raising
+  the sysctl is a host change. What the table does show is 64 KiB to
+  1 MiB, a 16× range, flat within noise, with the remaining cost being
+  the reader's copy. Nothing in that shape suggests a second knee, but
+  that is an argument, not a measurement.
+
+## Huge pages: the arm exists and has never run
+
+Also asked 2026-08-09: *"what if you use 2 MiB huge page for the pipe?"*
+
+A pipe's capacity is a ring of slots holding one page each, and
+`F_SETPIPE_SZ` sets it in bytes. The measured round-trip counts are
+exactly `ceil(picture / pipe_size)` — 14 at 1 MiB, 211 at 64 KiB, 1688
+at 8 KiB — which is the pipe's own arithmetic and says nothing about how
+the source is backed. If a slot could carry 2 MiB, that count would
+collapse by 512× for the same nominal pipe size, so **the round-trip
+count is a clean binary discriminator** and the bench has an arm that
+watches it with a 2 MiB-backed source.
+
+**That arm has never run, and it prints no timing rows.** Transparent
+huge pages are unavailable on this dev box: `/sys/kernel/mm/
+transparent_hugepage/enabled` is `madvise` and `hugepages-2048kB` is
+`inherit`, `madvise(MADV_HUGEPAGE)` on a 32 MiB 2 MiB-aligned anonymous
+mapping returns 0, and the VMA still reports `THPeligible: 0` with
+`AnonHugePages: 0 kB` after being fully touched. There is no hugetlbfs
+pool either (`HugePages_Total: 0`). Details in
+`negotiation_20260809.txt`.
+
+The arm deliberately prints `ARM NOT RUN` instead of timing rows,
+because a row labelled "huge-page source" that in fact used 4 KiB pages
+is a number a later reader would quote. Answering this empirically needs
+a box where THP works.
 
 **And asking for more than the ceiling makes things worse, which is a
 real defect the sweep exposed.** `F_SETPIPE_SZ` does not clamp — it fails

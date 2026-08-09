@@ -790,13 +790,19 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
    fix the condition to an assured pipe size rather than a spec came from
    nowhere"*). Three separate quantities, and conflating them is the
    mistake this clause exists to prevent:
-   * **`FF_IN_PIPE_WANT_BYTES` = 1 MiB — what xrdp asks for.** Not a
-     taste: it is the default value of `fs/pipe-max-size`, i.e. the
-     largest pipe an unprivileged process can obtain on a stock kernel.
-     Asking for more is actively harmful, because `F_SETPIPE_SZ` above
-     the ceiling **fails outright and leaves the pipe at its 64 KiB
-     default** rather than clamping — measured, "8 MiB requested → granted
-     64 KiB, RESIZE REFUSED".
+   * **`FF_IN_PIPE_WANT_BYTES` = 1 MiB — what xrdp asks for.** It is the
+     compiled-in default of `fs/pipe-max-size`, which `fcntl(2)` defines
+     as the limit *"an unprivileged process"* may set; **a process with
+     `CAP_SYS_RESOURCE` in the initial user namespace overrides it, and a
+     host may tune it either way, so this is not an architectural
+     ceiling.** xrdp asks for it anyway because more buys nothing — the
+     cost is flat from 64 KiB upward over a 16× range, and what remains
+     is the reader's copy. Above 1 MiB is **untested**: an unprivileged
+     process cannot get there, and the dev box has no route to it.
+     Asking for more than the sysctl allows is actively harmful, which is
+     why this is a wish and not a maximum: `F_SETPIPE_SZ` does not clamp,
+     it **fails outright and leaves the pipe at its 64 KiB default** —
+     measured, "8 MiB requested → granted 64 KiB, RESIZE REFUSED".
    * **`FF_IN_PIPE_MIN_BYTES` = 64 KiB — what xrdp requires**, and the
      only thing `PIPE_TOO_SMALL` is judged against. Measured 2026-08-09
      with `tools/vmsplice_pipe_bench.c`, one 13.82 MB picture, timed
@@ -814,6 +820,18 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
      state already satisfies it.
    * **What was actually granted**, read back with `F_GETPIPE_SZ`. The
      size in force is never inferred from the return of `F_SETPIPE_SZ`.
+
+   **Huge pages do not enter into this.** A pipe's capacity is a ring of
+   slots holding one page each, and `F_SETPIPE_SZ` sets it in bytes
+   independently of how the *source* buffer is backed — the measured
+   round-trip counts are exactly `ceil(picture / pipe_size)` (14 at
+   1 MiB, 211 at 64 KiB), which is the pipe's own arithmetic and nothing
+   else's. The bench carries an arm that would settle it empirically by
+   watching whether that count collapses with a 2 MiB-backed source, and
+   **that arm has never run**: transparent huge pages are unavailable on
+   the dev box (`madvise(MADV_HUGEPAGE)` returns 0, the VMA still reports
+   `THPeligible: 0`, and there is no hugetlbfs pool). It prints
+   `ARM NOT RUN` and no timing rows rather than mislabelling 4 KiB pages.
 5. **The size is negotiated down, not asked for once.** Because
    `F_SETPIPE_SZ` is all-or-nothing, one ask for 1 MiB on a host whose
    administrator lowered `fs/pipe-max-size` to 256 KiB yields 64 KiB when

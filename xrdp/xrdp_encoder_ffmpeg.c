@@ -65,13 +65,28 @@
 /* fixed input+output framing (~40 tokens) plus up to XRDP_AVC444_MAX_ENC_ARGS
  * verbatim encoder tokens, with headroom */
 #define FF_MAX_ARGV 128
-/* How large an input pipe the feeder ASKS for. 1 MiB is not a taste:
- * it is the default value of fs/pipe-max-size, i.e. the largest pipe an
- * unprivileged process can obtain on a stock kernel. Asking for more
- * is actively harmful -- F_SETPIPE_SZ above the ceiling fails outright
- * and leaves the pipe at its 64 KiB default, so a greedy request gets
- * LESS than a modest one (measured: "8 MiB requested -> granted 64 KiB,
- * RESIZE REFUSED", tools/vmsplice_pipe_bench.c). */
+/* How large an input pipe the feeder ASKS for, and why that number.
+ *
+ * 1 MiB is the compiled-in default of fs/pipe-max-size, which fcntl(2)
+ * defines as "the limit ... an unprivileged process can adjust the pipe
+ * capacity to"; a process with CAP_SYS_RESOURCE in the initial user
+ * namespace overrides it. So this is NOT an architectural ceiling: a
+ * host may raise or lower the sysctl, and a bare-metal xrdp running as
+ * real root could ask for more.
+ *
+ * It asks for 1 MiB anyway, because more buys nothing. Measured over a
+ * 16x range of pipe sizes, the handover cost is FLAT from 64 KiB upward
+ * (see FF_IN_PIPE_MIN_BYTES): what remains at that point is the reader's
+ * copy, which no pipe size removes. Above 1 MiB is untested -- an
+ * unprivileged process cannot get there -- but nothing in the shape of
+ * the curve suggests a second knee.
+ *
+ * Asking for MORE than the sysctl allows is actively harmful, which is
+ * why this is a wish and not a maximum: F_SETPIPE_SZ does not clamp, it
+ * fails and leaves the pipe at its 64 KiB default, so a greedy request
+ * gets LESS than a modest one (measured: asking 8 MiB once yields 65536
+ * on a box whose limit is 1 MiB, tools/vmsplice_pipe_bench.c). See
+ * negotiate_in_pipe_size(). */
 #define FF_IN_PIPE_WANT_BYTES (1024 * 1024)
 /* How large it must ACTUALLY be, which is the whole of the requirement
  * and is what PIPE_TOO_SMALL is judged against. Measured 2026-08-09

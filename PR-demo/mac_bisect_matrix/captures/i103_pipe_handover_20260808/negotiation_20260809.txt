@@ -5,3 +5,15 @@ ask    65536  single->    65536   negotiated->    65536
 fs/pipe-max-size = 1048576
 fs/pipe-user-pages-soft = 262144
 fs/pipe-user-pages-hard = 0
+
+=== transparent huge pages on this box, 2026-08-09 ===
+enabled:        always [madvise] never
+defrag:         always defer defer+madvise [madvise] never
+hugepages-2048kB/enabled: always [inherit] madvise never
+hpage_pmd_size: 2097152
+AnonHugePages:         0 kB
+HugePages_Total:       0
+Hugepagesize:       2048 kB
+A 32 MiB, 2 MiB-aligned, MAP_ANONYMOUS|MAP_PRIVATE mapping with
+madvise(MADV_HUGEPAGE) returning 0 still reports THPeligible: 0
+and AnonHugePages: 0 kB after being fully touched.

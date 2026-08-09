@@ -363,6 +363,26 @@ requirement instead (demonstrated on a real refusal: asking 8 MiB once
 gives 65536, negotiating gives 1048576). Table and evidence in
 `captures/i103_pipe_handover_20260808/README.md`.
 
+**(a3) 1 MiB is NOT a ceiling, corrected the same day on the owner's
+challenge.** `fcntl(2)` defines `fs/pipe-max-size` as the limit an
+*unprivileged* process may set and says a `CAP_SYS_RESOURCE` process
+overrides it; a host may tune it either way. 1048576 is the kernel's
+compiled-in default and what this box reads, but a bare-metal xrdp as
+real root could ask for more. **Above 1 MiB is UNTESTED and untestable
+here** -- container root lacks initial-namespace `CAP_SYS_RESOURCE` and
+raising the sysctl is a host change. The flat 64 KiB-1 MiB range (16x,
+no trend) is why xrdp does not chase it, but that is an argument, not a
+measurement, and it is written as such.
+
+**Huge pages: the discriminator exists, the arm has never run.** The
+round-trip count is exactly `ceil(picture / pipe_size)`, so if a pipe
+slot could carry 2 MiB it would collapse 512x for the same nominal pipe
+size. The bench has an arm that watches exactly that with a 2 MiB-backed
+source and it **prints no timing rows on this box**: THP is unavailable
+(`madvise(MADV_HUGEPAGE)` returns 0, VMA still `THPeligible: 0`,
+`AnonHugePages: 0 kB`, no hugetlbfs pool). Settling it empirically needs
+a box where THP works.
+
 **STILL OPEN:** (b) whether the sysctl change is made permanent on the
 host (it is a live `sysctl -w`, lost on reboot) -- with (a) landed this
 is now self-announcing rather than silent: a reboot that loses it makes

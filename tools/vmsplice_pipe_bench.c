@@ -67,6 +67,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
+#include <sys/mman.h>
 #include <sys/uio.h>
 #include <sys/wait.h>
 #include <time.h>
@@ -74,6 +76,61 @@
 
 #define DEFAULT_BYTES 13824000      /* 3840x2400 NV12, one picture */
 #define DEFAULT_ITERS 30
+#define HUGE_BYTES (2 * 1024 * 1024)
+
+/*****************************************************************************/
+/* AnonHugePages for this whole process, in kB, or -1. This is the gate
+ * on the huge-page arm: MADV_HUGEPAGE is ADVICE, and an arm that failed
+ * to get a single huge page would otherwise be reported as "huge pages
+ * make no difference" when what it measured was 4 KiB pages twice. */
+static long
+anon_huge_kb(void)
+{
+    FILE *f = fopen("/proc/self/smaps_rollup", "r");
+    char line[256];
+    long kb = -1;
+
+    if (f == NULL)
+    {
+        return -1;
+    }
+    while (fgets(line, sizeof(line), f) != NULL)
+    {
+        if (sscanf(line, "AnonHugePages: %ld kB", &kb) == 1)
+        {
+            break;
+        }
+    }
+    fclose(f);
+    return kb;
+}
+
+/*****************************************************************************/
+/* A buffer the kernel has been asked to back with 2 MiB pages. Returns
+ * NULL if the mapping fails; MADV_HUGEPAGE failing is not fatal, the
+ * caller checks anon_huge_kb() to find out what it really got. */
+static unsigned char *
+alloc_huge(long long nbytes)
+{
+    size_t len = (size_t)((nbytes + HUGE_BYTES - 1) / HUGE_BYTES)
+                 * HUGE_BYTES;
+    void *p = mmap(NULL, len + HUGE_BYTES, PROT_READ | PROT_WRITE,
+                   MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    unsigned char *aligned;
+
+    if (p == MAP_FAILED)
+    {
+        return NULL;
+    }
+    /* THP only collapses a range that is itself huge-page aligned */
+    aligned = (unsigned char *)(((uintptr_t)p + HUGE_BYTES - 1)
+                                & ~(uintptr_t)(HUGE_BYTES - 1));
+    if (madvise(aligned, len, MADV_HUGEPAGE) != 0)
+    {
+        /* reported by the caller through anon_huge_kb(), not hidden */
+    }
+    return aligned;
+}
 
 /*****************************************************************************/
 static double
@@ -358,6 +415,70 @@ main(int argc, char **argv)
             128 * 1024, 32 * 1024, 1);
     run_arm("vmsplice, 512 KiB pipe", src, nbytes, iters,
             512 * 1024, 32 * 1024, 1);
+    printf("\n");
+
+    printf("DOES A 2 MiB HUGE PAGE HELP? A pipe's capacity is a ring of "
+           "slots holding ONE\nPAGE each, so the question is whether "
+           "backing the SOURCE with huge pages lets\na slot carry 2 MiB "
+           "instead of 4 KiB. If it did, the round-trip count for a "
+           "given\npipe size would collapse by 512x. Watch the round "
+           "trips, not the time.\n");
+    {
+        unsigned char *hsrc = alloc_huge(nbytes);
+        long before = anon_huge_kb();
+        long after;
+
+        if (hsrc == NULL)
+        {
+            printf("  huge-page mapping failed; arm NOT RUN\n");
+        }
+        else
+        {
+            for (i = 0; i < nbytes; i++)
+            {
+                hsrc[i] = (unsigned char)(i & 0xff);
+            }
+            after = anon_huge_kb();
+            printf("  AnonHugePages for this process: %ld kB before the "
+                   "buffer, %ld kB after\n", before, after);
+            if (after <= before)
+            {
+                /* NO ROWS. A timing row under a "huge-page source"
+                 * label that was in fact 4 KiB pages is worse than no
+                 * row: it is a number a later reader will quote. The
+                 * arm reports that it did not run, and why. */
+                printf("  *** ARM NOT RUN -- the kernel backed no huge "
+                       "pages for this buffer, so\n      there is "
+                       "nothing here to measure. Timing rows are "
+                       "deliberately NOT\n      printed; a row labelled "
+                       "'huge page' that used 4 KiB pages would be a\n"
+                       "      number someone quotes later. Diagnose "
+                       "with:\n"
+                       "        cat /sys/kernel/mm/transparent_hugepage"
+                       "/enabled\n"
+                       "        cat /sys/kernel/mm/transparent_hugepage"
+                       "/hugepages-2048kB/enabled\n"
+                       "        grep THPeligible /proc/self/smaps\n"
+                       "      Observed 2026-08-09 on the dev box: "
+                       "enabled=madvise, 2048kB=inherit,\n"
+                       "      madvise(MADV_HUGEPAGE) returned 0, and "
+                       "the VMA still reported\n"
+                       "      THPeligible: 0 -- transparent huge pages "
+                       "are simply unavailable in\n      this "
+                       "unprivileged container, and there is no "
+                       "hugetlbfs pool either.\n");
+            }
+            else
+            {
+                run_arm("vmsplice from huge-page source, 1 MiB pipe",
+                        hsrc, nbytes, iters, 1024 * 1024, 32 * 1024, 1);
+                run_arm("vmsplice from huge-page source, 64 KiB pipe",
+                        hsrc, nbytes, iters, 64 * 1024, 32 * 1024, 1);
+                run_arm("vmsplice from 4 KiB source, 1 MiB (control)",
+                        src, nbytes, iters, 1024 * 1024, 32 * 1024, 1);
+            }
+        }
+    }
     printf("\n");
 
     printf("IS THE ZERO-COPY SIDE BUYING ANYTHING? Same pipe and same "
