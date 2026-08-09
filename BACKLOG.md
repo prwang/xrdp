@@ -254,6 +254,34 @@ both landed, and items 1–3 below are CLOSED.**
      "both clients" is not evidenced. The criterion itself, both halves,
      is now written down in `PR-demo/INTERACTIVE_ARM.md`.
 
+## #104 — the PR evidence matrix: five arms, one image, and the rest of the fleet retired (filed 2026-08-09)
+
+**Owner directive:** as the branch matures into the clean-room pass and
+the PR write-up, stand up *a few representative instances in the pod,
+with the frontier in various options plus simulated conditions, each
+supporting a point in the writing document* — and do NOT maintain the
+legacy results; most are retired and garbage-collected.
+
+**Proposal written, nothing built or torn down:**
+`docs/pr_evidence_matrix.md`. Ten claims the PR makes, the cheapest
+instrument for each (two need no fleet time at all — CI and a
+microbench), five arms differing only in `gfx.toml` and built from ONE
+image, with round-trip time, payload, geometry and bandwidth as run-time
+conditions rather than arms. Today's fleet is 17 pods across FIVE
+images, which is why no two of them are comparable.
+
+**BLOCKING, and it is a harness-selection mistake rather than missing
+work.** Every recent run used `textflood` (16.2 ms/frame), which after
+the pipe fix gives an FR-BENCH-1 margin of **1.04x** against the PRD's
+2.0x floor — the payload and the pipeline are the same speed, so the
+gate voids overlap claims and the fps figures may be reporting the
+payload. The fast payload already exists (#83, `--scroll strip`,
+**4.5 ms/frame, margin 3.94x at exactly this geometry**) and only two of
+92 captures ever used it. **Step 0: one 20 s leg on x030 with
+`SESSION_KIND=textflood_strip`, ~5 min**, which re-verifies the producer
+on the current build and decides whether the 55.6/58.6 fps figures stand
+or are withdrawn. Awaiting the owner.
+
 ## #103 — the raw-frame pipe is clamped to 8 KiB in this container, and every fleet number carries it (filed 2026-08-08)
 
 **Two separate things, and only the first is xrdp's.**
@@ -306,7 +334,14 @@ code change:
   CYCLE           23.82/24.62/24.79/24.46  17.99/27.91*/17.02/17.11
 
 **The frame period fell 24.5 -> 17.0 ms, 41 fps to 59, from a host
-sysctl and nothing else.** The encode is invariant across all eight legs
+sysctl and nothing else.** *(Labelled 2026-08-09 on the owner's
+question: that pair is the SPARSE condition on both sides, and 98.2 % of
+its frames shipped luma only -- AVC420-quality traffic in an AVC444
+wrapper. Stated per condition, by the `period` column: full AVC444
+23.820/24.619 -> 17.985 ms, 41.3 -> 55.6 fps, with no replicate after
+because its second leg is the quarantined a2; sparse 24.790/24.462 ->
+17.021/17.114, 40.6 -> 58.6 fps. The sysctl bought 6.2 ms/frame for
+AVC444 and 7.6 for sparse.)* The encode is invariant across all eight legs
 (13.80-14.36 ms), which is the control proving the change hit only the
 two segments that cross a pipe. (*leg a2 is an outlier, see the capture
 README -- its drain was 26x every other leg and its chroma encode ran

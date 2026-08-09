@@ -16,6 +16,33 @@ code change at all.** The handover of the raw picture to the encoder
 child fell from 8.5–9.1 ms to 1.86–2.05 ms, and the read-back of the
 encoded frame from 1.03–1.21 ms to 0.375–0.383 ms.
 
+> **Labelling correction, 2026-08-09, on the owner's question "is that
+> the AVC444 result or the (mostly) AVC420 result?" — it is the latter,
+> and the sentence above never said so.** The verdict line is arithmetic
+> ally right: 24.626 → 17.068 ms is the TREATMENT condition on both
+> sides, apples to apples for the sysctl. But the treatment condition is
+> the sparse cadence, and **98.2 % of its frames shipped the luma view
+> alone** (979 luma-only against 18 chroma in leg b1, 972 against 18 in
+> b2) — a luma-only frame is an `LC=1` PDU carrying the ordinary 4:2:0
+> picture, so those legs are AVC420-quality traffic in an AVC444
+> wrapper. All 18 chroma frames per leg were fired by the 1000 ms
+> guarantee, never by the 100 ms settle: textflood never goes 100 ms
+> without damage, so the "4:4:4 at rest" half of the feature does not
+> trigger under this payload at all.
+>
+> **The two conditions, stated separately, by the `period` column:**
+>
+> | condition | before (8 KiB pipes) | after (1 MiB pipes) |
+> |---|---|---|
+> | full AVC444, chroma every frame | 23.820, 24.619 → 41.3 fps | 17.985, [27.908 quarantined] → **55.6 fps** |
+> | sparse chroma, 98 % luma-only | 24.790, 24.462 → 40.6 fps | 17.021, 17.114 → **58.6 fps** |
+>
+> So the sysctl bought AVC444 6.2 ms/frame and the sparse cadence
+> 7.6 ms/frame; both are real and neither depends on the cadence. **The
+> AVC444 figure has no replicate**, because its second leg is the
+> quarantined a2 — that is the standing weakness of this capture and is
+> not fixed by any amount of re-reading it.
+
 **And the encode is unchanged**, 13.80–14.36 ms on all eight legs across
 both runs. That invariance is the control: the sysctl moved the two
 segments that cross a pipe and nothing else.
