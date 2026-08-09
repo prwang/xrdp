@@ -164,14 +164,19 @@ kubectl -n "$NS" exec "$POD" -- bash -lc \
 
 # --- ENCODER INPUT PIPE GUARD (BACKLOG #103) ---------------------------
 # The certification is what says "this deployed pair is fit to measure",
-# and an arm whose encoder children could not get the input pipe xrdp
-# asked for is not. xrdp asks the kernel for 1 MiB per child so one
-# vmsplice hands over a large batch of page references; a uid over the
-# HOST's fs/pipe-user-pages-soft, without CAP_SYS_RESOURCE in the initial
-# user namespace, is refused and gets two pages instead. Measured
-# 2026-08-08 on this fleet: 1688 writes per 13.8 MB picture instead of
-# 14, 7.5 ms of a 24.5 ms frame at 3840x2400, 41 fps against 59 for the
-# same build and config once the host limit was raised.
+# and an arm whose encoder children could not get an input pipe of the
+# minimum size xrdp REQUIRES is not. The requirement is 64 KiB and it is
+# a measured knee, not the 1 MiB xrdp asks for: below 64 KiB the pipe
+# cannot hold enough for xrdp and the encoder to run at the same time,
+# so they take turns and each turn costs a pair of context switches
+# (PRD FR-PROC-6 clause 4). A uid over the HOST's fs/pipe-user-pages-
+# soft, without CAP_SYS_RESOURCE in the initial user namespace, is
+# refused every resize and gets two pages. Measured 2026-08-08 on this
+# fleet: 1688 turns per 13.8 MB picture instead of 14, 7.5 ms of a
+# 24.5 ms frame at 3840x2400, 41 fps against 59 for the same build and
+# config once the host limit was raised. xrdp does not warn about a pipe
+# that is merely smaller than it asked for, so this check has no false
+# alarm on a host with a lowered fs/pipe-max-size.
 #
 # xrdp does not and must not change a system setting to fix that (owner
 # directive, 2026-08-09) -- it logs PIPE_TOO_SMALL, and the harness
@@ -205,13 +210,14 @@ BYTES=$(stat -c %s "$DUMP")
     echo "=== encoder input pipe (BACKLOG #103) ==="
     if [ -n "$PIPE_HITS" ]; then
         echo "PIPE VERDICT: TOO SMALL — this arm is NOT fit to measure."
-        echo "xrdp asked the kernel for a 1 MiB input pipe per encoder"
-        echo "child and was given less, so every raw picture crosses it"
-        echo "in hundreds of small writes instead of a few large ones."
-        echo "On this fleet that alone was 7.5 ms of a 24.5 ms frame at"
-        echo "3840x2400 — 41 fps where the same build and config did 59"
-        echo "once the host limit was raised. It depresses every rate by"
-        echo "an amount that has nothing to do with what is under test."
+        echo "The encoder input pipe is below the 64 KiB minimum xrdp"
+        echo "requires, so it cannot hold enough for xrdp and the encoder"
+        echo "to run at the same time: they take turns, and each turn"
+        echo "costs a pair of context switches. On this fleet that alone"
+        echo "was 7.5 ms of a 24.5 ms frame at 3840x2400 — 41 fps where"
+        echo "the same build and config did 59 once the host limit was"
+        echo "raised. It depresses every rate by an amount that has"
+        echo "nothing to do with what is under test."
         echo
         echo "OWNER ACTION REQUIRED: raise fs/pipe-user-pages-soft on the"
         echo "HOST, or give the server CAP_SYS_RESOURCE in the initial"
@@ -222,7 +228,10 @@ BYTES=$(stat -c %s "$DUMP")
     else
         echo "PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log"
         echo "after ${SECS}s of real encoding, so every encoder child got"
-        echo "the 1 MiB input pipe xrdp asked for."
+        echo "an input pipe of at least the 64 KiB minimum. Above that"
+        echo "the handover cost is flat (0.71 ms at 512 KiB against"
+        echo "0.60 ms at 1 MiB for a 13.82 MB picture), so this is the"
+        echo "whole of the requirement."
     fi
     echo
     echo "=== wire audit (--assert) ==="

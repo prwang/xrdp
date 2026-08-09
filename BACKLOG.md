@@ -343,12 +343,43 @@ container gave on 2026-08-08 (printed "1688 writes instead of 14"), and
 `make check` stays 208/208 with no `PIPE_TOO_SMALL` in the CI log, which
 is the negative case.
 
+**(a2) CORRECTED THE SAME DAY, after the owner asked whether 1 MiB is
+itself a bottleneck and where the number came from.** It is not, and the
+round trips are not the cost: swept over pipe size for one 13.82 MB
+picture, 14 round trips (1 MiB, 0.601 ms) and 211 round trips (64 KiB,
+0.729 ms) measure the same, while below 64 KiB the time tracks the round
+trips exactly (32 KiB 1.952 ms, 16 KiB 2.824, 8 KiB 5.632). The knee is
+where the pipe stops being too small for xrdp and the encoder to run at
+the same time. So the requirement is **64 KiB** (`FF_IN_PIPE_MIN_BYTES`,
+also the kernel's default pipe size) and 1 MiB is only the ceiling
+(`fs/pipe-max-size`'s default = the most an unprivileged process can
+get). The morning's threshold -- warn below what was ASKED -- was wrong
+and would have failed a host at 256 KiB that is indistinguishable from
+1 MiB; it now judges against the requirement, with one INFO line in
+between. Also fixed: `F_SETPIPE_SZ` does not clamp, it fails and leaves
+the default, so one ask above a lowered ceiling yields 64 KiB when more
+was available -- `negotiate_in_pipe_size()` halves from the wish to the
+requirement instead (demonstrated on a real refusal: asking 8 MiB once
+gives 65536, negotiating gives 1048576). Table and evidence in
+`captures/i103_pipe_handover_20260808/README.md`.
+
 **STILL OPEN:** (b) whether the sysctl change is made permanent on the
 host (it is a live `sysctl -w`, lost on reboot) -- with (a) landed this
 is now self-announcing rather than silent: a reboot that loses it makes
 the next certification fail with the owner action printed. (c)
 re-measuring the archived baselines that later work will be compared
-against.
+against. **(d) the copy itself, which is now the whole of the handover
+cost and is the owner's original question** ("a fundamental question the
+maintainer would question as well the fifo as load bearing for IPC").
+With the pipe correctly sized, the feed is 1.95 ms of a 17.0 ms cycle
+for a pair of pictures; two memcpys of the same bytes are 0.56 ms, so
+the pipe machinery above an unavoidable copy is ~1.4 ms and the copy
+itself ~0.56 ms. Removing BOTH means the encoder reading the capture
+shmem in place rather than through a stream, which is an architecture
+change (in-process libavcodec, or a child that maps the buffer) and not
+a tuning knob. Worth ~8-11 % of the frame at 3840x2400. NOT filed as
+work: it needs the owner's decision on whether an ffmpeg child stays the
+shipped architecture at all.
 
 Records: `captures/i103_pipe_handover_20260808/` (mechanism),
 `captures/i92_sparse_aux_ab_20260808_233519_s20/` (the before/after).

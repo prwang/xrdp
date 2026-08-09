@@ -338,6 +338,28 @@ main(int argc, char **argv)
             8 * 1024 * 1024, 32 * 1024, 1);
     printf("\n");
 
+    printf("WHERE IS THE KNEE? The block above jumps from 64 KiB to "
+           "1 MiB and shows no\ndifference, while the 8 KiB a clamped "
+           "container gives costs 10x. So the cost is\nNOT the number "
+           "of round trips -- it is whether the pipe holds enough for "
+           "the\nwriter and the reader to run at the same time instead "
+           "of taking turns. This\nsweep is what says where that "
+           "starts, and therefore what an ASSURED minimum\npipe size "
+           "has to be. Reader chunk is 32 KiB throughout.\n");
+    run_arm("vmsplice, 8 KiB pipe (kernel minimum)", src, nbytes,
+            iters, 8 * 1024, 32 * 1024, 1);
+    run_arm("vmsplice, 16 KiB pipe", src, nbytes, iters,
+            16 * 1024, 32 * 1024, 1);
+    run_arm("vmsplice, 32 KiB pipe", src, nbytes, iters,
+            32 * 1024, 32 * 1024, 1);
+    run_arm("vmsplice, 64 KiB pipe", src, nbytes, iters,
+            64 * 1024, 32 * 1024, 1);
+    run_arm("vmsplice, 128 KiB pipe", src, nbytes, iters,
+            128 * 1024, 32 * 1024, 1);
+    run_arm("vmsplice, 512 KiB pipe", src, nbytes, iters,
+            512 * 1024, 32 * 1024, 1);
+    printf("\n");
+
     printf("IS THE ZERO-COPY SIDE BUYING ANYTHING? Same pipe and same "
            "reader, but the\nwriter uses an ordinary write() instead of "
            "vmsplice.\n");

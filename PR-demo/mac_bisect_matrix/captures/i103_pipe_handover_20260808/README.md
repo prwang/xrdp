@@ -143,3 +143,76 @@ numbers first suggested.
 | `root_pipe_ceiling.txt` | every pipe size container root can obtain: 8192 and no more |
 | `in_pod_x030.txt` | the minimal `F_SETPIPE_SZ` probe in the pod |
 | `uid_map.txt` | the id mapping, capability set and the soft limit |
+| `pipe_size_knee_20260809.txt` | the pipe-size sweep below, full bench output |
+| `negotiation_20260809.txt` | one ask vs halving backoff, and this box's three pipe sysctls |
+
+## 2026-08-09 — is 1 MiB itself a bottleneck? No, and the round trips are not the cost
+
+Asked by the owner after the sysctl fix landed: a 1 MiB pipe still means
+about 30 kernel entries per frame per child and over a thousand per
+second at the frame rate we now run — is the pipe still the limit, and
+where does the 1 MiB actually come from?
+
+The sweep (`pipe_size_knee_20260809.txt`, one 13.82 MB picture, timed
+until the reader acknowledges the last byte):
+
+| pipe size | round trips | handover |
+|---|---|---|
+| 8 KiB | 1688 | 5.632 ms |
+| 16 KiB | 844 | 2.824 ms |
+| 32 KiB | 422 | 1.952 ms |
+| **64 KiB** | **211** | **0.729 ms** |
+| 128 KiB | 106 | 0.776 ms |
+| 512 KiB | 27 | 0.710 ms |
+| 1 MiB | 14 | 0.601 ms |
+
+**14 round trips and 211 round trips take the same time.** So the
+syscall count is not what the handover costs. Below 64 KiB the time
+tracks the round trips almost exactly — halve the pipe, double the time —
+because the pipe cannot hold enough for the writer and the reader to be
+busy at once, so they take turns and each turn costs a pair of context
+switches. From 64 KiB upward they overlap, and what is left is the
+reader's copy of 13.82 MB, which no pipe size can remove. The memcpy
+baseline on the same box and buffer is 0.279 ms, so the handover at any
+size from 64 KiB to 1 MiB costs about 2.2–2.6× a straight copy.
+
+Two consequences:
+
+* **The requirement is 64 KiB, not 1 MiB**, and it is now written down as
+  `FF_IN_PIPE_MIN_BYTES` with this table beside it. 64 KiB is also the
+  kernel's default pipe size, so every box that is not in the clamped
+  state already satisfies it.
+* **1 MiB is not arbitrary either, but it is a ceiling rather than a
+  requirement**: it is the default value of `fs/pipe-max-size`, the
+  largest pipe an unprivileged process can obtain on a stock kernel.
+
+**And asking for more than the ceiling makes things worse, which is a
+real defect the sweep exposed.** `F_SETPIPE_SZ` does not clamp — it fails
+and leaves the pipe at its default. The bench row "8 MiB requested →
+granted 64 KiB, RESIZE REFUSED" is that, and `negotiation_20260809.txt`
+isolates it on this box (`fs/pipe-max-size` = 1 MiB):
+
+```
+ask  8388608  single->    65536   negotiated->  1048576
+```
+
+A single ask above the ceiling gets 64 KiB; halving until one request is
+granted gets the full 1 MiB. So `spawn_child()` now negotiates down
+instead of asking once, which matters on any host whose administrator
+lowered `fs/pipe-max-size` below 1 MiB — there, one ask would have taken
+64 KiB while the configured maximum sat unused.
+
+**What this corrects in the same day's work.** The `PIPE_TOO_SMALL`
+threshold shipped that morning was "anything below what was asked",
+which would have failed a host at 256 KiB — measurably indistinguishable
+from 1 MiB (0.710 vs 0.601 ms). It is now judged against the 64 KiB
+requirement, with one INFO line in between.
+
+**Is the handover still worth attacking?** In the fleet the feed segment
+is 1.95 ms of a 17.0 ms cycle, 11.5 %, for the two pictures of a pair.
+The floor for any mechanism that copies the bytes is two memcpys, about
+0.56 ms, so a perfect pipe would save at most ~1.4 ms of the frame and
+removing the copy entirely would save ~1.95 ms. That is a real 8–11 %,
+and it is an argument about the copy, not about the syscalls. (The
+in-situ 1.95 ms against 2 × 0.601 = 1.20 ms standalone is the encoder
+running concurrently; different conditions, quoted as such.)

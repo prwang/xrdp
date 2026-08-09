@@ -49,12 +49,14 @@ construction, and the tester always knows which arm is on screen.
   black-frame decode on those bytes, plus the **encoder input pipe
   guard** (BACKLOG #103 / PRD FR-BENCH-2). It reads the arm's own
   `/var/log/xrdp.log` for the `PIPE_TOO_SMALL` line xrdp emits when the
-  kernel gives it less input pipe than it asked for, and a
-  `PIPE VERDICT: TOO SMALL` is **NOT CERTIFIED** — an arm whose children
-  could not get their pipes cannot produce a timing number that means
-  anything, and it needs the owner to raise `fs/pipe-user-pages-soft` on
-  the host. The certificate is reprinted by every gate run, so both
-  verdicts travel with every number the arm produces.
+  kernel gives it less than the **64 KiB minimum** it requires — a
+  measured knee, not the 1 MiB it asks for, so a host with a lowered
+  `fs/pipe-max-size` raises no false alarm. A `PIPE VERDICT: TOO SMALL`
+  is **NOT CERTIFIED**: an arm whose children could not get their pipes
+  cannot produce a timing number that means anything, and it needs the
+  owner to raise `fs/pipe-user-pages-soft` on the host. The certificate
+  is reprinted by every gate run, so both verdicts travel with every
+  number the arm produces.
 - `e_gate_run.sh` — the acceptance-gate runner (E2/E3/E4/E5 in one
   offscreen dual-monitor session). `E_TARGET=pod` (default) measures a
   fleet arm; `E_TARGET=ssh` measures a real box over an ssh port-forward

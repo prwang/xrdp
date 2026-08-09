@@ -785,29 +785,68 @@ buffer, no memcpy of pixel data anywhere in xrdp's hot path.
 3. Borrowed segments never outlive the encode call that queued them
    (FR-CAPTURE-6 amendment): unsplice'd input at wait end is an error and
    replaces the child.
-4. The pipe capacity is raised best-effort via `F_SETPIPE_SZ` to reduce
-   syscall count; failure to raise it is not an error — **but it is never
-   silent** (owner directive, 2026-08-09). `spawn_child()` reads the
-   granted size back with `F_GETPIPE_SZ` and, when it is below the
-   requested `FF_IN_PIPE_BYTES`, logs `PIPE_TOO_SMALL` at WARNING with the
-   requested size, the granted size, the NV12 picture size, and the number
-   of writes each picture now costs against the number it should. **xrdp
-   does not change a system setting to fix this** — not a sysctl, not a
-   capability — it reports and lets the administrator decide.
+4. **The input pipe has an assured minimum size, and it is a measured
+   number rather than a wish** (owner directive, 2026-08-09: *"we want to
+   fix the condition to an assured pipe size rather than a spec came from
+   nowhere"*). Three separate quantities, and conflating them is the
+   mistake this clause exists to prevent:
+   * **`FF_IN_PIPE_WANT_BYTES` = 1 MiB — what xrdp asks for.** Not a
+     taste: it is the default value of `fs/pipe-max-size`, i.e. the
+     largest pipe an unprivileged process can obtain on a stock kernel.
+     Asking for more is actively harmful, because `F_SETPIPE_SZ` above
+     the ceiling **fails outright and leaves the pipe at its 64 KiB
+     default** rather than clamping — measured, "8 MiB requested → granted
+     64 KiB, RESIZE REFUSED".
+   * **`FF_IN_PIPE_MIN_BYTES` = 64 KiB — what xrdp requires**, and the
+     only thing `PIPE_TOO_SMALL` is judged against. Measured 2026-08-09
+     with `tools/vmsplice_pipe_bench.c`, one 13.82 MB picture, timed
+     until the reader acknowledges the last byte: 8 KiB / 1688 round
+     trips / 5.632 ms; 16 KiB / 844 / 2.824; 32 KiB / 422 / 1.952;
+     **64 KiB / 211 / 0.729**; 128 KiB / 106 / 0.776; 512 KiB / 27 /
+     0.710; 1 MiB / 14 / 0.601. Below 64 KiB the time tracks the round
+     trips, because the pipe cannot hold enough for the two processes to
+     run at once and each turn costs a pair of context switches. At and
+     above it they overlap and the cost is the reader's copy, which no
+     pipe size removes. **14 round trips and 211 round trips measure the
+     same, so the syscall count is not the quantity to minimise** — the
+     requirement is only "enough to overlap". 64 KiB is also the kernel's
+     own default pipe size, so any box not in the pathological clamped
+     state already satisfies it.
+   * **What was actually granted**, read back with `F_GETPIPE_SZ`. The
+     size in force is never inferred from the return of `F_SETPIPE_SZ`.
+5. **The size is negotiated down, not asked for once.** Because
+   `F_SETPIPE_SZ` is all-or-nothing, one ask for 1 MiB on a host whose
+   administrator lowered `fs/pipe-max-size` to 256 KiB yields 64 KiB when
+   256 KiB was available. `negotiate_in_pipe_size()` halves from the wish
+   until a request is granted, stopping at the requirement — at most five
+   `fcntl` calls, once per child at spawn, and never worse than a single
+   ask. Demonstrated on a real kernel refusal: asking 8 MiB once yields
+   65536, negotiating from 8 MiB yields 1048576.
+6. **Failure to reach the requirement is not fatal, but it is never
+   silent.** Below `FF_IN_PIPE_MIN_BYTES`, `spawn_child()` logs
+   `PIPE_TOO_SMALL` at WARNING with the size in force, the minimum, the
+   wish, the NV12 picture size, the turns each picture now costs against
+   the turns it should, and a plain statement of the mechanism; then a
+   second line naming what an administrator can do and that measurements
+   taken in this state are not valid. Between the requirement and the
+   wish it logs one INFO line, because that state is fine and only worth
+   recording. **xrdp does not change a system setting to fix this** — not
+   a sysctl, not a capability — it reports and lets the administrator
+   decide.
    *Why this is load-bearing rather than tidiness:* the kernel refuses the
    resize for a caller over `fs/pipe-user-pages-soft` that is not
    `CAP_SYS_RESOURCE`-capable in the **initial** user namespace, and the
    pipe then stays at two pages. Measured 2026-08-08 (BACKLOG #103) in an
    unprivileged container whose root maps to an ordinary host uid: 1688
-   writes per 13.8 MB picture instead of 14, **7.5 ms of a 24.5 ms frame
+   turns per 13.8 MB picture instead of 14, **7.5 ms of a 24.5 ms frame
    at 3840x2400**, 41 fps against 59 for the same build and config once
    the host limit was raised. An invisible 30 % of the frame period is
    exactly what a log line is for. The harness half of the rule — who
    greps for that line and what happens when it is found — is FR-BENCH-2.
-5. Page-aligned segments take the kernel's reference path (true zero-copy);
+7. Page-aligned segments take the kernel's reference path (true zero-copy);
    unaligned tails fall back to an in-kernel copy — still never a
    user-space copy.
-6. **Why the feed is lazy (rationale, recorded 2026-07-29).** Queueing and
+8. **Why the feed is lazy (rationale, recorded 2026-07-29).** Queueing and
    transferring are deliberately separate: `in_iov_push()` only declares
    intent, and `feed_vmsplice()` runs solely inside `pump()`. This is
    forced, not stylistic. The pipe holds ~1 MB against a ~15 MB 4K frame,
@@ -1412,11 +1451,17 @@ warning nobody greps is the same as no warning.
    made a red result green would be the fallback-masking this project's
    strict-honesty rule forbids.
 
-*Why the threshold is "anything below what was asked" and not a tuned
-one:* the shipped code requests `FF_IN_PIPE_BYTES` because it wants that
-much; any shortfall is off-design, and the severity is already carried by
-the writes-per-picture figure inside the warning itself. One token, one
-rule, no arithmetic duplicated between the server and the harness.
+*The threshold is `FF_IN_PIPE_MIN_BYTES`, not "anything below what was
+asked".* **The first version of this clause, written the same morning,
+had it wrong** and would have invalidated perfectly good runs: a host
+whose administrator lowered `fs/pipe-max-size` to 256 KiB is measurably
+indistinguishable from one at 1 MiB (0.710 ms against 0.601 ms for a
+13.82 MB handover), and failing its captures would have been a false
+alarm with no mechanism behind it. The threshold is the knee in
+FR-PROC-6 clause 4 and nothing else. Between the requirement and the
+wish, xrdp logs one INFO line and the harness ignores it. One token,
+`PIPE_TOO_SMALL`, one rule, and the arithmetic that decides it lives in
+the server alone — the harness only greps.
 
 ### FR-TRACE-1: The perf tracer must not be able to perturb what it measures (owner directive, 2026-08-01)
 

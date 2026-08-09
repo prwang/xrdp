@@ -1,0 +1,7 @@
+ask  8388608  single->    65536   negotiated->  1048576
+ask  1048576  single->  1048576   negotiated->  1048576
+ask   262144  single->   262144   negotiated->   262144
+ask    65536  single->    65536   negotiated->    65536
+fs/pipe-max-size = 1048576
+fs/pipe-user-pages-soft = 262144
+fs/pipe-user-pages-hard = 0

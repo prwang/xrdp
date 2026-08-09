@@ -65,11 +65,38 @@
 /* fixed input+output framing (~40 tokens) plus up to XRDP_AVC444_MAX_ENC_ARGS
  * verbatim encoder tokens, with headroom */
 #define FF_MAX_ARGV 128
-/* how large an input pipe the feeder asks the kernel for, so one
- * vmsplice moves a large batch of page references instead of a small
- * one (FR-PROC-6). The kernel may refuse and grant less -- see the
- * check in spawn_child(). */
-#define FF_IN_PIPE_BYTES (1024 * 1024)
+/* How large an input pipe the feeder ASKS for. 1 MiB is not a taste:
+ * it is the default value of fs/pipe-max-size, i.e. the largest pipe an
+ * unprivileged process can obtain on a stock kernel. Asking for more
+ * is actively harmful -- F_SETPIPE_SZ above the ceiling fails outright
+ * and leaves the pipe at its 64 KiB default, so a greedy request gets
+ * LESS than a modest one (measured: "8 MiB requested -> granted 64 KiB,
+ * RESIZE REFUSED", tools/vmsplice_pipe_bench.c). */
+#define FF_IN_PIPE_WANT_BYTES (1024 * 1024)
+/* How large it must ACTUALLY be, which is the whole of the requirement
+ * and is what PIPE_TOO_SMALL is judged against. Measured 2026-08-09
+ * with tools/vmsplice_pipe_bench.c, one 13.82 MB picture, handover
+ * timed until the reader acknowledges the last byte:
+ *
+ *      8 KiB  1688 round trips  5.632 ms
+ *     16 KiB   844 round trips  2.824 ms
+ *     32 KiB   422 round trips  1.952 ms
+ *     64 KiB   211 round trips  0.729 ms   <-- flat from here
+ *    128 KiB   106 round trips  0.776 ms
+ *    512 KiB    27 round trips  0.710 ms
+ *      1 MiB    14 round trips  0.601 ms
+ *
+ * Below 64 KiB the time is proportional to the round trips: the pipe
+ * cannot hold enough for the two processes to run at once, so they take
+ * turns and every turn costs a pair of context switches. At and above
+ * 64 KiB they overlap and the cost is the reader's copy, which no pipe
+ * size can remove -- 14 round trips and 211 round trips measure the
+ * same. So the syscall count is NOT the thing to minimise, and the
+ * requirement is only "enough to overlap".
+ *
+ * 64 KiB is also the kernel's own default pipe size, so any box that is
+ * not in the pathological clamped state already satisfies it. */
+#define FF_IN_PIPE_MIN_BYTES (64 * 1024)
 #define FF_READ_CHUNK 65536
 #define FF_MAX_INFLIGHT_PAIRS 8
 /* borrowed input segments queued for the vmsplice feeder */
@@ -489,6 +516,36 @@ close_range_from(int low)
 }
 
 /*****************************************************************************/
+/* Negotiate the input pipe DOWN from what we want to what this kernel
+ * will give, and return the size actually in force (or -1).
+ *
+ * A single F_SETPIPE_SZ is not enough, because the call is all-or-
+ * nothing: it does not clamp to the ceiling, it fails and leaves the
+ * pipe at its default. On a box whose administrator lowered
+ * fs/pipe-max-size to 256 KiB, asking once for 1 MiB therefore yields
+ * 64 KiB when 256 KiB was there for the asking. Halving until one
+ * request is granted takes at most five fcntl calls, once per child at
+ * spawn, and cannot leave us below what a single ask would have got.
+ *
+ * Stops at FF_IN_PIPE_MIN_BYTES: shrinking below the requirement to
+ * make a call succeed would be answering the wrong question. */
+static int
+negotiate_in_pipe_size(int fd)
+{
+    int want;
+
+    for (want = FF_IN_PIPE_WANT_BYTES; want >= FF_IN_PIPE_MIN_BYTES;
+            want /= 2)
+    {
+        if (fcntl(fd, F_SETPIPE_SZ, want) >= 0)
+        {
+            break;
+        }
+    }
+    return fcntl(fd, F_GETPIPE_SZ);
+}
+
+/*****************************************************************************/
 /* spawn the child; on success sets the in/out/err fds and pid (parent fds  */
 /* are nonblocking + close-on-exec). Returns 0 on success.                 */
 static int
@@ -573,39 +630,42 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
     fcntl(outpipe[0], F_SETFD, FD_CLOEXEC);
     fcntl(errpipe[0], F_SETFL, O_NONBLOCK);
     fcntl(errpipe[0], F_SETFD, FD_CLOEXEC);
-    /* Enlarge the input pipe so vmsplice moves fewer, larger batches of
-     * page references (FR-PROC-6) -- and CHECK WHAT THE KERNEL ACTUALLY
-     * GAVE US. This request is refused, silently, for a caller that is
-     * over fs/pipe-user-pages-soft and is not CAP_SYS_RESOURCE-capable
-     * in the INITIAL user namespace; the pipe then stays at the kernel
-     * minimum of two pages. Measured 2026-08-08 (BACKLOG #103) inside an
-     * unprivileged container whose root maps to an ordinary host uid: an
-     * 8192-byte pipe carried a 13.8 MB picture in 1688 round trips
-     * instead of 14 and cost 7.5 ms of a 24.5 ms frame at 3840x2400.
-     * xrdp does not change system settings -- not a sysctl, not a
-     * capability -- so the only correct response is to be loud about it
-     * and let the administrator decide. */
-    fcntl(inpipe[1], F_SETPIPE_SZ, FF_IN_PIPE_BYTES);
-    got_pipe = fcntl(inpipe[1], F_GETPIPE_SZ);
+    /* Size the input pipe, and CHECK WHAT THE KERNEL ACTUALLY GAVE US
+     * against the requirement rather than against the wish (FR-PROC-6
+     * clause 4). The resize is refused, silently, for a caller over
+     * fs/pipe-user-pages-soft that is not CAP_SYS_RESOURCE-capable in
+     * the INITIAL user namespace; the pipe then stays at the kernel
+     * minimum of two pages. Measured 2026-08-08 (BACKLOG #103) inside
+     * an unprivileged container whose root maps to an ordinary host
+     * uid: an 8192-byte pipe carried a 13.8 MB picture in 1688 round
+     * trips instead of 14 and cost 7.5 ms of a 24.5 ms frame at
+     * 3840x2400. xrdp does not change system settings -- not a sysctl,
+     * not a capability -- so the only correct response is to be loud
+     * about it and let the administrator decide. */
+    got_pipe = negotiate_in_pipe_size(inpipe[1]);
+    picture_bytes = cw * ch + cw * (ch / 2);
     if (got_pipe < 0)
     {
         LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_SIZE_UNKNOWN monitor "
-            "%d: asked for a %d byte encoder input pipe and could not "
-            "read back what was granted (%s)", cfg->monitor_index,
-            (int)FF_IN_PIPE_BYTES, g_get_strerror());
+            "%d: sized the encoder input pipe and could not read back "
+            "what is in force (%s)", cfg->monitor_index,
+            g_get_strerror());
     }
-    else if (got_pipe < FF_IN_PIPE_BYTES)
+    else if (got_pipe < FF_IN_PIPE_MIN_BYTES)
     {
-        picture_bytes = cw * ch + cw * (ch / 2);
         LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_TOO_SMALL monitor %d: "
-            "asked the kernel for a %d byte encoder input pipe, it "
-            "granted %d. One %dx%d NV12 picture is %d bytes, so every "
-            "frame now crosses this pipe in %d writes instead of %d and "
-            "the encoder feed will be slow.", cfg->monitor_index,
-            (int)FF_IN_PIPE_BYTES, got_pipe, cw, ch, picture_bytes,
-            (picture_bytes + got_pipe - 1) / got_pipe,
-            (picture_bytes + (int)FF_IN_PIPE_BYTES - 1)
-            / (int)FF_IN_PIPE_BYTES);
+            "the encoder input pipe is %d bytes; %d is the minimum this "
+            "server needs and %d is what it asked for. One %dx%d NV12 "
+            "picture is %d bytes, so each one now crosses the pipe in "
+            "%d turns instead of %d. Below %d bytes the pipe cannot hold "
+            "enough for xrdp and the encoder to run at the same time, so "
+            "they take turns and each turn costs a pair of context "
+            "switches.", cfg->monitor_index, got_pipe,
+            (int)FF_IN_PIPE_MIN_BYTES, (int)FF_IN_PIPE_WANT_BYTES,
+            cw, ch, picture_bytes,
+            (picture_bytes + got_pipe - 1) / (got_pipe > 0 ? got_pipe : 1),
+            (picture_bytes + (int)FF_IN_PIPE_MIN_BYTES - 1)
+            / (int)FF_IN_PIPE_MIN_BYTES, (int)FF_IN_PIPE_MIN_BYTES);
         LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: PIPE_TOO_SMALL monitor %d: "
             "this is a host limit on this uid, not an xrdp setting. The "
             "administrator can raise fs/pipe-user-pages-soft, or give "
@@ -613,6 +673,19 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
             "xrdp will not change a system setting on its own. Any "
             "performance measurement taken in this state is not valid.",
             cfg->monitor_index);
+    }
+    else if (got_pipe < FF_IN_PIPE_WANT_BYTES)
+    {
+        /* Above the requirement, below the wish -- normal on a box whose
+         * fs/pipe-max-size has been lowered. Worth one line so a capture
+         * records which it was, but NOT a warning: measured flat from
+         * 64 KiB upward (see FF_IN_PIPE_MIN_BYTES). */
+        LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: encoder input pipe is %d bytes "
+            "for monitor %d; asked for %d, need at least %d. This is "
+            "fine -- the handover cost is flat above the minimum -- and "
+            "means fs/pipe-max-size on this host is below %d.",
+            got_pipe, cfg->monitor_index, (int)FF_IN_PIPE_WANT_BYTES,
+            (int)FF_IN_PIPE_MIN_BYTES, (int)FF_IN_PIPE_WANT_BYTES);
     }
     *in_fd = inpipe[1];
     *out_fd = outpipe[0];

@@ -357,15 +357,17 @@ MARK_P=${MARK_P:-0}
 echo "log marks: session-xorg $MARK_X lines, xrdp.log $MARK_P lines"
 
 # --- ENCODER INPUT PIPE GUARD (BACKLOG #103) -----------------------------
-# xrdp asks the kernel for a 1 MiB input pipe per encoder child so one
-# vmsplice hands over a large batch of page references (FR-PROC-6). A uid
-# that is over the HOST's fs/pipe-user-pages-soft and is not
-# CAP_SYS_RESOURCE-capable in the initial user namespace is refused and
-# the pipe stays at two pages. That is not a small effect and it is not
-# visible in any rate: measured 2026-08-08 in this fleet, an 8192-byte
-# pipe carried each 13.8 MB picture in 1688 writes instead of 14 and cost
-# 7.5 ms of a 24.5 ms frame at 3840x2400 -- 41 fps where the same build
-# and the same config did 59 with the sysctl raised.
+# xrdp requires an encoder input pipe of at least 64 KiB, which is a
+# measured knee and not the 1 MiB it asks for (PRD FR-PROC-6 clause 4):
+# below it the pipe cannot hold enough for xrdp and the encoder to run at
+# the same time, so they take turns and each turn costs a pair of context
+# switches. A uid over the HOST's fs/pipe-user-pages-soft that is not
+# CAP_SYS_RESOURCE-capable in the initial user namespace is refused every
+# resize and the pipe stays at two pages. That is not a small effect and
+# it is not visible in any rate: measured 2026-08-08 in this fleet, an
+# 8192-byte pipe carried each 13.8 MB picture in 1688 turns instead of 14
+# and cost 7.5 ms of a 24.5 ms frame at 3840x2400 -- 41 fps where the
+# same build and the same config did 59 with the sysctl raised.
 #
 # xrdp does not and must not change a system setting to fix this (owner
 # directive, 2026-08-09). It logs PIPE_TOO_SMALL instead, and THIS is the
@@ -738,12 +740,12 @@ $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
     if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
         echo "pipe:     *** ENCODER INPUT PIPE TOO SMALL — THIS RUN IS"
         echo "          NOT A VALID MEASUREMENT (BACKLOG #103) ***"
-        echo "          xrdp asked the kernel for a 1 MiB input pipe per"
-        echo "          encoder child and was given less, $PIPE_N times."
-        echo "          Each raw picture then crosses the pipe in"
-        echo "          hundreds of small writes instead of a few large"
-        echo "          ones; on this fleet that alone was 7.5 ms of a"
-        echo "          24.5 ms frame at 3840x2400. Every rate below is"
+        echo "          An encoder child got an input pipe below the"
+        echo "          64 KiB minimum xrdp requires, $PIPE_N times."
+        echo "          The pipe cannot then hold enough for xrdp and"
+        echo "          the encoder to run at the same time, so they"
+        echo "          take turns; on this fleet that alone was 7.5 ms"
+        echo "          of a 24.5 ms frame at 3840x2400. Every rate below is"
         echo "          depressed by an amount that has nothing to do"
         echo "          with the build or the config under test."
         echo "          OWNER ACTION: raise fs/pipe-user-pages-soft on"
@@ -752,8 +754,8 @@ $(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
         echo "          a system setting itself (owner directive,"
         echo "          2026-08-09). Lines: pipe_too_small.txt"
     else
-        echo "pipe:     encoder input pipe as asked, 1 MiB (no"
-        echo "          PIPE_TOO_SMALL in $SRV_NAME's xrdp log)"
+        echo "pipe:     encoder input pipe at or above the 64 KiB"
+        echo "          minimum (no PIPE_TOO_SMALL in $SRV_NAME's log)"
     fi
     # A freeze leg must never be readable as an ordinary one. Say so here,
     # in the VERDICT, above every number it contaminates.
