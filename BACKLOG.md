@@ -37,9 +37,10 @@ If you are about to paste a results table into this file, it goes in
   (`3ca17beaa84d.xx10fa3aa-tf.p2fde5531`) and one xorgxrdp, differing
   only in `gfx.toml`: reference / frontier C=1 / frontier C=2 / frontier
   + sparse chroma / AVC420. All run `SESSION_KIND=textflood_strip`.
-  **x035 is NOT CERTIFIED** — the wire audit is the wrong instrument for
-  a single-view stream; see #104. Everything before this was
-  garbage-collected: 30 arm configs, 89 captures, all old certificates.
+  **All five are certified** — x035 needed `arm_certify.sh` taught to
+  run the single-view gate for an AVC420 arm first (#104, closed
+  2026-08-10). Everything before this was garbage-collected: 30 arm
+  configs, 89 captures, all old certificates.
 * **T4:** decommissioned 2026-07-31. Its recorded numbers stay
   attributable through `docs/experiments/` and `PRD.md`; re-provisioning
   from bare AMI is #93's first step.
@@ -76,14 +77,70 @@ stay as "(was #NN)" in each header.
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 15. **#102** — a client displaces one screen by 33 px until minimise+restore (filed 2026-08-08; DOCUMENT ONLY by owner ruling, below #92)
 16. ~~**#103** — the clamped raw-frame pipe~~ **mostly DONE 2026-08-09**: guard shipped, requirement measured at 64 KiB; (b) sysctl permanence and (c) the copy itself remain
-17. ~~**#104** — the PR evidence matrix~~ **DONE 2026-08-10**, except x035's certification instrument
+17. ~~**#104** — the PR evidence matrix~~ **DONE 2026-08-10** (x035 certification instrument fixed the same day)
 18. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
+19. **#105** — the upstream port: one PR off a synced `upstream/devel` (filed 2026-08-10)
+
+## #105 — the upstream port: ONE pull request, fresh branch (filed 2026-08-10)
+
+**Scope.** Port the AVC444 external-ffmpeg backend upstream as a single
+PR, internally sliced into commits that each build and pass `make
+check`. Owner directives 2026-08-10: one PR (the five-PR proposal is
+withdrawn — the first four would not stand alone); step 0 is a truly
+synced `upstream/devel`; `common/perf_trace` is excluded from the PR
+branch with the dev-branch trace code left untouched; the shipped
+`wire_window` default is 1 with 2 documented, and the PR asks
+maintainers whether 2 should be the default.
+
+Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
+2026-07-24 version is in git history, not reproduced in the file).
+
+**Done 2026-08-10**
+
+* Step 0 fetched: `upstream/devel` `3af31df3` → `fe850a22`, 14 commits.
+  `origin/devel` (`8812646d`) is 11 behind it and a clean ancestor.
+  `origin` is not fetchable from this box (no key); `upstream` is, over
+  https. Of the 15 existing source files this branch modifies, exactly
+  one moved upstream: `xrdp/xrdp_mm.c` +13/−11 (`de284747`, resize
+  before encoder/surface creation).
+* The `wire_window` default changed 2 → 1 in the dev tree, so the port
+  copies a tree that already carries the shipped decision:
+  `xrdp/xrdp_tconfig.h`, the defaults comment in `xrdp/xrdp_tconfig.c`,
+  the no-config assertion in `tests/xrdp/test_tconfig.c` (an announced
+  test change — the value is the owner's specification of what ships,
+  and the superseded directive is named in the comment), the default
+  and its arithmetic in `docs/man/gfx.toml.5.in`, and `xrdp/gfx.toml`,
+  which had never documented `wire_window` or `eager_slot_ack` at all.
+  `eager_slot_ack` stays defaulted on: on plus window 1 is measured
+  identical to the mechanism it replaces, so an upgrade that changes no
+  configuration keeps today's wire behaviour, and CI asserts both
+  halves together.
+
+**Open**
+
+* (a) **The branch point is not agreed and nothing is cut.** Re-fetch
+  and re-run the one-file check on the day it is. The port branch lives
+  in its own worktree off the upstream tip (owner directive
+  2026-08-10); `/work`'s tip is always dev.
+* (b) **The perf_trace branch is a deliverable, not an afterthought.**
+  With perf_trace excluded, no timing claim in the PR can be reproduced
+  on the PR branch as it stands. The private branch that carries it
+  back should exist before the PR is opened.
+* (c) **The evidence section is unwritten** because every timing that
+  predates 2026-08-08 was taken with the encoder input pipe clamped
+  (#103). Re-measuring the flow-control arms (x031/x032/x033) is fleet
+  time and needs owner approval.
+* (d) `docs/man/gfx.toml.5.in` references
+  `PR-demo/BREAKING_CHANGE_credit_frontier.md`, a path that does not
+  exist in a tree without `PR-demo/`. It must not survive the port —
+  and with the default at 1 it is no longer a breaking change anyway.
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
 **Done and recorded** — design, implementation behind `eager_slot_ack`
-with C as `gfx.toml [avc444_ffmpeg] wire_window` (default 2 — but see
-the correction below: it is NOT legacy-equivalent), CI enumeration
+with C as `gfx.toml [avc444_ffmpeg] wire_window` (default 2 when this
+was written; **1 since 2026-08-10**, see the default bullet below), CI
+enumeration
 RED-on-HEAD verified
 (`tests/xrdp/test_avc444_credit_frontier.c`), LAN head-to-head vs the
 old build (withheld p90 35.3 → 10.6 ms, stalls 29.7 → 18.2 %,
@@ -102,8 +159,18 @@ model, and #98 measured that at 4K the WAN constraint is TCP/byte
 behaviour, not the credit count. Simulation's job here is verifying the
 MECHANISM and its BOUND, nothing more. Consequences:
 
-* **The shipped default is UNRESOLVED, and the reason changed on
-  2026-08-07.** Two findings, in order:
+* **SETTLED 2026-08-10 (owner): the shipped default is `wire_window =
+  1`, and the case for 2 goes to the maintainers in the PR text rather
+  than being decided here.** 1 is what the mechanism it replaces
+  allowed, so an installation that upgrades and changes no
+  configuration keeps today's number of frames on the wire; 2 is
+  documented in `xrdp/gfx.toml` and `gfx.toml(5)` as the value that
+  removes the stall, with its cost — one more frame in flight — stated
+  next to it. `eager_slot_ack` stays defaulted on. Applied in
+  `xrdp/xrdp_tconfig.h`; see #105. The two findings below are what the
+  decision was made on and are kept as written.
+* **The shipped default was UNRESOLVED from 2026-08-06, and the reason
+  changed on 2026-08-07.** Two findings, in order:
   * **C = 2 is not legacy-equivalent.** Legacy grants credit up to
     `client + fif - 1` = `client + 1` (`xrdp/xrdp_encoder.h:40-44`); the
     frontier clamps at `client + C` (`:114-130`). With the two capture
