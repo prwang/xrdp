@@ -32,7 +32,7 @@ floor is **2.0×**. Measured margins, read out of the captures' own
 | `i92_sparse_aux_ab_…_233519` leg b1 (after) | textflood | 16.9 ms | 16.2 ms | **1.04×** |
 | `i80_c1_nonregression_…_141752` | textflood | 18.8 ms | 16.5 ms | 1.14× |
 | `i87_eager_ab_…_180910` | textflood | 19.1 ms | 16.7 ms | 1.14× |
-| `i91_window4_m2_…_201346` | textflood | 13.3 ms | 10.7 ms | 1.25× |
+| `i91_window4_m2_…_201346` (two monitors) | textflood_strip | 13.3 ms | 10.7 ms | 1.25× |
 | `i80_multimon_strip_…_152223` (two monitors) | textflood_strip | 14.6 ms | 9.9 ms | 1.47× |
 | `i83_strip_payload_…_182340` leg r2 | textflood | 17.5 ms | 16.6 ms | 1.05× |
 | `i83_strip_payload_…_182340` leg s1 | **textflood_strip** | 17.6 ms | **4.5 ms** | **3.94×** |
@@ -59,10 +59,20 @@ So the position is:
   matrix runs on it.** At a 17 ms pipeline that is ~3.8×, and it stays
   above 2.0× down to a 9 ms pipeline — enough headroom that the matrix
   does not have to be rebuilt the next time the server gets faster.
-* **Nothing else in `captures/` used it** except
-  `i83_strip_payload_…_182340` legs s1/s2 and
-  `i80_multimon_strip_…_152223`. That is two captures out of 92, which
-  is most of the reason section 3 retires the rest.
+* **Only four of the 92 captures ever used it** —
+  `i83_strip_payload_…_182340` (legs s1/s2),
+  `i80_multimon_strip_…_152223`, `i91_window4_m2_…_201346` and
+  `i91_attribution_m2_…_211825`. Every other measurement in this tree
+  was taken with the slow payload, which is most of the reason section 3
+  retires them.
+* **At TWO monitors the fast payload is not fast enough either.** It
+  drives both screens, so its own interval goes from 4.5 ms at one
+  monitor to 9.9–10.7 ms at two, and the margin there is 1.25×–1.47× —
+  still under the floor. **Claim C10 (multi-monitor) therefore cannot be
+  made as a rate claim with any payload we own**, and the matrix must
+  either restrict C10 to counts and orderings, which are unaffected by a
+  slow producer, or wait for a payload that scales with monitor count.
+  This is a real gap and it is not closed by anything in this file.
 
 **Consequence for the numbers quoted so far, stated plainly:** the
 55.6 fps and 58.6 fps from `i92_sparse_aux_ab_…_233519` were taken at
@@ -130,7 +140,7 @@ cross-arm number from them is not evidence of anything.
 | **F1** | true | 1 | off | 444 | the frontier at the legacy-equivalent window |
 | **F2** | true | 2 | off | 444 | the frontier as proposed to ship |
 | **S** | true | 2 | 1000 / 100 ms | 444 | F2 plus the sparse-chroma cadence |
-| **A420** | true | 2 | off | 420 | the 4:2:0 comparison a reviewer will ask for |
+| **A420** | true | 2 | n/a | 420 | the 4:2:0 comparison a reviewer will ask for (config exists today as `gfx/arm-e.toml`) |
 
 Everything else is a **run-time condition, not an arm**, and must not
 become one:
