@@ -430,10 +430,11 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
     /* BACKLOG #80: the credit frontier is the DEFAULT ack mechanism
-     * (owner directive, 2026-08-07). It is an extension, not a
-     * replacement: at wire_window 1 it reproduces the legacy gate's
-     * behaviour exactly -- measured identical on frame period, tail,
-     * stall rate and the wire bound -- and at the shipped wire_window 2
+     * (owner directive, 2026-08-07), at the DEFAULT window of 1 (owner
+     * directive, 2026-08-10). It is an extension, not a replacement: at
+     * wire_window 1 it reproduces the legacy gate's behaviour exactly
+     * -- measured identical on frame period, tail, stall rate and the
+     * wire bound, which is why 1 is what ships -- and at wire_window 2
      * it can additionally grant a credit the legacy gate has no
      * variable to express, because that gate's value is
      * frame_id_server, which advances only at egress. Widening the

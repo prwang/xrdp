@@ -284,22 +284,28 @@ overlapping. With this enabled the acknowledgement is sent as soon as the
 encoder has drained the buffer, and how far ahead the server may run is
 \fBwire_window\fR below.
 
-Setting \fBwire_window\fR = \fB1\fR with this enabled reproduces the older
-rule's behaviour: measured on one monitor at 3840x2400, the two are the same
-within run\(hyto\(hyrun spread on frame period, on the wait for permission to
-capture, and on the number of frames the client may have outstanding. The
-benefit appears at \fBwire_window\fR = \fB2\fR, and it costs one more frame
-outstanding than the older rule allowed. See
-\fIPR\(hydemo/BREAKING_CHANGE_credit_frontier.md\fR in the source tree for the
-measurements and for how to roll back.
+The shipped \fBwire_window\fR of \fB1\fR reproduces the older rule's
+behaviour: measured on one monitor at 3840x2400, the two are the same within
+run\(hyto\(hyrun spread on frame period, on the wait for permission to
+capture, and on the number of frames the client may have outstanding. An
+installation that upgrades and changes no configuration therefore puts no
+more frames on the wire than it did before.
+
+The benefit appears at \fBwire_window\fR = \fB2\fR, which removes the stall
+almost entirely \(em on that measurement the wait for permission to capture
+falls from 10.5 ms at the 90th percentile, with 16 % of frames waiting, to
+0.04 ms and 1 %. It is not the default because it allows one more frame
+outstanding than xrdp has previously allowed. Administrators willing to
+accept that in exchange for the throughput should set it.
 
 .TP
 \fBwire_window\fR = \fI<integer>\fR
 How far the client is allowed to fall behind, in frames, before the server
-stops capturing new ones. Default: \fB2\fR. Accepted range is \fB1\fR to
-\fB64\fR; a value outside it is refused with a warning and the default is
-kept. Applies only when \fBeager_slot_ack\fR is enabled; the legacy path is
-unaffected.
+stops capturing new ones. Default: \fB1\fR, which is what the mechanism this
+replaces allowed; see \fBeager_slot_ack\fR above for why \fB2\fR is the
+interesting value and what it costs. Accepted range is \fB1\fR to \fB64\fR; a
+value outside it is refused with a warning and the default is kept. Applies
+only when \fBeager_slot_ack\fR is enabled; the legacy path is unaffected.
 
 .SS What it counts, and why that matters with more than one monitor
 Read this part before setting the value on a multi\(hymonitor session; the
@@ -321,17 +327,18 @@ wire_window + 2 x (number of monitors)
 .fi
 .RE
 
-\(em with the default and two monitors, at most 6. The two per monitor are
+\(em with the default and two monitors, at most 5; with
+\fBwire_window\fR = \fB2\fR and two monitors, at most 6. The two per monitor are
 the capture slots the X server may fill ahead of the acknowledgement it is
 waiting on, and they are fixed: they are a property of the shared memory the
 two halves of the server exchange, not a setting.
 
 The consequence for an administrator is the part worth remembering:
 \fBadding a monitor divides the window's headroom between the screens.\fR
-The default of 2 gives a single screen two frames of headroom, two screens
-about one each, and three screens less than one each. Nothing in the
-configuration changes and nothing is logged; the same number simply means
-less per screen.
+A value of 2 gives a single screen two frames of headroom, two screens about
+one each, and three screens less than one each. Nothing in the configuration
+changes and nothing is logged; the same number simply means less per
+screen.
 
 This asymmetry is not a design goal, it is what the code does today, and it
 is documented here rather than hidden: the window predates multi\(hymonitor
@@ -355,10 +362,11 @@ frames per second <= (wire_window + 2 x monitors) / round trip
 .fi
 .RE
 
-At 80 ms round trip the default gives about 50 frames per second on one
-monitor and about 75 across two \(em but that is the total across all
-screens, so it is still about 37 per screen. At 200 ms, about 20 on one
-monitor and 30 across two.
+At 80 ms round trip the default of 1 gives about 37 frames per second on one
+monitor and about 62 across two \(em but that is the total across all
+screens, so it is still about 31 per screen. At 200 ms, about 15 on one
+monitor and 25 across two. Setting it to 2 raises those to about 50 and 75
+at 80 ms, and 20 and 30 at 200 ms.
 
 Raising it buys frame rate at the cost of latency: every extra frame in
 flight is one more frame of delay between an action and seeing it, and one

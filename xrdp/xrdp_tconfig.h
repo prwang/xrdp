@@ -33,14 +33,24 @@
 #define NUM_CONNECTION_TYPES 7
 #define GFX_CONF XRDP_CFG_PATH "/gfx.toml"
 
-/* BACKLOG #80 / PRD FR-FLOW-1 clause 4: bounds and placeholder default
- * for [avc444_ffmpeg] wire_window (C). See the field's comment below.
+/* BACKLOG #80 / PRD FR-FLOW-1 clause 4: bounds and default for
+ * [avc444_ffmpeg] wire_window (C). See the field's comment below.
  * The MIN is 1 because C = 0 admits no capture at all once the first
  * frame is outstanding -- a session that never draws again -- and the
  * MAX exists only so a typo cannot ask for an unbounded wire; a value
  * outside the range is REFUSED with a log line, never silently
- * clamped. */
-#define XRDP_GFX_WIRE_WINDOW_DEFAULT 2
+ * clamped.
+ *
+ * The DEFAULT is 1 (owner directive, 2026-08-10; it was 2 from
+ * 2026-08-07). At 1 the frontier grants exactly what the mechanism it
+ * replaces granted, so an installation that upgrades and changes no
+ * configuration keeps today's number of frames outstanding on the
+ * wire. 2 is the value that removes the stall, and it is documented in
+ * gfx.toml and gfx.toml(5) as the value to set; it is not shipped as
+ * the default because it puts one more frame in flight than xrdp has
+ * ever put there, and that is a change to ask reviewers about rather
+ * than to make on their behalf. */
+#define XRDP_GFX_WIRE_WINDOW_DEFAULT 1
 #define XRDP_GFX_WIRE_WINDOW_MIN 1
 #define XRDP_GFX_WIRE_WINDOW_MAX 64
 
