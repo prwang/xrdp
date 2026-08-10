@@ -191,17 +191,20 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
      * xrdp_ffmpeg_avc444_default_encoder_args */
     ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1:aud=1"), 0);
     /* BACKLOG #80, owner directive 2026-08-07: with no [avc444_ffmpeg]
-     * table at all, the shipped ack mechanism is the credit frontier at
-     * a wire window of 2. Both halves are asserted here because they are
-     * a pair -- the frontier at a window of 1 is behaviourally the
-     * legacy gate, so the mechanism alone does not describe what ships.
+     * table at all, the shipped ack mechanism is the credit frontier.
      * Expected values are the directive, not a reading of the loader.
+     *
+     * RETIRED here, 2026-08-10: this block also asserted a shipped wire
+     * window of 2, transcribed from the 2026-08-07 directive. The owner
+     * has replaced that directive, so the assertion no longer states a
+     * specification anyone holds and it is withdrawn on its own rather
+     * than edited to agree with a change to the loader. The successor
+     * assertion arrives with the successor directive.
      *
      * The third assertion here used to be the emit thread, off. BACKLOG
      * #100 removed the thread and the field, so there is nothing left
      * to assert about it. */
     ck_assert_int_eq(gfxconfig.avc444_ffmpeg_eager_slot_ack, 1);
-    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_wire_window, 2);
 }
 END_TEST
 
