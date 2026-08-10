@@ -57,6 +57,26 @@ arm_toml_int()
     sed -n "s/^ *$1 *= *\\([0-9][0-9]*\\).*/\\1/p" \
         "$D/gfx/$ARM.toml" 2>/dev/null | head -1
 }
+# The arm's CODEC MODE, read the same way. An arm configured
+# avc_mode = "420" is a legitimate, shipped configuration -- an
+# administrator may set it and a control arm needs it -- so the
+# certifier must certify it rather than fail it (owner directive,
+# 2026-08-10: "the validation machine should not bite on normal
+# functionality/legit config an user or admin would set"). It gets the
+# single-view gate: the AVC444 two-view assertions are about a
+# long-term-reference chain across two views and a single-view stream
+# has neither, so running them there tests whether the arm is AVC444,
+# not whether it is correct.
+arm_toml_str()
+{
+    sed -n "s/^ *$1 *= *\"\([^\"]*\)\".*/\1/p" \
+        "$D/gfx/$ARM.toml" 2>/dev/null | head -1
+}
+AVC_MODE=$(arm_toml_str avc_mode)
+AVC_MODE=${AVC_MODE:-444}
+AUDIT_ARGS=""
+[ "$AVC_MODE" = "420" ] && AUDIT_ARGS="--single-view"
+
 REFRESH=${E_REFRESH:-$(arm_toml_int intra_refresh_frames)}
 REFRESH=${REFRESH:-250}
 REFRESH_AUX=${E_REFRESH_AUX:-$(arm_toml_int intra_refresh_frames_aux)}
@@ -201,6 +221,9 @@ BYTES=$(stat -c %s "$DUMP")
 
 {
     echo "arm:    $ARM"
+    echo "mode:   AVC$AVC_MODE$([ -n "$AUDIT_ARGS" ] \
+        && echo "  (single-view gate: the AVC444 two-view assertions do \
+not apply)")"
     echo "image:  $IMAGE"
     echo "gfx:    sha256:$GFXSUM"
     echo "key:    $KEY"
@@ -236,6 +259,7 @@ BYTES=$(stat -c %s "$DUMP")
     echo
     echo "=== wire audit (--assert) ==="
     python3 "$D/../../tools/avc444_ltr_wire_audit.py" --assert \
+        $AUDIT_ARGS \
         --intra-refresh "$REFRESH" --intra-refresh-aux "$REFRESH_AUX" \
         "$DUMP" "$ARM deploy certification" \
         2>&1 | tail -25

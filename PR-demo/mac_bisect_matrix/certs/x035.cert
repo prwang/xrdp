@@ -1,0 +1,83 @@
+arm:    x035
+mode:   AVC420  (single-view gate: the AVC444 two-view assertions do not apply)
+image:  localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+gfx:    sha256:cf7dbbb0a9a55147
+key:    localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf.p2fde5531|cf7dbbb0a9a55147
+when:   2026-08-10T00:32:57Z
+window: 3s at 1920x1080, 35978637 bytes
+
+=== encoder input pipe (BACKLOG #103) ===
+PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
+after 3s of real encoding, so every encoder child got
+an input pipe of at least the 64 KiB minimum. Above that
+the handover cost is flat (0.71 ms at 512 KiB against
+0.60 ms at 1 MiB for a 13.82 MB picture), so this is the
+whole of the requirement.
+
+=== wire audit (--assert) ===
+  main fn=3      P   none       [(1, 0), (0, None)]  215097B
+  main fn=4      P   none       [(1, 0), (0, None)]  153547B
+  main fn=5      P   none       [(1, 0), (0, None)]  177555B
+  main fn=6      P   none       [(1, 0), (0, None)]  178816B
+  main fn=7      P   none       [(1, 0), (0, None)]  163662B
+  main fn=8      P   none       [(1, 0), (0, None)]  212371B
+  main fn=9      P   none       [(1, 0), (0, None)]  157885B
+  main fn=10     P   none       [(1, 0), (0, None)]  171467B
+  main fn=11     P   none       [(1, 0), (0, None)]  170605B
+
+single view (AVC420): the LTR / cross-view narrative does
+not apply and is not printed. 220 picture(s) parsed.
+
+=== ASSERT GATE (single view, AVC420) ===
+  The AVC444 two-view assertions A1-A7 are NOT run: they
+  assert properties of a long-term-reference chain across
+  two views, which this configuration does not have. The
+  checks below are what a single-view stream can be held
+  to. See assert_gate_single_view().
+  S1 pictures parsed from the capture      PASS  220 picture(s) parsed
+  S2 single view, no aux sub-stream        PASS  no aux pictures, as an AVC420 arm must emit
+  S3 SPS repeated in band                  PASS  2 SPS NAL(s) in the capture
+  S4 frame_num contiguous within each IDR period PASS  one chain per IDR period
+
+ASSERT VERDICT: PASS -- 4 checks, all clean
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 0
+  frames decoded          : 0
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  decoder errors          :
+      Error opening output file -.
+      Error opening output files: Invalid argument
+  VERDICT: FAIL
+
+NO MID-STREAM BLACK FRAME: FAIL
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+A 3s window holds roughly 100 frames. The scheduled intra
+refresh is every 250 main pictures and every 250
+aux pictures, so this certification
+typically contains NO scheduled cut, and asserts A2 (intra only
+on a scheduled index), A3 (cuts paired across views) and A4 (no
+scheduled cut skipped) VACUOUSLY. What it does prove on real
+bytes from this image: A1 no mid-stream IDR, A5 own-slot refs
+and self-marking, A6 one contiguous frame_num chain, A7 chain
+depth within bound, and that every picture decodes without a
+black frame.
+The cut schedule itself is covered by CI against golden vectors
+(tests/xrdp/test_avc444_ltr.c: test_ltr_dpb_scheduled_paired_cut
+_both_modes, test_ltr_schedule_observed_vs_requested,
+test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window
+to chase A2-A4 -- that is the 10x tax this file exists to
+remove, and CI already pins the logic byte-exactly.
+
+If A3 reads SKIP above, this arm is running the SPARSE AUX
+cadence (BACKLOG #92): the aux view is sent on only some
+frames, so the two views hold different numbers of pictures
+and comparing their ordinals is not a check that can pass or
+fail. Owner ruling, 2026-08-08. The audit decides that from
+the PICTURE COUNTS in the capture, never from a config flag,
+and A3 keeps full force at 1:1 -- which is what ships.

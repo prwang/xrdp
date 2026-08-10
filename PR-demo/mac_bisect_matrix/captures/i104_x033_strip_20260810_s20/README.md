@@ -53,6 +53,14 @@ comparison and 2.88× means nothing here. This is the exact trap
 `CLAUDE.md`'s scientific-quality gate names in its first example; the
 harness still prints it and the default has not been retired.
 
+## The pair it belongs to
+
+x034 ran the same leg with the sparse-chroma cadence ten minutes later:
+17.0 ms against this leg's 17.7, and 1.892 MB per frame against 3.410 --
+a 44.5 % byte saving. See
+`captures/i104_x034_strip_20260810_s20/README.md`, which also says why
+the 4 % time difference is suggestive rather than established.
+
 ## Two harness faults this leg exposed, both fixed
 
 1. **`e_gate_run.sh` defaulted `PORT` to a hardcoded 40017.** `E_ARM=x033`

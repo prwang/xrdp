@@ -159,11 +159,16 @@ speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
 conditions, never arms.** A WAN leg is `netem_rtt.sh` on x032 and x033,
 not two more pods.
 
-**x035 is NOT CERTIFIED and that is unresolved.** `arm_certify.sh` runs
-`avc444_ltr_wire_audit.py`, which asserts two-view long-term-reference
-properties that a single-view AVC420 stream does not have and cannot
-have: the audit reads the whole stream as "aux", reports `main
-pictures=0`, and fails A1–A6. It is the wrong instrument for that arm
-rather than a broken arm, but changing a certification instrument is a
-separate, announced act and it has not been made. Until it is, x035 is
-red and must not be measured.
+**All five arms are certified.** x035 needed a fix first: the certifier
+ran the AVC444 two-view wire audit against a single-view AVC420 stream,
+read the whole thing as "aux", reported `main pictures=0` and failed
+A1–A6 — on bytes that were correct for the configuration. Owner ruling,
+2026-08-10: *"let the certify accept the 420 mode if config says so ...
+the validation machine should not bite on normal functionality/legit
+config an user or admin would set."* `arm_certify.sh` now reads
+`avc_mode` from the arm's own gfx.toml and passes `--single-view`, and
+the audit runs a different, smaller gate (S1–S4) whose checks are all
+POSITIVE, so a capture it failed to parse cannot pass quietly: S1
+asserts pictures were parsed at all, S2 that there is no aux sub-stream,
+S3 that the SPS is repeated in band, S4 that `frame_num` is contiguous
+within each IDR period. x035 passes 4/4 with 220 pictures parsed.

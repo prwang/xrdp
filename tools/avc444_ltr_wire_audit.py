@@ -272,7 +272,19 @@ def nals_of(buf):
     return out
 
 
+# Set by --single-view. A plain AVC420 PDU (codec id 0x000B) carries NO
+# avc420EncodedBitstreamInfo word: it is the RFX_AVC420_METABLOCK and the
+# bitstream, nothing else. Reading its first four bytes as an LC word --
+# which is what this tool does for AVC444 -- lands on numRegionRects and
+# produces nonsense: arm x035 was read as 291 "aux" pictures and 0 "main"
+# ones on 2026-08-10, and every two-view assertion duly failed on a
+# stream that was perfectly correct for its configuration.
+SINGLE_VIEW = False
+
+
 def views_of(rec):
+    if SINGLE_VIEW:
+        return [('main', rec)]
     (w,) = struct.unpack_from('<I', rec, 0)
     cb1 = w & 0x3FFFFFFF
     lc = (w >> 30) & 0x3
@@ -567,9 +579,74 @@ def assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None):
     return out
 
 
-def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None):
-    checks = assert_gate(sps, pics, refresh, allow_idr, refresh_aux)
-    print('=== ASSERT GATE (BACKLOG #45 step 0) ===')
+def assert_gate_single_view(sps_seen, sps, pics):
+    """The assertions that MEAN something for a plain AVC420 stream.
+
+    None of A1-A7 do. They are assertions about a two-view long-term-
+    reference chain -- own-slot retargeting, paired cuts across views,
+    LT1 self-marking -- and a single-view stream has no second view to
+    pair with and no LTR slots to retarget to. Running them against
+    AVC420 does not test the arm, it tests whether the arm is AVC444.
+
+    So this is a different, smaller gate. Every check is POSITIVE: it
+    asserts something is present, never that something is absent, so a
+    capture this tool failed to parse cannot pass it quietly. S1 in
+    particular is the guard on the framing assumption above -- if the
+    single-view record layout were wrong, no slice header would parse
+    and S1 would fail loudly rather than S2-S4 passing on an empty set.
+    """
+    out = []
+    main = [s for s in pics if s['view'] == 'main']
+    aux = [s for s in pics if s['view'] == 'aux']
+
+    out.append(('S1 pictures parsed from the capture', len(main) > 0,
+                '%d picture(s) parsed' % len(main)
+                if main else 'NO slice header parsed -- the record '
+                'framing is wrong or the capture is empty'))
+
+    out.append(('S2 single view, no aux sub-stream', not aux,
+                'no aux pictures, as an AVC420 arm must emit'
+                if not aux else '%d aux picture(s) in a stream that '
+                'should have none' % len(aux)))
+
+    n_sps = len(sps_seen)
+    out.append(('S3 SPS repeated in band', n_sps >= 2,
+                '%d SPS NAL(s) in the capture' % n_sps))
+
+    # S4 -- frame_num is contiguous WITHIN each IDR period. An IDR
+    # legitimately resets it, which is why this is not A6: A6 forbids
+    # the reset outright because the AVC444 LTR chain never takes one.
+    gaps = []
+    expect = None
+    for i, sh in enumerate(main):
+        if sh['idr']:
+            expect = (sh['frame_num'] + 1) % (1 << sps['log2_max_frame_num'])
+            continue
+        if expect is not None and sh['frame_num'] != expect:
+            gaps.append((i, expect, sh['frame_num']))
+        expect = (sh['frame_num'] + 1) % (1 << sps['log2_max_frame_num'])
+    out.append(('S4 frame_num contiguous within each IDR period',
+                not gaps,
+                'one chain per IDR period'
+                if not gaps else '%d break(s), first at decode index '
+                '%d: expected %d, got %d'
+                % (len(gaps), gaps[0][0], gaps[0][1], gaps[0][2])))
+    return out
+
+
+def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None,
+                    sps_seen=None):
+    if SINGLE_VIEW:
+        checks = assert_gate_single_view(sps_seen or [], sps, pics)
+        print('=== ASSERT GATE (single view, AVC420) ===')
+        print('  The AVC444 two-view assertions A1-A7 are NOT run: they')
+        print('  assert properties of a long-term-reference chain across')
+        print('  two views, which this configuration does not have. The')
+        print('  checks below are what a single-view stream can be held')
+        print('  to. See assert_gate_single_view().')
+    else:
+        checks = assert_gate(sps, pics, refresh, allow_idr, refresh_aux)
+        print('=== ASSERT GATE (BACKLOG #45 step 0) ===')
     failed = 0
     skipped = 0
     for name, ok, detail in checks:
@@ -596,6 +673,7 @@ def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None):
 
 
 def main():
+    global SINGLE_VIEW
     argv = sys.argv[1:]
     annexb = False
     do_assert = False
@@ -620,6 +698,8 @@ def main():
             refresh_aux = int(argv[i])
             if refresh_aux < 1:
                 sys.exit('--intra-refresh-aux must be >= 1')
+        elif a == '--single-view':
+            SINGLE_VIEW = True
         elif a == '--allow-idr':
             i += 1
             allow_idr = int(argv[i])
@@ -663,6 +743,20 @@ def main():
 
     own_slot = {'main': 0, 'aux': 1}
     problems = []
+    # The narrative below reasons about LTR slots, cross-view prediction
+    # and a shared frame_num chain. A single-view AVC420 stream has none
+    # of those by design, so running it there manufactures "problems"
+    # out of correct bytes -- which is exactly what happened to arm x035
+    # on 2026-08-10. Hand straight to the single-view gate instead.
+    if SINGLE_VIEW:
+        print('single view (AVC420): the LTR / cross-view narrative does')
+        print('not apply and is not printed. %d picture(s) parsed.'
+              % len(pics))
+        print()
+        if do_assert:
+            sys.exit(run_assert_gate(sps, pics, refresh, allow_idr,
+                                     refresh_aux, sps_seen))
+        sys.exit(0)
     for view in ('main', 'aux'):
         sel = [s for s in pics if s['view'] == view]
         if not sel:
