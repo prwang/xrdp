@@ -1,5 +1,0 @@
-== xrandr --listmonitors ==
-Monitors: 2
- 0: +*DUMMY0 1024/271x768/203+0+0  DUMMY0
- 1: +DUMMY1 1024/271x768/203+1024+0  DUMMY1
-OK: 2 x 1024x768 monitors (virtual 2048x768)

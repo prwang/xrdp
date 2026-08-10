@@ -1,6 +1,0 @@
-t0 1785976285
-t1 1785976315
-delay_ms 40
-rate_mbit 200
-secs 20
-leg bbr200

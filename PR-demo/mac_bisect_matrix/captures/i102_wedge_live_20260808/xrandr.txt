@@ -1,8 +1,0 @@
-Screen 0: minimum 256 x 256, current 7680 x 2166, maximum 16384 x 16384
-rdp0 connected primary 3840x2160+3840+0 697mm x 392mm
-   3840x2160     50.00* 
-rdp1 connected 3840x2160+0+6 697mm x 392mm
-   3840x2160     50.00* 
-Monitors: 2
- 0: +*rdp0 3840/697x2160/392+3840+0  rdp0
- 1: +rdp1 3840/697x2160/392+0+6  rdp1

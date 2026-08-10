@@ -1,6 +1,0 @@
-t0 1786137535
-t1 1786137566
-arm x029
-port 40045
-leg B
-monitors 2

@@ -1,5 +1,0 @@
-counting for 40s on xorg pid=27278
-                 0      probe_libxorgxrdp:rdpCopyBoxList                                      
-               841      probe_libxorgxrdp:a8r8g8b8_to_avc444_box                                      
-               825      probe_libxorgxrdp:rdpCapture                                          
-      40.005867211 seconds time elapsed

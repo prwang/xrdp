@@ -1,0 +1,82 @@
+arm:    x035
+image:  localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+gfx:    sha256:cf7dbbb0a9a55147
+key:    localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf.p2fde5531|cf7dbbb0a9a55147
+when:   2026-08-10T00:16:41Z
+window: 3s at 1920x1080, 47159285 bytes
+
+=== encoder input pipe (BACKLOG #103) ===
+PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
+after 3s of real encoding, so every encoder child got
+an input pipe of at least the 64 KiB minimum. Above that
+the handover cost is flat (0.71 ms at 512 KiB against
+0.60 ms at 1 MiB for a 13.82 MB picture), so this is the
+whole of the requirement.
+
+=== wire audit (--assert) ===
+  aux  fn=9      P   none       [(1, 0), (0, None)]  160787B
+  aux  fn=10     P   none       [(1, 0), (0, None)]  134390B
+  aux  fn=11     P   none       [(1, 0), (0, None)]  139649B
+
+aux  pictures=291    P(inter)=288    I(intra)=0     IDR=3
+      P slices retargeted to OWN slot LT1 : 0/288
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 288
+      pictures self-marking into LT1      : 0/291
+      avg P size=161522B   avg I/IDR size=211439B   inter share of pictures=99.0%
+
+merged decode-order frame_num chain: 291 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: PROBLEMS -- aux: 288 P slices carry no list modification; aux: 0/288 non-IDR pictures self-mark
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     FAIL  2 mid-stream IDR(s) at decode indices [120, 240]
+  A2 intra only on a scheduled index       FAIL  unscheduled intra: main [] aux [120, 240]
+  A3 cuts are paired across views          FAIL  main intra ordinals [] ... aux [0, 120, 240]
+  A4 no scheduled cut skipped              FAIL  scheduled ordinals with no intra: main [] aux [250]
+  A5 own-slot refs and self-marks          FAIL  aux: 288/288 P not retargeted to LT1; aux: 288/291 non-IDR pictures do not self-mark LT1
+  A6 one contiguous frame_num chain        FAIL  2 gap(s) at decode indices [120, 240]
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 0 (bound 250) aux 119 (bound 250)
+
+ASSERT VERDICT: FAIL -- 6 of 7 checks violated
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 0
+  frames decoded          : 0
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  decoder errors          :
+      Error opening output file -.
+      Error opening output files: Invalid argument
+  VERDICT: FAIL
+
+NO MID-STREAM BLACK FRAME: FAIL
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+A 3s window holds roughly 100 frames. The scheduled intra
+refresh is every 250 main pictures and every 250
+aux pictures, so this certification
+typically contains NO scheduled cut, and asserts A2 (intra only
+on a scheduled index), A3 (cuts paired across views) and A4 (no
+scheduled cut skipped) VACUOUSLY. What it does prove on real
+bytes from this image: A1 no mid-stream IDR, A5 own-slot refs
+and self-marking, A6 one contiguous frame_num chain, A7 chain
+depth within bound, and that every picture decodes without a
+black frame.
+The cut schedule itself is covered by CI against golden vectors
+(tests/xrdp/test_avc444_ltr.c: test_ltr_dpb_scheduled_paired_cut
+_both_modes, test_ltr_schedule_observed_vs_requested,
+test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window
+to chase A2-A4 -- that is the 10x tax this file exists to
+remove, and CI already pins the logic byte-exactly.
+
+If A3 reads SKIP above, this arm is running the SPARSE AUX
+cadence (BACKLOG #92): the aux view is sent on only some
+frames, so the two views hold different numbers of pictures
+and comparing their ordinals is not a check that can pass or
+fail. Owner ruling, 2026-08-08. The audit decides that from
+the PICTURE COUNTS in the capture, never from a config flag,
+and A3 keeps full force at 1:1 -- which is what ships.

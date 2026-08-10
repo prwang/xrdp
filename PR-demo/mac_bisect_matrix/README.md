@@ -7,31 +7,22 @@ variant runs as its own k3s pod with its own pinned xrdp-dev deb and its own
 entire matrix in one sitting. **Server side only** — the client harness on
 the host is never touched by this rig.
 
-## Current matrix (Mac blackout bisect, pocket = {HRD VUI} + {SEI NALs})
+## Current matrix
 
-| arm | port (host loopback) | xrdp-dev | encoder config | meaning |
-|-----|----|----------|----------------|---------|
-| A | 127.0.0.1:40000 | 52099149 | CQP 20 | control-good (Mac-validated baseline) |
-| B | 127.0.0.1:40001 | 52099149 | CBR 20M + `-sei +timing` | control-black (M1 repro: HRD VUI + BP/PT SEI) |
-| C | 127.0.0.1:40002 | e96e655416dc | CBR 20M + `-sei +timing` + `strip_sei` | SEI NALs removed post-encode, HRD VUI stays |
-| D | 127.0.0.1:40003 | 52099149 | CBR 20M | rate control without the SEI flag |
-| E | 127.0.0.1:40004 | c693eeab5ec2 | CBR 20M + `strip_sei` + `sanitize_hrd` | fix candidate: SPS rewritten to drop nal_hrd |
+**See "The arm set (BACKLOG #104)" below — five arms, `x031`-`x035`, on
+one image.** Everything before them was garbage-collected on 2026-08-10.
 
-2026-07-27 owner verdict on A–D: A renders, B/C/D black. arm-c (zero SEI
-NALs, HRD VUI kept) black => nal_hrd_parameters in the SPS VUI convicted;
-timing_info exonerated (present in A). arm-d shows Mesa emits HRD + SEI
-from CBR alone. arm-e carries the fix candidate: xrdp_h264_sanitize_hrd()
-rewrites every SPS post-encode (golden unit test: captured arm-c SPS
-rewrites to captured arm-a SPS byte-for-byte).
+*History, in two lines, because the rig exists because of it:* this
+folder was built on 2026-07-26 for the macOS blackout bisect, arms A-E
+on ports 40000-40004. It convicted `nal_hrd_parameters` in the SPS VUI
+(arm-c rendered black with zero SEI NALs) and exonerated `timing_info`;
+arm-e carried the `xrdp_h264_sanitize_hrd()` fix, which is pinned by a
+golden unit test and has shipped since. Those arms are gone; the finding
+lives in `PRD.md`.
 
-Original A–D verdict table (resolved 2026-07-27, kept for the record):
-C renders ⇒ SEI NALs convicted. C black ⇒ HRD VUI in the SPS convicted
-(what happened). Now: E renders ⇒ sanitize_hrd+strip_sei is the proven
-macOS fix, portable to T4/nvenc. E black ⇒ conviction wrong, re-open.
-
-Every arm's session is the same full-screen banner (arm name + colour field
-stepping 1/s), so a frozen/black screen is a pipeline failure by
-construction, and the tester always knows which arm is on screen.
+Every arm's session is the same deterministic payload, so a frozen or
+black screen is a pipeline failure by construction and the tester always
+knows which arm is on screen.
 
 ## Files
 
@@ -141,3 +132,38 @@ Edit/add `gfx/arm-X.toml` + `k8s/arm-X.yaml` (next port), map the arm in
 `build_and_deploy.sh` if it needs a different deb, rerun the script. Commit
 the yaml/toml with the bisect log entry in `BACKLOG.md` — the matrix in git
 must always describe what is actually listening.
+
+## The arm set (BACKLOG #104, 2026-08-10)
+
+The fleet is **five arms on ONE image**, `x031`–`x035`, differing only in
+`gfx/<arm>.toml`. Everything before them was garbage-collected: 30 arm
+configs, 89 capture directories (32 GB down to 32 MB) and every
+certificate. The reason is in `docs/pr_evidence_matrix.md` — the old
+fleet was 17 pods across five images, so no two of them were comparable,
+and every timing in them predates the encoder-input-pipe fix (#103).
+
+| arm | port | flow control | chroma | mode | it exists to be |
+|---|---|---|---|---|---|
+| x031 | 40047 | legacy (`eager_slot_ack` off) | every frame | 444 | the reference: what upstream does today |
+| x032 | 40048 | frontier, `wire_window` 1 | every frame | 444 | the legacy-equivalent window |
+| x033 | 40049 | frontier, `wire_window` 2 | every frame | 444 | the frontier as proposed to ship |
+| x034 | 40050 | frontier, `wire_window` 2 | sparse 1000/100 ms | 444 | the byte lever, against x033 |
+| x035 | 40051 | frontier, `wire_window` 2 | n/a | 420 | what 4:4:4 costs, against x033 |
+
+All five run `SESSION_KIND=textflood_strip`. The slow `textflood`
+payload is retired as an instrument: at 16.2 ms/frame it is the same
+speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
+1.04× against the 2.0× floor.
+
+**Round-trip time, payload, geometry and bandwidth are run-time
+conditions, never arms.** A WAN leg is `netem_rtt.sh` on x032 and x033,
+not two more pods.
+
+**x035 is NOT CERTIFIED and that is unresolved.** `arm_certify.sh` runs
+`avc444_ltr_wire_audit.py`, which asserts two-view long-term-reference
+properties that a single-view AVC420 stream does not have and cannot
+have: the audit reads the whole stream as "aux", reports `main
+pictures=0`, and fails A1–A6. It is the wrong instrument for that arm
+rather than a broken arm, but changing a certification instrument is a
+separate, announced act and it has not been made. Until it is, x035 is
+red and must not be measured.

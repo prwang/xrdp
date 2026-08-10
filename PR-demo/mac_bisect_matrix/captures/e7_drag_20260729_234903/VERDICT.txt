@@ -1,8 +1,0 @@
-=== E7 — per-monitor progress during the boundary sweep ===
-sweep window starts at 85751.600 (session startup before it is reported separately, not scored)
-  startup: surface 0 45 sends, worst gap 356 ms
-  startup: surface 1 1 sends, worst gap 0 ms
-surface 0    sends 551    span   59.9 s  worst gap   702.0 ms  mean  108.9 ms
-surface 1    sends 812    span   59.9 s  worst gap   406.0 ms  mean   73.9 ms
-
-E7 VERDICT: PASS — both monitors' rect streams advanced throughout the sweep, no stall beyond 2000 ms

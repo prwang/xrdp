@@ -1,0 +1,192 @@
+# ARM x030 (host port 40046) — BACKLOG #92 / PRD FR-H264-9: the
+# SPARSE-AUX cadence. The AVC444 aux (chroma) view is sent when the
+# screen settles and at least once a second whatever it is doing;
+# every other frame carries the luma view alone.
+#
+# WHAT IS UNDER TEST, in plain words. The aux view is 44.8 % of the
+# bytes and a whole second pack and encode. Chroma detail is least
+# perceptible while the screen is moving, which is also when the frame
+# period is longest. This arm drops it in motion and puts it back when
+# the screen stops.
+#
+# THE TWO KEYS, and the owner's deployed values (2026-08-08):
+#   chroma_refresh_ms = 1000   the GUARANTEE. Chroma is restored at
+#                              least this often WHATEVER the screen is
+#                              doing. Without it, one animating window
+#                              in a corner would starve a static
+#                              document beside it of 4:4:4 text for as
+#                              long as the animation ran.
+#   chroma_idle_ms = 100       the SETTLE. The pipeline must have been
+#                              quiet this long before chroma is sent
+#                              again -- which also clamps chroma to at
+#                              most 10 frames per second while the luma
+#                              view runs at whatever rate it needs.
+# Neither is a fraction of the screen and neither looks at a pixel: the
+# decision function takes two configured times and three timestamps and
+# nothing else (owner directive -- a reviewer settles "is the server
+# inspecting the user's screen?" by reading the signature).
+#
+# THE CONTROL IS THIS SAME ARM. The A/B is run by rolling ONLY this
+# ConfigMap between chroma_refresh_ms = 0 (feature off, the aux view on
+# every frame, byte-for-byte today's behaviour) and 1000, interleaved
+# off/on/off/on. Same image, same xorgxrdp, same payload, same geometry,
+# same client rig, same hour -- because an unchanged arm on this host
+# has drifted 36.8 -> 41.8 ms across a single day (BACKLOG #88), and one
+# leg each cannot be read against that. Each leg's capture archives the
+# gfx.toml that was actually live for it, so which body produced which
+# number is never in doubt.
+#
+# BUILD. xrdp 7b550f6ae87f (the #92 implementation), xorgxrdp
+# 10fa3aa23033 -- the SAME producer as x014/x015/x017/x018-x029, so the
+# archived textflood numbers this arm is read against were taken with an
+# identical capture side. SESSION_KIND=textflood, one monitor at
+# 3840x2400, as the owner directed.
+#
+# MECHANISM CHECKS BEFORE ANY RATE (quality gate 2). Read them off the
+# perf ring, not off the config:
+#   (a) 'auxdue' records must be PRESENT and field b must be 0 on a real
+#       fraction of frames. Field b is the decision itself: 1 = chroma
+#       went with this frame, 0 = luma only. All-1 means the feature did
+#       not apply and the run says nothing about it.
+#   (b) field e is chroma_refresh_ms at the call site. If it reads 0 on
+#       a leg meant to be ON, this pod is running the wrong ConfigMap.
+#   (c) the gap between consecutive chroma frames must never exceed
+#       1000 ms. That is the guarantee, and a run that violates it is a
+#       red result whatever the rate says.
+#
+# intra_refresh_frames stays at 240 -- the value every archived
+# textflood arm used -- so the comparison against them is not confounded
+# by the 250 default that landed in the same commit.
+# intra_refresh_frames_aux is deliberately NOT set: absent means "follow
+# intra_refresh_frames", so the aux view cuts every 240 AUX pictures.
+# Under this cadence that is a much longer wall-clock interval than the
+# main view's, which is the documented cost of counting in pictures.
+[codec]
+order = [ "H.264", "RFX" ]
+
+# Specify a preferred H.264 encoder, "x264" or "OpenH264".
+# This parameter takes effect only when more than one encoder is
+# enabled at compile time. If only one encoder is enabled, the encoder
+# will be used regardless the value of this parameter.
+h264_encoder = "ffmpeg"
+
+# Hardware H.264 via VAAPI (Intel/AMD render node). ffmpeg runs as root under
+# xrdp so it can open /dev/dri/renderD128; frames arrive as system-memory NV12,
+# so they are uploaded to the GPU (-vf format=nv12,hwupload) before h264_vaapi.
+# -bf 0 -async_depth 1 keep the one-in/one-out cadence the pipelined runner wants.
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+avc_mode = "444"
+tail_flush = false
+# EXPERIMENTAL FR-H264-8: aux-refs-aux via long-term reference slots
+aux_ltr_chain = true
+# BACKLOG #70 -- THE LINE UNDER TEST in the x020/x021 pair: false on
+# x020 (control, the shipped gated ack) and true on x021 (treatment,
+# the credit frontier). It is the ONLY line that differs between the
+# two files below their header comments.
+eager_slot_ack = true
+# BACKLOG #80 / PRD FR-FLOW-1: the wire window C = 2, the value the
+# code ships as its default (XRDP_GFX_WIRE_WINDOW_DEFAULT). Written on
+# BOTH arms so the bodies differ by exactly one line; it is consulted
+# only on the eager path, so on x020 it is inert. See the header.
+wire_window = 1
+
+# BACKLOG #92 / PRD FR-H264-9 -- THE LINES UNDER TEST. Rolled to
+# chroma_refresh_ms = 0 for the control legs of the A/B; everything
+# else in this file is held byte-identical between the two bodies.
+chroma_refresh_ms = 0
+chroma_idle_ms = 0
+# BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
+# pictures per view. The runner spawns BOTH children with the identical
+# frame-indexed -force_key_frames schedule and pins -g to the same value
+# (D7), so every intra picture lands on a scheduled index and the
+# rewriter can check observed against requested.
+intra_refresh_frames = 250
+encoder_args = [
+  "-vaapi_device", "/dev/dri/renderD128",
+  "-vf", "format=nv12,hwupload",
+  "-c:v", "h264_vaapi",
+  "-rc_mode", "CQP", "-qp", "20",
+  "-bf", "0", "-async_depth", "1",
+  # BACKLOG #45 step 4 retires the `-g 30000` interim: with the
+  # scheduled paired intra refresh a mid-stream IDR no longer empties
+  # the DPB, so a long GOP is no longer the thing keeping LT1 alive.
+  # The runner PINS -g to intra_refresh_frames itself (D7) and appends
+  # it after this block, so any -g written here is overridden; it is
+  # left out rather than left misleading.
+]
+[x264.default]
+# NOTE: x264 specifies bitrate in unit of kbps.
+preset = "ultrafast"
+tune = "zerolatency"
+profile = "main"     # profile is forced to baseline if preset == ultrafast
+vbv_max_bitrate = 0
+vbv_buffer_size = 0
+fps_num = 60
+fps_den = 1
+threads = 1          # recommended: 1 or 2, see `man gfx.toml` for details
+
+[x264.lan]
+# inherits default
+
+[x264.wan]
+vbv_max_bitrate = 15_000
+vbv_buffer_size = 1_500
+
+[x264.broadband_high]
+preset = "superfast"
+vbv_max_bitrate = 8_000
+vbv_buffer_Size = 800
+
+[x264.satellite]
+preset = "superfast"
+vbv_max_bitrate = 5_000
+vbv_buffer_size = 500
+
+[x264.broadband_low]
+preset = "veryfast"
+vbv_max_bitrate = 1_600
+vbv_buffer_size = 66
+
+[x264.modem]
+preset = "fast"
+vbv_max_bitrate = 1_200
+vbv_buffer_size = 50
+
+#
+# Configurations for OpenH264
+#
+[OpenH264.default]
+# NOTE: OpenH264 specifies bitrate in unit of bps, not kbps.
+EnableFrameSkip = false
+TargetBitrate = 20_000_000
+MaxBitrate =    0          # unspecified
+MaxFrameRate = 60.0
+
+[OpenH264.lan]
+# inherits default
+
+[OpenH264.wan]
+TargetBitrate = 10_000_000
+MaxBitrate =    12_000_000
+
+[OpenH264.broadband_high]
+EnableFrameSkip = true
+TargetBitrate = 8_000_000
+MaxBitrate =   10_000_000
+
+[OpenH264.satellite]
+EnableFrameSkip = true
+TargetBitrate = 4_000_000
+MaxBitrate =    6_000_000
+
+[OpenH264.broadband_low]
+EnableFrameSkip = true
+TargetBitrate = 1_600_000
+MaxBitrate =    1_800_000
+
+[OpenH264.modem]
+EnableFrameSkip = true
+TargetBitrate =   600_000
+MaxBitrate =    1_200_000
+

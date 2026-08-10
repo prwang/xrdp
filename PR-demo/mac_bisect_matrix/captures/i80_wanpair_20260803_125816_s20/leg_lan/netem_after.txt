@@ -1,7 +1,0 @@
-arm       x018
-pod ip    10.42.0.8
-pod pid   970440
-host veth vethaafac092
-host qdisc  qdisc noqueue 0: root refcnt 2 
-pod  qdisc  qdisc noqueue 0: root refcnt 2 
-measured rtt 0.073 ms

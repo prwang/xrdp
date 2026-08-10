@@ -52,7 +52,13 @@
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 SECS=${1:-20}
-ARM=${I92_ARM:-x030}
+# BACKLOG #104: x030 is gone with the rest of the old fleet. The sparse
+# cadence now has a DEDICATED arm (x034) and its control is a SEPARATE
+# arm one config line away (x033), so the roll-one-arm A/B this script
+# performs is no longer the only way to get the comparison -- but it is
+# still the tighter one, because both legs share a pod as well as an
+# image. Default retargeted; I92_ARM overrides.
+ARM=${I92_ARM:-x034}
 PORT=${I92_PORT:-40046}
 NS=bisect-matrix
 OUT=$D/captures/i92_sparse_aux_ab_$(date +%Y%m%d_%H%M%S)_s$SECS

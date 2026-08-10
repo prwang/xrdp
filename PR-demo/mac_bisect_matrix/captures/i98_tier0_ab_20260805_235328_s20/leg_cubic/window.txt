@@ -1,6 +1,0 @@
-t0 1785974030
-t1 1785974060
-delay_ms 40
-secs 20
-arm x019
-leg cubic

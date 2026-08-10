@@ -1,5 +1,0 @@
-re-key boundaries in window : 7
-usable measurements         : 6
-log-timestamp inversions    : 1 (excluded)
-server-side stall (ms)      : [106, 203, 207, 208, 211, 212]
-min 106  median 208  max 212  mean 191

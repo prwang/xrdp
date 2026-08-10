@@ -1,3 +1,0 @@
-SESSION_KIND=code (10 fps line-scroll)
-MODE=oracle
-surface ids alternate 0 <-> 16 across re-keys (two oracle dumps)

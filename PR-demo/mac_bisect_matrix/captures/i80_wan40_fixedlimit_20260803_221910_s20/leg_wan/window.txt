@@ -1,6 +1,0 @@
-t0 1785795554
-t1 1785795584
-delay_ms 40
-secs 20
-arm x019
-rtt_measured_ms 40.451

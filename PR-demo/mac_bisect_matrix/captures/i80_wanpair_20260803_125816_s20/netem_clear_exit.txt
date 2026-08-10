@@ -1,6 +1,0 @@
-netem_rtt: cleared x019 (veth2f62153b + pod eth0)
-host qdisc  qdisc noqueue 0: root refcnt 2 
-pod  qdisc  qdisc noqueue 0: root refcnt 2 
-netem_rtt: cleared x018 (vethaafac092 + pod eth0)
-host qdisc  qdisc noqueue 0: root refcnt 2 
-pod  qdisc  qdisc noqueue 0: root refcnt 2 

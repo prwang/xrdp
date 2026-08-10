@@ -1,4 +1,0 @@
-netem_rtt: x019 applied 40 ms RTT (20000 us each way, jitter 0 ms, loss 0 %)
-netem_rtt: declared environment: netem limit 25000 pkts/direction; single-flow TCP ceiling ~= tcp_wmem_max (4194304 B) / RTT = ~105 MB/s
-netem_rtt: requested 40 ms, measured 40.312 ms, tolerance 6.000 ms -> OK
-40.312

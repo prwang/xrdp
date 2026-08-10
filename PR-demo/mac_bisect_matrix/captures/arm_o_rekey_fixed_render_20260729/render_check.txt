@@ -1,8 +1,0 @@
-shot_016.xwd                 1024x768     54.44      yes          ok
-shot_017.xwd                 1024x768     56.23      yes          ok
-shot_018.xwd                 1024x768     54.67      yes          ok
-shot_019.xwd                 1024x768     54.13      yes          ok
-shot_020.xwd                 1024x768     54.08      yes          ok
-
-frames: 20   black: 0   frozen: 0
-RENDER ACROSS BOUNDARIES: PASS

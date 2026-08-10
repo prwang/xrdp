@@ -85,7 +85,7 @@ DIST=${DIST:-/work/dist}
 # are config-only on a cached image. Deployed together or not at all:
 #   build_and_deploy.sh x020 x021
 # Letters ran out at arm-w; later arms are numbered x001, x002, ...
-ARMS="${*:-arm-e arm-m arm-n}"
+ARMS="${*:-x031 x032 x033 x034 x035}"
 
 # arm -> xrdp-dev commit tag. xorgxrdp defaults to the Mac-good ee1ec01
 # but MUST be paired per-arm when the xrdp build speaks a newer xup
@@ -93,261 +93,30 @@ ARMS="${*:-arm-e arm-m arm-n}"
 # version complaint (caught live 2026-07-27).
 XORGXRDP_DEB="xorgxrdp-dev_1%3a0.10.80+gitee1ec01eed50_amd64.deb"
 declare -A ARM_XORG_DEB=(
-    # arm-m/arm-n: 251bc4d + shmem up-front reservation (SIGBUS ->
-    # loud connect-time refusal on undersized /dev/shm, 2026-07-28)
-    [arm-m]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
-    [arm-n]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
-    # arm-p: same xorgxrdp as arm-n; only the xrdp side carries the
-    # frame_num-wrap re-key knobs (PRD FR-H264-8)
-    [arm-p]="xorgxrdp-dev_1%3a0.10.80+git5b9650cafbc3_amd64.deb"
-    # arm-q: arm-n's xrdp deb with the RECON xorgxrdp (5b9650c + the
-    # R1SLOT log line) — xrdp BACKLOG #45 recon gate R1. RETIRED with the
-    # gate (2026-07-29): R1 and R2 are answered, step 6c landed, and the
-    # recon instrumentation is reverted. Kept registered only so an old
-    # capture can be reproduced; not in the default arm list.
-    [arm-q]="xorgxrdp-dev_1%3a0.10.80+git20260729190443.957fa794ebdc_amd64.deb"
-    # arm-s/arm-t: the BACKLOG #52 E5-2 pair — SAME xorgxrdp as arm-r on
-    # both, so the producer side is identical and the A/B isolates the
-    # xrdp-side steps 5+7
-    [arm-s]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
-    [arm-t]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
-    # arm-r: the BACKLOG #45 arm — step 6's per-monitor capture budget,
-    # coverage intersect and per-monitor slot (xorgxrdp d77d05463e52),
-    # paired with the xrdp deb carrying steps 0-7
-    [arm-r]="xorgxrdp-dev_1%3a0.10.80+git20260729225933.d77d05463e52_amd64.deb"
-    # arm-u/arm-v: the BACKLOG #70 A/B. SAME xrdp deb and SAME xorgxrdp
-    # deb on both -- the only difference between the arms is one
-    # gfx.toml line (eager_slot_ack), so a build difference cannot
-    # confound the comparison. The xorgxrdp side carries the SLOT_ONLY
-    # ack and the +1 held-region entry; the xup contract moved to
-    # 20260731, so this xorgxrdp pairs ONLY with this xrdp.
-    [arm-u]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [arm-v]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # arm-w (BACKLOG #70B): arm-v's config on an instrumented xrdp. The
-    # xorgxrdp side is the SAME deb as arm-u/arm-v -- the xup contract
-    # did not move, so the attribution is about arm-v's pipeline.
-    [arm-w]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x001/x002 (BACKLOG #70B): the emit-split A/B. SAME xrdp deb and
-    # SAME xorgxrdp deb on both -- the arms differ by one gfx.toml line
-    # (emit_thread). The xrdp change is encoder-internal and does not
-    # move the xup contract, so this is still arm-u/v/w's xorgxrdp.
-    [x001]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x002]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x003/x004 (BACKLOG #61b): the x001/x002 A/B re-run under textflood.
-    # Same debs on all four arms; the pairs differ only in SESSION_KIND.
-    [x003]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x004]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x005/x006 (BACKLOG #61e): x003/x004's configs on the INSTRUMENTED
-    # xrdp. The xorgxrdp side is untouched -- the new brackets are all
-    # inside xrdp, and the producer must stay identical or the `wait`
-    # bracket would be measuring a different capture path.
-    [x005]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x006]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x007 (#61e CONTROL): the UNTRACED twin of x006 -- same xrdp deb,
-    # same xorgxrdp deb, same gfx.toml body; XRDP_PERF_TRACE unset.
-    [x007]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x013 (#61e redo): the SAME xorgxrdp as x005/x006/x007, so the
-    # producer side is identical to the arms whose numbers this replaces
-    [x013]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x015 (#76): the SAME xorgxrdp and the SAME IMAGE as x014. This arm
-    # builds nothing: it is x014 with XRDP_GFX_FRAMES_IN_FLIGHT=1 set in
-    # k8s/x015.yaml, so the tag below is x014's and the image cache hits.
-    [x015]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x014 (#75): the SAME xorgxrdp as x013 -- the only thing that differs
-    # between the two arms is the xrdp build
-    [x014]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x017 (#78): the SAME xorgxrdp as x014/x015 -- the pump split is
-    # xrdp-internal and the producer must stay identical
-    [x017]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x018/x019 (#80 step 4 / #81): the credit frontier. The SAME
-    # xorgxrdp as x014/x015/x017 -- #80 changed only the arithmetic that
-    # produces the credit, not the wire's credit semantics, so the
-    # producer side is byte-identical to the arms this pair is read
-    # against. If this deb ever differs from x017's, the head-to-head
-    # against x017 is void.
-    [x018]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x019]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x020/x021 (the merged eager-ack A/B): the SAME xorgxrdp as
-    # x017/x018/x019 and the SAME image on both halves. The producer is
-    # not part of this experiment -- the treatment is one gfx.toml line
-    # in xrdp -- so any difference here would void the pair.
-    [x020]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x021]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x023/x024 (owner-directed 2026-08-07): the non-regression pair.
-    # x023 = credit frontier at wire_window 1, the LEGACY-EQUIVALENT
-    # window (same credit ceiling and same client+3 bound as the
-    # shipped frames_in_flight=2 path); x024 = x023 with emit_thread
-    # off. So x020 vs x023 isolates the ack mechanism and x023 vs x024
-    # isolates the emit thread.
-    # x025 (owner-directed 2026-08-07): the LEGACY path with its window
-    # widened to 3 via XRDP_GFX_FRAMES_IN_FLIGHT. Answers the reviewer
-    # objection "why not just raise the old knob?" -- its gfx.toml body
-    # is byte-identical to x020, so the env var is the only difference.
-    # x026: the LEGACY ack path carrying the strip payload, so the
-    # multi-monitor comparison against x022 (frontier + strip) is not
-    # producer-limited the way the textflood pair was (margin 0.5x).
-    # x027: THE INTERACTIVE ARM -- XFCE desktop, shipped defaults, built
-    # from HEAD so what the owner looks at is what actually ships.
-    # x028: frontier at wire_window 4 -- the leg that decides whether the
-    # session-wide window is what limits a monitor at M = 2 (owner,
-    # 2026-08-07). Same image and payload as x022; one config line apart.
-    # x029 (#91): the three attribution fields. Shipped defaults, two
-    # monitors, strip payload -- the arm the two approved legs run on.
-    # x030 (#92): the SAME xorgxrdp as every textflood arm from x014 on.
-    # The sparse-aux cadence is entirely inside xrdp -- the producer still
-    # captures and packs both views on every frame; what changes is
-    # whether xrdp feeds the aux one to an encoder. A different producer
-    # here would void the comparison against the archived numbers.
-    [x030]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x029]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x028]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x027]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x026]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x025]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x023]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    [x024]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
-    # x022 (BACKLOG #83): same server as x021, different PAYLOAD.
-    [x022]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    # BACKLOG #104: the whole matrix is ONE xrdp build on ONE
+    # xorgxrdp. Every arm names it explicitly rather than taking a
+    # default, so a future arm cannot silently pair differently.
+    [x031]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x032]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x033]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x034]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
+    [x035]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
-    [arm-e]=c693eeab5ec2
-    [arm-m]=39bb08a48377.xx5b9650c-xfce
-    [arm-n]=34795577580b.xx5b9650c-xfce
-    [arm-p]=6894d7de2202.xx5b9650c-xfce
-    [arm-q]=34795577580b.xx957fa79
-    [arm-r]=f7acb5979788.xxd77d054
-    [arm-s]=52b8798839ad.xxd77d054
-    [arm-t]=5dae11f63adb.xxd77d054
-    [arm-u]=348a16dde3f3.xx10fa3aa
-    [arm-v]=348a16dde3f3.xx10fa3aa
-    [arm-w]=e6e1f6f5641e.xx10fa3aa
-    [x001]=4bbf11814323.xx10fa3aa
-    [x002]=4bbf11814323.xx10fa3aa
-    # -tf = the SAME xrdp deb, image rebuilt with the textflood binary.
-    # A distinct tag so x001/x002 keep the exact image they were measured on.
-    [x003]=4bbf11814323.xx10fa3aa-tf
-    [x004]=4bbf11814323.xx10fa3aa-tf
-    # #61e: a NEW tag, never a rebuild of the -tf image -- x003/x004
-    # keep the exact bytes their 1.12x was measured on.
-    # #61e v2: the ring-buffer tracer (FR-TRACE-1). The v1 tag
-    # 05847031a303 is the one whose SHARED FILE* measured 135 ms.
-    [x005]=2781220ae747.xx10fa3aa-tf
-    [x006]=2781220ae747.xx10fa3aa-tf
-    # x007: the UNTRACED twin of x006 -- the SAME image, differing only
-    # in that its manifest omits XRDP_PERF_TRACE. It is the only control
-    # that can show whether observing the pipeline changes it.
-    [x007]=2781220ae747.xx10fa3aa-tf
-    # x013: the ring-traced build (#61h). Shipped source is identical to
-    # the 66a60311 image already on this box, but that tag names a commit
-    # the history rewrite removed, so it is rebuilt from a hash that still
-    # exists rather than deployed from a package nothing can trace.
-    [x013]=82babb9fe4ba.xx10fa3aa-tf
-    # x014: x013 plus BACKLOG #75 -- the LTR rewrite copies the child's
-    # already-escaped payload instead of unescaping and re-escaping the
-    # whole picture around a 30-byte header edit. gfx.toml body is
-    # x013's byte for byte, so the arms differ only in the xrdp deb.
-    [x014]=73e4cb76d483.xx10fa3aa-tf
-    # x015: BACKLOG #76 -- the SAME TAG as x014 on purpose. This arm ships
-    # no new code; it is x014 with XRDP_GFX_FRAMES_IN_FLIGHT=1 in its
-    # manifest, so the image cache hits and nothing is built. Deploying an
-    # env-only arm this way is the cheap shape: no deb, no podman build,
-    # no k3s import.
-    [x015]=73e4cb76d483.xx10fa3aa-tf
-    # x017 (#78): x015's config on the pump-split instrumented xrdp
-    # (feedend/outfirst on the existing perf ring, nothing else)
-    [x017]=661ff5fc64fa.xx10fa3aa-tf
-    # x018/x019 (#80 step 4 / #81): the SAME TAG on both. The pair is a
-    # WAN comparison, so a build difference between its two halves would
-    # be the one thing that ruins it; the RTT is applied from the host by
-    # netem_rtt.sh and lives in neither image nor manifest.
-    [x018]=1d5bc0960db8.xx10fa3aa-tf
-    [x019]=1d5bc0960db8.xx10fa3aa-tf
-    # x020/x021 (the merged eager-ack A/B): x018/x019's TAG on both, on
-    # purpose. These arms ship no new code -- they are gfx.toml and one
-    # env var -- so the image cache hits, nothing is built, and the two
-    # halves of the A/B are the same bytes by construction. This tag
-    # predates the payload-identity suffix below; it is grandfathered
-    # and must not be rebuilt (see PAYLOAD_HASH).
-    [x020]=1d5bc0960db8.xx10fa3aa-tf
-    [x021]=1d5bc0960db8.xx10fa3aa-tf
-    [x023]=1d5bc0960db8.xx10fa3aa-tf
-    [x025]=1d5bc0960db8.xx10fa3aa-tf
-    [x026]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
-    [x028]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
-    [x029]=1fed64c16a89.xx10fa3aa-tf.pc0097388
-    # x030 (#92): a NEW image -- this is the first arm carrying the
-    # sparse-aux implementation. The payload suffix moves too, because
-    # the onscreen probes joined the payload set on 2026-08-08.
-    [x030]=7b550f6ae87f.xx10fa3aa-tf.p2fde5531
-    [x027]=821218e54c24.xx10fa3aa-xfce.pc0097388
-    [x024]=1d5bc0960db8.xx10fa3aa-tf
-    # x022 carries the STRIP-RENDER payload, so its tag must name the
-    # payload: same server build, different producer. Comparing it with
-    # x021 is a comparison of two payloads on one server, which is
-    # exactly what BACKLOG #83 asks and what the .p suffix now records.
-    [x022]=1d5bc0960db8.xx10fa3aa-tf.pc0097388
+    # ONE TAG FOR THE WHOLE MATRIX. If these five ever differ, the
+    # matrix has stopped being a matrix: the arms would no longer
+    # be one variable apart. That is exactly what happened to the
+    # fleet this replaced -- 17 pods across five images.
+    [x031]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+    [x032]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+    [x033]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+    [x034]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+    [x035]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
 )
 declare -A TAG_DEB=(
-    [c693eeab5ec2]="xrdp-dev_0.10.80+gitc693eeab5ec2_amd64.deb"
-    # .xx<hash> = same xrdp deb, rebuilt image embedding xorgxrdp <hash>
-    [39bb08a48377.xx5b9650c]="xrdp-dev_0.10.80+git20260728011331.39bb08a48377_amd64.deb"
-    [34795577580b.xx5b9650c]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
-    # BACKLOG #48: ltr_rekey_surface_reset — churn masked from the client
-    [6894d7de2202.xx5b9650c]="xrdp-dev_0.10.80+git20260729030225.6894d7de2202_amd64.deb"
-    # arm-q: arm-n's xrdp deb, image rebuilt on the recon xorgxrdp
-    [34795577580b.xx957fa79]="xrdp-dev_0.10.80+git20260728163625.34795577580b_amd64.deb"
-    # arm-r: BACKLOG #45 steps 0-7 (xrdp) paired with step 6 (xorgxrdp
-    # d77d05463e52). This is the pair every #45 gate is measured on.
-    [f7acb5979788.xxd77d054]="xrdp-dev_0.10.80+git20260729233553.f7acb5979788_amd64.deb"
-    # arm-s (#52 E5-2): #45 steps 0-7 PLUS the step-0 log clock fix — the
-    # trace timestamps this benchmark is read from have to be right
-    [52b8798839ad.xxd77d054]="xrdp-dev_0.10.80+git20260730013346.52b8798839ad_amd64.deb"
-    # arm-t (#52 E5-2 baseline): #45 steps 0-4 only (a0d9e773) + the same
-    # log clock fix, from branch bench/e52-arm-t-baseline
-    [5dae11f63adb.xxd77d054]="xrdp-dev_0.10.80+git20260730013437.5dae11f63adb_amd64.deb"
-    # arm-u/arm-v (BACKLOG #70): the eager slot-release ack, off by
-    # default in the binary and turned on per arm by gfx.toml
-    [348a16dde3f3.xx10fa3aa]="xrdp-dev_0.10.80+git20260731212249.348a16dde3f3_amd64.deb"
-    # arm-w (BACKLOG #70B): the same encoder, plus common/perf_trace and
-    # the worker-stage brackets
-    [e6e1f6f5641e.xx10fa3aa]="xrdp-dev_0.10.80+git20260801010944.e6e1f6f5641e_amd64.deb"
-    # x001/x002 (BACKLOG #70B): the assembler thread, plus the
-    # prerequisites that make its join point sound (emit no longer
-    # touches the ffmpeg handle array; arm state published after the
-    # join). Default off in the binary; armed per arm by gfx.toml.
-    [4bbf11814323.xx10fa3aa]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
-    [4bbf11814323.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801021842.4bbf11814323_amd64.deb"
-    # x005/x006 (BACKLOG #61e): the same encoder plus five perf-trace
-    # brackets -- book, rel, wait, enq, take. Behaviourally a no-op with
-    # the sink disarmed, which gate 4 (x005 vs x003, x006 vs x004) is
-    # there to confirm rather than assume.
-    [05847031a303.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801141607.05847031a303_amd64.deb"
-    [2781220ae747.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801150407.2781220ae747_amd64.deb"
-    # x013 (#61e redo): per-frame records on common/perf_trace's ring
-    # instead of log.c -- the #61h fix, plus the six-field payload
-    [82babb9fe4ba.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801213501.82babb9fe4ba_amd64.deb"
-    # x014 (#75): the rewrite optimisation, output byte-identical to the
-    # x013 build (CI golden vectors + an FNV-1a digest over 120 whole 4K
-    # pictures)
-    [73e4cb76d483.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260801232618.73e4cb76d483_amd64.deb"
-    # x017 (#78): the pump-split instrument -- feedend + outfirst per
-    # child per cycle on the existing ring; behaviourally a no-op with
-    # the sink disarmed
-    [661ff5fc64fa.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260802030326.661ff5fc64fa_amd64.deb"
-    # x018/x019 (#80): the credit frontier. Supersedes x017's build and
-    # keeps its instrumentation -- feedend/outfirst are still there, plus
-    # ackslot/ackregion carrying the client frontier and C, and egress
-    # carrying the transport's queued KiB from trans::wait_bytes.
-    [1d5bc0960db8.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260803024109.1d5bc0960db8_amd64.deb"
-    # x027 (the interactive arm): built from HEAD on 2026-08-07, so it
-    # carries the SHIPPED defaults -- the credit frontier on by default
-    # at wire_window 2, and no emit thread in the binary at all.
-    [1fed64c16a89.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260807211642.1fed64c16a89_amd64.deb"
-    [821218e54c24.xx10fa3aa]="xrdp-dev_0.10.80+git20260807153324.821218e54c24_amd64.deb"
-    # x030 (#92): the sparse-aux implementation -- the aux view skipped
-    # in submit/pump/collect, the luma-only LC=1 framing, and the aux
-    # view's own intra refresh interval. Built from HEAD on 2026-08-08.
-    [7b550f6ae87f.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260808210040.7b550f6ae87f_amd64.deb"
+    # BACKLOG #104: xrdp at 3ca17bea -- the encoder-input-pipe
+    # requirement (#103) and the sparse-aux cadence (#92) both in.
+    [3ca17beaa84d.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260810000106.3ca17beaa84d_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---

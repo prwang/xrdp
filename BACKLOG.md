@@ -24,7 +24,7 @@ If you are about to paste a results table into this file, it goes in
 
 ---
 
-## Deployed state (2026-08-06)
+## Deployed state (2026-08-10)
 
 * **Branches:** `/work` and `/workUpdateXorgXrdp` are both on
   `dev/avc444_metablock_checkpoint` (WIP ended 2026-08-06; merge
@@ -32,11 +32,14 @@ If you are about to paste a results table into this file, it goes in
   Nothing pushed — publishing is the owner's command to run.
 * **Host install:** the fixed known-good reference for bisect sessions;
   never mutated during a campaign (CLAUDE.md deployment rules).
-* **Fleet:** arms are containers on `127.0.0.1:400xx`, images pinned
-  per-arm in `PR-demo/mac_bisect_matrix/k8s/*.yaml`, certificates in
-  `certs/`. x018/x019 carry the #80 credit-frontier build
-  (`1d5bc0960db8.xx10fa3aa-tf`, `eager_slot_ack = true`,
-  `wire_window = 1`); x013–x017 are pre-frontier reference arms.
+* **Fleet (rebuilt 2026-08-10, #104):** FIVE arms, `x031`–`x035` on
+  ports 40047–40051, all on ONE image
+  (`3ca17beaa84d.xx10fa3aa-tf.p2fde5531`) and one xorgxrdp, differing
+  only in `gfx.toml`: reference / frontier C=1 / frontier C=2 / frontier
+  + sparse chroma / AVC420. All run `SESSION_KIND=textflood_strip`.
+  **x035 is NOT CERTIFIED** — the wire audit is the wrong instrument for
+  a single-view stream; see #104. Everything before this was
+  garbage-collected: 30 arm configs, 89 captures, all old certificates.
 * **T4:** decommissioned 2026-07-31. Its recorded numbers stay
   attributable through `docs/experiments/` and `PRD.md`; re-provisioning
   from bare AMI is #93's first step.
@@ -72,8 +75,9 @@ stay as "(was #NN)" in each header.
 13. **#98** — flow-control survey: owner decisions + owed legs
 14. **#99** — the gate cannot tell "wrong target" from "no records" (filed 2026-08-06)
 15. **#102** — a client displaces one screen by 33 px until minimise+restore (filed 2026-08-08; DOCUMENT ONLY by owner ruling, below #92)
-16. **#103** — the raw-frame pipe is clamped to 8 KiB in this container; every absolute fleet number carries ~5 ms of it (filed 2026-08-08)
-17. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
+16. ~~**#103** — the clamped raw-frame pipe~~ **mostly DONE 2026-08-09**: guard shipped, requirement measured at 64 KiB; (b) sysctl permanence and (c) the copy itself remain
+17. ~~**#104** — the PR evidence matrix~~ **DONE 2026-08-10**, except x035's certification instrument
+18. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -254,33 +258,36 @@ both landed, and items 1–3 below are CLOSED.**
      "both clients" is not evidenced. The criterion itself, both halves,
      is now written down in `PR-demo/INTERACTIVE_ARM.md`.
 
-## #104 — the PR evidence matrix: five arms, one image, and the rest of the fleet retired (filed 2026-08-09)
+## ~~#104 — the PR evidence matrix~~ **DONE 2026-08-10** — five arms on one image, the rest garbage-collected
 
-**Owner directive:** as the branch matures into the clean-room pass and
-the PR write-up, stand up *a few representative instances in the pod,
-with the frontier in various options plus simulated conditions, each
-supporting a point in the writing document* — and do NOT maintain the
-legacy results; most are retired and garbage-collected.
+**Owner directive:** *"Execute Cleanup first and close #104, agreed the
+five new arms x31 --- x35 and garbage collect everything else."*
 
-**Proposal written, nothing built or torn down:**
-`docs/pr_evidence_matrix.md`. Ten claims the PR makes, the cheapest
-instrument for each (two need no fleet time at all — CI and a
-microbench), five arms differing only in `gfx.toml` and built from ONE
-image, with round-trip time, payload, geometry and bandwidth as run-time
-conditions rather than arms. Today's fleet is 17 pods across FIVE
-images, which is why no two of them are comparable.
+Built and deployed: `x031` reference (legacy flow control), `x032`
+frontier at window 1, `x033` frontier at window 2, `x034` x033 plus the
+sparse-chroma cadence, `x035` AVC420 — **one image
+(`3ca17beaa84d.xx10fa3aa-tf.p2fde5531`), one xorgxrdp, differing only in
+`gfx.toml`**, all on `SESSION_KIND=textflood_strip`. Collected: 30 arm
+configs, 89 capture directories (32 GB -> 32 MB), every old certificate,
+17 running pods, and `verify_matrix.sh` (which drove arms a-k, gone
+since July). Design and the claim-to-arm mapping:
+`docs/pr_evidence_matrix.md`; inventory: `PR-demo/mac_bisect_matrix/README.md`.
 
-**BLOCKING, and it is a harness-selection mistake rather than missing
-work.** Every recent run used `textflood` (16.2 ms/frame), which after
-the pipe fix gives an FR-BENCH-1 margin of **1.04x** against the PRD's
-2.0x floor — the payload and the pipeline are the same speed, so the
-gate voids overlap claims and the fps figures may be reporting the
-payload. The fast payload already exists (#83, `--scroll strip`,
-**4.5 ms/frame, margin 3.94x at exactly this geometry**) and only two of
-92 captures ever used it. **Step 0: one 20 s leg on x030 with
-`SESSION_KIND=textflood_strip`, ~5 min**, which re-verifies the producer
-on the current build and decides whether the 55.6/58.6 fps figures stand
-or are withdrawn. Awaiting the owner.
+**The encoder-input-pipe guard (#103) had its first live test and passed
+on all five arms** — `PIPE VERDICT: OK` in every certificate, read out
+of each pod's own log after 3 s of real encoding.
+
+**RED AND OPEN: x035 is NOT CERTIFIED.** `arm_certify.sh` runs
+`avc444_ltr_wire_audit.py`, which asserts two-view long-term-reference
+properties on a single-view AVC420 stream: it reads the whole stream as
+"aux", reports `main pictures=0`, and fails A1-A6. It is the wrong
+instrument for that arm rather than a broken arm — but changing a
+certification instrument is a separate, announced act and it has not
+been made. **x035 must not be measured until it is.** The likely shape,
+for the owner to rule on: `arm_certify.sh` selects its audit from the
+arm's own `avc_mode`, and an AVC420 arm is certified on the black-frame
+decode plus a single-view conformance check, with the LTR assertions
+reported SKIP rather than FAIL.
 
 ## #103 — the raw-frame pipe is clamped to 8 KiB in this container, and every fleet number carries it (filed 2026-08-08)
 

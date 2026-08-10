@@ -1,2 +1,0 @@
-xorg_pid=17608 ticks=5524 hz=100 wall=60.015682376
-xorg_cpu_frac=.920
