@@ -106,7 +106,15 @@ set -u
 D=$(cd "$(dirname "$0")" && pwd)
 SECS=${1:-120}
 ARM=${E_ARM:-arm-r}
-PORT=${E_PORT:-40017}
+# BACKLOG #104: DERIVE the port from the arm's own manifest, exactly as
+# arm_certify.sh does. It used to default to a hardcoded 40017, which
+# was one arm's port in a fleet that has since been replaced twice --
+# and on 2026-08-10 that cost a whole 20 s run: E_ARM=x033 was passed,
+# E_PORT was not, the client dialled 40017 where nothing listens, and
+# the gate reported "0 GFX_TRACE send records" as though the ARM were
+# silent. A default that names one arm is a trap for every other arm.
+PORT=${E_PORT:-$(sed -n 's/^ *hostPort: *//p' "$D/k8s/$ARM.yaml" 2>/dev/null | head -1)}
+PORT=${PORT:-40017}
 NS=${E_NS:-bisect-matrix}
 # TARGET: pod (a bisect-fleet arm, the default) or ssh (a real box reached
 # over an ssh port-forward — the T4). The client side is identical either
@@ -733,7 +741,8 @@ ${FREEZE_AT:+, FREEZE LEG at +${FREEZE_AT}s} ==="
     echo "monitors: $(tail -1 "$OUT/client-monitors.txt")"
     echo "payload:  SESSION_KIND = $(cat "$OUT/deployed_session_kind.txt")"
     echo "refresh:  intra_refresh_frames = \
-$(grep -a intra_refresh_frames "$OUT/gfx.toml" | tr -d ' ' | cut -d= -f2)"
+$(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
+  "$OUT/gfx.toml" | head -1)"
     # Same rule as the freeze banner below: a run whose encoder input
     # pipe was clamped must never be readable as an ordinary one, so it
     # is stated here, above every number it contaminates.
