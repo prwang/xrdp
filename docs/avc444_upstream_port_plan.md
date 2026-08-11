@@ -1,8 +1,8 @@
 # AVC444 external-ffmpeg backend — upstream port plan
 
-Status: **PLAN. Nothing is cut until step 0's branch point is agreed.**
+Status: **BASE PINNED. Cleanup implementation has not been cut.**
 
-Owner directives this plan implements (2026-08-10):
+Owner directives this plan implements (2026-08-10, amended 2026-08-11):
 
 1. The work goes upstream as **ONE pull request**, internally sliced into
    reviewable commits. The earlier five-PR proposal is withdrawn: each PR
@@ -10,12 +10,16 @@ Owner directives this plan implements (2026-08-10):
    they are prerequisites for each other, and the regressions in the
    early ones are fixed by the later ones. Only the final state is
    complete.
-2. **Step 0 is a truly synced `upstream/devel`.** The branch point is the
-   real upstream tip, not a stale fork mirror.
+2. **Step 0 is pinned to
+   `fe850a22c08a624c66bbac07e310251782e6f828`.** Newly fetched
+   `origin/devel` and `upstream/devel` both resolve to that commit. It is
+   the cleanup implementation base even if either ref later advances.
 3. **`common/perf_trace` is excluded from the PR branch**, and the trace
-   code on the dev branch is left untouched. After the port is cooked, a
-   private branch off the PR branch carries perf_trace back, for use only
-   where an experiment strictly needs it.
+   code on the dev branch is left untouched. The former private
+   port-after-PR deliverable is withdrawn: performance characterization
+   uses standard external Linux profiling where possible, with standard
+   USDT tracepoints proposed separately only if dynamic probes cannot
+   recover a required semantic identity.
 4. **The shipped `wire_window` default is 1**, with 2 documented in
    `gfx.toml` and `gfx.toml(5)` as the value that removes the stall and
    what it costs. The PR text raises the question so maintainer feedback
@@ -46,42 +50,55 @@ remove it is needed or possible.
 
 ## Step 0 — the branch point
 
-**Done 2026-08-10.** `git fetch upstream devel` moved `upstream/devel`
-from `3af31df3` (2026-07-02) to **`fe850a22`**, 14 commits. The fork
-mirror everything on this branch has been diffed against,
-`origin/devel` = `8812646d`, is **11 commits behind that tip** and is a
-clean ancestor of it (0 commits ahead), so nothing has to be reconciled
-— only rebased forward.
+**Pinned by the owner 2026-08-11.** Newly fetched `origin/devel` and
+`upstream/devel` both resolve to
+`fe850a22c08a624c66bbac07e310251782e6f828`. This is the cleanup
+implementation base. Do not replace it with "whatever devel is on the
+day"; a later upstream move is an explicit rebase decision, not an
+implicit change of the experiment and review base.
 
-`origin` itself cannot be fetched from this box (no SSH key: *"Permission
-denied (publickey)"*), so `origin/*` refs here are frozen at their last
-fetch. Only `upstream` is reachable, over https, and it is the one that
-matters.
+The pinned base is 14 commits past this dev line's merge-base
+`3af31df3` (2026-07-02): 1,229 additions and 90 removals across 14
+files. The changes were read semantically and checked with synthetic
+merges.
 
-**Of the 15 existing source files this branch modifies, exactly one was
-touched by those 11 commits:** `xrdp/xrdp_mm.c`, +13/−11, commit
-`de284747` — a reordering in the dynamic-resize state machine so the
-screen bitmap is resized *before* the encoder and GFX surfaces are
-created. That ordering is favourable to this work (the encoder is
-created already knowing the new geometry) but the rebase must be checked
-by hand rather than accepted from a clean `git` merge, because this
-branch changes `xrdp_encoder_create`'s cost and what it spawns.
+### New-base compatibility audit
 
-Also landed upstream in that range and worth reading before the rebase,
-because they are on the EGFX transport path this backend feeds:
-`be95ba30`/`3ef2f883` (a separate dechunker module with tests),
-`b824c93b`/`a2d130bc`/`5ae11e2a` (DYNVC multi-chunk reassembly and
-stream-bounds fixes), and `de284747`/`a5975210` (GFX state machine and
-its comments). None of them touch a file this branch creates.
+**Verdict: no breaking AVC444 API, wire-contract, configuration or build
+change.** Preserve one new upstream ordering and inherit the remaining
+hardening:
 
-**The branch point to agree before anything is cut:** `upstream/devel`
-at `fe850a22`, or whatever it has become on the day the branch is cut —
-re-run the fetch and re-run the one-file check above rather than
-trusting this paragraph.
+* `de284747` moves `xrdp_bitmap_resize()` before GFX-surface and encoder
+  creation in the dynamic-resize state machine. This is favourable to
+  AVC444—the external encoder is created against the target geometry—but
+  the cleanup must retain that order when adding its more expensive
+  `xrdp_encoder_create()` path.
+* `b824c93b`, `be95ba30` and `3ef2f883` replace incoming static-channel
+  chunk assembly with the tested `common/dechunker` module. The
+  `xrdp_drdynvc` callback signatures used by EGFX do not change. This is
+  the receive path for client DVC messages (including frame acks), not
+  the server's outgoing AVC byte stream; inherit it and keep the normal
+  full-frame/ack smoke check.
+* `a2d130bc`, `5ae11e2a`, `e4f4364c` and `b36ad7b2` harden stream and
+  pointer bounds. They change no AVC-facing API and must not be undone by
+  copied old code.
+* `2e8a4a82` adds per-suite selection to the common-test runner. It
+  conflicts only with this dev branch's perf-trace test registration.
+  Since custom perf_trace is excluded, the cleanup has no reason to
+  touch that runner.
+
+`git merge-tree --write-tree fe850a22 avc444-ffmpeg-upstream` completes
+without a conflict; its only common modified file is `xrdp/xrdp_mm.c`
+and Git merges the resize ordering cleanly. The same synthetic merge of
+the whole current dev branch reports one conflict,
+`tests/common/test_common_main.c`, entirely from custom perf_trace/log
+test registration. Excluding that instrumentation removes the conflict.
+`common/trans.{c,h}`'s `wait_bytes` counter is likewise trace-only and
+is not part of the cleanup when the custom sink is absent.
 
 ## What ships in the PR, and what does not
 
-### Excluded: `common/perf_trace` (owner directive 3)
+### Excluded: `common/perf_trace`; use standard external tracing
 
 `common/perf_trace.{c,h}` (614 lines), `tools/perf_trace_bench.c` (416),
 `tests/common/test_perf_trace.c` (298) and its registration in
@@ -106,13 +123,49 @@ Three things make this cheap rather than costly:
   what is *copied out*, not about what exists here. Nothing in
   `/work` is stripped.
 
-**The consequence to state plainly in the PR: the upstream branch has no
-per-frame instrumentation, so no timing number can be reproduced on it
-as it stands.** The evidence for the performance claims is measured on
-the dev branch and on the fleet arms, and the PR says so. A maintainer
-who wants to reproduce a number needs the perf_trace branch described in
-directive 3, and that branch is the deliverable that makes the claims
-auditable — it should exist before the PR is opened, not after.
+**There is no private perf_trace port after the PR.** The custom ring is
+useful dev history, but porting a private asynchronous logger would
+duplicate Linux's established perf/uprobe machinery and leave reviewers
+with a second tracing system that has little independent merge value.
+
+The replacement is a build-ID-pinned external profiling recipe and
+standard `perf.data` capture:
+
+1. Build the cleanup branch with its normal `-g -O2`; archive the exact
+   unstripped binary and Build ID with each capture.
+2. Use `perf probe -x <binary>` userspace probes for the symbolized
+   submit/pump/collect functions and DWARF line probes for internal
+   worker wait/drain boundaries. Record with `perf record`; render with
+   `perf script`. Where summary distributions suffice, a bpftrace script
+   may aggregate durations into kernel maps instead of emitting every
+   event.
+3. Carry explicit frame identity from function arguments. This was
+   checked on the current binary: `perf probe -V` exposes
+   `desktop_sequence` on both submit and collect, and dry-run probe
+   definitions resolve it to the actual calling-convention registers.
+   Never recover cross-frame ordering by a time-window join.
+4. Before quoting a number, run one approved armed-versus-none
+   transparency calibration with the exact probe set. Archive probe
+   definitions, tool/kernel versions, binary Build ID, raw `perf.data`,
+   payload, geometry and trace-loss counters.
+
+This is feasible from the binary: `xrdp/.libs/xrdp` is unstripped, has
+DWARF and a symbol table; `perf probe` resolves
+`xrdp_ffmpeg_avc444_submit_pair`, `_pump_pairs`, `_collect_pair`,
+`proc_enc_msg`, and source-line variables. It is **not runtime-proven on
+this rig yet**. The dev container has `kernel.perf_event_paranoid=4` and
+no effective `CAP_PERFMON`/`CAP_BPF`; `perf stat`, perf probe attachment
+and bpftrace all fail permission checks. Fleet pods are privileged but
+do not contain the tools or mount tracefs. Enabling that host/pod
+observability is an owner-controlled measurement setup, not an xrdp
+source change.
+
+Dynamic probes are less stable than source tracepoints: an optimized
+local may disappear and source-line offsets move between builds. If a
+load-bearing identity or state value cannot be recovered from a function
+argument or DWARF location, the fallback is a small, separately reviewed
+set of standard USDT probes. It is not a licence to re-port the custom
+ring, and no performance claim may silently drop the missing identity.
 
 ### Not written into any slice: the `tools/` benches
 
@@ -132,8 +185,9 @@ bench copied across.
 
 ### The size the reviewer actually sees
 
-Against `origin/devel`, C and headers only, `tests/` and `PR-demo/`
-excluded:
+Pre-cleanup estimate against the then-current `origin/devel`, C and
+headers only, `tests/` and `PR-demo/` excluded. Recompute this table from
+the authored branch before using it as the PR diff size:
 
 | | files | added | removed |
 |---|---|---|---|
@@ -280,4 +334,3 @@ display, isoluminant 1px-stripe bands render softened, while mstsc and
 UWP show a crisp grid — i.e. true 4:4:4 on the wire. This is a
 client-side artifact of that client's HiDPI pipeline, not reachable from
 the server. Accepted; does not block the port.
-

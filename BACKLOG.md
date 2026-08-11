@@ -88,21 +88,28 @@ PR, internally sliced into commits that each build and pass `make
 check`. Owner directives 2026-08-10: one PR (the five-PR proposal is
 withdrawn — the first four would not stand alone); step 0 is a truly
 synced `upstream/devel`; `common/perf_trace` is excluded from the PR
-branch with the dev-branch trace code left untouched; the shipped
+branch with the dev-branch trace code left untouched; no private
+perf-trace port is required (owner direction 2026-08-11 — use standard
+external profiling after the main PR); the shipped
 `wire_window` default is 1 with 2 documented, and the PR asks
 maintainers whether 2 should be the default.
 
 Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
 2026-07-24 version is in git history, not reproduced in the file).
 
-**Done 2026-08-10**
+**Done through 2026-08-11**
 
-* Step 0 fetched: `upstream/devel` `3af31df3` → `fe850a22`, 14 commits.
-  `origin/devel` (`8812646d`) is 11 behind it and a clean ancestor.
-  `origin` is not fetchable from this box (no key); `upstream` is, over
-  https. Of the 15 existing source files this branch modifies, exactly
-  one moved upstream: `xrdp/xrdp_mm.c` +13/−11 (`de284747`, resize
-  before encoder/surface creation).
+* **The cleanup base is pinned** (owner, 2026-08-11) to full commit
+  `fe850a22c08a624c66bbac07e310251782e6f828`. Newly fetched
+  `origin/devel` and `upstream/devel` both resolve to it. The cleanup
+  does not silently move if either ref advances.
+* The pinned base is 14 commits past this dev line's merge-base
+  `3af31df3`. Audit: no AVC444 API or xup wire-contract break; preserve
+  upstream's resize-before-encoder-create ordering in `xrdp_mm.c`.
+  Incoming DVC dechunking and stream bounds are hardened with unchanged
+  callbacks. The old cleanup branch merges cleanly; the whole dev tree's
+  sole merge conflict is perf_trace's common-test registration, which is
+  excluded. Full audit: `docs/avc444_upstream_port_plan.md`.
 * The `wire_window` default changed 2 → 1 in the dev tree, so the port
   copies a tree that already carries the shipped decision:
   `xrdp/xrdp_tconfig.h`, the defaults comment in `xrdp/xrdp_tconfig.c`,
@@ -118,18 +125,22 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
 
 **Open**
 
-* (a) **The branch point is not agreed and nothing is cut.** Re-fetch
-  and re-run the one-file check on the day it is. The port branch lives
-  in its own worktree off the upstream tip (owner directive
-  2026-08-10); `/work`'s tip is always dev.
-* (b) **The perf_trace branch is a deliverable, not an afterthought.**
-  With perf_trace excluded, no timing claim in the PR can be reproduced
-  on the PR branch as it stands. The private branch that carries it
-  back should exist before the PR is opened.
-* (c) **The evidence section is unwritten** because every timing that
-  predates 2026-08-08 was taken with the encoder input pipe clamped
-  (#103). Re-measuring the flow-control arms (x031/x032/x033) is fleet
-  time and needs owner approval.
+* (a) **Nothing is cut yet.** The port branch will live in its own
+  worktree off pinned `fe850a22`; `/work`'s tip is always dev.
+* (b) **Performance characterization moves to standard external
+  tracing; there is no private perf_trace-port deliverable.** The local
+  binary is suitable for `perf probe`/uprobes (DWARF, symbols and frame
+  sequence arguments verified), but this container cannot attach with
+  `perf_event_paranoid=4` and no effective `CAP_PERFMON`/`CAP_BPF`.
+  A host-enabled runtime capture and armed-vs-none transparency check
+  remain before external-probe numbers are quotable. If a semantic
+  identity cannot be recovered externally, propose standard USDT
+  tracepoints separately — do not re-port the custom sink by default.
+* (c) **The evidence section is unwritten, but its three current legs are
+  measured.** Legacy acknowledgement / frontier window 1 / frontier
+  window 2 were re-run on 2026-08-10 with unclamped pipes, the same
+  image, one 4K monitor and the ring trace. Record:
+  `docs/experiments/90-the-eight-ms-prize-was-stale.md`.
 * (d) `docs/man/gfx.toml.5.in` references
   `PR-demo/BREAKING_CHANGE_credit_frontier.md`, a path that does not
   exist in a tree without `PR-demo/`. It must not survive the port —

@@ -3737,14 +3737,13 @@ The dev branch stays as-is (history + scaffold); the PR is rebuilt clean.
   Keep `flush_next` — that is the teardown/resize drain, unrelated to the
   spammer.
 
-#### Base the clean-room branch on `origin/devel`, not local `devel`
-Cut the clean branch from `origin/devel` (currently 8812646d, 2026-07-16;
-remote cache is synced — do not run `git fetch`, this env has no push/fetch
-creds). Against that ref our branch is **41 ours-only / 3 origin-only**,
-merge-base `3af31df3` (Jul 2). Do NOT use the local `devel` ref (21d38d0c,
-Jun 17) as the base or comparison — it is ~a month stale, and that staleness
-is why `git diff devel..HEAD` shows a set of changes that are **upstream, not
-ours**, and must NOT appear in the PR:
+#### Base the clean-room branch on pinned `fe850a22`, not local `devel`
+Owner directive 2026-08-11: the cleanup implementation base is full commit
+`fe850a22c08a624c66bbac07e310251782e6f828`. Newly fetched `origin/devel`
+and `upstream/devel` both resolve to it. Do NOT move the base implicitly if a
+remote ref advances, and do not use local `devel` (21d38d0c, Jun 17). The
+feature line's merge-base remains `3af31df3` (Jul 2). Stale-base comparisons
+show changes that are **upstream, not ours**, and must NOT appear in the PR:
 - `libxrdp/xrdp_caps.c`, `xrdp_rdp.c`, `xrdp_sec.c` — upstream CVE fixes
   (CVE-2026-55639 GCC OOB read, and merged fork hardening).
 - `vnc/vnc.c`, `vnc/vnc.h` — CVE-2026-41252 heap overflow + desktop-size
@@ -3766,20 +3765,26 @@ the only non-AVC444 file the PR touches should be `common/xrdp_client_info.h`
 / licensing attestation) — fold it into the NUT slice and the PR cover letter;
 maintainers will ask.
 
-#### Divergence risk: none textual, one semantic touchpoint to verify
-The only commits on `origin/devel` past our merge-base (3af31df3..8812646d)
-are the 3-commit DYNVC multi-chunk reassembly fix (#3829), touching a single
-file, `libxrdp/xrdp_channel.c` — which our branch never touches. Zero conflict
-surface, so **do not rebase the dev branch to "derisk"**: there is nothing to
-resolve, and the clean-room slices apply onto `origin/devel` (which already
-has the fix) as a clean textual apply. One semantic note: large full-screen
-AVC444 frames are chunked over drdynvc, and #3829 corrects multi-chunk
-reassembly — a correctness fix we *inherit* by basing on `origin/devel`.
-Confirm during clean-room smoke that large AVC444 frames reassemble cleanly on
-the new base (expected: fine / better; not a risk, just a checkpoint).
+#### Pinned-base audit: no breaking change; preserve resize ordering
+The 14 commits from `3af31df3..fe850a22` add tested incoming DVC dechunking,
+stream-bound hardening, and a dynamic-resize correction. They change no
+AVC444 API, xup wire contract or configuration. Preserve `de284747`'s order:
+resize the screen bitmap before creating GFX surfaces and the encoder. The
+incoming DVC callback signatures are unchanged; inherit the new dechunker and
+retain a normal full-frame/frame-ack smoke check. Synthetic merge of the old
+cleanup branch is clean. The whole dev branch conflicts only in the common
+test runner where custom perf_trace registered itself; perf_trace is excluded.
+
+Owner direction 2026-08-11 also withdraws the private perf_trace port after
+the main PR. Performance characterization should use build-ID-pinned standard
+Linux perf/userspace probes and archive `perf.data`; bpftrace may aggregate
+summary distributions. Run an armed-versus-none transparency check before
+quoting results. If optimized code hides a required semantic identity, propose
+standard USDT tracepoints separately rather than re-porting the custom sink.
 
 #### Acceptance
-- PR branch = fresh `origin/devel` + the slices below; `git diff` touches only
+- PR branch = pinned `fe850a22c08a624c66bbac07e310251782e6f828` +
+  the slices below; `git diff` touches only
   AVC444 feature files + `CC_GFX_AVC444`; no CVE/vnc/sesman/submodule noise.
 - Every slice builds and `make check` passes on its own (bisectable).
   Re-verified 2026-07-22 after the dump_extra rewrite for the four
