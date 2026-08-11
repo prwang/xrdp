@@ -66,7 +66,7 @@ stay as "(was #NN)" in each header.
 3. ~~**#83** — a faster producer~~ **LANDED 2026-08-06**, acceptance met
 4. ~~**#87** — emit-split and eager-ack ratios~~ **CLOSED 2026-08-06**
 5. **#88** (was #61g) — oracle client 50–150 ms pauses
-6. **#90** (was #74) — lever-2 architecture decision
+6. ~~**#90** (was #74) — lever-2 architecture~~ **WITHDRAWN 2026-08-10**
 7. ~~**#91** — multimon window + m≥2 serial cost~~ **CLOSED 2026-08-08** — our code does not serialise the two screens
 8. **#92** (was #72) — 4:2:0 in motion / 4:4:4 at rest (consolidated 2026-08-06)
 9. **#93** (was #73; absorbs #97/was #60) — T4 re-establishment and re-runs
@@ -628,29 +628,17 @@ socket buffers (it would change what E5 means — the fallback shape the
 honesty rule catches). Not a substitute for the server-side items: a
 perfect client removes the forcing, not the vulnerability.
 
-## #90 (was #74) — lever-2 architecture: DECISION OPEN (owner discussion)
+## ~~#90 (was #74) — lever-2 architecture~~ **WITHDRAWN 2026-08-10**
 
-Overlap `pump` (wait for the ffmpeg children) with `collect` (NUT
-demux + LTR rewrite) — sized by #61e at up to 8.8 of 25.5 ms. **Do not
-start implementation until the shape is decided.** Candidates:
-
-- **A. Depth reorder, one thread** (`subm(N+1) → coll(N) → pump(N+1)`):
-  ~21 ms at m=1, but only while `tail ≤ encode` (3 ms margin today),
-  and a hardwired order idles the children when encode finishes early.
-- **B. Submit/collect stage threads** (owner proposal): submit side
-  owns stdin fds + cadence, collect side owns stdout fds + demux/LTR
-  rewrite, bounded one-frame SPSC queue between; period
-  `max(subm, tail, encode)`, generalises to m≥2 (~27 vs A's ~36 ms
-  projected). Requires a dated amendment to PRD's "exactly one worker
-  thread" paragraph.
-- **C. Resumable-coll coroutines, one thread** — rejected: strictly
-  heavier than a thread for the same 8.5 ms.
-
-Constraints that survive whichever wins: the bounded queue is the
-contract (the bufferbloat prohibition applies); the m≥2 arithmetic is
-projected, not measured (#91 owns those numbers). The old "do #61f
-step 1 first" constraint is retired — #61f's measurement showed the
-delivery-loop delay IS the encode in progress, not scheduling slack.
+The 8.8 ms premise was stale: #75 had already removed 7.44 ms from the
+collect/LTR-rewrite stage, independently of the later pipe fix. On the
+current non-clamped-pipe environment, all three full-AVC444 flow-control
+arms put collect at 1.24–1.28 ms of a 17.9–19.1 ms worker cycle. That
+upper bound does not justify splitting the specified one encoder worker
+into stage threads: the proposed shape violates the PRD's one-worker
+requirement and has insufficient ROI to justify amending it.
+The two-page-pipe penalty was in raw-frame feed, not collect. Record:
+[`90-the-eight-ms-prize-was-stale.md`](docs/experiments/90-the-eight-ms-prize-was-stale.md).
 
 ## #92 (was #72, earlier #66/#63) — 4:2:0 while the screen is in motion, 4:4:4 when it settles (CONSOLIDATED 2026-08-06)
 

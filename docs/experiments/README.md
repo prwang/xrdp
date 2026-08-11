@@ -35,4 +35,5 @@ Where things go:
 | `62-textflood-payload.md` | #62 | DONE — 1.41× RED, later annotated producer-confounded |
 | `64-rect-id-ack-ghost.md` | #64 | CLOSED — root cause REFUTED |
 | `70-eager-slot-release-ack.md` | #70 | DONE — 1.11×, encode‖tail 4.8 → 8.5 ms |
+| `90-the-eight-ms-prize-was-stale.md` | #90 | WITHDRAWN — PRD-violating stage threads have insufficient ROI at 1.24–1.28 ms |
 | `61h-the-logger-was-in-the-measurement.md` | #61h | the per-frame trace was `log.c` on the measured path; 25 captures and 3 records voided, #61c/#61e/#70B reopened |

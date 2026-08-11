@@ -1,0 +1,7 @@
+== xrandr --listmonitors ==
+Monitors: 1
+ 0: +*DUMMY0 2560/677x1440/381+0+0  DUMMY0
+FAIL: DUMMY0 active geometry is '2560x1440' but mode '3840x2400R'
+  promises '3840x2400' — a mode with this name exists with the
+  WRONG timings. Delete it (xrandr --delmode DUMMY0 3840x2400R;
+  xrandr --rmmode 3840x2400R) or pass the matching MM_MODELINE.
