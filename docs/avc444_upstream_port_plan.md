@@ -2,7 +2,8 @@
 
 Status: **BASE PINNED. Cleanup implementation has not been cut.**
 
-Owner directives this plan implements (2026-08-10, amended 2026-08-11):
+Owner directives this plan implements (2026-08-10, amended through
+2026-08-12):
 
 1. The work goes upstream as **ONE pull request**, internally sliced into
    reviewable commits. The earlier five-PR proposal is withdrawn: each PR
@@ -14,12 +15,12 @@ Owner directives this plan implements (2026-08-10, amended 2026-08-11):
    `fe850a22c08a624c66bbac07e310251782e6f828`.** Newly fetched
    `origin/devel` and `upstream/devel` both resolve to that commit. It is
    the cleanup implementation base even if either ref later advances.
-3. **`common/perf_trace` is excluded from the PR branch**, and the trace
-   code on the dev branch is left untouched. The former private
-   port-after-PR deliverable is withdrawn: performance characterization
-   uses standard external Linux profiling where possible, with standard
-   USDT tracepoints proposed separately only if dynamic probes cannot
-   recover a required semantic identity.
+3. **The full existing server-side `common/perf_trace` instrument is in the
+   PR.** #106 closed RED because standard per-PID Linux perf probes cannot
+   reproduce 13 of 34 semantic records. #107 found that every current event
+   family serves an open post-PR obligation, so the ring, test, all 34 call
+   sites, lifecycle hooks and queue counter form one slice. Dev-only benches
+   and capture/analyzer machinery stay out.
 4. **The shipped `wire_window` default is 1**, with 2 documented in
    `gfx.toml` and `gfx.toml(5)` as the value that removes the stall and
    what it costs. The PR text raises the question so maintainer feedback
@@ -44,9 +45,9 @@ The port branch is **re-authored in a separate worktree** off the
 upstream tip. Because it is authored rather than filtered, "what is
 excluded" is not a subtraction anyone performs: only what is
 deliberately written into a slice appears there. Dev scaffolding —
-`BACKLOG.md`, `docs/`, `PR-demo/`, the `tools/` benches and probes,
-`common/perf_trace` — simply never gets written, and no decision to
-remove it is needed or possible.
+`BACKLOG.md`, `docs/`, `PR-demo/` and the `tools/` benches and probes —
+simply never gets written. `common/perf_trace`, its server call sites and its
+unit test are deliberately written as the #107 tracing slice.
 
 ## Step 0 — the branch point
 
@@ -84,88 +85,65 @@ hardening:
   copied old code.
 * `2e8a4a82` adds per-suite selection to the common-test runner. It
   conflicts only with this dev branch's perf-trace test registration.
-  Since custom perf_trace is excluded, the cleanup has no reason to
-  touch that runner.
+  The cleanup must port its registration as a new conditional
+  `run_suite("perf_trace")` entry, preserving upstream's layout and its
+  dechunker suite.
 
 `git merge-tree --write-tree fe850a22 avc444-ffmpeg-upstream` completes
 without a conflict; its only common modified file is `xrdp/xrdp_mm.c`
 and Git merges the resize ordering cleanly. The same synthetic merge of
 the whole current dev branch reports one conflict,
 `tests/common/test_common_main.c`, entirely from custom perf_trace/log
-test registration. Excluding that instrumentation removes the conflict.
-`common/trans.{c,h}`'s `wait_bytes` counter is likewise trace-only and
-is not part of the cleanup when the custom sink is absent.
+test registration. The port resolves only the perf-trace part into the new
+suite-selection structure; it must not copy the older runner wholesale or
+carry unrelated dev-only test registration. `common/trans.{c,h}`'s
+`wait_bytes` counter is trace-only and ships with the instrument.
 
 ## What ships in the PR, and what does not
 
-### Excluded: `common/perf_trace`; use standard external tracing
+### Included: the complete existing server tracing slice
 
-`common/perf_trace.{c,h}` (614 lines), `tools/perf_trace_bench.c` (416),
-`tests/common/test_perf_trace.c` (298) and its registration in
-`tests/common/Makefile.am`, `test_common.h` and `test_common_main.c` do
-not go upstream, and neither do the **34 `PERF_TRACE*()` call sites** —
-`xrdp/xrdp_encoder.c` 24, `xrdp/xrdp_mm.c` 8,
-`xrdp/xrdp_encoder_ffmpeg.c` 2 — nor the eleven other references to the
-ring (its include, its init and shutdown, and comments) spread over
-those files and `xrdp/xrdp_encoder.h`.
+The slice is `common/perf_trace.{c,h}` (614 lines),
+`tests/common/test_perf_trace.c` (298), its build and test-runner
+registration, the **34 `PERF_TRACE*()` call sites** —
+`xrdp/xrdp_encoder.c` 24, `xrdp/xrdp_mm.c` 8 and
+`xrdp/xrdp_encoder_ffmpeg.c` 2 — and eleven lifecycle/include/comment
+references. `tools/perf_trace_bench.c` remains dev-only unless separately
+justified; a benchmark is not part of the server instrument.
 
-Three things make this cheap rather than costly:
+The 2026-08-11 exclusion depended on standard external perf replacing this
+semantic trace. #106 falsified that premise in two ways:
 
-* **No test depends on it.** The only mention in
-  `tests/xrdp/test_avc444_credit_frontier.c` is a code comment saying
-  where the event order in the test came from. Nothing else in `tests/`
-  references it. Excluding it costs no CI coverage.
-* **It removes a live rebase conflict.** Upstream's `2e8a4a82` changed
-  `tests/common/test_common.h` and `tests/common/test_common_main.c` —
-  the same two files perf_trace's registration edits. Excluding
-  perf_trace deletes that conflict rather than resolving it.
-* **The dev branch keeps every line of it.** This is a decision about
-  what is *copied out*, not about what exists here. Nothing in
-  `/work` is stripped.
+* Phase A could register a uprobe through the remapped control inode, but
+  `perf record` could not read the event metadata required to open it for
+  the selected PID.
+* Phase B found credible direct mappings for 21 of 34 private records and
+  no exact mapping for 13. The missing values include the
+  `feedend`/`outfirst` encode identity and explicit frame chains. Omitting
+  them would force the time-window joins this project forbids.
 
-**There is no private perf_trace port after the PR.** The custom ring is
-useful dev history, but porting a private asynchronous logger would
-duplicate Linux's established perf/uprobe machinery and leave reviewers
-with a second tracing system that has little independent merge value.
+Phase C is therefore cancelled. More host permission cannot repair the
+semantic coverage failure, and no Build-ID-recorded `perf.data` recipe is a
+complete replacement. The exact audit is in
+`docs/experiments/106-perf-isolation-and-trace-equivalence.md`.
 
-The replacement is a build-ID-pinned external profiling recipe and
-standard `perf.data` capture:
+#107 audited the open post-PR work against the analyses already used in past
+experiments. Every event family remains load-bearing: sparse-chroma mechanism
+and child windows (#92), full GPU decompositions (#93), changed-monitor and
+capture-handoff attribution (#94/#95), or credit/wire/queue behaviour
+(#80/#98). The stage endpoints close the cycle and cannot be removed one at a
+time. Since the 614-line ring and 298-line test are the fixed review cost,
+trimming small call-site statements would save little while making the one
+instrument incomplete. Record:
+`docs/experiments/107-private-tracer-is-pr-scope.md`.
 
-1. Build the cleanup branch with its normal `-g -O2`; archive the exact
-   unstripped binary and Build ID with each capture.
-2. Use `perf probe -x <binary>` userspace probes for the symbolized
-   submit/pump/collect functions and DWARF line probes for internal
-   worker wait/drain boundaries. Record with `perf record`; render with
-   `perf script`. Where summary distributions suffice, a bpftrace script
-   may aggregate durations into kernel maps instead of emitting every
-   event.
-3. Carry explicit frame identity from function arguments. This was
-   checked on the current binary: `perf probe -V` exposes
-   `desktop_sequence` on both submit and collect, and dry-run probe
-   definitions resolve it to the actual calling-convention registers.
-   Never recover cross-frame ordering by a time-window join.
-4. Before quoting a number, run one approved armed-versus-none
-   transparency calibration with the exact probe set. Archive probe
-   definitions, tool/kernel versions, binary Build ID, raw `perf.data`,
-   payload, geometry and trace-loss counters.
+The tracer remains default disarmed and uses the existing thread-local ring
+and separate sink. This decision does not authorize a new tracer, per-frame
+`LOG()`, source tracepoints, or inferred time-window pairing.
 
-This is feasible from the binary: `xrdp/.libs/xrdp` is unstripped, has
-DWARF and a symbol table; `perf probe` resolves
-`xrdp_ffmpeg_avc444_submit_pair`, `_pump_pairs`, `_collect_pair`,
-`proc_enc_msg`, and source-line variables. It is **not runtime-proven on
-this rig yet**. The dev container has `kernel.perf_event_paranoid=4` and
-no effective `CAP_PERFMON`/`CAP_BPF`; `perf stat`, perf probe attachment
-and bpftrace all fail permission checks. Fleet pods are privileged but
-do not contain the tools or mount tracefs. Enabling that host/pod
-observability is an owner-controlled measurement setup, not an xrdp
-source change.
-
-Dynamic probes are less stable than source tracepoints: an optimized
-local may disappear and source-line offsets move between builds. If a
-load-bearing identity or state value cannot be recovered from a function
-argument or DWARF location, the fallback is a small, separately reviewed
-set of standard USDT probes. It is not a licence to re-port the custom
-ring, and no performance claim may silently drop the missing identity.
+Resolve the unit test under upstream `2e8a4a82`'s suite-selection layout. The
+dev branch keeps every bench and analyzer; only the server instrument and its
+test are re-authored into the PR branch.
 
 ### Not written into any slice: the `tools/` benches
 
@@ -194,10 +172,13 @@ the authored branch before using it as the PR diff size:
 | genuinely new files | 19 | 11,008 | 0 |
 | modified existing files | 15 | 5,311 | 137 |
 
-Leaving out perf_trace (2 new files, 614 lines) and the seven `tools/`
-benches (2,114 lines) takes the new-file column to **10 files, +8,280**.
-The modified column barely moves — perf_trace's call sites are
-individual lines inside functions that change anyway.
+The old exclusion case left out perf_trace and the seven `tools/` benches,
+taking the new-file column to 10 files and +8,280. #107 adds the two tracer
+source files and 614 lines back: the current source-only estimate is **12 new
+files, +8,894**. Recompute from the authored branch before quoting PR size.
+The modified column barely moves because the call sites are individual lines
+inside functions that change anyway. The 298-line tracer test is already in
+the separate test-tree total below.
 
 The modified column is what a reviewer has to hold in their head, and it
 concentrates hard: `xrdp/xrdp_encoder.c` +2,526, `common/xup_client_info.h`

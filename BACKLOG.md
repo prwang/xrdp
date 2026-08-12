@@ -80,6 +80,10 @@ stay as "(was #NN)" in each header.
 17. ~~**#104** — the PR evidence matrix~~ **DONE 2026-08-10** (x035 certification instrument fixed the same day)
 18. ~~**#100** — remove the emit thread~~ **DONE 2026-08-07** (measured: it bought nothing at one monitor)
 19. **#105** — the upstream port: one PR off a synced `upstream/devel` (filed 2026-08-10)
+20. ~~**#106** — prove per-PID perf isolation and private-trace
+    equivalence~~ **CLOSED RED 2026-08-12**
+21. ~~**#107** — reassess `common/perf_trace` as required PR scope~~
+    **DONE 2026-08-12** — the full existing server tracer is PR scope
 
 ## #105 — the upstream port: ONE pull request, fresh branch (filed 2026-08-10)
 
@@ -87,10 +91,9 @@ stay as "(was #NN)" in each header.
 PR, internally sliced into commits that each build and pass `make
 check`. Owner directives 2026-08-10: one PR (the five-PR proposal is
 withdrawn — the first four would not stand alone); step 0 is a truly
-synced `upstream/devel`; `common/perf_trace` is excluded from the PR
-branch with the dev-branch trace code left untouched; no private
-perf-trace port is required (owner direction 2026-08-11 — use standard
-external profiling after the main PR); the shipped
+synced `upstream/devel`; the full existing server-side
+`common/perf_trace` instrument is included (#107, after #106 proved the
+external replacement incomplete); the shipped
 `wire_window` default is 1 with 2 documented, and the PR asks
 maintainers whether 2 should be the default.
 
@@ -108,8 +111,15 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
   upstream's resize-before-encoder-create ordering in `xrdp_mm.c`.
   Incoming DVC dechunking and stream bounds are hardened with unchanged
   callbacks. The old cleanup branch merges cleanly; the whole dev tree's
-  sole merge conflict is perf_trace's common-test registration, which is
-  excluded. Full audit: `docs/avc444_upstream_port_plan.md`.
+  sole merge conflict is perf_trace's common-test registration. #107
+  includes the tracer, so the cleanup must resolve it in upstream's
+  suite-selection layout. Full audit:
+  `docs/avc444_upstream_port_plan.md`.
+* **The full existing server tracer is PR scope** (#107): the ring,
+  schema/ring test, all 34 call sites, lifecycle hooks and trace-only
+  transport queue counter. Dev-only benches, capture machinery and
+  analyzers remain excluded. The test registration must be integrated
+  into upstream `2e8a4a82`'s suite-selection layout, not copied over it.
 * The `wire_window` default changed 2 → 1 in the dev tree, so the port
   copies a tree that already carries the shipped decision:
   `xrdp/xrdp_tconfig.h`, the defaults comment in `xrdp/xrdp_tconfig.c`,
@@ -127,21 +137,12 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
 
 * (a) **Nothing is cut yet.** The port branch will live in its own
   worktree off pinned `fe850a22`; `/work`'s tip is always dev.
-* (b) **Performance characterization moves to standard external
-  tracing; there is no private perf_trace-port deliverable.** The local
-  binary is suitable for `perf probe`/uprobes (DWARF, symbols and frame
-  sequence arguments verified), but this container cannot attach with
-  `perf_event_paranoid=4` and no effective `CAP_PERFMON`/`CAP_BPF`.
-  A host-enabled runtime capture and armed-vs-none transparency check
-  remain before external-probe numbers are quotable. If a semantic
-  identity cannot be recovered externally, propose standard USDT
-  tracepoints separately — do not re-port the custom sink by default.
-* (c) **The evidence section is unwritten, but its three current legs are
+* (b) **The evidence section is unwritten, but its three current legs are
   measured.** Legacy acknowledgement / frontier window 1 / frontier
   window 2 were re-run on 2026-08-10 with unclamped pipes, the same
   image, one 4K monitor and the ring trace. Record:
   `docs/experiments/90-the-eight-ms-prize-was-stale.md`.
-* (d) `docs/man/gfx.toml.5.in` references
+* (c) `docs/man/gfx.toml.5.in` references
   `PR-demo/BREAKING_CHANGE_credit_frontier.md`, a path that does not
   exist in a tree without `PR-demo/`. It must not survive the port —
   and with the default at 1 it is no longer a breaking change anyway.
@@ -923,3 +924,5 @@ are in git history.
 | **#87** emit-split and eager-ack ratios | CLOSED 2026-08-06. Emit split RETIRED unrun — the stage is 0.333 ms at 4K against the 6.39 ms its requirement rested on, which came from a build with two per-frame log writes inside the timed bracket; PRD FR-ACK-2's table, projection and ship-together clause deleted. The eager-ack half was measured in #80's merged A/B. | [`87-the-emit-split-was-measuring-its-own-logger.md`](docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md) |
 | **#91** multimon window + m≥2 serial cost | CLOSED 2026-08-08. Three answers: the window divides by monitor count (a frame id is one monitor's frame, and the window is session-wide); widening it does not fix the two-monitor stall, so the default is NOT scaled by M and the per-screen consequence is documented in `gfx.toml(5)`; and **our code does not serialise the two screens** — the encodes overlap, and what staggers them is our own raw-input transfer. Carries one retraction, and one question left open rather than answered: what sets the rate at which the ffmpeg children take their input. | [`91-the-multimon-window-and-the-shared-pump.md`](docs/experiments/91-the-multimon-window-and-the-shared-pump.md) |
 | **#100** remove the emit thread | DONE 2026-08-07. The assembly thread, its two semaphores, its depth-1 hand-off slot, its join, its unarmed-drop counter and the `gfx.toml emit_thread` key are gone; assembly runs inline on the encoder worker. The separation of assembly from the encode path (the use-after-free fix) stays, and an old `gfx.toml` still loads with one warning. **Scoped to one monitor** — the thread is not shown to be worthless at m >= 2. | [`100-the-emit-thread-bought-nothing.md`](docs/experiments/100-the-emit-thread-bought-nothing.md) |
+| **#106** external perf isolation/equivalence | CLOSED RED. Phase A could not record through the delegated tracefs boundary; Phase B found 13 of 34 semantic records had no exact mapping, so Phase C was cancelled. | [`106-perf-isolation-and-trace-equivalence.md`](docs/experiments/106-perf-isolation-and-trace-equivalence.md) |
+| **#107** private tracer PR scope | DONE. Port the full existing default-disarmed server tracer and test; keep benches, capture machinery and analyzers dev-only. | [`107-private-tracer-is-pr-scope.md`](docs/experiments/107-private-tracer-is-pr-scope.md) |

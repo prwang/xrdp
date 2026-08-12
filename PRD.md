@@ -3773,14 +3773,24 @@ resize the screen bitmap before creating GFX surfaces and the encoder. The
 incoming DVC callback signatures are unchanged; inherit the new dechunker and
 retain a normal full-frame/frame-ack smoke check. Synthetic merge of the old
 cleanup branch is clean. The whole dev branch conflicts only in the common
-test runner where custom perf_trace registered itself; perf_trace is excluded.
+test runner where custom perf_trace registered itself. #107 includes the
+tracer, so the cleanup resolves its registration in upstream's new
+suite-selection layout without copying the older runner wholesale.
 
-Owner direction 2026-08-11 also withdraws the private perf_trace port after
-the main PR. Performance characterization should use build-ID-pinned standard
-Linux perf/userspace probes and archive `perf.data`; bpftrace may aggregate
-summary distributions. Run an armed-versus-none transparency check before
-quoting results. If optimized code hides a required semantic identity, propose
-standard USDT tracepoints separately rather than re-porting the custom sink.
+Owner direction 2026-08-11 withdrew the private perf_trace port after the
+main PR, conditional on #106 proving one standard external replacement. That
+direction was reopened on 2026-08-12 when #106 closed RED. Phase A could not
+record the selected-PID uprobe through the delegated tracefs boundary; more
+decisively, Phase B found no exact external mapping for 13 of 34 private
+records, including load-bearing encode and frame identities. Phase C is
+cancelled. There is no external replacement on which to base exclusion.
+#107 therefore makes the full existing default-disarmed server tracer PR
+scope: ring, schema/ring test, all 34 call sites, lifecycle hooks and the
+trace-only transport queue counter. Every current event family is required by
+open post-PR work, and the paired endpoints are needed for stage closure.
+Dev-only benches, capture machinery and analyzers remain excluded. The port
+may not substitute time-window joins, per-frame `LOG()`, or a newly invented
+tracer. Record: `docs/experiments/107-private-tracer-is-pr-scope.md`.
 
 #### Acceptance
 - PR branch = pinned `fe850a22c08a624c66bbac07e310251782e6f828` +
