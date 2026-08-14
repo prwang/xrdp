@@ -423,6 +423,32 @@ be corrected in the next turn costs the owner a full round trip, and
 this project has now spent several of them on answers that were right
 in substance and unusable as written.
 
+#### Completeness survives steering (owner directive, 2026-08-12)
+
+**The draft must answer the complete outstanding task, not merely the
+owner's latest steering message.** A message sent while work is in
+progress adds to the turn unless the owner explicitly replaces,
+cancels, narrows or defers part of the existing scope. A correction,
+objection, request for a durable record, status question or new process
+rule does not silently supersede the task that prompted it. The turn is
+not complete until the initial task and every additive steering request
+are complete.
+
+This rule applies immediately when the steering itself adds or changes
+a rule. Re-read the still-outstanding request under the new rule in the
+same turn; do not update the rule, answer only the steering, and leave
+the request that exposed the rule gap unanswered. Example: if the owner
+asks whether tracing should ship and then steers that the decision must
+be recorded in `docs/experiments/`, the scope is still a complete
+shipping decision **plus** its experiment record. Writing the record or
+explaining the recordkeeping rule alone does not complete the turn.
+
+Before the draft can pass, enumerate the requests still in scope and
+check that the draft contains the requested outcome and requested depth
+for each one. If the owner explicitly narrows the request — for example,
+"answer only the tracing-ships question in detail" — honour that smaller
+scope; do not re-add superseded material.
+
 #### The file, and the mechanics (owner directive, 2026-08-03)
 
 **The draft goes in `/work/.turn_draft.md`.** One file, at the repo

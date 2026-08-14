@@ -15,12 +15,17 @@ Owner directives this plan implements (2026-08-10, amended through
    `fe850a22c08a624c66bbac07e310251782e6f828`.** Newly fetched
    `origin/devel` and `upstream/devel` both resolve to that commit. It is
    the cleanup implementation base even if either ref later advances.
-3. **The full existing server-side `common/perf_trace` instrument is in the
-   PR.** #106 closed RED because standard per-PID Linux perf probes cannot
-   reproduce 13 of 34 semantic records. #107 found that every current event
-   family serves an open post-PR obligation, so the ring, test, all 34 call
-   sites, lifecycle hooks and queue counter form one slice. Dev-only benches
-   and capture/analyzer machinery stay out.
+3. **One completed `common/perf_trace` facility is in the paired main
+   change.** #106 closed RED because standard per-PID Linux perf probes
+   cannot reproduce 13 of 34 semantic records. #107 found that every current
+   event family serves an open post-PR obligation. Its completeness
+   correction also found that the dev source is not copy-ready: initialization,
+   shutdown, atomics, private output, failure visibility, documentation and
+   the xorgxrdp capture endpoint must be finished in the same change. Dev-only
+   benches and capture/analyzer machinery stay out.
+   **Amended 2026-08-13:** it is an explicit compile-time opt-in, absent from
+   ordinary binaries, and its sink emits versioned structured text with named
+   fields rather than the private six-integer file plus adapter.
 4. **The shipped `wire_window` default is 1**, with 2 documented in
    `gfx.toml` and `gfx.toml(5)` as the value that removes the stall and
    what it costs. The PR text raises the question so maintainer feedback
@@ -47,7 +52,10 @@ excluded" is not a subtraction anyone performs: only what is
 deliberately written into a slice appears there. Dev scaffolding —
 `BACKLOG.md`, `docs/`, `PR-demo/` and the `tools/` benches and probes —
 simply never gets written. `common/perf_trace`, its server call sites and its
-unit test are deliberately written as the #107 tracing slice.
+unit test are deliberately re-authored under #107: the generic facility and
+tests are slice 1, while event descriptors/call sites and the paired producer
+bridge land with the feature slices whose stages and wire messages they
+describe.
 
 ## Step 0 — the branch point
 
@@ -101,14 +109,15 @@ carry unrelated dev-only test registration. `common/trans.{c,h}`'s
 
 ## What ships in the PR, and what does not
 
-### Included: the complete existing server tracing slice
+### Included: the completed server tracing slice
 
-The slice is `common/perf_trace.{c,h}` (614 lines),
+The existing baseline is `common/perf_trace.{c,h}` (614 lines),
 `tests/common/test_perf_trace.c` (298), its build and test-runner
 registration, the **34 `PERF_TRACE*()` call sites** —
 `xrdp/xrdp_encoder.c` 24, `xrdp/xrdp_mm.c` 8 and
 `xrdp/xrdp_encoder_ffmpeg.c` 2 — and eleven lifecycle/include/comment
-references. `tools/perf_trace_bench.c` remains dev-only unless separately
+references. That is the event manifest, not a direction to copy the files
+unchanged. `tools/perf_trace_bench.c` remains dev-only unless separately
 justified; a benchmark is not part of the server instrument.
 
 The 2026-08-11 exclusion depended on standard external perf replacing this
@@ -137,13 +146,58 @@ trimming small call-site statements would save little while making the one
 instrument incomplete. Record:
 `docs/experiments/107-private-tracer-is-pr-scope.md`.
 
-The tracer remains default disarmed and uses the existing thread-local ring
-and separate sink. This decision does not authorize a new tracer, per-frame
-`LOG()`, source tracepoints, or inferred time-window pairing.
+The tracer is compile-time disabled by default. A build made explicitly with
+`--enable-perf-trace` remains runtime-disarmed until configured and uses one
+thread-local ring per producer plus a separate sink. This decision does not
+authorize a new tracer, per-frame `LOG()`, source tracepoints, or inferred
+time-window pairing.
+
+The authored slice must also complete the defects found by #107's second
+audit:
+
+* initialize after the connection fork and before the measured session path,
+  so the first event cannot perform file I/O, allocation or thread creation;
+* close after connection work is quiescent and before `log_end()`, joining and
+  final-draining the sink;
+* replace the current `fopen()` with one symlink-resistant, close-on-exec,
+  mode-`0600` file creation and report initialization/write/flush failures
+  once in the human-rate log;
+* make every cross-thread ring and lifecycle object atomic without adding a
+  source-path lock;
+* add the default-off configure/Automake/preprocessor gate. In a disabled
+  build, omit the source, tests, symbols, event/environment strings,
+  trace-only state/counters and xup diagnostic payload; disabled macros
+  evaluate no arguments;
+* replace the positional six-integer disk schema with versioned JSON Lines
+  carrying named 64-bit/boolean fields. Before freezing the internal
+  transport, compare fixed typed slots formatted by the sink with a bounded
+  producer formatter writing directly into a Linux double-mapped text byte
+  ring. The latter has contiguous virtual space across the logical boundary,
+  so it needs no split copy or wrap record. Select on measured source p50,
+  p99 and maximum cost plus record integrity under boundary and delayed-sink
+  pressure, as specified by #107. Retire `perf_trace_lines.py` after
+  consumers read the generic stream directly;
+* remove xorgxrdp's per-frame `ACK_TRACE cap` logger. Under an xrdp-requested
+  trace flag, carry the producer frame/monitor, begin/packed timestamps and
+  ack frontiers with the existing xup frame message, and emit the
+  producer-timestamped events into xrdp's one ring on receipt. This is a
+  paired xup-contract change and test, not a second producer-side tracer;
+* ship manpage/sample-config instructions for the three trace variables,
+  private file, failure behavior and the `fork=false` one-active-session
+  limitation; and
+* add armed lifecycle, output-security, failure, concurrency, xup trace
+  serialization, `trans::wait_bytes` accounting, disabled-binary erasure and
+  structured-format compatibility tests.
+
+The full acceptance and the source findings behind each bullet are in
+`docs/experiments/107-private-tracer-is-pr-scope.md`. Until those bullets are
+implemented, “the tracer ships” is a scope decision, not an implementation
+completion claim.
 
 Resolve the unit test under upstream `2e8a4a82`'s suite-selection layout. The
-dev branch keeps every bench and analyzer; only the server instrument and its
-test are re-authored into the PR branch.
+dev branch keeps every bench and analyzer; only the completed paired
+instrument, its shipped operating documentation and its tests are re-authored
+into the PR branches.
 
 ### Not written into any slice: the `tools/` benches
 
@@ -176,6 +230,10 @@ The old exclusion case left out perf_trace and the seven `tools/` benches,
 taking the new-file column to 10 files and +8,280. #107 adds the two tracer
 source files and 614 lines back: the current source-only estimate is **12 new
 files, +8,894**. Recompute from the authored branch before quoting PR size.
+That arithmetic predates #107's completeness correction and counts only the
+existing tracer files; it does not count the required lifecycle/safety work
+or the paired xup producer-trace change. Therefore +8,894 is not an estimate
+of the completed tracing slice and must not be used as the PR's final size.
 The modified column barely moves because the call sites are individual lines
 inside functions that change anyway. The 298-line tracer test is already in
 the separate test-tree total below.
@@ -228,6 +286,22 @@ One consequence to carry into the PR text: with the default at 1 this is
 `PR-demo/` is not ported, and a manpage may not reference a path that
 does not exist in the tree it ships in.
 
+## Pre-port gate — finish the generic tracer on dev first
+
+Before the cleanup worktree is cut, make #107 shippable on the current dev
+branches: complete lifecycle, atomics, private output, compile-time erasure,
+the generic structured format, consumer migration and the xorgxrdp logger
+replacement; then rerun its armed/disarmed transparency bench. This is not a
+new upstream PR and does not change the one-PR decision. It gives the port a
+reviewed instrument rather than asking the port to redesign its measuring
+device while also moving every measured stage.
+
+The gate is green only when both build modes pass: the ordinary build has no
+tracer symbol/string/state and the explicitly enabled build passes lifecycle,
+format, concurrency and source-overhead acceptance. #108's evidence cleanup
+is separate from implementing this gate; old contaminated timings are not
+used to declare it green.
+
 ## Slice order
 
 Each commit **builds and passes `make check`**, so the series is
@@ -238,33 +312,48 @@ PR. **No commit message claims a rate, a client rendering correctly, or
 a bottleneck removed, except where that is true at that commit.**
 
 The existing eleven-slice branch is the starting shape; the frontier,
-LTR, sparse-chroma and multi-monitor work extends it. Order:
+LTR, sparse-chroma, multi-monitor and generic tracer work extend it. Order:
 
-1. **Foundations, no caller.** RGB→NV12 dual-plane converter, H.264
+1. **Generic performance-trace foundation.** Re-author the already-completed
+   dev facility on pinned upstream: compile gate, common ring/sink, xrdp
+   lifecycle, the microbench-selected JSON-Lines ring/formatter, operating
+   documentation and tests. No AVC444 call site and no AVC444 xup payload
+   exists in this slice.
+   This slice is deliberately shippable and useful on its own, although it
+   remains the first commit of the one main PR.
+2. **Codec foundations, no caller.** RGB→NV12 dual-plane converter, H.264
    Annex-B validator, minimal NUT demuxer, the RFX_AVC420 metablock
    emitter exposed outside the codec guard and its even-alignment fix.
    Each with its unit tests. Nothing in the server calls any of it yet.
-2. **Capability negotiation.** `CC_GFX_AVC444` capture capability,
+3. **Capability negotiation.** `CC_GFX_AVC444` capture capability,
    AVC444/AVC420 GFX capability negotiation, mm selector flags.
-3. **The external ffmpeg runner.** Spawn, pipes, the input-pipe size
+4. **The external ffmpeg runner.** Spawn, pipes, the input-pipe size
    negotiation and its non-silent failure, submit/pump/collect.
    `dump_extra` is per-encoder from birth — the blanket form is never
    written (see fold points).
-4. **Configuration.** `[avc444_ffmpeg]` parsing, bounds, refusals,
+5. **Configuration.** `[avc444_ffmpeg]` parsing, bounds, refusals,
    the shipped defaults including `wire_window = 1`.
-5. **Serialization and the wire.** `gfx_wiretosurface1_avc444` and the
+6. **Serialization and the wire.** `gfx_wiretosurface1_avc444` and the
    LC serializer, **born emitting luma-then-chroma as two PDUs** (LC=1
    then LC=2). The single-PDU LC=0 form the macOS client rejects never
-   exists in the history.
-6. **The LTR chain and scheduled intra refresh**, with the golden
+   exists in the history. The paired xorgxrdp producer-timestamp bridge lands
+   here with its versioned xup serialization test; it was deliberately not
+   placed in the generic foundation.
+7. **The LTR chain and scheduled intra refresh**, with the golden
    vectors.
-7. **Multi-monitor.** Per-monitor encoder, converter, geometry and LTR
+8. **Multi-monitor.** Per-monitor encoder, converter, geometry and LTR
    state; the poll set over all children. Landed here rather than
    deferred, per the standing directive that multi-monitor ships with
    this port.
-8. **The credit frontier**, default 1, documented at 2.
-9. **The sparse chroma cadence.**
-10. **Documentation.** `gfx.toml`, `gfx.toml(5)`.
+9. **The credit frontier**, default 1, documented at 2.
+10. **The sparse chroma cadence.**
+11. **Feature documentation.** `gfx.toml`, `gfx.toml(5)`.
+
+Each slice which creates a measured stage adds that stage's event descriptors
+and call sites in the same commit. Instrumented intermediate builds use
+`--enable-perf-trace`; the ordinary build stays compiled out. This makes a
+regression attributable to the slice which introduced it without pretending
+the final 34-event manifest exists before its feature code.
 
 Within each of those, split further wherever a commit exceeds what one
 sitting can review. The numbering is review order, not a promise about
@@ -275,12 +364,12 @@ commit count.
 A defect a later commit in the same PR fixes is a defect that should not
 have been written into the series. Two are known:
 
-* **The LC framing.** Fold into the serializer slice (5); the previous
+* **The LC framing.** Fold into the serializer slice (6); the previous
   plan already decided this and its reasoning stands.
 * **The blanket `dump_extra`.** On the abandoned branch, slice
   `04e43ee2` applied the bitstream filter unconditionally, which
   regresses NVENC on Linux and produces duplicate parameter sets that
-  black out strict decoders. The runner slice (3) is authored with the
+  black out strict decoders. The runner slice (4) is authored with the
   per-encoder form from the start.
 
 ## What the PR claims, and the evidence for each claim
@@ -299,6 +388,10 @@ than something to reconcile afterwards.
 ## Validation before the branch is handed over
 
 * Every slice builds; `make check` green at every slice.
+* Slice 1 is tested in both modes: default build has no tracer
+  symbols/environment/event strings or trace-only state; enabled build passes
+  lifecycle, JSON validity/compatibility, concurrency and source-overhead
+  gates.
 * `astyle --options=astyle_config.as` clean (CI pins astyle 3.4.14).
 * cppcheck clean, per CI.
 * Rendering confirmed on mstsc, UWP and the macOS Windows App, on a

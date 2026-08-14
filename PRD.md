@@ -1509,6 +1509,66 @@ following are hard requirements, not preferences.
    caps" rule).
 4. **No shared `FILE*`, ever.** More than one thread using stdio on one
    stream is the defect this requirement exists to forbid.
+5. **Initialization is not a source event.** File creation, ring allocation
+   and sink-thread creation happen after the connection fork and before any
+   measured session path. `perf_trace_on()` is only a cached armed-state test;
+   the first `PERF_TRACE*()` invocation is held to the same no-I/O,
+   no-allocation and no-lock rule as every later invocation. Never arm the
+   listening parent before it forks connection children.
+6. **The output is private and failures are visible.** Create exactly one
+   close-on-exec, symlink-resistant `<prefix>.<pid>` file at mode `0600` in an
+   administrator-owned directory writable by xrdp's runtime user. Failure to
+   create the sink, allocate/start it, write, flush or close is reported once
+   through the human-rate log; it must not masquerade as an empty valid trace.
+   Normal shutdown joins and final-drains the sink after emitters are
+   quiescent and before logging shuts down. No trace lifecycle code runs in a
+   signal handler.
+7. **Cross-thread state is atomic, not merely volatile.** SPSC ownership
+   removes producer contention but does not make ordinary shared C objects
+   race-free. Head/tail publication, drop observation, armed/quit state and
+   every other producer/sink handoff use acquire/release atomics or an
+   equivalent reviewed primitive, without adding a source-path lock.
+8. **Isolation is exactly the matched connection scope.** The tracer records
+   explicit calls in its xrdp process plus producer metadata delivered by that
+   connection's matched xorgxrdp process. It attaches to no kernel facility
+   and can observe no unrelated PID. With the shipped `fork=true`, each
+   connection child has its own PID-suffixed file. With `fork=false`,
+   concurrent sessions share one process and one trace and are not reliably
+   separable by TID, so a characterization in that mode requires exactly one
+   active session.
+9. **The producer endpoint uses this same sink.** xorgxrdp must not issue its
+   current per-frame `ACK_TRACE cap` log line and must not grow a second
+   tracer. When xrdp requests capture tracing, the matched xup frame contract
+   carries the producer frame/monitor, capture-begin and capture-packed
+   monotonic timestamps and ack frontiers. xrdp records them with their
+   producer timestamps in `common/perf_trace`; its `msgin` record closes the
+   local handoff. Disarmed operation takes no producer timestamps and carries
+   no diagnostic trailer. The paired xup version and serialization tests move
+   together.
+10. **The production default is compile-time absent.** The facility is enabled
+   only by an explicit configure option (provisionally
+   `--enable-perf-trace`, default no). Without it, the tracer source and tests
+   are not built; macros evaluate no arguments; trace-only helpers, members,
+   counters, producer timestamps and xup diagnostic payload are omitted; and
+   no tracer symbol, event/environment string, branch, ring or sink thread
+   remains in either binary. Symbol and string inspection of disabled builds
+   is an acceptance test. An enabled build is still runtime-disarmed until an
+   operator supplies the trace environment.
+11. **The disk contract is self-describing structured text.** The fixed
+   positional `<tag> <a> ... <f>` file and its AVC444-specific rendering
+   adapter are retired. The facility emits versioned JSON Lines with common
+   `schema`, monotonic timestamp, PID, TID and event-name keys plus named,
+   typed event fields of at least 64-bit range. Readers ignore unknown keys
+   and events; incompatible common semantics increment `schema`. The internal
+   transport is not a serialized API. Before it is frozen, the source-path
+   microbench compares fixed typed slots formatted by the sink with a bounded
+   producer formatter writing directly into a Linux double-mapped text byte
+   ring. The latter is virtually contiguous across the logical boundary and
+   needs no split copy or wrap record. Source p50/p99/maximum cost and complete
+   record integrity under wrap and delayed-sink pressure decide between them.
+   Neither design uses the ordinary logger, allocation, I/O, a shared lock or
+   a general `printf` formatter on the source path, and neither extends a
+   central anonymous-field tuple when adding an event.
 
 **Why this is a requirement and not a nicety — the measurement it
 destroyed (2026-08-01, BACKLOG #61e).** The original sink was a
@@ -1531,7 +1591,8 @@ CPU/memory (`avc444_pack_bench` identical at 3.32 vs 3.23 ms/frame).
 **The instrument was the bug.**
 
 **Implementation decision (2026-08-01): an in-tree, per-thread SPSC ring
-in C. `spdlog` was considered and REJECTED.**
+in C. `spdlog` was considered and REJECTED. Internal record-layout choice
+reopened 2026-08-14.**
 
 spdlog was the obvious off-the-shelf answer — Debian ships it
 (`libspdlog-dev`, trixie 1:1.15.2), it is MIT, and its async mode has
@@ -1539,10 +1600,10 @@ the right shape (a `circular_q` drained by a dedicated backend thread).
 It was rejected on two counts, both recorded so the decision is not
 re-litigated from scratch:
 
-- **It would put `libstdc++` into the shipped `xrdp` binary**, which
+- **It would put `libstdc++` into a tracer-enabled `xrdp` binary**, which
   links no C++ runtime today — only the optional `vrplayer/` Qt tool is
   C++. Paying a permanent runtime dependency in the RDP server for a
-  diagnostic that is disarmed in production is the wrong trade, and it
+  compile-time optional diagnostic is the wrong trade, and it
   is a dependency the upstream `devel` PR would rightly refuse.
 - **It is not lock-free anyway.** `mpmc_blocking_q` is a `std::mutex`
   plus condition variables around the ring, so the source still takes a
@@ -1559,9 +1620,12 @@ The in-tree design gives a **stronger** guarantee than spdlog would:
 - **The pool is allocated when the sink is ARMED**, never on the source
   path, so clause 1's "must not allocate" holds literally. A thread that
   finds the pool exhausted drops and counts, and never blocks.
-- **`tag` is stored as a pointer, not copied** — every call site passes
-  a string literal, which is a documented precondition of the API, and
-  it keeps the source path free of any formatting work.
+- **The source representation is bounded and event schemas are static.** The
+  2026-08-13 proposal stored an immutable descriptor plus typed values and
+  kept formatting on the sink. The 2026-08-14 candidate instead uses that
+  static schema to format directly into a per-producer byte ring whose Linux
+  backing is mapped twice. The latter removes boundary splitting without
+  changing the SPSC ownership. Clause 11's microbench decides between them.
 - **Only the sink thread ever touches the `FILE*`**, satisfying clause 4
   by construction rather than by convention.
 
@@ -1570,6 +1634,18 @@ in `tests/common/` against the SPSC specification (capacity `N` yields
 `N-1` usable slots; FIFO order; the `N`th push drops and increments the
 counter) — the expected values come from the ring specification, never
 from running the implementation.
+
+The shipped operating contract documents the compile option, the three
+runtime selectors (`XRDP_PERF_TRACE`, `XRDP_GFX_TRACE`,
+`XRDP_ACK_TRACE`), filename, schema,
+permissions, failure behavior and the non-fork isolation limit. Tests cover
+armed start/final drain, mode and symlink refusal, visible failures,
+idempotent close, defined concurrent wrap/drop behavior, the paired xup trace
+payload, queued/partial/completed `trans::wait_bytes` accounting, disabled
+macro non-evaluation, binary symbol/string absence, JSON validity and
+forward-compatible unknown fields. The dev-only armed/disarmed bench is rerun
+on the authored cleanup to ensure these
+completion changes preserve the measured source-cost bound; it does not ship.
 
 ### FR-ACK-1: WITHDRAWN 2026-07-31 — see NG-9 and BACKLOG #70
 
@@ -3784,13 +3860,32 @@ record the selected-PID uprobe through the delegated tracefs boundary; more
 decisively, Phase B found no exact external mapping for 13 of 34 private
 records, including load-bearing encode and frame identities. Phase C is
 cancelled. There is no external replacement on which to base exclusion.
-#107 therefore makes the full existing default-disarmed server tracer PR
-scope: ring, schema/ring test, all 34 call sites, lifecycle hooks and the
-trace-only transport queue counter. Every current event family is required by
+#107 therefore makes one completed compile-time-opt-in paired tracer PR scope:
+an ordinary build contains no trace footprint; an enabled build retains the
+ring, semantic set of 34 xrdp call sites, identities and trace-only transport
+queue counter, while initialization, final drain, atomics, private output,
+failure visibility and operating documentation are completed. The facility
+emits versioned JSON Lines with named typed fields; the positional six-integer
+file and AVC-specific format adapter do not ship. The internal ring
+representation remains the measured choice specified by #107: fixed typed
+slots formatted by the sink versus bounded producer formatting directly into
+a Linux double-mapped text byte ring. The latter has no logical-boundary split
+copy or wrap record; source tail cost and record integrity decide between the
+two.
+The matching xorgxrdp change removes its remaining per-frame `ACK_TRACE cap`
+logger and carries producer timestamps over the versioned xup frame contract
+for xrdp to place in the same ring. Every current event family is required by
 open post-PR work, and the paired endpoints are needed for stage closure.
 Dev-only benches, capture machinery and analyzers remain excluded. The port
 may not substitute time-window joins, per-frame `LOG()`, or a newly invented
 tracer. Record: `docs/experiments/107-private-tracer-is-pr-scope.md`.
+
+Sequencing amended 2026-08-13: complete and benchmark the reusable facility
+on the dev pair before cleanup re-authoring, then make its generic foundation
+the first shippable slice on the pinned base. AVC event descriptors land with
+the feature slices which introduce their stages, and the producer-timestamp
+bridge lands with the paired xup wire slice. This is commit order inside the
+one main PR, not a second tracer PR.
 
 #### Acceptance
 - PR branch = pinned `fe850a22c08a624c66bbac07e310251782e6f828` +

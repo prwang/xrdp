@@ -83,7 +83,11 @@ stay as "(was #NN)" in each header.
 20. ~~**#106** — prove per-PID perf isolation and private-trace
     equivalence~~ **CLOSED RED 2026-08-12**
 21. ~~**#107** — reassess `common/perf_trace` as required PR scope~~
-    **DONE 2026-08-12** — the full existing server tracer is PR scope
+    **DONE 2026-08-13** — one reusable, compile-time-opt-in paired tracer is
+    PR scope; the existing dev source and positional file are not copied
+    unchanged
+22. **#108** — retire timing evidence carrying xorgxrdp's per-frame
+    `ACK_TRACE cap` logger (filed 2026-08-12)
 
 ## #105 — the upstream port: ONE pull request, fresh branch (filed 2026-08-10)
 
@@ -91,9 +95,10 @@ stay as "(was #NN)" in each header.
 PR, internally sliced into commits that each build and pass `make
 check`. Owner directives 2026-08-10: one PR (the five-PR proposal is
 withdrawn — the first four would not stand alone); step 0 is a truly
-synced `upstream/devel`; the full existing server-side
-`common/perf_trace` instrument is included (#107, after #106 proved the
-external replacement incomplete); the shipped
+synced `upstream/devel`; one completed paired `common/perf_trace`
+instrument is included (#107, after #106 proved the external replacement
+incomplete and the follow-up audit found the dev source cannot be copied
+unchanged); the shipped
 `wire_window` default is 1 with 2 documented, and the PR asks
 maintainers whether 2 should be the default.
 
@@ -115,11 +120,26 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
   includes the tracer, so the cleanup must resolve it in upstream's
   suite-selection layout. Full audit:
   `docs/avc444_upstream_port_plan.md`.
-* **The full existing server tracer is PR scope** (#107): the ring,
-  schema/ring test, all 34 call sites, lifecycle hooks and trace-only
-  transport queue counter. Dev-only benches, capture machinery and
-  analyzers remain excluded. The test registration must be integrated
-  into upstream `2e8a4a82`'s suite-selection layout, not copied over it.
+* **One completed paired tracer is PR scope** (#107): preserve the ring,
+  semantic set of 34 xrdp call sites, identities and trace-only transport
+  queue counter, but do not copy the dev implementation unchanged. The slice
+  must move initialization before the measured path, add clean final drain,
+  atomic cross-thread state, private/safe output and visible failures, remove
+  xorgxrdp's remaining per-frame capture `LOG()` by carrying its producer
+  timestamps into xrdp's same ring over the matched xup contract, ship the
+  operating documentation, and add lifecycle/security/paired-wire tests. It
+  is compile-time disabled by default: a disabled build contains no tracer
+  source, call, argument evaluation, event/environment string, trace-only
+  state/counter or xup diagnostic payload. Enabled builds write versioned
+  JSON Lines with named typed fields, not the private six-integer file plus
+  `perf_trace_lines.py`. The internal representation remains a measured
+  pre-port choice: fixed typed slots with sink formatting versus bounded
+  producer formatting directly into a Linux double-mapped text byte ring;
+  #107 records the source-tail and integrity gate.
+  Dev-only benches, capture machinery and analyzers remain excluded. The test
+  registration must be integrated into upstream `2e8a4a82`'s suite-selection
+  layout, not copied over it. Exact acceptance:
+  `docs/experiments/107-private-tracer-is-pr-scope.md`.
 * The `wire_window` default changed 2 → 1 in the dev tree, so the port
   copies a tree that already carries the shipped decision:
   `xrdp/xrdp_tconfig.h`, the defaults comment in `xrdp/xrdp_tconfig.c`,
@@ -137,6 +157,14 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
 
 * (a) **Nothing is cut yet.** The port branch will live in its own
   worktree off pinned `fe850a22`; `/work`'s tip is always dev.
+* (a1) **Pre-port gate:** finish the generic tracer on the current dev pair
+  first, including consumer migration and removal of xorgxrdp's per-frame
+  logger. Both default-disabled and explicitly enabled builds must pass, and
+  the enabled build must rerun the source-overhead bench. Then re-author that
+  generic facility as slice 1 on the pinned base. AVC event descriptors land
+  with the later feature slices which create their stages; the producer
+  timestamp bridge lands with the paired xup wire slice. This remains one PR
+  and lets every subsequent slice be characterized while it is authored.
 * (b) **The evidence section is unwritten, but its three current legs are
   measured.** Legacy acknowledgement / frontier window 1 / frontier
   window 2 were re-run on 2026-08-10 with unclamped pipes, the same
@@ -146,6 +174,29 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
   `PR-demo/BREAKING_CHANGE_credit_frontier.md`, a path that does not
   exist in a tree without `PR-demo/`. It must not survive the port —
   and with the default at 1 it is no longer a breaking change anyway.
+
+## #108 — retire xorgxrdp per-frame-log timing evidence (filed 2026-08-12)
+
+**Hypothesis.** #61h removed xrdp's per-frame records from `common/log.c`,
+but the paired producer still writes one `ACK_TRACE cap` line per capture
+through Xorg's log path. That instrument is on the producer path and its cost
+was never bounded. Under the instrument-on-path rule, timings from a run that
+enabled it are not quotable even when the xrdp-side ring had zero drops.
+
+**Known footprint.** Source inventory found 13 affected session-Xorg logs in
+seven capture directories: the two i92 sparse-chroma matrices, three #90
+re-grounding arms, and the two i104 strip arms. #107 records why the shipped
+fix is to carry producer timestamps over xup into xrdp's same ring, not to
+measure or preserve the logger.
+
+**Scope / acceptance.** Before any of those timings are quoted again,
+enumerate every derived record and PRD/BACKLOG conclusion. Delete the affected
+timing captures and records as required for an instrument on the measured
+path, write one replacement experiment record naming what was voided and why,
+and reopen every conclusion which depended on the timings. Preserve only
+independently valid non-timing evidence (wire bytes, identities, ordering and
+correctness), with its provenance stated. Do not run a logger-vs-no-logger
+contrast arm: per-frame logging is forbidden in both arms and probes.
 
 ## #80 — the credit frontier: what remains (steps 1–3 landed 2026-08-03; step 4's mechanism legs run; RESCOPED 2026-08-06)
 
@@ -925,4 +976,4 @@ are in git history.
 | **#91** multimon window + m≥2 serial cost | CLOSED 2026-08-08. Three answers: the window divides by monitor count (a frame id is one monitor's frame, and the window is session-wide); widening it does not fix the two-monitor stall, so the default is NOT scaled by M and the per-screen consequence is documented in `gfx.toml(5)`; and **our code does not serialise the two screens** — the encodes overlap, and what staggers them is our own raw-input transfer. Carries one retraction, and one question left open rather than answered: what sets the rate at which the ffmpeg children take their input. | [`91-the-multimon-window-and-the-shared-pump.md`](docs/experiments/91-the-multimon-window-and-the-shared-pump.md) |
 | **#100** remove the emit thread | DONE 2026-08-07. The assembly thread, its two semaphores, its depth-1 hand-off slot, its join, its unarmed-drop counter and the `gfx.toml emit_thread` key are gone; assembly runs inline on the encoder worker. The separation of assembly from the encode path (the use-after-free fix) stays, and an old `gfx.toml` still loads with one warning. **Scoped to one monitor** — the thread is not shown to be worthless at m >= 2. | [`100-the-emit-thread-bought-nothing.md`](docs/experiments/100-the-emit-thread-bought-nothing.md) |
 | **#106** external perf isolation/equivalence | CLOSED RED. Phase A could not record through the delegated tracefs boundary; Phase B found 13 of 34 semantic records had no exact mapping, so Phase C was cancelled. | [`106-perf-isolation-and-trace-equivalence.md`](docs/experiments/106-perf-isolation-and-trace-equivalence.md) |
-| **#107** private tracer PR scope | DONE. Port the full existing default-disarmed server tracer and test; keep benches, capture machinery and analyzers dev-only. | [`107-private-tracer-is-pr-scope.md`](docs/experiments/107-private-tracer-is-pr-scope.md) |
+| **#107** private tracer PR scope | DONE. Ship one reusable compile-time-opt-in paired tracer in the main change; disabled binaries contain no trace footprint, enabled builds emit named structured records, and the xorgxrdp capture endpoint moves off per-frame logging into xrdp's same ring. Make it shippable on dev first, then re-author its generic foundation as slice 1. Keep benches and capture machinery dev-only. | [`107-private-tracer-is-pr-scope.md`](docs/experiments/107-private-tracer-is-pr-scope.md) |
