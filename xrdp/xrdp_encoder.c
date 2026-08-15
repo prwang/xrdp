@@ -925,12 +925,12 @@ gfx_trace_rects(const char *tag, int surface_id, int num_rects,
         bx2 = MAX(bx2, rects[i].x2);
         by2 = MAX(by2, rects[i].y2);
     }
-    /* `tag` is a literal at every call site, which is what the ring
-       requires; the bounding box is all six payload fields, so the
-       `first=` rect the old log line also carried is dropped -- no
-       reader parsed it (checked across PR-demo and tools). */
+    /* The bounding box names all four coordinates. The old log line's
+       `first=` rect remains omitted -- no reader used it. */
     (void)tag;
-    PERF_TRACE6("dmg", surface_id, num_rects, bx1, by1, bx2, by2);
+    PERF_TRACE("event=dmg class=GFX_TRACE surface=%d num_rects=%d "
+               "x1=%d y1=%d x2=%d y2=%d",
+               surface_id, num_rects, bx1, by1, bx2, by2);
 }
 
 /* #45 step 7 -- the xorgxrdp AVC444 xup blob is EXACTLY three EGFX
@@ -1683,12 +1683,14 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
         int cy_off = (xrdp_ffmpeg_avc444_coded_height(ff) / 2) * t_cw
                      + t_cw / 2;
-        PERF_TRACE6("enc", (int)(self->avc444_seq - 1),
-                    enc_rv == XRDP_FFMPEG_PAIR_READY
-                    ? (int)pic.desktop_sequence : -1,
-                    enc_rv == XRDP_FFMPEG_PAIR_READY,
-                    xrdp_ffmpeg_avc444_inflight(ff),
-                    (int)main_view[cy_off], 0);
+        PERF_TRACE("event=enc class=GFX_TRACE submitted_seq=%d "
+                   "returned_seq=%d ready=%d inflight=%d center_y=%d",
+                   (int)(self->avc444_seq - 1),
+                   enc_rv == XRDP_FFMPEG_PAIR_READY
+                   ? (int)pic.desktop_sequence : -1,
+                   enc_rv == XRDP_FFMPEG_PAIR_READY,
+                   xrdp_ffmpeg_avc444_inflight(ff),
+                   (int)main_view[cy_off]);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -2219,12 +2221,14 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         {
             center_y = (int)main_view[cy_off];
         }
-        PERF_TRACE6("enc", (int)seq,
-                    enc_rv == XRDP_FFMPEG_PAIR_READY
-                    ? (int)pair.desktop_sequence : -1,
-                    enc_rv == XRDP_FFMPEG_PAIR_READY,
-                    ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
-                    center_y, 0);
+        PERF_TRACE("event=enc class=GFX_TRACE submitted_seq=%d "
+                   "returned_seq=%d ready=%d inflight=%d center_y=%d",
+                   (int)seq,
+                   enc_rv == XRDP_FFMPEG_PAIR_READY
+                   ? (int)pair.desktop_sequence : -1,
+                   enc_rv == XRDP_FFMPEG_PAIR_READY,
+                   ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
+                   center_y);
     }
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
@@ -2463,12 +2467,13 @@ gfx_avc444_aux_due(struct xrdp_encoder *self, int mon)
          * chroma went with this frame, ms since this monitor last
          * carried chroma, ms since its previous frame, and the bound
          * the guarantee is being held to. */
-        PERF_TRACE6("auxdue", mon, due,
-                    self->avc444_last_aux_ms[mon] < 0
-                    ? -1 : (int)(now - self->avc444_last_aux_ms[mon]),
-                    self->avc444_prev_frame_ms[mon] < 0
-                    ? -1 : (int)(now - self->avc444_prev_frame_ms[mon]),
-                    self->avc444_chroma_refresh_ms, 0);
+        PERF_TRACE("event=auxdue monitor=%d due=%d since_aux_ms=%d "
+                   "since_previous_ms=%d refresh_ms=%d", mon, due,
+                   self->avc444_last_aux_ms[mon] < 0
+                   ? -1 : (int)(now - self->avc444_last_aux_ms[mon]),
+                   self->avc444_prev_frame_ms[mon] < 0
+                   ? -1 : (int)(now - self->avc444_prev_frame_ms[mon]),
+                   self->avc444_chroma_refresh_ms);
     }
     self->avc444_prev_frame_ms[mon] = now;
     if (due)
@@ -2547,7 +2552,8 @@ gfx_batch_release_slots(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         {
             /* stamped in BOTH modes: the absorb instant is the axis the
              * A/B is read on, so the control arm has to publish it too */
-            PERF_TRACE6("absorb", frame_id, set_mon[index], 0, 0, 0, 0);
+            PERF_TRACE("event=absorb class=ACK_TRACE id=%d monitor=%d",
+                       frame_id, set_mon[index]);
         }
         if (!self->eager_slot_ack)
         {
@@ -2786,7 +2792,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * the same order and the same single global counter as before this
      * step, so GFX_TRACE lines, XRDP_AVC444_DUMP file names and the wire
      * audit still correlate across monitors. */
-    PERF_TRACE("subm_beg", set_n, 0);
+    PERF_TRACE("event=subm_beg set_n=%d", set_n);
     for (index = 0; index < set_n; index++)
     {
         if (set_mon[index] < 0)
@@ -2831,18 +2837,18 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         sub_state[mon] = 1;
         if (xrdp_ack_trace_on())
         {
-            PERF_TRACE6("submit",
-                        gfx_egfx_batch_peek_frame_id(
-                            set[index]->u.gfx.cmd,
-                            set[index]->u.gfx.cmd_bytes),
-                        mon, 0, 0, 0, 0);
+            PERF_TRACE("event=submit class=ACK_TRACE id=%d monitor=%d",
+                       gfx_egfx_batch_peek_frame_id(
+                           set[index]->u.gfx.cmd,
+                           set[index]->u.gfx.cmd_bytes),
+                       mon);
         }
         handles[n_handles] = ff;
         handle_mon[n_handles] = mon;
         pump_mon_mask |= 1 << mon;
         n_handles++;
     }
-    PERF_TRACE("subm_end", n_handles, 0);
+    PERF_TRACE("event=subm_end n_handles=%d", n_handles);
     if (n_handles < 1)
     {
         /* nothing armed; every item takes the unchanged path */
@@ -2867,12 +2873,14 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * would have permitted to capture, e = that credit. See
      * gfx_batch_credit_mask() for what (c, d) together may and may not
      * be read to mean. */
-    PERF_TRACE6("pump_beg", n_handles, 0, pump_mon_mask, credit_mask,
-                credit, 0);
+    PERF_TRACE("event=pump_beg n_handles=%d kids_armed=%d "
+               "monitor_mask=%d credit_mask=%d credit=%d",
+               n_handles, 0, pump_mon_mask, credit_mask, credit);
     st = xrdp_ffmpeg_avc444_pump_pairs(handles, n_handles, &bad_handle,
                                        &kids_armed);
-    PERF_TRACE6("pump_end", n_handles, kids_armed, pump_mon_mask,
-                credit_mask, credit, 0);
+    PERF_TRACE("event=pump_end n_handles=%d kids_armed=%d "
+               "monitor_mask=%d credit_mask=%d credit=%d",
+               n_handles, kids_armed, pump_mon_mask, credit_mask, credit);
     gfx_batch_publish(self, sub_seq, sub_state, sub_reset);
     /* #61e -- the cycle decomposition ran out of names here: the span
      * from pump_end to the first coll_beg was 2.4-2.8
@@ -2881,7 +2889,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * log.c writes unbuffered under a global mutex, so it is a
      * plausible owner of milliseconds and must be measured, not
      * assumed. */
-    PERF_TRACE("book_beg", n_handles, 0);
+    PERF_TRACE("event=book_beg n_handles=%d", n_handles);
     self->avc444_batch_cycles++;
     self->avc444_batch_items += n_handles;
     if (kids_armed > self->avc444_batch_max_kids)
@@ -2902,11 +2910,12 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         kids_armed, self->avc444_batch_max_kids, st);
     if (gfx_enc_trace_on())
     {
-        PERF_TRACE6("batch", (int)self->avc444_batch_cycles, set_n,
-                    n_handles, kids_armed, self->avc444_batch_max_kids,
-                    st);
+        PERF_TRACE("event=batch class=GFX_TRACE cycle=%d set_n=%d "
+                   "monitors_armed=%d kids_armed=%d max_kids=%d rv=%d",
+                   (int)self->avc444_batch_cycles, set_n, n_handles,
+                   kids_armed, self->avc444_batch_max_kids, st);
     }
-    PERF_TRACE("book_end", n_handles, 0);
+    PERF_TRACE("event=book_end n_handles=%d", n_handles);
     if (st != XRDP_FFMPEG_PAIR_READY)
     {
         LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: pump of %d children failed; "
@@ -2939,14 +2948,14 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * in-situ cost (the offline bench measured 1.75 ms/pair) */
     for (index = 0; index < n_handles; index++)
     {
-        PERF_TRACE("coll_beg", handle_mon[index], 0);
+        PERF_TRACE("event=coll_beg monitor=%d", handle_mon[index]);
         gfx_batch_collect_one(self, handles[index], handle_mon[index]);
-        PERF_TRACE("coll_end", handle_mon[index], 0);
+        PERF_TRACE("event=coll_end monitor=%d", handle_mon[index]);
     }
     /* #70: the collects above are the absorb proof for this set */
-    PERF_TRACE("rel_beg", set_n, 0);
+    PERF_TRACE("event=rel_beg set_n=%d", set_n);
     gfx_batch_release_slots(self, set, set_mon, set_n);
-    PERF_TRACE("rel_end", set_n, 0);
+    PERF_TRACE("event=rel_end set_n=%d", set_n);
 }
 
 /*****************************************************************************/
@@ -3766,9 +3775,11 @@ gfx_emit_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                 ? gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
                                                set[index]->u.gfx.cmd_bytes)
                 : 0;
-        PERF_TRACE("emit_beg", pf_id, set_mon[index]);
+        PERF_TRACE("event=emit_beg frame_id=%d monitor=%d", pf_id,
+                   set_mon[index]);
         self->process_enc(self, set[index]);
-        PERF_TRACE("emit_end", pf_id, set_mon[index]);
+        PERF_TRACE("event=emit_end frame_id=%d monitor=%d", pf_id,
+                   set_mon[index]);
     }
 }
 
@@ -3851,14 +3862,15 @@ proc_enc_msg(void *arg)
              * that this bracket is empty. Bracketing the wait is the
              * only way to distinguish "the producer is late" from "the
              * worker is slow" -- both look like a long cycle. */
-            PERF_TRACE("wait_beg", n_items, drain_full);
+            PERF_TRACE("event=wait_beg n_items=%d drain_full=%d",
+                       n_items, drain_full);
             if (g_obj_wait(robjs, robjs_count, wobjs, wobjs_count,
                            timeout) != 0)
             {
                 /* error, should not get here */
                 g_sleep(100);
             }
-            PERF_TRACE("wait_end", 0, 0);
+            PERF_TRACE("event=wait_end");
         }
         /* THE STARVATION RULE: a cycle that ends holding carried items
          * must NOT block, or the monitor those items belong to would sit
@@ -3895,7 +3907,7 @@ proc_enc_msg(void *arg)
          * on the fifo until unrelated damage re-set the event.) */
         drain_full = 0;
         n_carried = n_items;
-        PERF_TRACE("drain_beg", n_items, 0);
+        PERF_TRACE("event=drain_beg n_items=%d", n_items);
         tc_mutex_lock(mutex);
         while (n_items < GFX_BATCH_MAX_ITEMS)
         {
@@ -3909,7 +3921,8 @@ proc_enc_msg(void *arg)
         }
         drain_full = (n_items >= GFX_BATCH_MAX_ITEMS);
         tc_mutex_unlock(mutex);
-        PERF_TRACE("drain_end", n_items, drain_full);
+        PERF_TRACE("event=drain_end n_items=%d drain_full=%d",
+                   n_items, drain_full);
         /* #61e -- one record per item this drain actually TOOK off the
          * fifo, carrying the producer's echoed frame id. Paired with the
          * "enq" record the main thread writes when it puts that same id
@@ -3923,7 +3936,7 @@ proc_enc_msg(void *arg)
         {
             for (index = n_carried; index < n_items; index++)
             {
-                PERF_TRACE("take",
+                PERF_TRACE("event=take frame_id=%d fifo_depth=%d",
                            gfx_egfx_batch_peek_frame_id(
                                items[index]->u.gfx.cmd,
                                items[index]->u.gfx.cmd_bytes),

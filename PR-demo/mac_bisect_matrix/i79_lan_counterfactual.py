@@ -63,19 +63,19 @@ def classify(evs):
     pumps = {}
     wtid = next((e[1] for e in evs if e[2] == "pump_beg"), None)
     pb = None
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
         if name == "egress":
-            egress.setdefault(a[0], ts)
+            egress.setdefault(fields["id"], ts)
         elif name == "msgin":
-            msgin.setdefault(a[0], ts)
+            msgin.setdefault(fields["id"], ts)
         elif name == "absorb":
-            absorb.setdefault(a[0], ts)
-        elif name in ("ackslot", "ackregion"):
-            acks.append((ts, a[0]))
+            absorb.setdefault(fields["id"], ts)
+        elif name == "ack" and fields.get("class") == "ACK_TRACE":
+            acks.append((ts, fields["id"]))
         elif tid == wtid and name == "pump_beg":
             pb = ts
         elif tid == wtid and name == "pump_end" and pb is not None:
-            pumps.setdefault(a[0], (ts - pb) / 1e6)
+            pumps.setdefault(fields["n_handles"], (ts - pb) / 1e6)
             pb = None
     acks.sort()
     cut = (min(msgin.values()) + int(WARMUP_S * 1e9)) if msgin else 0
@@ -188,11 +188,11 @@ def main():
     for name, win, cyc, by_pos, run_len, gated, prompt in rows:
         evs, _ = load(os.path.join(root, "leg_" + name))
         eg, cl = {}, {}
-        for ts, tid, nm, a in evs:
+        for ts, tid, nm, fields in evs:
             if nm == "egress":
-                eg.setdefault(a[0], ts)
-            elif nm == "cliack":
-                cl.setdefault(a[0], ts)
+                eg.setdefault(fields["id"], ts)
+            elif nm == "ack" and fields.get("class") == "GFX_TRACE":
+                cl.setdefault(fields["frame_id"], ts)
         lag = sorted((cl[i] - eg[i]) / 1e6 for i in cl if i in eg)
         if not lag or not prompt:
             continue

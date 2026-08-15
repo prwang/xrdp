@@ -45,23 +45,16 @@ Usage:
     i80_ack_latency.py <perf-ring-file> [--monitors N] [--window C] [label]
 """
 
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
 
 
 def load(path):
-    out = []
-    for line in open(path):
-        if line.startswith('#'):
-            continue
-        f = line.split()
-        if len(f) < 9:
-            continue
-        try:
-            t = int(f[0])
-        except ValueError:
-            continue
-        out.append((t, f[2], [int(x) for x in f[3:9]]))
-    return out
+    return [(r["mono_ns"], r["event"], r) for r in read_records(path)
+            if r["event"] != "clock_base"]
 
 
 def pct(v, k):
@@ -77,15 +70,15 @@ def report(path, label, monitors, window):
     # cliack: a = frame_id, b = queue depth, c = frames decoded,
     #         d = frame_id_server
     egress = {}
-    for t, name, a in recs:
-        if name == 'egress' and a[0] not in egress:
-            egress[a[0]] = (t, a[3])
+    for t, name, fields in recs:
+        if name == 'egress' and fields['id'] not in egress:
+            egress[fields['id']] = (t, fields['client'])
 
     first_ack = {}
-    for t, name, a in recs:
-        if name != 'cliack':
+    for t, name, fields in recs:
+        if name != 'ack' or fields.get('class') != 'GFX_TRACE':
             continue
-        fid = a[0]
+        fid = fields['frame_id']
         for k in egress:
             if k <= fid and k not in first_ack:
                 first_ack[k] = t
@@ -119,11 +112,16 @@ def report(path, label, monitors, window):
                   " worst observed %d -- %s"
                   % (window, monitors, bound, worst, verdict))
 
-    slots = [a for _t, n, a in recs if n == 'ackslot']
+    slots = [fields for _t, name, fields in recs
+             if name == 'ack' and fields.get('class') == 'ACK_TRACE'
+             and fields.get('kind') == 'slot']
     if slots:
         terms = {}
-        for a in slots:
-            _slot, server, consumed, client, C = a[0], a[1], a[2], a[3], a[4]
+        for fields in slots:
+            server = fields['egress']
+            consumed = fields['absorbed']
+            client = fields['client']
+            C = fields['window']
             v = {'consumed': consumed, 'server+1': server + 1,
                  'client+C': client + C}
             lo = min(v.values())

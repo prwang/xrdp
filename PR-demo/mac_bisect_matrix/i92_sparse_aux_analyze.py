@@ -24,17 +24,17 @@ project's quality gate 2, learned from an arm where the concurrency a
 change existed to create never appeared and the rate was reported
 anyway).
 
-THE RECORDS THIS READS, and what each field is:
+THE RECORDS THIS READS, with their printed field names:
 
-  auxdue  a=monitor index
-          b=THE DECISION: 1 = the chroma view went with this frame,
+  auxdue  monitor=monitor index
+          due=THE DECISION: 1 = the chroma view went with this frame,
             0 = luma only
-          c=ms since this monitor last carried chroma (-1 = never yet)
-          d=ms since this monitor's previous frame (-1 = none yet)
-          e=chroma_refresh_ms as the running binary holds it, so a leg
+          since_aux_ms=ms since this monitor last carried chroma
+          since_previous_ms=ms since its previous frame
+          refresh_ms=chroma_refresh_ms as the running binary holds it, so a leg
             can be shown to have had the config it claims
   egress  ONE PER FRAME handed to the transport. a=the frame's id,
-          c=bytes queued in the transport (KiB), d=the last frame id the
+          pending_kib=bytes queued in the transport, client=the last frame the
           client had acknowledged. This -- not 'send' -- is the frame
           delivery rate, and it reproduces e_gate_run.sh's own
           "send-to-send gap" line to within 0.2 ms, which is how the two
@@ -52,23 +52,14 @@ Usage: i92_sparse_aux_analyze.py <capture-dir>
 import os
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
+
 
 def load(path):
-    """Read a perf_trace ring dump: mono_ns thread name a b c d e f."""
-    out = []
-    with open(path) as fh:
-        for line in fh:
-            if line.startswith('#'):
-                continue
-            f = line.split()
-            if len(f) < 9:
-                continue
-            try:
-                t = int(f[0])
-            except ValueError:
-                continue
-            out.append((t, f[2], [int(x) for x in f[3:9]]))
-    return out
+    """Read named records; every payload field keeps its printed name."""
+    return [(r["mono_ns"], r["event"], r) for r in read_records(path)
+            if r["event"] != "clock_base"]
 
 
 def leg_records(legdir):
@@ -108,18 +99,18 @@ def analyse_leg(legdir):
 
     aux = [r for r in recs if r[1] == 'auxdue']
     out['auxdue_records'] = len(aux)
-    out['chroma_frames'] = sum(1 for r in aux if r[2][1] == 1)
-    out['luma_only_frames'] = sum(1 for r in aux if r[2][1] == 0)
-    out['refresh_ms_on_wire'] = sorted({r[2][4] for r in aux})
+    out['chroma_frames'] = sum(1 for r in aux if r[2]['due'] == 1)
+    out['luma_only_frames'] = sum(1 for r in aux if r[2]['due'] == 0)
+    out['refresh_ms_on_wire'] = sorted({r[2]['refresh_ms'] for r in aux})
 
     # the GUARANTEE, measured rather than assumed: the wall-clock gap
     # between consecutive frames that carried chroma, per monitor
     gaps = []
     last = {}
-    for t, _, f in aux:
-        if f[1] != 1:
+    for t, _, fields in aux:
+        if fields['due'] != 1:
             continue
-        mon = f[0]
+        mon = fields['monitor']
         if mon in last:
             gaps.append((t - last[mon]) / 1e6)
         last[mon] = t
@@ -183,10 +174,10 @@ def analyse_leg(legdir):
     # however many bytes it saved.
     fed = {}
     for r in [x for x in recs if x[1] == 'feedend']:
-        fed.setdefault((r[2][1], r[2][0]), r[0])
+        fed.setdefault((r[2]['main'], r[2]['sequence']), r[0])
     win = {}
     for r in [x for x in recs if x[1] == 'outfirst']:
-        k = (r[2][1], r[2][0])
+        k = (r[2]['main'], r[2]['sequence'])
         if k in fed and k not in win:
             win[k] = (fed[k], r[0])
     wmain = {k[1]: v for k, v in win.items() if k[0] == 0}
@@ -278,11 +269,16 @@ def analyse_leg(legdir):
     # Ties are counted as ties, deliberately: if two terms are equal,
     # relaxing either ALONE changes nothing, and reporting one of them
     # as "the binder" would point at a knob that cannot move anything.
-    ack = [r for r in recs if r[1] == 'ackslot']
+    ack = [r for r in recs if r[1] == 'ack'
+           and r[2].get('class') == 'ACK_TRACE'
+           and r[2].get('kind') == 'slot']
     bind = {}
     head = {}
-    for _, _, f in ack:
-        server, consumed, client, wwin = f[1], f[2], f[3], f[4]
+    for _, _, fields in ack:
+        server = fields['egress']
+        consumed = fields['absorbed']
+        client = fields['client']
+        wwin = fields['window']
         terms = {'absorbed': consumed,
                  'inventory': server + 1,
                  'wire': client + wwin}
@@ -295,15 +291,16 @@ def analyse_leg(legdir):
     out['credit_binder'] = dict(sorted(bind.items(),
                                        key=lambda kv: -kv[1]))
     out['wire_headroom'] = dict(sorted(head.items()))
-    out['wire_window'] = sorted({f[4] for _, _, f in ack})
+    out['wire_window'] = sorted({fields['window']
+                                 for _, _, fields in ack})
 
     # how many children the pump armed. 2 per monitor normally; 1 for a
     # monitor whose chroma was skipped. This is the skip visible from
     # the OTHER side of the mechanism.
     pe = [r for r in recs if r[1] == 'pump_end']
     armed = {}
-    for _, _, f in pe:
-        armed[f[1]] = armed.get(f[1], 0) + 1
+    for _, _, fields in pe:
+        armed[fields['kids_armed']] = armed.get(fields['kids_armed'], 0) + 1
     out['kids_armed_histogram'] = dict(sorted(armed.items()))
 
     # THE BYTES. The oracle client saves every encoded payload it

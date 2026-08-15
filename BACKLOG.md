@@ -82,10 +82,10 @@ stay as "(was #NN)" in each header.
 19. **#105** — the upstream port: one PR off a synced `upstream/devel` (filed 2026-08-10)
 20. ~~**#106** — prove per-PID perf isolation and private-trace
     equivalence~~ **CLOSED RED 2026-08-12**
-21. ~~**#107** — reassess `common/perf_trace` as required PR scope~~
-    **DONE 2026-08-13** — one reusable, compile-time-opt-in paired tracer is
-    PR scope; the existing dev source and positional file are not copied
-    unchanged
+21. ~~**#107** — reusable `common/perf_trace` implementation gate~~ **DONE
+    2026-08-15**: selected and installed the named text byte ring on dev;
+    retired fixed objects and positional recovery. The remaining lifecycle,
+    compile-erasure and paired-xorg shipping gates are #105 implementation
 22. **#108** — retire timing evidence carrying xorgxrdp's per-frame
     `ACK_TRACE cap` logger (filed 2026-08-12)
 
@@ -128,14 +128,15 @@ Plan: `docs/avc444_upstream_port_plan.md` (rewritten 2026-08-10; the
   xorgxrdp's remaining per-frame capture `LOG()` by carrying its producer
   timestamps into xrdp's same ring over the matched xup contract, ship the
   operating documentation, and add lifecycle/security/paired-wire tests. It
-  is compile-time disabled by default: a disabled build contains no tracer
+  will be compile-time disabled by default: a disabled build contains no tracer
   source, call, argument evaluation, event/environment string, trace-only
   state/counter or xup diagnostic payload. Enabled builds write versioned
-  JSON Lines with named typed fields, not the private six-integer file plus
-  `perf_trace_lines.py`. The internal representation remains a measured
-  pre-port choice: fixed typed slots with sink formatting versus bounded
-  producer formatting directly into a Linux double-mapped text byte ring;
-  #107 records the source-tail and integrity gate.
+  versioned key/value lines with named fields, not the private six-integer file.
+  The dev `perf_trace_lines.py` now supplies only a generic wall-clock envelope;
+  it has no event or positional-field map. #107's two-mechanism gate selected bounded
+  producer `snprintf()` directly into a Linux double-mapped text byte ring:
+  about +10 µs/frame mean over fixed objects for twelve events, with absolute
+  p99 25.6–42.3 µs and complete zero-drop alias-wrap output.
   Dev-only benches, capture machinery and analyzers remain excluded. The test
   registration must be integrated into upstream `2e8a4a82`'s suite-selection
   layout, not copied over it. Exact acceptance:
@@ -976,4 +977,4 @@ are in git history.
 | **#91** multimon window + m≥2 serial cost | CLOSED 2026-08-08. Three answers: the window divides by monitor count (a frame id is one monitor's frame, and the window is session-wide); widening it does not fix the two-monitor stall, so the default is NOT scaled by M and the per-screen consequence is documented in `gfx.toml(5)`; and **our code does not serialise the two screens** — the encodes overlap, and what staggers them is our own raw-input transfer. Carries one retraction, and one question left open rather than answered: what sets the rate at which the ffmpeg children take their input. | [`91-the-multimon-window-and-the-shared-pump.md`](docs/experiments/91-the-multimon-window-and-the-shared-pump.md) |
 | **#100** remove the emit thread | DONE 2026-08-07. The assembly thread, its two semaphores, its depth-1 hand-off slot, its join, its unarmed-drop counter and the `gfx.toml emit_thread` key are gone; assembly runs inline on the encoder worker. The separation of assembly from the encode path (the use-after-free fix) stays, and an old `gfx.toml` still loads with one warning. **Scoped to one monitor** — the thread is not shown to be worthless at m >= 2. | [`100-the-emit-thread-bought-nothing.md`](docs/experiments/100-the-emit-thread-bought-nothing.md) |
 | **#106** external perf isolation/equivalence | CLOSED RED. Phase A could not record through the delegated tracefs boundary; Phase B found 13 of 34 semantic records had no exact mapping, so Phase C was cancelled. | [`106-perf-isolation-and-trace-equivalence.md`](docs/experiments/106-perf-isolation-and-trace-equivalence.md) |
-| **#107** private tracer PR scope | DONE. Ship one reusable compile-time-opt-in paired tracer in the main change; disabled binaries contain no trace footprint, enabled builds emit named structured records, and the xorgxrdp capture endpoint moves off per-frame logging into xrdp's same ring. Make it shippable on dev first, then re-author its generic foundation as slice 1. Keep benches and capture machinery dev-only. | [`107-private-tracer-is-pr-scope.md`](docs/experiments/107-private-tracer-is-pr-scope.md) |
+| **#107** reusable perf-trace implementation gate | DONE 2026-08-15. The dev tracer now has one direct-`snprintf()` double-mapped text byte ring, 34 named call sites and generic readers; fixed objects, the six-int API and positional recovery are gone. The final implementation smoke was 14.147 µs/frame mean and 24.749 µs p99 for twelve events, with 6,000/6,000 records, zero drops and mode 0600. #105 owns the already-recorded lifecycle, compile-erasure and paired-xorg work required before the tracer ships. | [`107-private-tracer-is-pr-scope.md`](docs/experiments/107-private-tracer-is-pr-scope.md) |

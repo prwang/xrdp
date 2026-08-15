@@ -28,7 +28,7 @@ import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
-DMG = re.compile(r"GFX_TRACE avc dmg surface=(\d+) num_rects=(\d+)")
+DMG = re.compile(r"GFX_TRACE dmg surface=(\d+) num_rects=(\d+)")
 BATCH = re.compile(r"GFX_TRACE batch cycle=(\d+) set_n=(\d+) "
                    r"monitors_armed=(\d+) kids_armed=(\d+)")
 ENC = re.compile(r"GFX_TRACE enc submitted_seq=(\d+)")

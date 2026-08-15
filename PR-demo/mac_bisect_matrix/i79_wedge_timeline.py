@@ -54,12 +54,19 @@ def timeline(evs, hs):
     rows = []
     server = client = -1
     slots = {}          # slot index -> frame id occupying it
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
+        if name == "ack" and fields.get("class") == "GFX_TRACE":
+            name = "cliack"
+            fid = fields["frame_id"]
+        elif name == "ack" and fields.get("class") == "ACK_TRACE":
+            name = "ack" + fields["kind"]
+            fid = fields["id"]
+        else:
+            fid = fields.get("id", fields.get("frame_id", -1))
         if name not in KINDS:
             continue
         if first is None:
             first = ts
-        fid = a[0]
         if name == "msgin":
             slots[fid & 1] = fid
         elif name == "egress":
@@ -147,13 +154,15 @@ def race(evs):
     Neither is under the client's control in any meaningful sense.
     """
     eg, ab, cl = {}, {}, {}
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
+        if name == "ack" and fields.get("class") == "GFX_TRACE":
+            name = "cliack"
         if name == "egress":
-            eg.setdefault(a[0], ts)
+            eg.setdefault(fields["id"], ts)
         elif name == "absorb":
-            ab.setdefault(a[0], ts)
+            ab.setdefault(fields["id"], ts)
         elif name == "cliack":
-            cl.setdefault(a[0], ts)
+            cl.setdefault(fields["frame_id"], ts)
     deadline, roundtrip = [], []
     for k in sorted(ab):
         if (k - 1) in eg and ab[k] > eg[k - 1]:

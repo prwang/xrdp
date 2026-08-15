@@ -38,6 +38,9 @@ import os
 import statistics as st
 import sys
 
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
+
 WARMUP_S = 1.0          # dropped from every leg alike, and reported
 STALL_MS = 10.0         # the >10 ms threshold #78 quoted
 
@@ -52,23 +55,20 @@ def load(legdir):
     t1 = int(win["t1"]) * 10 ** 9
     evs = []
     for path in glob.glob(os.path.join(legdir, "perf", "enc.*")):
-        base_mono = base_real = None
-        for line in open(path, errors="replace"):
-            if line.startswith("# perfbase"):
-                f = line.split()
-                base_mono, base_real = int(f[3]), int(f[5])
+        records = read_records(path)
+        base = next((r for r in records
+                     if r["event"] == "clock_base"), None)
+        if base is None:
+            raise ValueError("%s has no event=clock_base" % path)
+        base_mono = base["mono_ns"]
+        base_real = base["real_ns"]
+        for record in records:
+            if record["event"] == "clock_base":
                 continue
-            f = line.split()
-            if len(f) != 9 or base_mono is None:
-                continue
-            try:
-                ns = int(f[0])
-                a = [int(x) for x in f[3:9]]
-            except ValueError:
-                continue
+            ns = record["mono_ns"]
             real = base_real + (ns - base_mono)
             if t0 <= real <= t1:
-                evs.append((real, f[1], f[2], a))
+                evs.append((real, record["tid"], record["event"], record))
     evs.sort(key=lambda e: e[0])
     return evs, win
 
@@ -87,21 +87,19 @@ def summarize(evs, delay_ms):
     waits, pumps = [], []
     wtid = next((e[1] for e in evs if e[2] == "pump_beg"), None)
     wb = pb = None
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
         if name == "msgin":
-            msgin.setdefault(a[0], ts)
+            msgin.setdefault(fields["id"], ts)
         elif name == "absorb":
-            absorb.setdefault(a[0], ts)
+            absorb.setdefault(fields["id"], ts)
         elif name == "egress":
-            egress.setdefault(a[0], ts)
-        elif name == "cliack":
-            cliack.setdefault(a[0], ts)
+            egress.setdefault(fields["id"], ts)
+        elif name == "ack" and fields.get("class") == "GFX_TRACE":
+            cliack.setdefault(fields["frame_id"], ts)
         elif name == "take":
-            take.setdefault(a[0], ts)
-        elif name == "ackslot":
-            acks.append((ts, a[0], "slot"))
-        elif name == "ackregion":
-            acks.append((ts, a[0], "region"))
+            take.setdefault(fields["frame_id"], ts)
+        elif name == "ack" and fields.get("class") == "ACK_TRACE":
+            acks.append((ts, fields["id"], fields["kind"]))
         elif tid == wtid and name == "wait_beg":
             wb = ts
         elif tid == wtid and name == "wait_end" and wb is not None:
@@ -192,19 +190,18 @@ def discriminate(evs):
     egress, msgin, absorb = {}, {}, {}
     acks = []
     outstanding = {}
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
         if name == "send":
-            outstanding[a[3] - a[4]] = outstanding.get(a[3] - a[4], 0) + 1
+            depth = fields["id_server"] - fields["id_client"]
+            outstanding[depth] = outstanding.get(depth, 0) + 1
         elif name == "egress":
-            egress.setdefault(a[0], ts)
+            egress.setdefault(fields["id"], ts)
         elif name == "msgin":
-            msgin.setdefault(a[0], ts)
+            msgin.setdefault(fields["id"], ts)
         elif name == "absorb":
-            absorb.setdefault(a[0], ts)
-        elif name == "ackslot":
-            acks.append((ts, a[0]))
-        elif name == "ackregion":
-            acks.append((ts, a[0]))
+            absorb.setdefault(fields["id"], ts)
+        elif name == "ack" and fields.get("class") == "ACK_TRACE":
+            acks.append((ts, fields["id"]))
     acks.sort()
     if msgin:
         cut = min(msgin.values()) + int(WARMUP_S * 1e9)

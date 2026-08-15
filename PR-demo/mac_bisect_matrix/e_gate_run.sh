@@ -788,9 +788,9 @@ import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
-DMG = re.compile(r"GFX_TRACE avc dmg surface=(\d+)")
-BBOX = re.compile(r"GFX_TRACE avc dmg surface=\d+ num_rects=\d+ "
-                  r"bbox=\((\d+),(\d+)\)-\((\d+),(\d+)\)")
+DMG = re.compile(r"GFX_TRACE dmg surface=(\d+)")
+BBOX = re.compile(r"GFX_TRACE dmg surface=\d+ num_rects=\d+ "
+                  r"x1=(\d+) y1=(\d+) x2=(\d+) y2=(\d+)")
 BATCH = re.compile(r"GFX_TRACE batch cycle=(\d+) set_n=(\d+) "
                    r"monitors_armed=(\d+) kids_armed=(\d+)")
 SEND = re.compile(r"GFX_TRACE send bytes=(\d+) last=(\d+) frame_id=(\d+)")

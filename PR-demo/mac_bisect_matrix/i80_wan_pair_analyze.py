@@ -29,13 +29,8 @@ WIRE_SLOTS = 2          # XUP_CAP_AVC444_SLOT_COUNT, per monitor
 def frontier_facts(evs):
     """the #80-specific readings, none of which exist on the old build.
 
-    ackslot / ackregion records carry, in order:
-        a[0] the credit (or clamped region target) being granted
-        a[1] frame_id_server     a[2] frame_id_consumed
-        a[3] frame_id_client     a[4] the wire window C in force
-    egress records carry:
-        a[0] frame_id  a[1] displayed  a[2] transport bytes queued, KiB
-        a[3] frame_id_client
+    Named ack records carry id, kind, egress, absorbed, client and window.
+    Named egress records carry id, shown, pending_kib and client.
     """
     cs, queued = set(), []
     # Every emitted ack is classified by WHICH of the three terms was the
@@ -46,26 +41,27 @@ def frontier_facts(evs):
     # the tie bucket exists because that was wrong.)
     binder = {"consumed": 0, "server+1": 0, "client+C": 0, "tied": 0}
     n_slot = n_region = 0
-    for ts, tid, name, a in evs:
-        if name in ("ackslot", "ackregion"):
-            cs.add(a[4])
-            if name == "ackslot":
+    for ts, tid, name, fields in evs:
+        if name == "ack" and fields.get("class") == "ACK_TRACE":
+            cs.add(fields["window"])
+            if fields["kind"] == "slot":
                 n_slot += 1
             else:
                 n_region += 1
-            if a[4] == 0:
+            if fields["window"] == 0:
                 # the OLD build's legacy record has no C field. Reading
                 # its zero as a window would invent an answer out of a
                 # missing field, and it did: every old-build ack came out
                 # as "client+C binding, 100 %".
                 continue
-            terms = {"consumed": a[2], "server+1": a[1] + 1,
-                     "client+C": a[3] + a[4]}
+            terms = {"consumed": fields["absorbed"],
+                     "server+1": fields["egress"] + 1,
+                     "client+C": fields["client"] + fields["window"]}
             lo = min(terms.values())
             w = [k for k, v in terms.items() if v == lo]
             binder["tied" if len(w) > 1 else w[0]] += 1
         elif name == "egress":
-            queued.append(a[2])
+            queued.append(fields["pending_kib"])
     return {
         "C_seen": sorted(cs),
         "is_frontier": any(c > 0 for c in cs),
@@ -90,29 +86,30 @@ def stall_attribution(evs, stall_ms=STALL_MS):
     """
     msgin, absorb = {}, {}
     acks = []
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
         if name == "msgin":
-            msgin.setdefault(a[0], ts)
+            msgin.setdefault(fields["id"], ts)
         elif name == "absorb":
-            absorb.setdefault(a[0], ts)
-        elif name in ("ackslot", "ackregion"):
-            acks.append((ts, a))
+            absorb.setdefault(fields["id"], ts)
+        elif name == "ack" and fields.get("class") == "ACK_TRACE":
+            acks.append((ts, fields))
     acks.sort()
-    if not msgin or not acks or all(a[1][4] == 0 for a in acks):
+    if not msgin or not acks or all(a[1]["window"] == 0 for a in acks):
         return None
     cut = min(msgin.values()) + int(WARMUP_S * 1e9)
     out = {"consumed": 0, "server+1": 0, "client+C": 0, "tied": 0, "n": 0}
     for k in sorted(msgin):
         if msgin[k] < cut or (k - 2) not in absorb:
             continue
-        cred = next((x for x in acks if x[1][0] >= k - 2), None)
+        cred = next((x for x in acks if x[1]["id"] >= k - 2), None)
         if cred is None or cred[0] > msgin[k]:
             continue
         if (cred[0] - absorb[k - 2]) / 1e6 <= stall_ms:
             continue
-        a = cred[1]
-        terms = {"consumed": a[2], "server+1": a[1] + 1,
-                 "client+C": a[3] + a[4]}
+        fields = cred[1]
+        terms = {"consumed": fields["absorbed"],
+                 "server+1": fields["egress"] + 1,
+                 "client+C": fields["client"] + fields["window"]}
         lo = min(terms.values())
         w = [t for t, v in terms.items() if v == lo]
         out["tied" if len(w) > 1 else w[0]] += 1
@@ -123,11 +120,11 @@ def stall_attribution(evs, stall_ms=STALL_MS):
 def period_tail(evs):
     """period distribution, id-keyed, same warm-up rule as summarize()"""
     egress, msgin = {}, {}
-    for ts, tid, name, a in evs:
+    for ts, tid, name, fields in evs:
         if name == "egress":
-            egress.setdefault(a[0], ts)
+            egress.setdefault(fields["id"], ts)
         elif name == "msgin":
-            msgin.setdefault(a[0], ts)
+            msgin.setdefault(fields["id"], ts)
     cut = (min(msgin.values()) + int(WARMUP_S * 1e9)) if msgin else 0
     eg = sorted(t for t in egress.values() if t >= cut)
     per = [(b - a) / 1e6 for a, b in zip(eg, eg[1:])]

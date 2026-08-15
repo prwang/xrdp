@@ -888,9 +888,9 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
             /* BACKLOG #91: d = the monitor this child belongs to, so a
              * four-child pump can be split by screen. -1 when the
              * creator did not set one (probes, unit tests). */
-            PERF_TRACE6("outfirst", trace_seq_front(self),
-                        self->leaf == NULL, n, self->cfg.monitor_index,
-                        0, 0);
+            PERF_TRACE("event=outfirst sequence=%d main=%d bytes=%d "
+                       "monitor=%d", trace_seq_front(self),
+                       self->leaf == NULL, n, self->cfg.monitor_index);
         }
         if (xrdp_nut_feed(self->nut, (unsigned char *)tmp, n) != 0)
         {
@@ -990,9 +990,9 @@ feed_vmsplice(struct xrdp_ffmpeg_avc444 *self)
                  * worker", not "child copied the last byte". */
                 /* BACKLOG #91: d = the monitor, in the SAME field as
                  * outfirst's, so one reader rule covers both */
-                PERF_TRACE6("feedend", trace_seq_front(self),
-                            self->leaf == NULL, 0,
-                            self->cfg.monitor_index, 0, 0);
+                PERF_TRACE("event=feedend sequence=%d main=%d monitor=%d",
+                           trace_seq_front(self), self->leaf == NULL,
+                           self->cfg.monitor_index);
             }
         }
         return 0;

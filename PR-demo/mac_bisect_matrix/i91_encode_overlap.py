@@ -45,26 +45,19 @@ only for the per-megapixel columns; every overlap count is independent
 of it.
 """
 
+import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
 
 DEFAULT_GEOM = "2560x1440,3840x2400"
 
 
 def load(path):
-    """Read a perf_trace ring dump: mono_ns thread name a b c d e f."""
-    out = []
-    for line in open(path):
-        if line.startswith('#'):
-            continue
-        f = line.split()
-        if len(f) < 9:
-            continue
-        try:
-            t = int(f[0])
-        except ValueError:
-            continue
-        out.append((t, f[2], [int(x) for x in f[3:9]]))
-    return out
+    """Read the named text stream without positional payload recovery."""
+    return [(r["mono_ns"], r["event"], r) for r in read_records(path)
+            if r["event"] != "clock_base"]
 
 
 def bits(mask):
@@ -84,18 +77,19 @@ def pumps_of(recs):
     """
     out = []
     cur = None
-    for t, name, a in recs:
+    for t, name, fields in recs:
         if name == 'pump_beg':
-            cur = {'t0': t, 'mask': a[2], 'feed': [], 'out': []}
+            cur = {'t0': t, 'mask': fields['monitor_mask'],
+                   'feed': [], 'out': []}
         elif cur is None:
             continue
         elif name == 'feedend':
-            cur['feed'].append((t, a[3], a[1]))   # t, monitor, is_main
+            cur['feed'].append((t, fields['monitor'], fields['main']))
         elif name == 'outfirst':
-            cur['out'].append((t, a[3], a[1]))
+            cur['out'].append((t, fields['monitor'], fields['main']))
         elif name == 'pump_end':
             cur['t1'] = t
-            cur['armed'] = a[1]
+            cur['armed'] = fields['kids_armed']
             out.append(cur)
             cur = None
     return out

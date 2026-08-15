@@ -15,57 +15,52 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *
- * Dedicated performance trace sink -- see perf_trace.h for why the
- * source and the sink are on different threads (PRD FR-TRACE-1).
+ * Dedicated performance trace sink -- see perf_trace.h.
  */
 
 #if defined(HAVE_CONFIG_H)
 #include <config_ac.h>
 #endif
 
+#include <stdarg.h>
+#include <fcntl.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <sys/mman.h>
+#include <sys/types.h>
 
 #include "perf_trace.h"
 
-/* The SINK's own stdio buffer. Only the sink thread ever touches the
- * FILE*, so this buffering is invisible to every measured thread. */
 #define PERF_TRACE_BUF_SIZE (1024 * 1024)
-
-/* How long the sink sleeps between drain passes. A ring holds
- * PERF_TRACE_RING_SLOTS - 1 = 8191 records; at the rate this is used
- * for (single digits of events per frame, tens of frames per second) a
- * 10 ms pass drains a handful of records and the ring is never close to
- * full. It is deliberately NOT event-driven: a condition variable would
- * put a shared lock back on the source path, which is the entire defect
- * this design exists to remove. */
 #define PERF_TRACE_DRAIN_MS 10
+
+struct perf_trace_ring
+{
+    char *base;
+    unsigned long long head;
+    unsigned long long tail;
+    unsigned int dropped;
+    unsigned int drop_seen;
+    unsigned int format_failed;
+    unsigned int format_failed_seen;
+    int claimed;
+};
 
 static FILE *g_perf_file = NULL;
 static char *g_perf_buf = NULL;
 static int g_perf_armed = 0;
 static pthread_once_t g_perf_once = PTHREAD_ONCE_INIT;
-
-/* The ring pool. Allocated ONCE when the sink is armed -- never on the
- * source path, so perf_trace_ev() cannot allocate. */
-static struct perf_trace_ring *g_perf_rings = NULL;
+static struct perf_trace_ring *g_perf_rings[PERF_TRACE_MAX_RINGS];
 static int g_perf_ring_count = 0;
 static pthread_t g_perf_sink;
 static int g_perf_sink_live = 0;
 static volatile int g_perf_quit = 0;
-
-/* Threads that wanted a ring and found the pool exhausted. Written by
- * any thread, read by the sink; it is a diagnostic counter, so a lost
- * update is acceptable where a lock on the source path is not. */
 static volatile unsigned int g_perf_no_ring = 0;
-
-/* This thread's ring, resolved once per thread. NULL means "not yet
- * looked up"; the claim below sets it to a ring or leaves it NULL and
- * sets g_perf_no_ring. */
+static long long g_perf_pid = 0;
 static __thread struct perf_trace_ring *g_perf_my_ring = NULL;
 static __thread int g_perf_my_ring_done = 0;
 
@@ -75,8 +70,6 @@ perf_trace_now_ns(void)
 {
     struct timespec ts;
 
-    /* vDSO on Linux: a memory read and arithmetic, not a syscall. This
-     * is the ONE thing FR-TRACE-1 clause 1 permits on the source path. */
     if (clock_gettime(CLOCK_MONOTONIC, &ts) != 0)
     {
         return 0;
@@ -85,121 +78,260 @@ perf_trace_now_ns(void)
 }
 
 /*****************************************************************************/
-/* SPSC push. Called ONLY by the thread that owns this ring, so head is
- * read and written by this thread alone and needs no lock. Returns 1 if
- * the record was stored, 0 if the ring was full. */
-int
-perf_trace_ring_push(struct perf_trace_ring *r, long long ns, long long tid,
-                     const char *tag, int a, int b, int c, int d, int e,
-                     int f)
+struct perf_trace_ring *
+perf_trace_ring_create(void)
 {
-    unsigned int head;
-    unsigned int next;
+    struct perf_trace_ring *ring;
+    void *reserved;
+    void *first;
+    void *second;
+    int fd;
+    size_t offset;
+    long page_size;
 
-    if (r == NULL)
+    ring = (struct perf_trace_ring *)calloc(1, sizeof(*ring));
+    if (ring == NULL)
+    {
+        return NULL;
+    }
+    fd = memfd_create("xrdp-perf-trace", MFD_CLOEXEC);
+    if (fd < 0 || ftruncate(fd, PERF_TRACE_RING_BYTES) != 0)
+    {
+        if (fd >= 0)
+        {
+            close(fd);
+        }
+        free(ring);
+        return NULL;
+    }
+    reserved = mmap(NULL, PERF_TRACE_RING_BYTES * 2, PROT_NONE,
+                    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    if (reserved == MAP_FAILED)
+    {
+        close(fd);
+        free(ring);
+        return NULL;
+    }
+    first = mmap(reserved, PERF_TRACE_RING_BYTES, PROT_READ | PROT_WRITE,
+                 MAP_SHARED | MAP_FIXED, fd, 0);
+    second = first == MAP_FAILED ? MAP_FAILED :
+             mmap((char *)reserved + PERF_TRACE_RING_BYTES,
+                  PERF_TRACE_RING_BYTES, PROT_READ | PROT_WRITE,
+                  MAP_SHARED | MAP_FIXED, fd, 0);
+    close(fd);
+    if (first == MAP_FAILED || second == MAP_FAILED)
+    {
+        munmap(reserved, PERF_TRACE_RING_BYTES * 2);
+        free(ring);
+        return NULL;
+    }
+    ring->base = (char *)reserved;
+
+    page_size = sysconf(_SC_PAGESIZE);
+    if (page_size < 1)
+    {
+        page_size = 4096;
+    }
+    for (offset = 0; offset < PERF_TRACE_RING_BYTES;
+            offset += (size_t)page_size)
+    {
+        ring->base[offset] = 0;
+    }
+    return ring;
+}
+
+/*****************************************************************************/
+void
+perf_trace_ring_delete(struct perf_trace_ring *ring)
+{
+    if (ring != NULL)
+    {
+        if (ring->base != NULL)
+        {
+            munmap(ring->base, PERF_TRACE_RING_BYTES * 2);
+        }
+        free(ring);
+    }
+}
+
+/*****************************************************************************/
+static char *
+perf_trace_ring_reserve(struct perf_trace_ring *ring)
+{
+    unsigned long long head;
+    unsigned long long tail;
+
+    if (ring == NULL)
+    {
+        return NULL;
+    }
+    head = __atomic_load_n(&ring->head, __ATOMIC_RELAXED);
+    tail = __atomic_load_n(&ring->tail, __ATOMIC_ACQUIRE);
+    if (head - tail > PERF_TRACE_RING_BYTES - PERF_TRACE_RECORD_BYTES)
+    {
+        __atomic_add_fetch(&ring->dropped, 1, __ATOMIC_RELAXED);
+        return NULL;
+    }
+    return ring->base + (head & (PERF_TRACE_RING_BYTES - 1));
+}
+
+/*****************************************************************************/
+static int
+perf_trace_ring_vwrite(struct perf_trace_ring *ring, long long ns,
+                       long long pid, long long tid, const char *format,
+                       va_list ap)
+{
+    char *dest;
+    int prefix_length;
+    int payload_length;
+    int length;
+    unsigned long long head;
+
+    if (format == NULL)
     {
         return 0;
     }
-    head = r->head;
-    next = (head + 1) & PERF_TRACE_RING_MASK;
-    /* One slot is left empty so that full and empty are distinguishable
-     * without a shared count. */
-    if (next == r->tail)
+    dest = perf_trace_ring_reserve(ring);
+    if (dest == NULL)
     {
-        r->dropped++;
         return 0;
     }
-    r->slots[head].ns = ns;
-    r->slots[head].tid = tid;
-    r->slots[head].tag = tag;
-    r->slots[head].a = a;
-    r->slots[head].b = b;
-    r->slots[head].c = c;
-    r->slots[head].d = d;
-    r->slots[head].e = e;
-    r->slots[head].f = f;
-    /* The slot must be visible to the sink BEFORE the index that
-     * publishes it, or the sink can read a half-written record. */
-    __sync_synchronize();
-    r->head = next;
+    prefix_length = snprintf(dest, PERF_TRACE_RECORD_BYTES,
+                             "schema=1 mono_ns=%lld pid=%lld tid=%lld ",
+                             ns, pid, tid);
+    if (prefix_length < 0 || prefix_length >= PERF_TRACE_RECORD_BYTES)
+    {
+        __atomic_add_fetch(&ring->format_failed, 1, __ATOMIC_RELAXED);
+        return 0;
+    }
+    payload_length = vsnprintf(dest + prefix_length,
+                               PERF_TRACE_RECORD_BYTES - prefix_length,
+                               format, ap);
+    length = prefix_length + payload_length;
+    if (payload_length < 0 || length >= PERF_TRACE_RECORD_BYTES - 1)
+    {
+        __atomic_add_fetch(&ring->format_failed, 1, __ATOMIC_RELAXED);
+        return 0;
+    }
+    dest[length++] = '\n';
+    head = __atomic_load_n(&ring->head, __ATOMIC_RELAXED);
+    __atomic_store_n(&ring->head, head + (unsigned int)length,
+                     __ATOMIC_RELEASE);
     return 1;
 }
 
 /*****************************************************************************/
-/* SPSC pop. Called ONLY by the sink thread. Returns 1 and fills *out if
- * a record was available, 0 if the ring was empty. */
 int
-perf_trace_ring_pop(struct perf_trace_ring *r, struct perf_trace_rec *out)
+perf_trace_ring_write(struct perf_trace_ring *ring, long long ns,
+                      long long pid, long long tid, const char *format, ...)
 {
-    unsigned int tail;
+    va_list ap;
+    int rv;
 
-    if (r == NULL || out == NULL)
+    va_start(ap, format);
+    rv = perf_trace_ring_vwrite(ring, ns, pid, tid, format, ap);
+    va_end(ap);
+    return rv;
+}
+
+/*****************************************************************************/
+int
+perf_trace_ring_peek(struct perf_trace_ring *ring, const char **data,
+                     size_t *length)
+{
+    unsigned long long head;
+    unsigned long long tail;
+
+    if (ring == NULL || data == NULL || length == NULL)
     {
         return 0;
     }
-    tail = r->tail;
-    if (tail == r->head)
+    tail = __atomic_load_n(&ring->tail, __ATOMIC_RELAXED);
+    head = __atomic_load_n(&ring->head, __ATOMIC_ACQUIRE);
+    if (head == tail)
     {
+        *data = NULL;
+        *length = 0;
         return 0;
     }
-    /* Read the published index before the slot it publishes. */
-    __sync_synchronize();
-    *out = r->slots[tail];
-    __sync_synchronize();
-    r->tail = (tail + 1) & PERF_TRACE_RING_MASK;
+    *data = ring->base + (tail & (PERF_TRACE_RING_BYTES - 1));
+    *length = (size_t)(head - tail);
     return 1;
 }
 
 /*****************************************************************************/
-int
-perf_trace_format(char *buf, int len, long long ns, long long tid,
-                  const char *tag, int a, int b, int c, int d, int e, int f)
+void
+perf_trace_ring_consume(struct perf_trace_ring *ring, size_t length)
 {
-    if (buf == NULL || len < 1 || tag == NULL)
+    unsigned long long head;
+    unsigned long long tail;
+
+    if (ring == NULL)
     {
-        return -1;
+        return;
     }
-    return snprintf(buf, (size_t)len, "%lld %lld %s %d %d %d %d %d %d\n",
-                    ns, tid, tag, a, b, c, d, e, f);
+    tail = __atomic_load_n(&ring->tail, __ATOMIC_RELAXED);
+    head = __atomic_load_n(&ring->head, __ATOMIC_ACQUIRE);
+    if (length > head - tail)
+    {
+        length = (size_t)(head - tail);
+    }
+    __atomic_store_n(&ring->tail, tail + length, __ATOMIC_RELEASE);
 }
 
 /*****************************************************************************/
-/* One drain pass over every ring. Sink thread only. */
+unsigned int
+perf_trace_ring_dropped(const struct perf_trace_ring *ring)
+{
+    return ring == NULL ? 0 :
+           __atomic_load_n(&ring->dropped, __ATOMIC_RELAXED);
+}
+
+/*****************************************************************************/
+unsigned int
+perf_trace_ring_format_failed(const struct perf_trace_ring *ring)
+{
+    return ring == NULL ? 0 :
+           __atomic_load_n(&ring->format_failed, __ATOMIC_RELAXED);
+}
+
+/*****************************************************************************/
 static void
 perf_trace_drain(void)
 {
-    struct perf_trace_rec rec;
-    char line[256];
+    const char *data;
+    size_t length;
     int index;
     unsigned int dropped;
+    unsigned int format_failed;
 
     for (index = 0; index < g_perf_ring_count; index++)
     {
-        struct perf_trace_ring *r = &g_perf_rings[index];
+        struct perf_trace_ring *ring = g_perf_rings[index];
 
-        while (perf_trace_ring_pop(r, &rec))
+        while (perf_trace_ring_peek(ring, &data, &length))
         {
-            /* through perf_trace_format(), so the schema has ONE
-               definition and the unit test that pins it pins what the
-               sink actually writes */
-            if (perf_trace_format(line, (int)sizeof(line), rec.ns, rec.tid,
-                                  rec.tag, rec.a, rec.b, rec.c, rec.d,
-                                  rec.e, rec.f) > 0)
+            if (fwrite(data, 1, length, g_perf_file) != length)
             {
-                fputs(line, g_perf_file);
+                return;
             }
+            perf_trace_ring_consume(ring, length);
         }
-        /* A truncated trace must announce itself. */
-        dropped = r->dropped;
-        if (dropped != r->drop_seen)
+        dropped = perf_trace_ring_dropped(ring);
+        if (dropped != ring->drop_seen)
         {
-            if (perf_trace_format(line, (int)sizeof(line),
-                                  perf_trace_now_ns(), index, "perfdrop",
-                                  (int)dropped, index, 0, 0, 0, 0) > 0)
-            {
-                fputs(line, g_perf_file);
-            }
-            r->drop_seen = dropped;
+            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
+                    "event=perfdrop dropped=%u ring=%d\n",
+                    perf_trace_now_ns(), g_perf_pid, dropped, index);
+            ring->drop_seen = dropped;
+        }
+        format_failed = perf_trace_ring_format_failed(ring);
+        if (format_failed != ring->format_failed_seen)
+        {
+            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
+                    "event=perfformat failed=%u ring=%d\n",
+                    perf_trace_now_ns(), g_perf_pid, format_failed, index);
+            ring->format_failed_seen = format_failed;
         }
     }
 }
@@ -218,48 +350,61 @@ perf_trace_sink_thread(void *arg)
         perf_trace_drain();
         nanosleep(&ts, NULL);
     }
-    /* Final pass: whatever the producers wrote before they stopped. */
     perf_trace_drain();
     if (g_perf_no_ring != 0)
     {
-        {
-            char line[256];
-            if (perf_trace_format(line, (int)sizeof(line),
-                                  perf_trace_now_ns(), 0, "perfnoring",
-                                  (int)g_perf_no_ring, 0, 0, 0, 0, 0) > 0)
-            {
-                fputs(line, g_perf_file);
-            }
-        }
+        fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
+                "event=perfnoring count=%u\n", perf_trace_now_ns(),
+                g_perf_pid, g_perf_no_ring);
     }
     fflush(g_perf_file);
     return NULL;
 }
 
 /*****************************************************************************/
-/* Runs exactly once, from whichever thread calls perf_trace_on() first. */
+static void
+perf_trace_delete_rings(void)
+{
+    int index;
+
+    for (index = 0; index < g_perf_ring_count; index++)
+    {
+        perf_trace_ring_delete(g_perf_rings[index]);
+        g_perf_rings[index] = NULL;
+    }
+    g_perf_ring_count = 0;
+}
+
+/*****************************************************************************/
 static void
 perf_trace_open(void)
 {
     const char *prefix;
     char path[512];
+    int fd;
+    int index;
 
     prefix = getenv("XRDP_PERF_TRACE");
     if (prefix == NULL || prefix[0] == '\0')
     {
         return;
     }
-    /* the pid keeps sibling xrdp processes out of each other's file */
-    if (snprintf(path, sizeof(path), "%s.%d", prefix, (int)getpid())
+    g_perf_pid = (long long)getpid();
+    if (snprintf(path, sizeof(path), "%s.%d", prefix, (int)g_perf_pid)
             >= (int)sizeof(path))
     {
         return;
     }
-    /* "e" is O_CLOEXEC: a forked child must not inherit the sink and
-     * append its own records to a file another process is buffering */
-    g_perf_file = fopen(path, "we");
+    fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+              0600);
+    if (fd < 0)
+    {
+        return;
+    }
+    g_perf_file = fdopen(fd, "w");
     if (g_perf_file == NULL)
     {
+        close(fd);
         return;
     }
     g_perf_buf = (char *)malloc(PERF_TRACE_BUF_SIZE);
@@ -267,46 +412,38 @@ perf_trace_open(void)
     {
         setvbuf(g_perf_file, g_perf_buf, _IOFBF, PERF_TRACE_BUF_SIZE);
     }
-    /* The whole pool, up front. After this point the source path never
-     * allocates -- it only claims an already-built ring. */
-    g_perf_rings = (struct perf_trace_ring *)
-                   calloc(PERF_TRACE_MAX_RINGS,
-                          sizeof(struct perf_trace_ring));
-    if (g_perf_rings == NULL)
+    for (index = 0; index < PERF_TRACE_MAX_RINGS; index++)
     {
-        fclose(g_perf_file);
-        g_perf_file = NULL;
-        free(g_perf_buf);
-        g_perf_buf = NULL;
-        return;
+        g_perf_rings[index] = perf_trace_ring_create();
+        if (g_perf_rings[index] == NULL)
+        {
+            perf_trace_delete_rings();
+            fclose(g_perf_file);
+            g_perf_file = NULL;
+            free(g_perf_buf);
+            g_perf_buf = NULL;
+            return;
+        }
+        g_perf_ring_count++;
     }
-    g_perf_ring_count = PERF_TRACE_MAX_RINGS;
-    /* The clock base, once, as the first line. Records carry
-     * CLOCK_MONOTONIC because that is what can be intersected across
-     * processes; a reader that has to place them beside a wall-clock
-     * artefact (an xrdp.log line, a screenshot) needs the pair, and
-     * fitting one from the other is exactly the kind of guess this
-     * project has been bitten by. Comment-prefixed so a record parser
-     * skips it. */
     {
         struct timespec mono;
         struct timespec real;
+
         if (clock_gettime(CLOCK_MONOTONIC, &mono) == 0 &&
                 clock_gettime(CLOCK_REALTIME, &real) == 0)
         {
-            fprintf(g_perf_file, "# perfbase mono_ns %lld real_ns %lld\n",
+            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
+                    "event=clock_base real_ns=%lld\n",
                     (long long)mono.tv_sec * 1000000000LL + mono.tv_nsec,
+                    g_perf_pid,
                     (long long)real.tv_sec * 1000000000LL + real.tv_nsec);
         }
     }
     if (pthread_create(&g_perf_sink, NULL, perf_trace_sink_thread,
                        NULL) != 0)
     {
-        /* No sink thread means no way to drain, and a source that fills
-         * its ring and drops everything is worse than a disarmed one. */
-        free(g_perf_rings);
-        g_perf_rings = NULL;
-        g_perf_ring_count = 0;
+        perf_trace_delete_rings();
         fclose(g_perf_file);
         g_perf_file = NULL;
         free(g_perf_buf);
@@ -326,9 +463,6 @@ perf_trace_on(void)
 }
 
 /*****************************************************************************/
-/* Claim this thread's ring. Runs at most once per thread; the claim is
- * an atomic test-and-set on an already-allocated slot, so it neither
- * allocates nor takes a lock. */
 static struct perf_trace_ring *
 perf_trace_my_ring(void)
 {
@@ -341,44 +475,36 @@ perf_trace_my_ring(void)
     g_perf_my_ring_done = 1;
     for (index = 0; index < g_perf_ring_count; index++)
     {
-        if (__sync_bool_compare_and_swap(&g_perf_rings[index].claimed, 0, 1))
+        if (__sync_bool_compare_and_swap(&g_perf_rings[index]->claimed, 0, 1))
         {
-            g_perf_my_ring = &g_perf_rings[index];
+            g_perf_my_ring = g_perf_rings[index];
             return g_perf_my_ring;
         }
     }
-    /* Pool exhausted: this thread drops, loudly in the trace, rather
-     * than blocking or allocating on the measured path. */
     __sync_fetch_and_add(&g_perf_no_ring, 1);
     return NULL;
 }
 
 /*****************************************************************************/
 void
-perf_trace_ev6(const char *tag, int a, int b, int c, int d, int e, int f)
+perf_trace_ev(const char *format, ...)
 {
-    struct perf_trace_ring *r;
+    struct perf_trace_ring *ring;
+    va_list ap;
 
-    if (!g_perf_armed || tag == NULL)
+    if (!g_perf_armed || format == NULL)
     {
         return;
     }
-    r = perf_trace_my_ring();
-    if (r == NULL)
+    ring = perf_trace_my_ring();
+    if (ring == NULL)
     {
         return;
     }
-    /* No syscall, no I/O, no allocation, no shared lock -- a clock read
-     * through the vDSO and a store into this thread's own ring. */
-    perf_trace_ring_push(r, perf_trace_now_ns(), (long long)pthread_self(),
-                         tag, a, b, c, d, e, f);
-}
-
-/*****************************************************************************/
-void
-perf_trace_ev(const char *tag, int a, int b)
-{
-    perf_trace_ev6(tag, a, b, 0, 0, 0, 0);
+    va_start(ap, format);
+    perf_trace_ring_vwrite(ring, perf_trace_now_ns(), g_perf_pid,
+                           (long long)pthread_self(), format, ap);
+    va_end(ap);
 }
 
 /*****************************************************************************/
@@ -387,8 +513,6 @@ perf_trace_close(void)
 {
     if (g_perf_sink_live)
     {
-        /* Stop producing before draining, so the final pass sees a
-         * quiescent set of rings. */
         g_perf_armed = 0;
         g_perf_quit = 1;
         pthread_join(g_perf_sink, NULL);
@@ -401,12 +525,7 @@ perf_trace_close(void)
         fclose(g_perf_file);
         g_perf_file = NULL;
     }
-    if (g_perf_rings != NULL)
-    {
-        free(g_perf_rings);
-        g_perf_rings = NULL;
-        g_perf_ring_count = 0;
-    }
+    perf_trace_delete_rings();
     if (g_perf_buf != NULL)
     {
         free(g_perf_buf);

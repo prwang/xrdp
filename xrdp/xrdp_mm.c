@@ -1747,11 +1747,11 @@ xrdp_mm_emit_credit_frontier(struct xrdp_mm *self,
         {
             if (xrdp_ack_trace_on())
             {
-                PERF_TRACE6("ackregion", plan.region,
-                            encoder->frame_id_server,
-                            encoder->frame_id_consumed,
-                            encoder->frame_id_client,
-                            encoder->wire_window, 0);
+                PERF_TRACE("event=ack class=ACK_TRACE id=%d kind=region "
+                           "egress=%d absorbed=%d client=%d window=%d",
+                           plan.region, encoder->frame_id_server,
+                           encoder->frame_id_consumed,
+                           encoder->frame_id_client, encoder->wire_window);
             }
             m->mod_frame_ack(m, 0, plan.region);
         }
@@ -1763,10 +1763,11 @@ xrdp_mm_emit_credit_frontier(struct xrdp_mm *self,
         {
             if (xrdp_ack_trace_on())
             {
-                PERF_TRACE6("ackslot", plan.slot, encoder->frame_id_server,
-                            encoder->frame_id_consumed,
-                            encoder->frame_id_client,
-                            encoder->wire_window, 0);
+                PERF_TRACE("event=ack class=ACK_TRACE id=%d kind=slot "
+                           "egress=%d absorbed=%d client=%d window=%d",
+                           plan.slot, encoder->frame_id_server,
+                           encoder->frame_id_consumed,
+                           encoder->frame_id_client, encoder->wire_window);
             }
             m->mod_frame_ack(m, XUP_ACK_FLAGS_SLOT_ONLY, plan.slot);
         }
@@ -1804,10 +1805,13 @@ xrdp_mm_emit_legacy_frame_ack(struct xrdp_mm *self,
             {
                 if (xrdp_ack_trace_on())
                 {
-                    PERF_TRACE6("ackregion", encoder->frame_id_server,
-                                encoder->frame_id_server,
-                                encoder->frame_id_consumed,
-                                encoder->frame_id_client, 0, 0);
+                    PERF_TRACE("event=ack class=ACK_TRACE id=%d "
+                               "kind=region egress=%d absorbed=%d "
+                               "client=%d window=%d",
+                               encoder->frame_id_server,
+                               encoder->frame_id_server,
+                               encoder->frame_id_consumed,
+                               encoder->frame_id_client, 0);
                 }
                 m->mod_frame_ack(m, 0, encoder->frame_id_server);
             }
@@ -1947,8 +1951,10 @@ xrdp_mm_egfx_frame_ack(void *user, uint32_t queue_depth, int frame_id,
               frame_id, encoder->frame_id_client, encoder->frame_id_server);
     if (gfx_trace_on())
     {
-        PERF_TRACE6("cliack", frame_id, (int)queue_depth, frames_decoded,
-                    encoder->frame_id_server, encoder->gfx_ack_off, 0);
+        PERF_TRACE("event=ack class=GFX_TRACE frame_id=%d queue_depth=%d "
+                   "decoded=%d id_server=%d ack_off=%d", frame_id,
+                   (int)queue_depth, frames_decoded,
+                   encoder->frame_id_server, encoder->gfx_ack_off);
     }
     if (frame_id < 0 || frame_id > encoder->frame_id_server)
     {
@@ -4326,11 +4332,13 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                                     enc_done->comp_bytes);
                 if (gfx_trace_on())
                 {
-                    PERF_TRACE6("send", enc_done->comp_bytes,
-                                enc_done->last, enc_done->frame_id,
-                                self->encoder->frame_id_server,
-                                self->encoder->frame_id_client,
-                                self->encoder->frames_in_flight);
+                    PERF_TRACE("event=send class=GFX_TRACE bytes=%d last=%d "
+                               "frame_id=%d id_server=%d id_client=%d fif=%d",
+                               enc_done->comp_bytes, enc_done->last,
+                               enc_done->frame_id,
+                               self->encoder->frame_id_server,
+                               self->encoder->frame_id_client,
+                               self->encoder->frames_in_flight);
                 }
             }
             else
@@ -4397,9 +4405,11 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
                      * cost a per-frame walk of a malloc'd list.
                      * KiB, not bytes, so a broken bound cannot overflow
                      * the trace field before it is visible. */
-                    PERF_TRACE6("egress", enc_done->frame_id, displayed,
-                                xrdp_mm_egress_pending_kib(self),
-                                self->encoder->frame_id_client, 0, 0);
+                    PERF_TRACE("event=egress class=ACK_TRACE id=%d "
+                               "shown=%d pending_kib=%d client=%d",
+                               enc_done->frame_id, displayed,
+                               xrdp_mm_egress_pending_kib(self),
+                               self->encoder->frame_id_client);
                 }
                 if (!displayed)
                 {
@@ -5158,9 +5168,9 @@ server_egfx_cmd(struct xrdp_mod *mod,
     {
         /* the producer's frame has arrived at xrdp: the head of the leg
          * chain the #70 A/B is read on */
-        PERF_TRACE6("msgin",
-                    gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
-                    data_bytes, 0, 0, 0, 0);
+        PERF_TRACE("event=msgin class=ACK_TRACE id=%d bytes=%d",
+                   gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
+                   data_bytes);
     }
     enc->u.gfx.data = data;
     enc->u.gfx.data_bytes = data_bytes;
@@ -5211,8 +5221,8 @@ server_egfx_cmd(struct xrdp_mod *mod,
      * and the worker was busy with the previous one. Stamped OUTSIDE
      * the encoder mutex: the worker's drain takes the same lock, and an
      * instrument must not add contention to the thing it measures. */
-    PERF_TRACE("enq", gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes),
-               enq_depth);
+    PERF_TRACE("event=enq frame_id=%d fifo_depth=%d",
+               gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes), enq_depth);
     /* signal xrdp_encoder thread */
     g_set_wait_obj(mm->encoder->xrdp_encoder_event_to_proc);
     return 0;

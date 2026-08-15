@@ -157,10 +157,10 @@ import re
 import sys
 
 TS = re.compile(r"^\[(\d{4})-(\d\d)-(\d\d)T(\d\d):(\d\d):(\d\d)\.(\d+)")
-# the trace line is "GFX_TRACE avc dmg surface=N num_rects=..." -- two
+# the trace line is "GFX_TRACE dmg surface=N num_rects=..." -- two
 # tokens before the field, and other GFX_TRACE lines (ack, batch) carry
 # no surface at all. Match the field itself, not a token count.
-SURF = re.compile(r"GFX_TRACE avc dmg surface=(\d+)")
+SURF = re.compile(r"GFX_TRACE dmg surface=(\d+)")
 
 
 def secs(line):

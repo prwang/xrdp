@@ -168,15 +168,15 @@ audit:
   build, omit the source, tests, symbols, event/environment strings,
   trace-only state/counters and xup diagnostic payload; disabled macros
   evaluate no arguments;
-* replace the positional six-integer disk schema with versioned JSON Lines
-  carrying named 64-bit/boolean fields. Before freezing the internal
-  transport, compare fixed typed slots formatted by the sink with a bounded
-  producer formatter writing directly into a Linux double-mapped text byte
-  ring. The latter has contiguous virtual space across the logical boundary,
-  so it needs no split copy or wrap record. Select on measured source p50,
-  p99 and maximum cost plus record integrity under boundary and delayed-sink
-  pressure, as specified by #107. Retire `perf_trace_lines.py` after
-  consumers read the generic stream directly;
+* replace the positional six-integer disk schema with versioned restricted
+  key/value lines carrying named 64-bit/boolean fields. #107's two-mechanism
+  gate selected static, non-positional `snprintf()` directly into a Linux
+  double-mapped text byte ring: about +10 µs/frame mean over fixed publication
+  for twelve events, with absolute p99 25.6–42.3 µs, zero drops and complete
+  alias-wrap output. The adjacent mapping needs no split copy or wrap record.
+  keep any dev-only `perf_trace_lines.py` use as a generic
+  monotonic-to-wall-clock envelope only, with no event schema or positional
+  field map;
 * remove xorgxrdp's per-frame `ACK_TRACE cap` logger. Under an xrdp-requested
   trace flag, carry the producer frame/monitor, begin/packed timestamps and
   ack frontiers with the existing xup frame message, and emit the
@@ -286,15 +286,15 @@ One consequence to carry into the PR text: with the default at 1 this is
 `PR-demo/` is not ported, and a manpage may not reference a path that
 does not exist in the tree it ships in.
 
-## Pre-port gate — finish the generic tracer on dev first
+## Pre-port gate — carry the selected tracer through #105's shipping gates
 
-Before the cleanup worktree is cut, make #107 shippable on the current dev
-branches: complete lifecycle, atomics, private output, compile-time erasure,
-the generic structured format, consumer migration and the xorgxrdp logger
-replacement; then rerun its armed/disarmed transparency bench. This is not a
-new upstream PR and does not change the one-PR decision. It gives the port a
-reviewed instrument rather than asking the port to redesign its measuring
-device while also moving every measured stage.
+#107 installed the selected named text byte ring and migrated its consumers on
+dev. Before the cleanup worktree is cut, #105 still completes lifecycle,
+atomics, failure visibility, compile-time erasure and the paired xorgxrdp
+logger replacement, then reruns the armed/disarmed transparency bench. This
+is not a new upstream PR and does not change the one-PR decision. It gives the
+port a reviewed instrument rather than asking the port to redesign its
+measuring device while also moving every measured stage.
 
 The gate is green only when both build modes pass: the ordinary build has no
 tracer symbol/string/state and the explicitly enabled build passes lifecycle,
@@ -316,7 +316,7 @@ LTR, sparse-chroma, multi-monitor and generic tracer work extend it. Order:
 
 1. **Generic performance-trace foundation.** Re-author the already-completed
    dev facility on pinned upstream: compile gate, common ring/sink, xrdp
-   lifecycle, the microbench-selected JSON-Lines ring/formatter, operating
+   lifecycle, the selected key/value byte ring/formatter, operating
    documentation and tests. No AVC444 call site and no AVC444 xup payload
    exists in this slice.
    This slice is deliberately shippable and useful on its own, although it

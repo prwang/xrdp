@@ -43,40 +43,17 @@ Usage: i61e_period_attribute.py <trace-file> [--steady N]
 """
 import sys
 import statistics as st
+import os
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
 
 
 def load(path):
-    """Read a perf_trace file.
-
-    The record is <ns> <tid> <tag> <a> <b> <c> <d> <e> <f> -- NINE
-    fields since BACKLOG #61h widened the payload from two ints to six
-    so a GFX send fits in one event. This reader accepted only the old
-    five-field form and silently `continue`d past every record of the
-    new one: against the x013 trace it loaded 0 events and reported
-    "0 drops, 0 records / not enough cycles", which reads like an empty
-    run rather than like a parser that cannot read the file. Both widths
-    are accepted, and a file that yields nothing is now an error rather
-    than an empty table.
-    """
-    evs = []
-    seen = 0
-    for line in open(path, errors="replace"):
-        if line.startswith("#"):
-            continue          # the `# perfbase` clock-base line
-        f = line.split()
-        if len(f) not in (5, 9):
-            continue
-        seen += 1
-        try:
-            evs.append((int(f[0]), f[1], f[2], int(f[3]), int(f[4])))
-        except ValueError:
-            pass
-    if seen == 0:
-        sys.exit("%s: no records this reader could parse. A perf_trace "
-                 "record is 5 fields (pre-#61h) or 9 (current); this file "
-                 "has neither, so it is a format mismatch and NOT an "
-                 "empty run." % path)
-    return evs
+    """Read named records; event-specific values stay named dictionaries."""
+    records = read_records(path)
+    return [(r["mono_ns"], r["tid"], r["event"], r)
+            for r in records if r["event"] != "clock_base"]
 
 
 def pct(v, q):
@@ -104,9 +81,9 @@ def main():
 
     # The worker is the thread that brackets the drain. The assembler is
     # whichever thread emits, when that is not the worker (emit_thread).
-    wtid = set(t for _, t, tag, _, _ in evs if tag == "drain_beg")
-    etid = set(t for _, t, tag, _, _ in evs if tag == "emit_beg") - wtid
-    mtid = set(t for _, t, tag, _, _ in evs if tag == "enq") - wtid
+    wtid = set(t for _, t, tag, _ in evs if tag == "drain_beg")
+    etid = set(t for _, t, tag, _ in evs if tag == "emit_beg") - wtid
+    mtid = set(t for _, t, tag, _ in evs if tag == "enq") - wtid
     print("threads: worker=%s assembler=%s main=%s"
           % (sorted(wtid), sorted(etid) or "(inline)", sorted(mtid)))
 
@@ -194,18 +171,20 @@ def main():
 
     # --- fifo residency: enq(id) -> take(id) --------------------------
     enq = {}
-    for ns, t, tag, a, b in evs:
-        if tag == "enq" and a > 0 and a not in enq:
-            enq[a] = ns
+    for ns, t, tag, fields in evs:
+        frame_id = fields.get("frame_id", -1)
+        if tag == "enq" and frame_id > 0 and frame_id not in enq:
+            enq[frame_id] = ns
     res = []
     early = 0
     for c in steady:
         tk = [e for e in c if e[2] == "take"]
         wb = c[0][0]
-        for ns, t, tag, a, b in tk:
-            if a in enq:
-                res.append((ns - enq[a]) / 1e6)
-                if enq[a] <= wb:
+        for ns, t, tag, fields in tk:
+            frame_id = fields["frame_id"]
+            if frame_id in enq:
+                res.append((ns - enq[frame_id]) / 1e6)
+                if enq[frame_id] <= wb:
                     early += 1
     if res:
         print()
@@ -234,7 +213,7 @@ def main():
         sb = [e for e in c if e[2] == "subm_beg"]
         if not tk or not sb:
             continue
-        fid = tk[0][3]
+        fid = tk[0][3]["frame_id"]
         if fid not in enq:
             continue
         t0, t1 = enq[fid], sb[0][0]
@@ -270,7 +249,7 @@ def main():
         spans = []
         for x, y in zip(ev, ev[1:]):
             if x[2] == "emit_beg" and y[2] == "emit_end":
-                spans.append((x[0], y[0], x[3]))
+                spans.append((x[0], y[0], x[3]["frame_id"]))
         # worker busy = everything in a cycle that is NOT the wait
         busy = []
         for c in steady:

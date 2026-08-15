@@ -1556,19 +1556,20 @@ following are hard requirements, not preferences.
    operator supplies the trace environment.
 11. **The disk contract is self-describing structured text.** The fixed
    positional `<tag> <a> ... <f>` file and its AVC444-specific rendering
-   adapter are retired. The facility emits versioned JSON Lines with common
-   `schema`, monotonic timestamp, PID, TID and event-name keys plus named,
-   typed event fields of at least 64-bit range. Readers ignore unknown keys
-   and events; incompatible common semantics increment `schema`. The internal
-   transport is not a serialized API. Before it is frozen, the source-path
-   microbench compares fixed typed slots formatted by the sink with a bounded
-   producer formatter writing directly into a Linux double-mapped text byte
-   ring. The latter is virtually contiguous across the logical boundary and
-   needs no split copy or wrap record. Source p50/p99/maximum cost and complete
-   record integrity under wrap and delayed-sink pressure decide between them.
-   Neither design uses the ordinary logger, allocation, I/O, a shared lock or
-   a general `printf` formatter on the source path, and neither extends a
-   central anonymous-field tuple when adding an event.
+   adapter are retired. The facility emits versioned, restricted `key=value`
+   lines with common `schema`, monotonic timestamp, PID, TID and event-name
+   keys plus named event fields of at least 64-bit range. Readers ignore
+   unknown keys and events; incompatible common semantics increment `schema`.
+   Static non-positional `snprintf()` formats write the completed line on the
+   producer directly into a Linux byte ring whose backing pages are mapped
+   into two adjacent virtual ranges. A logical-boundary crossing is contiguous
+   and needs no split copy or wrap record; the sink only drains published
+   bytes. Dynamic source strings and positional/custom printf formats are not
+   accepted. The #107 gate measured twelve events at 12.272–12.653 µs/frame
+   mean and 25.609–42.328 µs/frame p99 (at most 0.169% of 25 ms), about 10 µs
+   mean above fixed-object publication, with zero drops and complete output
+   across the alias. This source path uses no ordinary logger, allocation,
+   I/O, syscall, shared lock, blocking, spin or growth.
 
 **Why this is a requirement and not a nicety — the measurement it
 destroyed (2026-08-01, BACKLOG #61e).** The original sink was a
@@ -1590,9 +1591,9 @@ lines/frame, and 3.3× *fewer* per second on the slow arm) and pod
 CPU/memory (`avc444_pack_bench` identical at 3.32 vs 3.23 ms/frame).
 **The instrument was the bug.**
 
-**Implementation decision (2026-08-01): an in-tree, per-thread SPSC ring
-in C. `spdlog` was considered and REJECTED. Internal record-layout choice
-reopened 2026-08-14.**
+**Implementation decision (2026-08-01, representation selected
+2026-08-14): an in-tree, per-thread SPSC byte ring in C with direct bounded
+text formatting. `spdlog` was considered and REJECTED.**
 
 spdlog was the obvious off-the-shelf answer — Debian ships it
 (`libspdlog-dev`, trixie 1:1.15.2), it is MIT, and its async mode has
@@ -1620,20 +1621,19 @@ The in-tree design gives a **stronger** guarantee than spdlog would:
 - **The pool is allocated when the sink is ARMED**, never on the source
   path, so clause 1's "must not allocate" holds literally. A thread that
   finds the pool exhausted drops and counts, and never blocks.
-- **The source representation is bounded and event schemas are static.** The
-  2026-08-13 proposal stored an immutable descriptor plus typed values and
-  kept formatting on the sink. The 2026-08-14 candidate instead uses that
-  static schema to format directly into a per-producer byte ring whose Linux
-  backing is mapped twice. The latter removes boundary splitting without
-  changing the SPSC ownership. Clause 11's microbench decides between them.
+- **The source representation is bounded and event schemas are static.** A
+  static, non-positional `snprintf()` writes the final named key/value line
+  directly into a per-producer byte ring whose Linux backing is mapped twice.
+  This removes boundary splitting without changing SPSC ownership. #107's
+  same-output microbench selected it over sink-formatted fixed objects.
 - **Only the sink thread ever touches the `FILE*`**, satisfying clause 4
   by construction rather than by convention.
 
-The ring's push/pop/overflow behaviour is pure logic and is unit-tested
-in `tests/common/` against the SPSC specification (capacity `N` yields
-`N-1` usable slots; FIFO order; the `N`th push drops and increments the
-counter) — the expected values come from the ring specification, never
-from running the implementation.
+The ring's publication/overflow behaviour is unit-tested in `tests/common/`
+against the byte-ring specification: FIFO byte order, complete newline
+records, contiguous alias-boundary crossing, a fixed maximum reservation,
+whole-record drops and explicit counters. The expected record text comes from
+the named schema, never from running the implementation.
 
 The shipped operating contract documents the compile option, the three
 runtime selectors (`XRDP_PERF_TRACE`, `XRDP_GFX_TRACE`,
@@ -3865,13 +3865,12 @@ an ordinary build contains no trace footprint; an enabled build retains the
 ring, semantic set of 34 xrdp call sites, identities and trace-only transport
 queue counter, while initialization, final drain, atomics, private output,
 failure visibility and operating documentation are completed. The facility
-emits versioned JSON Lines with named typed fields; the positional six-integer
-file and AVC-specific format adapter do not ship. The internal ring
-representation remains the measured choice specified by #107: fixed typed
-slots formatted by the sink versus bounded producer formatting directly into
-a Linux double-mapped text byte ring. The latter has no logical-boundary split
-copy or wrap record; source tail cost and record integrity decide between the
-two.
+emits versioned restricted key/value lines with named fields; the positional
+six-integer file and AVC-specific format adapter do not ship. #107 selected
+bounded static, non-positional `snprintf()` directly into a Linux
+double-mapped text byte ring. It adds about 10 µs/frame mean for twelve events
+over fixed publication and remains at most 0.169% of a 25 ms frame at measured
+p99, with no logical-boundary split copy or wrap record.
 The matching xorgxrdp change removes its remaining per-frame `ACK_TRACE cap`
 logger and carries producer timestamps over the versioned xup frame contract
 for xrdp to place in the same ring. Every current event family is required by

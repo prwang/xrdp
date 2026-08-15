@@ -16,7 +16,7 @@ bracket pairs directly:
   gap     emit_end  -> next drain_beg   loop overhead, and any blocking
                                         wait for the next frame
 
-Records are "<monotonic_ns> <tid> <tag> <a> <b>". Stages are paired
+Records carry named `mono_ns`, `tid` and `event` keys. Stages are paired
 within one thread, in order -- a beg with no matching end is dropped
 rather than paired across a cycle boundary, and a NEGATIVE duration is
 reported as a hard error rather than averaged in (quality gate 2c).
@@ -25,6 +25,9 @@ Usage: i70b_stage_split.py <capture-dir> [<capture-dir> ...]
 """
 import os
 import sys
+
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from perf_trace_records import read_records
 
 STAGES = ["drain", "subm", "pump", "coll", "emit"]
 
@@ -37,16 +40,8 @@ def pct(vals, p):
 
 
 def load(path):
-    evs = []
-    for line in open(path, errors="replace"):
-        f = line.split()
-        if len(f) != 5:
-            continue
-        try:
-            evs.append((int(f[0]), f[1], f[2], int(f[3]), int(f[4])))
-        except ValueError:
-            continue
-    return evs
+    return [(r["mono_ns"], r["tid"], r["event"], r)
+            for r in read_records(path) if r["event"] != "clock_base"]
 
 
 def report(d):
@@ -63,7 +58,7 @@ def report(d):
     stage_tid = {}
     open_at = {}
     negative = 0
-    for ns, tid, tag, a, b in evs:
+    for ns, tid, tag, fields in evs:
         if "_" not in tag:
             continue
         stage, half = tag.rsplit("_", 1)
@@ -86,7 +81,7 @@ def report(d):
     # --- the loop gap: emit_end -> the next drain_beg on that thread ---
     gaps = []
     last_emit_end = {}
-    for ns, tid, tag, a, b in evs:
+    for ns, tid, tag, fields in evs:
         if tag == "emit_end":
             last_emit_end[tid] = ns
         elif tag == "drain_beg" and tid in last_emit_end:
@@ -95,7 +90,7 @@ def report(d):
     # --- the whole cycle, drain_beg to drain_beg ---
     cycle = []
     last_drain = {}
-    for ns, tid, tag, a, b in evs:
+    for ns, tid, tag, fields in evs:
         if tag == "drain_beg":
             if tid in last_drain:
                 cycle.append((ns - last_drain[tid]) / 1e6)
@@ -108,7 +103,7 @@ def report(d):
     # The worker is whichever thread drains the fifo; anything else is
     # marked concurrent and excluded from the serial sum.
     worker_tid = set()
-    for ns, tid, tag, a, b in evs:
+    for ns, tid, tag, fields in evs:
         if tag == "drain_beg":
             worker_tid.add(tid)
     concurrent = set(st for st, tids in stage_tid.items()
