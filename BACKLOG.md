@@ -32,13 +32,17 @@ stub at the end of this file and points to its record.
 ## Execution order
 
 1. Complete the paired tracer shipping gate (#200).
-2. Author the clean-room series in order (#210–#226) against the pinned
-   `PRD/` specifications. A red slice never
-   becomes a commit and the next slice does not start.
-3. Repair the evidence instrument and invalid records (#99, #108), then close
-   only the acceptance claims retained by the PR (#80, #92, and conditionally
-   #93).
-4. Post-port performance work follows (#88, #94–#96, #98, #103).
+2. Repair the evidence instrument and invalid records (#99, #108).
+3. On the dev pair, close every live acceptance claim retained by the PR
+   (#80, #92, and conditionally #93). Commit the exact procedure, paired
+   source and package identities, configuration, workload, instrument and
+   expected checks as the clean-room replay anchor.
+4. Author the clean-room series in order (#210–#226) against the pinned
+   `PRD/` specifications. A red slice never becomes a commit and the next
+   slice does not start. The final paired tree is an immutable candidate, not
+   a frozen history, until it passes exact replays of the anchored live gates.
+5. Post-port exploratory work follows (#88, #94–#96, #98, #103). Its results
+   may start later work; they cannot change or qualify this clean-room series.
 
 ---
 
@@ -340,45 +344,89 @@ Normative specification:
 
 ---
 
-# Evidence and post-port work
+# Pre-freeze qualification
+
+These items do not block offline re-authoring, but they do block freezing or
+handing off the slice whose retained claim they test. A dev anchor means a
+green result tied to identified paired commits and package hashes, a committed
+procedure/configuration/workload/instrument, and explicit expected checks.
+The clean-room run changes no arm, knob or interpretation: it replays that
+anchor on an immutable candidate tree. A gate that can still discover a
+product decision or an unbounded implementation defect is not a replay and
+must be completed on dev first.
 
 ## #80 — credit-frontier qualification still owed
 
-**Status: OPEN EVIDENCE; does not block re-authoring #224.** The mechanism,
-one-monitor attribution, frozen-client behavior and C+2M bound are recorded in
-`docs/experiments/80-the-credit-frontier.md` and
+**Status: PRE-FREEZE DEV QUALIFICATION; does not block offline re-authoring
+#224, but blocks freezing its retained client claim.** The mechanism,
+one-monitor attribution, frozen-client behavior and C+2M bound are anchored by
+the dev tests and recorded in `docs/experiments/80-the-credit-frontier.md` and
 `docs/experiments/91-the-multimon-window-and-the-shared-pump.md`.
 
 **Open:** complete the written six-check visual qualification on identified
-macOS and Windows client products and state the upstream performance claim as
-one-monitor only unless new two-monitor evidence supports more. The shipped
-decision is already settled: `wire_window=1`, `eager_slot_ack=true`; value 2
-is maintainer-facing optional guidance, not a second default.
+macOS and Windows client products on the dev pair; pin its artifacts and
+expected checks for clean-room replay; and state the upstream performance
+claim as one-monitor only unless new two-monitor evidence supports more. The
+shipped decision is already settled: `wire_window=1`,
+`eager_slot_ack=true`; value 2 is maintainer-facing optional guidance, not a
+second default.
+
+## #92 — sparse-chroma real-client and bandwidth acceptance
+
+**Status: PRE-FREEZE DEV QUALIFICATION; blocks freezing #225, not its offline
+re-authoring.** The byte mechanism and offline model are anchored by the dev
+tests and recorded in
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
+
+**Open:** certify an alternating LC=1 / optional LC=2 stream on macOS and
+Windows on the dev pair before quoting rate; rerun the decomposed bandwidth
+pair with valid instrumentation; perform the still-screen 4:4:4 visual check;
+and pin those artifacts and expected checks for clean-room replay. The
+guarantee is `chroma_refresh_ms` plus one frame interval; no extra heuristic
+is in scope.
+
+## #93 — T4 re-establishment and conditional hardware claims
+
+**Status: CONDITIONAL PRE-FREEZE DEV QUALIFICATION.** Re-provision the T4 only
+if the PR retains NVENC/T4 performance or live-compatibility claims. Qualify
+the dev pair before clean-room freeze, pin the result for exact replay, follow
+the committed deploy procedure, use the real hardware path, match bytes per
+picture across paired arms, and resolve or bound the recorded bimodality.
+
+## #99 — evidence gate must prove target identity and record presence
+
+**Status: TODO; blocks all new pre-freeze fleet evidence.** `e_gate_run.sh`
+must compare the dialled arm with the collected pod identity and reject too
+few trace records for the run duration. An empty trace may not be interpreted
+as an idle session. No measurement campaign starts until both positive checks
+pass.
+
+## #108 — retire timing evidence containing xorgxrdp's per-frame logger
+
+**Status: TODO; blocks quoting affected timings and timing qualification.**
+Enumerate all captures and derived conclusions carrying `ACK_TRACE cap`;
+delete timing captures/records as required for an instrument on the measured
+path; write one replacement record naming what was voided; reopen every
+dependent conclusion. Preserve independently valid bytes, identity, ordering
+and correctness evidence with explicit provenance. Do not run a
+logger-vs-no-logger arm. The source removal is #200.
+
+---
+
+# Post-port exploratory work
+
+These items are outside the current clean-room series. They are not evidence
+needed to accept it, and a result cannot cause a fixup to #210–#226. If one
+finds a worthwhile behavior or architecture change, that change starts a new
+specified, tested commit series after this PR.
 
 ## #88 — attribute the oracle client's 50–150 ms pauses
 
 **Status: TODO; post-port.** Host CPU contention and dump I/O are ruled out.
 Use the cheapest existing instrument: client timing logs, then a bounded
 per-PID `perf record`, then a one-line `/proc/<pid>/stat` delta. Do not add a
-sampler or alter socket buffers. This does not block the server port.
-
-## #92 — sparse-chroma real-client and bandwidth acceptance
-
-**Status: IN PROGRESS; blocks #225 handoff, not its offline implementation.**
-The byte mechanism and offline model are recorded in
-`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
-
-**Open:** certify an alternating LC=1 / optional LC=2 stream on macOS and
-Windows before quoting rate; rerun the decomposed bandwidth pair with valid
-instrumentation; perform the still-screen 4:4:4 visual check. The guarantee is
-`chroma_refresh_ms` plus one frame interval; no extra heuristic is in scope.
-
-## #93 — T4 re-establishment and conditional hardware claims
-
-**Status: TODO; conditional.** Re-provision the T4 only if the PR retains
-NVENC/T4 performance or live-compatibility claims. The run must follow the
-committed deploy procedure, use the real hardware path, match bytes per
-picture across paired arms, and resolve or bound the recorded bimodality.
+sampler or alter socket buffers. This does not block or qualify the server
+port.
 
 ## #94 — arm only monitors with changed pixels
 
@@ -414,13 +462,6 @@ frame pacing/`TCP_NOTSENT_LOWAT`; and whether encoder rate adaptation enters
 the roadmap. The owed LAN and C>1 transport measurements are evidence work,
 not clean-room implementation prerequisites.
 
-## #99 — evidence gate must prove target identity and record presence
-
-**Status: TODO; blocks new fleet evidence.** `e_gate_run.sh` must compare the
-dialled arm with the collected pod identity and reject too few trace records
-for the run duration. An empty trace may not be interpreted as an idle
-session. No measurement campaign starts until both positive checks pass.
-
 ## #103 — host pipe setting, comparable baselines and zero-copy decision
 
 **Status: OPEN ENVIRONMENT/ARCHITECTURE; source guard done.** The implemented
@@ -430,18 +471,8 @@ session. No measurement campaign starts until both positive checks pass.
 **Open:** make or deliberately decline host sysctl persistence; re-establish
 any baseline used across the sysctl boundary; separately decide whether the
 roughly 1.4 ms pipe machinery plus unavoidable copy justifies abandoning the
-stock-ffmpeg child architecture. These do not block porting the fail-loud
-runner guard.
-
-## #108 — retire timing evidence containing xorgxrdp's per-frame logger
-
-**Status: TODO; blocks quoting affected timings.** Enumerate all captures and
-derived conclusions carrying `ACK_TRACE cap`; delete timing captures/records
-as required for an instrument on the measured path; write one replacement
-record naming what was voided; reopen every dependent conclusion. Preserve
-independently valid bytes, identity, ordering and correctness evidence with
-explicit provenance. Do not run a logger-vs-no-logger arm. The source removal
-is #200.
+stock-ffmpeg child architecture. These do not block or qualify porting the
+fail-loud runner guard; abandoning that architecture would be a later series.
 
 ---
 
