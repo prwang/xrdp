@@ -19,7 +19,7 @@ Where things go:
 |---|---|
 | an open question + why it matters + a pointer | `BACKLOG.md` |
 | how a closed investigation was run and what it measured | here |
-| a contract, invariant, or baseline that is still true | `PRD.md` |
+| a contract, invariant, or baseline that is still true | `PRD.md` (moving to `PRD/` under BACKLOG #201) |
 | how to install, deploy, or triage | `DEPLOY_RUNBOOK.md` |
 | working rules for agents and contributors | `CLAUDE.md` |
 | the evidence for one run (logs, images, VERDICT) | `PR-demo/mac_bisect_matrix/captures/<run>/` |
@@ -37,3 +37,13 @@ Where things go:
 | `70-eager-slot-release-ack.md` | #70 | DONE — 1.11×, encode‖tail 4.8 → 8.5 ms |
 | `90-the-eight-ms-prize-was-stale.md` | #90 | WITHDRAWN — PRD-violating stage threads have insufficient ROI at 1.24–1.28 ms |
 | `61h-the-logger-was-in-the-measurement.md` | #61h | the per-frame trace was `log.c` on the measured path; 25 captures and 3 records voided, #61c/#61e/#70B reopened |
+| `91-the-multimon-window-and-the-shared-pump.md` | #91 | window arithmetic and encoder overlap resolved |
+| `92-sparse-aux-is-a-byte-lever-not-a-time-one.md` | #92 | mechanism implemented; real-client and bandwidth acceptance remain open |
+| `98-tier0-bbr-ab.md` | #98 | Tier 0 reached the transport floor under the measured condition |
+| `100-the-emit-thread-bought-nothing.md` | #100 | emit thread removed; inline assembly retained |
+| `102-client-display-offset.md` | #102 | documented client-visible 33-pixel offset; closed below the port |
+| `103-pipe-size-and-host-limit.md` | #103(a) | 64 KiB requirement and fail-loud guard established |
+| `104-pr-evidence-matrix.md` | #104 | five one-image arms built and certified; stale x035-red state superseded |
+| `105-port-preparation.md` | #105 preparation | pinned base, one-change, tracer and default decisions recorded |
+| `106-perf-isolation-and-trace-equivalence.md` | #106 | CLOSED RED — no exact external mapping for 13/34 records |
+| `107-private-tracer-is-pr-scope.md` | #107 | named text byte ring selected; shipping lifecycle moved to #200 |
