@@ -245,9 +245,11 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
      *                       macOS Windows App black screen -- adding the AUD was
      *                       tested live and did not change the black (mstsc/UWP
      *                       rendered without it too). Root cause is the AVC444
-     *                       LC framing (we emit same-region LC=0 every frame;
-     *                       real Windows bootstraps luma-only LC=1 and defers
-     *                       chroma via LC=2). See docs/avc444_lc_reframe_design.md.
+     *                       LC framing (the earlier implementation emitted
+     *                       same-region LC=0 every frame; real Windows
+     *                       bootstraps luma-only LC=1 and defers chroma via
+     *                       LC=2). See
+     *                       PRD/slices/219-avc-wire-serialization.md.
      * This reproduces the historic hard-coded argv (plus the AUD delimiter);
      * tuning is the administrator's job via gfx.toml [avc444_ffmpeg]
      * encoder_args.

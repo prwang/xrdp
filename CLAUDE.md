@@ -135,7 +135,7 @@ All durable rules and "memory" for this project live here, in-tree and committed
   `BACKLOG.md`, it belongs in `docs/experiments/` instead. Per-run evidence
   stays with its capture under
   `PR-demo/mac_bisect_matrix/captures/<run>/README.md`; anything still true
-  after the item closes belongs in `PRD.md`. This rule exists because the
+  after the item closes belongs in `PRD/`. This rule exists because the
   file has had to be rewritten twice for the same reason — 3268 lines on
   2026-07-28, 1923 on 2026-08-01.
 - **Records in `docs/experiments/` are kept verbatim, wrong claims included.**
@@ -398,14 +398,14 @@ Run all five, every time, before presenting:
    paired by cycle window when the pipeline overlaps cycles, so sends were
    attributed to the wrong frame. Pair by explicit identity — here
    `id_server` — never by time window.)*
-3. **Does the change violate a written spec?** Grep `PRD.md` and
+3. **Does the change violate a written spec?** Grep `PRD/` and
    `BACKLOG.md` for the mechanism BEFORE running, not after. The PRD had
    already forbidden the exact global-pool shape probed on 2026-07-31,
    naming its predicted symptoms — bufferbloat, +2 frames latency, slot
    aliasing — and the probe reproduced them.
 4. **Is it a regression against a previous recorded measurement?** Any
    metric that moved the wrong way versus a number already in
-   `BACKLOG.md`/`PRD.md`/a capture README must be surfaced with the
+   `BACKLOG.md`/`PRD/`/a capture README must be surfaced with the
    comparison, not quietly superseded. *(2026-07-31: fif=4 measured 98.1 ms
    against fif=2's 87.0 ms, and textflood 87.0 ms against codeflood's
    46-72 ms.)*
@@ -688,7 +688,7 @@ that ships.
 ### Escalation ladder (owner directive, 2026-07-31)
 
 **Never make the expensive remote run the FIRST experiment.** A property
-that is specified in `PRD.md` is checked in this order, and each rung is
+that is specified in `PRD/` is checked in this order, and each rung is
 reported before the next is run:
 
 1. **CI.** Run `make check` and quote the result. If the property has no
@@ -909,9 +909,9 @@ selling point, so its numbers are evidence, not just debugging.
 - **After every deb build touching the encoder/conversion path**, run
   `tools/avc444_pack_bench.c` remotely on the T4 (scp the `-O2` binary; the
   bench carries verbatim copies of the shipped loops — keep them in sync)
-  and RECORD the ms/frame results in `BACKLOG.md`/`PRD.md` alongside the
-  deployed commit hashes. Perf history on the reference CPU is part of the
-  deploy record.
+  and RECORD the ms/frame results in the applicable experiment record or
+  capture README alongside the deployed commit hashes. Perf history on the
+  reference CPU is part of the deploy record.
 - **Tear down stale Xorg sessions on the T4 BEFORE handing over for
   onscreen testing** (kill the session Xorg; verify sesman logs the clean
   session finish). A surviving session keeps the PREVIOUS xorgxrdp module

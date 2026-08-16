@@ -43,3 +43,10 @@ not a valid starting branch.
 
 Those open actions are now BACKLOG #200 and #201. The actual clean-room
 implementation is split into numbered BACKLOG items #210 and above.
+
+## Superseding note — 2026-08-16
+
+#201 is complete. The xorgxrdp base is pinned to
+`49bf2dd3546dc48b9d5bae62022762fde11793d0`, and the normative slice contract
+is now `PRD/`. Only #200 remains from the preparation actions named above.
+See `docs/experiments/201-prd-refactor.md`.

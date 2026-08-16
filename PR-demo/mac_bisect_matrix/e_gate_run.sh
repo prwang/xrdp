@@ -705,11 +705,12 @@ else
     : > "$OUT/gfx_trace.txt"
 fi
 
-# --- the producer's OWN frame timestamps (PRD FR-BENCH-1) ----------------
-# FR-BENCH-1: "Saturation is verified per run, never assumed. A gate run
+# --- the producer's OWN frame timestamps (evidence saturation gate) ------
+# "Saturation is verified per run, never assumed. A gate run
 # is valid only if BOTH hold, and the harness VERDICT must print both."
-# The requirement has been in PRD.md since 2026-07-31 and NO CODE HERE
-# IMPLEMENTED IT -- the 1.09x margin that arm x014's record turns on was
+# This is evidence methodology, not a product requirement; its live status is
+# in docs/pr_evidence_matrix.md. NO CODE HERE IMPLEMENTED IT -- the 1.09x
+# margin that arm x014's record turns on was
 # computed by hand from an archived stamps file after that run, which is
 # exactly the "verify per run" the FR exists to make automatic.
 #

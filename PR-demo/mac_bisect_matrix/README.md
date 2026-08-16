@@ -17,8 +17,8 @@ folder was built on 2026-07-26 for the macOS blackout bisect, arms A-E
 on ports 40000-40004. It convicted `nal_hrd_parameters` in the SPS VUI
 (arm-c rendered black with zero SEI NALs) and exonerated `timing_info`;
 arm-e carried the `xrdp_h264_sanitize_hrd()` fix, which is pinned by a
-golden unit test and has shipped since. Those arms are gone; the finding
-lives in `PRD.md`.
+golden unit test and has shipped since. Those arms are gone; the current
+normative policy is in `PRD/slices/215-annexb-and-parameter-policy.md`.
 
 Every arm's session is the same deterministic payload, so a frozen or
 black screen is a pipeline failure by construction and the tester always

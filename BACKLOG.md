@@ -12,14 +12,16 @@ stub at the end of this file and points to its record.
 ## Current repository state — 2026-08-16
 
 * `/work` and `/workUpdateXorgXrdp` are both on
-  `dev/avc444_metablock_checkpoint`; xrdp is at `356a5e1d`, xorgxrdp at
-  `10fa3aa`.
+  `dev/avc444_metablock_checkpoint`; the inventoried source frontiers are
+  xrdp `356a5e1d` and xorgxrdp `10fa3aa`. Documentation commits sit above the
+  xrdp source frontier and do not change the port inventory.
 * The xrdp clean-room base is pinned to
   `fe850a22c08a624c66bbac07e310251782e6f828`. Its compatibility audit is
   complete and found no breaking AVC API, configuration or wire change.
-* The current xorgxrdp upstream base resolves to
-  `49bf2dd3546dc48b9d5bae62022762fde11793d0`, but owner pinning and the paired
-  compatibility audit remain #201.
+* The xorgxrdp clean-room base is pinned to
+  `49bf2dd3546dc48b9d5bae62022762fde11793d0`. The paired compatibility audit
+  found no upstream capture/xup contract change to reconcile; the development
+  branch's 13 commits are the feature inventory, not base drift.
 * The old `/work-PR` branch at `c74a09e7` is an abandoned reference. It
   diverges from the pinned xrdp base and predates the current frontier.
 * The five-arm x031–x035 fleet exists on one paired image and all five arms
@@ -30,14 +32,13 @@ stub at the end of this file and points to its record.
 ## Execution order
 
 1. Complete the paired tracer shipping gate (#200).
-2. Finish the unique normative slice specifications and pin the xorgxrdp base
-   (#201).
-3. Author the clean-room series in order (#210–#226). A red slice never
+2. Author the clean-room series in order (#210–#226) against the pinned
+   `PRD/` specifications. A red slice never
    becomes a commit and the next slice does not start.
-4. Repair the evidence instrument and invalid records (#99, #108), then close
+3. Repair the evidence instrument and invalid records (#99, #108), then close
    only the acceptance claims retained by the PR (#80, #92, and conditionally
    #93).
-5. Post-port performance work follows (#88, #94–#96, #98, #103).
+4. Post-port performance work follows (#88, #94–#96, #98, #103).
 
 ---
 
@@ -50,7 +51,7 @@ re-authored from pinned upstream bases as a bisectable commit series. The
 completed base, scope, tracer-format and default decisions are recorded in
 `docs/experiments/105-port-preparation.md`; they are not repeated here.
 
-**Open scope only:** complete #200 and #201, then #210–#226 in order. Every
+**Open scope only:** complete #200, then #210–#226 in order. Every
 slice must name its exact files, dependencies, behavior boundary, targeted
 tests, full-suite gates and paired-repository compatibility gate in its
 normative `PRD/slices/` file before implementation begins.
@@ -82,22 +83,9 @@ removed and its producer timestamps cross the versioned xup contract into
 xrdp's single ring. Exact rationale and failure modes:
 `docs/experiments/107-private-tracer-is-pr-scope.md`.
 
-## #201 — freeze the paired bases and normative commit contract
-
-**Status: IN PROGRESS.** Refactor the monolithic, stale `PRD.md` into a
-self-contained `PRD/` tree. `PRD/README.md` defines the product and invariants;
-one file under `PRD/slices/` is the unique normative source for each
-clean-room commit. BACKLOG items point to dev source only as porting inventory.
-
-**Acceptance:** owner-pinned full xorgxrdp base; paired compatibility audit;
-one-to-one mapping between #210–#226 and `PRD/slices/`; exact target files and
-tests per slice; explicit activation boundary; no stale LC=0, single-monitor,
-window-2-default, tail-flush, JSON-trace or stripped-tracer language; all
-in-tree PRD links resolve.
-
 ## #210 — paired latent GFX H.264 shared-memory isolation fix
 
-**Status: TODO; blocked on #200/#201.** Port the pre-existing AVC420/H.264
+**Status: TODO; blocked on #200.** Port the pre-existing AVC420/H.264
 multi-monitor plane-overwrite fix before any AVC444 feature.
 
 **Dev source:** xrdp `common/xup_client_info.h`, `xrdp/xrdp_encoder.c`,
@@ -107,20 +95,21 @@ multi-monitor plane-overwrite fix before any AVC444 feature.
 **Acceptance:** standalone behavior for upstream-reachable `CC_GFX_A2`; each
 monitor owns a disjoint region; protocol version and both repositories agree;
 single- and multi-monitor layout tests plus paired builds are green. Normative
-specification: #201 will install `PRD/slices/210-shmem-isolation.md`.
+specification: [`PRD/slices/210-shmem-isolation.md`](PRD/slices/210-shmem-isolation.md).
 
 ## #211 — generic compile-time performance tracer foundation
 
-**Status: TODO; blocked on #200/#201.** Re-author the completed generic
+**Status: TODO; blocked on #200.** Re-author the completed generic
 facility without AVC events or diagnostic xup payloads.
 
-**Dev source:** `common/perf_trace.{c,h}`, `common/trans.{c,h}` and
-`tests/common/test_perf_trace.c`; lifecycle shape comes from #200.
+**Dev source:** `common/perf_trace.{c,h}` and
+`tests/common/test_perf_trace.c`; lifecycle shape comes from #200. The
+transport queue counter belongs to #224, not this generic slice.
 
 **Acceptance:** the slice is independently usable; default builds contain no
 trace symbols, strings, state or argument evaluation; enabled builds pass all
 generic lifecycle/security/format/concurrency tests. Normative specification:
-`PRD/slices/211-perf-trace-foundation.md` after #201.
+[`PRD/slices/211-perf-trace-foundation.md`](PRD/slices/211-perf-trace-foundation.md).
 
 ## #212 — paired AVC capture and diagnostic wire contract
 
@@ -135,7 +124,7 @@ backend is selectable.
 **Acceptance:** bounds/overflow and serialization tests cover both trace build
 modes; older peers reject incompatible structure versions cleanly; paired
 headers and builds agree. Normative specification:
-`PRD/slices/212-capture-wire-contract.md` after #201.
+[`PRD/slices/212-capture-wire-contract.md`](PRD/slices/212-capture-wire-contract.md).
 
 ## #213 — full-chroma view construction and producer packing
 
@@ -150,11 +139,12 @@ The backend remains unadvertised.
 **Acceptance:** specification-derived color, layout, odd-size, padding,
 alignment and AVC420-loss vectors pass; xorgxrdp packed bytes are checked
 against the independent xrdp oracle; scalar and vector paths are identical.
-Normative specification: `PRD/slices/213-view-construction.md` after #201.
+Normative specification:
+[`PRD/slices/213-view-construction.md`](PRD/slices/213-view-construction.md).
 
 ## #214 — bounded standard-NUT demuxer
 
-**Status: TODO; blocked on #201.** Port the independent standard-NUT subset as
+**Status: TODO; blocked on #200.** Port the independent standard-NUT subset as
 a pure leaf.
 
 **Dev source:** `xrdp/xrdp_nut.{c,h}`, `tests/xrdp/test_avc444_nut.c`,
@@ -162,11 +152,11 @@ a pure leaf.
 
 **Acceptance:** valid fixture, byte fragmentation, truncation, CRC, file-id
 and total-ceiling cases pass; no server caller exists. Normative specification:
-`PRD/slices/214-nut-demuxer.md` after #201.
+[`PRD/slices/214-nut-demuxer.md`](PRD/slices/214-nut-demuxer.md).
 
 ## #215 — Annex-B validation and parameter-set policy
 
-**Status: TODO; blocked on #201.** Port bounded Annex-B inspection plus the
+**Status: TODO; blocked on #200.** Port bounded Annex-B inspection plus the
 recorded SPS/SEI interoperability transforms used by current hardware
 profiles. LTR rewriting is not in this slice.
 
@@ -176,11 +166,11 @@ in `tests/xrdp/test_avc444_h264.c`.
 **Acceptance:** reset packet, missing/duplicate parameter sets, malformed NAL,
 HRD sanitization and `pic_struct` vectors pass. Explicit `fault_*` injections
 remain dev-only. Normative specification:
-`PRD/slices/215-annexb-and-parameter-policy.md` after #201.
+[`PRD/slices/215-annexb-and-parameter-policy.md`](PRD/slices/215-annexb-and-parameter-policy.md).
 
 ## #216 — pure AVC capability classification
 
-**Status: TODO; blocked on #201.** Port client-capability classification and
+**Status: TODO; blocked on #200.** Port client-capability classification and
 server mode choice as pure logic. Do not advertise a live backend.
 
 **Dev source:** `xrdp/xrdp_avc444_caps.{c,h}` and
@@ -188,11 +178,11 @@ server mode choice as pure logic. Do not advertise a live backend.
 
 **Acceptance:** table-driven v8/v8.1/v10.0/v10.1/v10.2–10.7, AVC-disabled,
 unknown-version and v2-support cases pass. Normative specification:
-`PRD/slices/216-capability-classifier.md` after #201.
+[`PRD/slices/216-capability-classifier.md`](PRD/slices/216-capability-classifier.md).
 
 ## #217 — secure ffmpeg runner and behavioral probe
 
-**Status: TODO; blocked on #214/#215.** Port spawn, descriptor layout,
+**Status: TODO; blocked on #213/#214/#215.** Port spawn, descriptor layout,
 nonblocking pipe pump, bounded collection, termination/reaping, static
 `dump_extra` verification, one-frame `probesize`, pipe-size negotiation and
 failure classification. LTR and multi-monitor pump-set behavior are later.
@@ -204,7 +194,7 @@ failure classification. LTR and multi-monitor pump-set behavior are later.
 **Acceptance:** pure and real-ffmpeg gates cover probe success, header-policy
 mismatch, duplicate headers, timeout, synchronous pair/single identity,
 resize/reap and small-geometry startup. Normative specification:
-`PRD/slices/217-ffmpeg-runner.md` after #201.
+[`PRD/slices/217-ffmpeg-runner.md`](PRD/slices/217-ffmpeg-runner.md).
 
 ## #218 — inactive server encoder integration
 
@@ -218,7 +208,7 @@ an AVC capability.
 **Acceptance:** existing x264/OpenH264 paths are unchanged; internal
 AVC420/444 transactions are unit-testable; no configuration or capability can
 reach the new path. Normative specification:
-`PRD/slices/218-inactive-encoder-integration.md` after #201.
+[`PRD/slices/218-inactive-encoder-integration.md`](PRD/slices/218-inactive-encoder-integration.md).
 
 ## #219 — LC=1/LC=2 wire serialization
 
@@ -230,7 +220,8 @@ is born as luma LC=1 followed by chroma LC=2; LC=0 never enters history.
 
 **Acceptance:** exact metablock, even-origin/even-extent, region, codec-id and
 two-PDU byte vectors pass; the backend remains unadvertised. Normative
-specification: `PRD/slices/219-avc-wire-serialization.md` after #201.
+specification:
+[`PRD/slices/219-avc-wire-serialization.md`](PRD/slices/219-avc-wire-serialization.md).
 
 ## #220 — two-slot capture and fail-early shared memory
 
@@ -244,7 +235,8 @@ of `xrdp/xrdp_encoder.{c,h}` and `xrdp/xrdp_mm.c`,
 
 **Acceptance:** layout, alternation, capacity, failure-before-session and
 paired ownership tests pass; allocation failure cannot become a later SIGBUS.
-Normative specification: `PRD/slices/220-two-slot-capture.md` after #201.
+Normative specification:
+[`PRD/slices/220-two-slot-capture.md`](PRD/slices/220-two-slot-capture.md).
 
 ## #221 — reference-safe AVC444 topology
 
@@ -258,7 +250,7 @@ become non-IDR intra leaves on the shared chain.
 
 **Acceptance:** golden leaf vectors, malformed/truncated rejection and both
 decoder-topology simulations pass. Normative specification:
-`PRD/slices/221-reference-safe-topology.md` after #201.
+[`PRD/slices/221-reference-safe-topology.md`](PRD/slices/221-reference-safe-topology.md).
 
 ## #222 — long-term-reference chain, re-key and scheduled intra refresh
 
@@ -274,7 +266,7 @@ LTR/re-key/intra cases in `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 **Acceptance:** golden bytes, Windows-field cross-check, both decode modes,
 sparse cadence, wrap/restart, observed-vs-requested cuts and live real-ffmpeg
 cut cases pass. Normative specification:
-`PRD/slices/222-ltr-rekey-intra.md` after #201.
+[`PRD/slices/222-ltr-rekey-intra.md`](PRD/slices/222-ltr-rekey-intra.md).
 
 ## #223 — one-thread multi-monitor pump set and batch emission
 
@@ -289,7 +281,8 @@ and inline batch assembly. The removed emit thread does not return.
 
 **Acceptance:** independent monitor identity/state, sequence zero, unarmed and
 failure states, four-view pump-set and two-monitor live correctness pass.
-Normative specification: `PRD/slices/223-multimon-pump-set.md` after #201.
+Normative specification:
+[`PRD/slices/223-multimon-pump-set.md`](PRD/slices/223-multimon-pump-set.md).
 
 ## #224 — paired credit frontier and split acknowledgement
 
@@ -307,7 +300,7 @@ frontier portions of `xrdp/xrdp_encoder.{c,h}`, `xrdp/xrdp_mm.c`,
 **Acceptance:** every credit term, monotonicity, frozen client, C+2M bound,
 slot/region separation, dropped-region return, per-monitor mask and paired
 wire serialization pass. Normative specification:
-`PRD/slices/224-credit-frontier.md` after #201.
+[`PRD/slices/224-credit-frontier.md`](PRD/slices/224-credit-frontier.md).
 
 ## #225 — sparse auxiliary cadence
 
@@ -324,7 +317,8 @@ before it can advance the encoder DPB.
 **Acceptance:** disabled equivalence, refresh-plus-one-frame bound, settle/rate
 clamps, independent intra schedules and DPB continuity pass; #92's real-client
 gates are green before the slice is accepted for handoff. Normative
-specification: `PRD/slices/225-sparse-chroma.md` after #201.
+specification:
+[`PRD/slices/225-sparse-chroma.md`](PRD/slices/225-sparse-chroma.md).
 
 ## #226 — configuration, activation, operating docs and final paired gate
 
@@ -341,7 +335,8 @@ injection.
 activation, probe-before-confirm, no fallback, resize lifecycle and all three
 real clients plus multi-monitor pass on builds made from the clean-room paired
 branches. Default and trace-enabled CI-equivalent matrices are green.
-Normative specification: `PRD/slices/226-activation-and-docs.md` after #201.
+Normative specification:
+[`PRD/slices/226-activation-and-docs.md`](PRD/slices/226-activation-and-docs.md).
 
 ---
 
@@ -477,5 +472,6 @@ The record, not this table, owns conditions, measurements and retractions.
 | #103(a) | Pipe-size negotiation and the 64 KiB fail-loud guard landed. | `docs/experiments/103-pipe-size-and-host-limit.md` |
 | #104 | Five one-image arms built and certified; the stale x035-red paragraph is superseded. | `docs/experiments/104-pr-evidence-matrix.md` |
 | #105 preparation | Base, one-PR, tracer and default decisions completed; implementation remains #200+. | `docs/experiments/105-port-preparation.md` |
+| #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |
 | #106 | External trace equivalence closed RED: 13/34 semantic records had no exact mapping. | `docs/experiments/106-perf-isolation-and-trace-equivalence.md` |
 | #107 | Named text byte ring selected and installed; shipping lifecycle moved to #200. | `docs/experiments/107-private-tracer-is-pr-scope.md` |

@@ -19,7 +19,7 @@ Where things go:
 |---|---|
 | an open question + why it matters + a pointer | `BACKLOG.md` |
 | how a closed investigation was run and what it measured | here |
-| a contract, invariant, or baseline that is still true | `PRD.md` (moving to `PRD/` under BACKLOG #201) |
+| a contract, invariant, or baseline that is still true | `PRD/` |
 | how to install, deploy, or triage | `DEPLOY_RUNBOOK.md` |
 | working rules for agents and contributors | `CLAUDE.md` |
 | the evidence for one run (logs, images, VERDICT) | `PR-demo/mac_bisect_matrix/captures/<run>/` |
@@ -47,3 +47,5 @@ Where things go:
 | `105-port-preparation.md` | #105 preparation | pinned base, one-change, tracer and default decisions recorded |
 | `106-perf-isolation-and-trace-equivalence.md` | #106 | CLOSED RED — no exact external mapping for 13/34 records |
 | `107-private-tracer-is-pr-scope.md` | #107 | named text byte ring selected; shipping lifecycle moved to #200 |
+| `201-prd-refactor.md` | #201 | paired bases pinned; one normative file per clean-room slice |
+| `avc444-lc-reframe-design.md` | pre-backlog | historical LC=1/LC=2 ground truth and original fix design; superseded normatively by PRD slice #219 |
