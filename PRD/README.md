@@ -53,7 +53,7 @@ that overlap a slice shall retain these changes and their tests.
   while the new backend is absent, disabled, unavailable or incomplete.
 * New capture structures shall carry an exact version. Mismatched paired
   versions shall fail before shared memory is interpreted.
-* No slice before #226 shall advertise, negotiate or select the new backend.
+* No slice before #142 shall advertise, negotiate or select the new backend.
   Incomplete code may be reached only by its deterministic unit tests.
 * Capability selection is immutable after RDPGFX confirmation. Probe failure
   shall remove the backend before confirmation; it shall not trigger a codec
@@ -148,26 +148,29 @@ interoperability policies and are not fault injection.
 Each row is exactly one proposed clean-room commit. A slice is complete only
 when its own targeted tests and every gate available at that point are green.
 A red slice shall not be committed, and work shall not proceed on top of it.
+Slices are authored strictly in numeric order from #126 through #142; the
+dependency column records the narrower functional inputs, but does not permit
+parallel or out-of-order commits.
 
 | item | normative slice | dependency | first activation |
 |---|---|---|---|
-| #210 | [Shared-memory isolation](slices/210-shmem-isolation.md) | bases | latent AVC420 fix |
-| #211 | [Performance trace foundation](slices/211-perf-trace-foundation.md) | bases | trace build only |
-| #212 | [Capture wire contract](slices/212-capture-wire-contract.md) | #211 | no backend |
-| #213 | [View construction](slices/213-view-construction.md) | #212 | no backend |
-| #214 | [NUT demuxer](slices/214-nut-demuxer.md) | bases | parser only |
-| #215 | [Annex-B policy](slices/215-annexb-and-parameter-policy.md) | bases | parser only |
-| #216 | [Capability classifier](slices/216-capability-classifier.md) | bases | pure policy only |
-| #217 | [FFmpeg runner](slices/217-ffmpeg-runner.md) | #213, #214, #215 | test-only runner |
-| #218 | [Inactive encoder integration](slices/218-inactive-encoder-integration.md) | #213, #216, #217 | internal only |
-| #219 | [Wire serialization](slices/219-avc-wire-serialization.md) | #218 | internal only |
-| #220 | [Two-slot capture](slices/220-two-slot-capture.md) | #212, #213 | internal only |
-| #221 | [Reference-safe topology](slices/221-reference-safe-topology.md) | #215, #217, #219 | internal only |
-| #222 | [LTR, re-key and intra refresh](slices/222-ltr-rekey-intra.md) | #221 | internal only |
-| #223 | [Multi-monitor pump set](slices/223-multimon-pump-set.md) | #220, #222 | internal only |
-| #224 | [Credit frontier](slices/224-credit-frontier.md) | #220, #223 | internal only |
-| #225 | [Sparse chroma](slices/225-sparse-chroma.md) | #222, #224 | internal only |
-| #226 | [Activation and documentation](slices/226-activation-and-docs.md) | #210–#225 | selectable backend |
+| #126 | [Shared-memory isolation](slices/126-shmem-isolation.md) | bases | latent AVC420 fix |
+| #127 | [Performance trace foundation](slices/127-perf-trace-foundation.md) | bases | trace build only |
+| #128 | [Capture wire contract](slices/128-capture-wire-contract.md) | #127 | no backend |
+| #129 | [View construction](slices/129-view-construction.md) | #128 | no backend |
+| #130 | [NUT demuxer](slices/130-nut-demuxer.md) | bases | parser only |
+| #131 | [Annex-B policy](slices/131-annexb-and-parameter-policy.md) | bases | parser only |
+| #132 | [Capability classifier](slices/132-capability-classifier.md) | bases | pure policy only |
+| #133 | [FFmpeg runner](slices/133-ffmpeg-runner.md) | #129, #130, #131 | test-only runner |
+| #134 | [Inactive encoder integration](slices/134-inactive-encoder-integration.md) | #129, #132, #133 | internal only |
+| #135 | [Wire serialization](slices/135-avc-wire-serialization.md) | #134 | internal only |
+| #136 | [Two-slot capture](slices/136-two-slot-capture.md) | #128, #129 | internal only |
+| #137 | [Reference-safe topology](slices/137-reference-safe-topology.md) | #131, #133, #135 | internal only |
+| #138 | [LTR, re-key and intra refresh](slices/138-ltr-rekey-intra.md) | #137 | internal only |
+| #139 | [Multi-monitor pump set](slices/139-multimon-pump-set.md) | #136, #138 | internal only |
+| #140 | [Credit frontier](slices/140-credit-frontier.md) | #136, #139 | internal only |
+| #141 | [Sparse chroma](slices/141-sparse-chroma.md) | #138, #140 | internal only |
+| #142 | [Activation and documentation](slices/142-activation-and-docs.md) | #126–#141 | selectable backend |
 
 ## Gate contract for every slice
 
@@ -182,9 +185,9 @@ addition, each commit shall pass these gates from a clean tree:
    `common/xup_client_info.h` contract.
 5. `scripts/run_astyle.sh -v 3.4.14`; it shall produce no diff.
 6. `scripts/run_cppcheck.sh -v 2.20.0`.
-7. From #211 onward, create a second clean xrdp build configured with
+7. From #127 onward, create a second clean xrdp build configured with
    `--enable-perf-trace` and repeat `make -j2` and `make check`. The ordinary
-   build shall also pass #211's disabled-footprint test. From #212 onward,
+   build shall also pass #127's disabled-footprint test. From #128 onward,
    perform the paired xorgxrdp build in both matching trace modes; mixed modes
    shall fail the version-agreement test.
 
@@ -196,6 +199,6 @@ may be changed only in a separate, acknowledged specification change.
 
 Older source comments use identifiers such as `FR-CAPTURE`, `FR-PROC`,
 `FR-NUT`, `FR-H264`, `FR-WIRE`, `FR-ACK`, `FR-CONFIG` and `FR-TRACE`.
-They map respectively to slices #212/#213/#220, #217/#223, #214,
-#215/#221/#222, #219, #224, #226 and #211. The slice documents, not the old
+They map respectively to slices #128/#129/#136, #133/#139, #130,
+#131/#137/#138, #135, #140, #142 and #127. The slice documents, not the old
 identifier wording, are authoritative.

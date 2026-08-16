@@ -1,4 +1,4 @@
-# Slice #212 — Paired AVC capture and diagnostic wire contract
+# Slice #128 — Paired AVC capture and diagnostic wire contract
 
 ## Commit boundary
 
@@ -13,20 +13,20 @@ Target files are xrdp `common/xrdp_client_info.h`,
 
 ## Requirements
 
-* S212-R1: `CC_GFX_AVC444` shall identify packed full-chroma capture and shall
+* S128-R1: `CC_GFX_AVC444` shall identify packed full-chroma capture and shall
   carry capture format, width alignment, monitor count, visible geometry,
   region offsets and region sizes.
-* S212-R2: the format shall distinguish AVC444v1, AVC444v2 and main-only
+* S128-R2: the format shall distinguish AVC444v1, AVC444v2 and main-only
   full-range BT.709 NV12. Unknown values shall be rejected.
-* S212-R3: the structure shall be fixed-width, versioned and checked for exact
+* S128-R3: the structure shall be fixed-width, versioned and checked for exact
   agreement before either peer uses offsets or monitor metadata.
-* S212-R4: monitor count and every dimension, stride, offset and length shall
+* S128-R4: monitor count and every dimension, stride, offset and length shall
   be range- and overflow-checked. Regions shall be ordered, disjoint and
   contained in the mapped allocation. At most 16 monitors are accepted; a
   capture width or height above 16384 is rejected. At most 15 dirty rectangles
   are transported per monitor; a more complex region is coalesced to its
   checked extent.
-* S212-R5: in a paired trace-enabled build, the per-frame paint message shall
+* S128-R5: in a paired trace-enabled build, the per-frame paint message shall
   append capture-begin, packing-complete and send timestamps from
   `CLOCK_MONOTONIC`, plus monitor/frame identity and the producer's slot and
   displayed-region acknowledgement frontiers. The exact extension and
@@ -34,14 +34,14 @@ Target files are xrdp `common/xrdp_client_info.h`,
   expose the matching `--enable-perf-trace` configure option, disabled by
   default. In that build `XRDP_ACK_TRACE=1` arms the timestamp reads; without
   it the fields are zero and the producer does not read the clock.
-* S212-R6: a default build shall contain no timestamp fields in the paint
+* S128-R6: a default build shall contain no timestamp fields in the paint
   message and shall perform no trace-only clock read. Mixed trace modes shall
   fail version agreement rather than parse different layouts.
-* S212-R7: the consumer shall emit the transported values as the `capture`
+* S128-R7: the consumer shall emit the transported values as the `capture`
   event with `frame_id`, `monitor`, `begin_ns`, `packed_ns`, `sent_ns`,
   `slot_ack` and `region_ack`, and static `class=ACK_TRACE` through the one
-  #211 sink. The producer shall not write a per-frame normal log.
-* S212-R8: no capability response or encoder dispatch shall select this
+  #127 sink. The producer shall not write a per-frame normal log.
+* S128-R8: no capability response or encoder dispatch shall select this
   capture code in this commit.
 
 ## Required tests and gate

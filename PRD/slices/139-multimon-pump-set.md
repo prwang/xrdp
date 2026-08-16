@@ -1,4 +1,4 @@
-# Slice #223 — One-thread multi-monitor pump set
+# Slice #139 — One-thread multi-monitor pump set
 
 ## Commit boundary
 
@@ -17,24 +17,24 @@ Target files are multi-monitor portions of `xrdp/xrdp_encoder.c`,
 
 ## Requirements
 
-* S223-R1: each monitor shall own its geometry, main/aux children, parsers,
+* S139-R1: each monitor shall own its geometry, main/aux children, parsers,
   frame identity, LTR state, pending input and completed output. No state may
   be indexed only by global frame order.
-* S223-R2: one worker shall build one poll set containing all live child input
+* S139-R2: one worker shall build one poll set containing all live child input
   and output descriptors and pump them under one monotonic batch deadline.
   A blocked child shall not prevent service of a ready child.
-* S223-R3: completion shall be matched by monitor, view and submission
+* S139-R3: completion shall be matched by monitor, view and submission
   identity. A monitor pair becomes publishable only when its required views
   are complete and valid.
-* S223-R4: ready monitors shall be assembled inline into one EGFX batch in
+* S139-R4: ready monitors shall be assembled inline into one EGFX batch in
   deterministic monitor order. Assembly shall not mutate encoder ownership,
   advance LTR state, acknowledge capture or perform normal per-frame logging.
-* S223-R5: sequence zero, an unarmed monitor, a failed submission and a
+* S139-R5: sequence zero, an unarmed monitor, a failed submission and a
   teardown/restart shall clear stale readiness and shall not publish old
   bytes.
-* S223-R6: failure of one monitor shall return/preserve that monitor's damage
+* S139-R6: failure of one monitor shall return/preserve that monitor's damage
   and tear down its process state without aliasing another monitor's buffers.
-* S223-R7: trace-enabled builds shall bracket submit (`subm_beg`, `subm_end`),
+* S139-R7: trace-enabled builds shall bracket submit (`subm_beg`, `subm_end`),
   polling (`pump_beg`, `pump_end`), bookkeeping (`book_beg`, `book_end`),
   per-monitor collection (`coll_beg`, `coll_end`), release (`rel_beg`,
   `rel_end`) and inline serialization (`emit_beg`, `emit_end`). `batch` shall

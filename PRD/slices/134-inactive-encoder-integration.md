@@ -1,4 +1,4 @@
-# Slice #218 — Inactive server encoder integration
+# Slice #134 — Inactive server encoder integration
 
 ## Commit boundary
 
@@ -12,22 +12,22 @@ Target files are `xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder.h`,
 
 ## Requirements
 
-* S218-R1: one worker-owned context shall carry selected mode, visible/coded
+* S134-R1: one worker-owned context shall carry selected mode, visible/coded
   geometry, capture identity, child handles, parser state and output buffers.
   Ownership transfer shall be explicit at submit, consume, complete and free.
-* S218-R2: internal AVC420 shall submit the main view to one child. Internal
+* S134-R2: internal AVC420 shall submit the main view to one child. Internal
   AVC444 shall submit matched main and auxiliary views and shall not publish a
   partial pair.
-* S218-R3: every failure shall return the capture ownership or preserve dirty
+* S134-R3: every failure shall return the capture ownership or preserve dirty
   damage according to existing semantics, tear down the affected process
   state and surface an error. It shall not invoke x264/OpenH264 as fallback.
-* S218-R4: the existing x264 and OpenH264 dispatch, queue ownership, surface
+* S134-R4: the existing x264 and OpenH264 dispatch, queue ownership, surface
   creation and completion behavior shall remain unchanged.
-* S218-R5: there shall be no parser/config key, codec-order value, capability
+* S134-R5: there shall be no parser/config key, codec-order value, capability
   response or runtime branch by which a session can select this integration.
-* S218-R6: lifecycle calls shall be safe for a never-started, partially
+* S134-R6: lifecycle calls shall be safe for a never-started, partially
   started, completed and failed context.
-* S218-R7: trace-enabled builds shall record damage geometry (`dmg`), encoder
+* S134-R7: trace-enabled builds shall record damage geometry (`dmg`), encoder
   submitted/returned/ready state (`enc`), worker enqueue/take FIFO identity
   (`enq`, `take`) and worker waiting/draining brackets (`wait_beg`,
   `wait_end`, `drain_beg`, `drain_end`). Every frame-bearing event shall carry

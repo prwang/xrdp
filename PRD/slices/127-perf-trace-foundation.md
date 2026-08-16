@@ -1,4 +1,4 @@
-# Slice #211 — Compile-time performance trace foundation
+# Slice #127 — Compile-time performance trace foundation
 
 ## Commit boundary
 
@@ -15,12 +15,12 @@ The disabled-footprint script is
 
 ## Requirements
 
-* S211-R1: configure shall expose `--enable-perf-trace`, disabled by default.
+* S127-R1: configure shall expose `--enable-perf-trace`, disabled by default.
   When it is off, trace macros expand to statements that evaluate none of
   their arguments and no trace implementation is linked.
-* S211-R2: disabled binaries and objects shall contain no event names, trace
+* S127-R2: disabled binaries and objects shall contain no event names, trace
   path, trace global, trace function or trace-only branch.
-* S211-R3: enabled records shall be complete newline-terminated ASCII records
+* S127-R3: enabled records shall be complete newline-terminated ASCII records
   with `schema=1`, `mono_ns`, `pid`, `tid`, `event` and event-specific named
   signed 64-bit values. Names and format strings are compile-time constants;
   untrusted text is never a format string. The `XRDP_PERF_TRACE` environment
@@ -29,15 +29,15 @@ The disabled-footprint script is
   conversions, dynamic width/precision, floating-point, pointer and dynamic
   string conversions; event keys and static token values come from the
   literal format, while dynamic fields are bounded integers.
-* S211-R4: producers shall use bounded `snprintf`-compatible local formatting
+* S127-R4: producers shall use bounded `snprintf`-compatible local formatting
   directly into their own byte ring. The Linux ring shall be double-mapped so
   a wrapped record is contiguous; wrap shall not require a second record copy.
-* S211-R5: a producer shall publish only a complete record. Overflow drops a
+* S127-R5: a producer shall publish only a complete record. Overflow drops a
   whole record and increments a counter; it never exposes a partial line.
   Each ring is 512 KiB, a record is at most 512 bytes including newline, and
   at most eight producer rings may be claimed. Failure to claim a ring is
   counted and reported at shutdown.
-* S211-R6: initialization shall be explicit after fork and before measured
+* S127-R6: initialization shall be explicit after fork and before measured
   work. The sink owns file I/O. Shutdown shall stop new publication, wake and
   join the sink, drain complete records, report drops/failures once, and be
   idempotent.
@@ -46,12 +46,12 @@ The disabled-footprint script is
   `pthread_once`, allocate or open. `perf_trace_close()` transitions armed to
   closing before it waits and leaves a terminal closed state. Initialization
   failure uses a terminal failed state and cannot be retried from an event.
-* S211-R7: the output shall use secure exclusive mode-0600 creation, no
+* S127-R7: the output shall use secure exclusive mode-0600 creation, no
   symlink following and close-on-exec. Open/write/drain failure shall disable
   tracing safely and remain observable at human rate.
-* S211-R8: no event call may allocate, lock a global mutex, perform file I/O,
+* S127-R8: no event call may allocate, lock a global mutex, perform file I/O,
   call normal logging or initialize the facility lazily.
-* S211-R9: an armed file shall begin with `clock_base`, relating monotonic and
+* S127-R9: an armed file shall begin with `clock_base`, relating monotonic and
   realtime nanoseconds. Shutdown diagnostics are `perfdrop` with ring/drop
   count, `perfformat` with ring/failure count, and `perfnoring` with the count
   of producer threads that could not claim a ring. These names and fields are

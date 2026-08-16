@@ -1,4 +1,4 @@
-# Slice #219 — AVC420 and AVC444 wire serialization
+# Slice #135 — AVC420 and AVC444 wire serialization
 
 ## Commit boundary
 
@@ -12,20 +12,20 @@ Register the suite in `tests/xrdp/Makefile.am`,
 
 ## Requirements
 
-* S219-R1: AVC420 shall produce the existing RDPGFX AVC420 metadata and one
+* S135-R1: AVC420 shall produce the existing RDPGFX AVC420 metadata and one
   validated H.264 bitstream for its visible region.
-* S219-R2: an AVC444 frame shall be serialized as one luma PDU with LC=1 and,
+* S135-R2: an AVC444 frame shall be serialized as one luma PDU with LC=1 and,
   when auxiliary output is due, one following chroma PDU with LC=2. Both PDUs
   shall carry the same frame/surface identity and ordered region set.
-* S219-R3: LC=0 shall not be serialized or admitted to clean history. A reset
+* S135-R3: LC=0 shall not be serialized or admitted to clean history. A reset
   starts with a validated LC=1 main reset; auxiliary state is joined without
   creating an LC=0 reference relationship.
-* S219-R4: visible dirty rectangles shall map to metablock rectangles with
+* S135-R4: visible dirty rectangles shall map to metablock rectangles with
   even origin and even extent, clipped to coded bounds. Empty output shall be
   omitted; unions and counts shall be overflow-checked.
-* S219-R5: serializer capacity shall be checked before each header, rectangle
+* S135-R5: serializer capacity shall be checked before each header, rectangle
   and payload. Oversize output shall fail without emitting a partial command.
-* S219-R6: codec IDs shall match #216 and LC selection. Region order shall be
+* S135-R6: codec IDs shall match #132 and LC selection. Region order shall be
   deterministic across monitors and input list ordering.
 
 ## Required tests and gate

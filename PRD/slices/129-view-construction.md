@@ -1,4 +1,4 @@
-# Slice #213 — Full-chroma views and producer packing
+# Slice #129 — Full-chroma views and producer packing
 
 ## Commit boundary
 
@@ -16,19 +16,19 @@ xorgxrdp `module/rdpCapture.c`, `module/rdpClientCon.c`,
 
 ## Requirements
 
-* S213-R1: XRGB8888 shall convert to full-range BT.709 Y, Cb and Cr with
+* S129-R1: XRGB8888 shall convert to full-range BT.709 Y, Cb and Cr with
   deterministic integer rounding and saturation.
-* S213-R2: AVC444v1 and AVC444v2 main/auxiliary views shall implement the
+* S129-R2: AVC444v1 and AVC444v2 main/auxiliary views shall implement the
   Microsoft reconstruction mapping. Main-only mode shall produce conventional
   full-range BT.709 NV12 and intentionally lose isoluminant chroma detail.
-* S213-R3: coded width shall round up to 16 or 32 as selected; coded height
-  shall round up to 16. Plane strides and offsets shall obey #212.
-* S213-R4: odd visible sizes and dirty rectangles shall not read outside the
+* S129-R3: coded width shall round up to 16 or 32 as selected; coded height
+  shall round up to 16. Plane strides and offsets shall obey #128.
+* S129-R4: odd visible sizes and dirty rectangles shall not read outside the
   source. Right and bottom padding shall replicate the last visible sample.
-* S213-R5: the producer's scalar and vectorized paths shall be byte-identical.
+* S129-R5: the producer's scalar and vectorized paths shall be byte-identical.
   Loops shall have explicit non-aliasing/stride preconditions and a scalar
   remainder; alignment shall never be assumed from client geometry.
-* S213-R6: xrdp's independent converter is a test oracle and standalone
+* S129-R6: xrdp's independent converter is a test oracle and standalone
   utility, not a second conversion or fallback on the shipped packed-capture
   path.
 

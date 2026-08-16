@@ -27,3 +27,11 @@ slots per monitor; the shipped credit settings are eager slot acknowledgement
 and wire window 1; assembly stays inline; `tail_flush` and explicit fault
 injection do not port; and performance trace is a compile-time-erased named
 text byte ring rather than JSON or fixed binary records.
+
+## Numbering addendum — 2026-08-16
+
+The active backlog was subsequently made one linear dependency chain. The
+same seventeen normative slice files were renumbered, without changing their
+order, from #210–#226 to #126–#142. Requirement identifiers and live
+cross-references moved with them; the paragraph above remains the historical
+numbering at the time of the refactor.

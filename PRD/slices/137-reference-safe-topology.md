@@ -1,4 +1,4 @@
-# Slice #221 — Reference-safe AVC444 topology
+# Slice #137 — Reference-safe AVC444 topology
 
 ## Commit boundary
 
@@ -12,19 +12,19 @@ Target files are the auxiliary-leaf functions in
 
 ## Requirements
 
-* S221-R1: a main picture may reference prior main pictures only. No main
+* S137-R1: a main picture may reference prior main pictures only. No main
   reference-list operation may select an auxiliary picture.
-* S221-R2: an auxiliary encoder IDR shall be transformed into a non-IDR intra
+* S137-R2: an auxiliary encoder IDR shall be transformed into a non-IDR intra
   leaf that is decoded after and may depend only on the corresponding main
   reference where the format requires it. The leaf shall not become a future
   short-term reference.
-* S221-R3: SPS/PPS identity, frame numbering, POC and deblocking syntax shall
+* S137-R3: SPS/PPS identity, frame numbering, POC and deblocking syntax shall
   remain consistent with the main chain and the selected AVC444 mode.
-* S221-R4: input that is not the expected auxiliary IDR, lacks the paired main
+* S137-R4: input that is not the expected auxiliary IDR, lacks the paired main
   reference VCL, contains unsupported slice structure, or is truncated shall
   fail before output publication.
-* S221-R5: the transform shall be bounded and deterministic. It shall preserve
-  unrelated NAL units admitted by #215 and shall not rebuild more syntax than
+* S137-R5: the transform shall be bounded and deterministic. It shall preserve
+  unrelated NAL units admitted by #131 and shall not rebuild more syntax than
   the topology change requires.
 
 ## Required tests and gate

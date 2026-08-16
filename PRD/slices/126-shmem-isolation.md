@@ -1,4 +1,4 @@
-# Slice #210 — Paired H.264 shared-memory isolation
+# Slice #126 — Paired H.264 shared-memory isolation
 
 ## Commit boundary
 
@@ -15,15 +15,15 @@ Target files are xrdp `common/xup_client_info.h`,
 
 ## Requirements
 
-* S210-R1: each active monitor shall receive a disjoint, page-aligned NV12
+* S126-R1: each active monitor shall receive a disjoint, page-aligned NV12
   region computed from that monitor's coded dimensions.
-* S210-R2: layout arithmetic shall reject invalid counts, dimensions,
+* S126-R2: layout arithmetic shall reject invalid counts, dimensions,
   overflow and aggregate sizes that cannot be represented by the transport.
-* S210-R3: both peers shall use one bumped exact structure version. A peer
+* S126-R3: both peers shall use one bumped exact structure version. A peer
   with the old version shall fail before dereferencing the new layout.
-* S210-R4: the one-monitor layout and existing encoder output shall remain
+* S126-R4: the one-monitor layout and existing encoder output shall remain
   byte-compatible apart from the new region base calculation.
-* S210-R5: no monitor may overwrite another monitor's plane while captures
+* S126-R5: no monitor may overwrite another monitor's plane while captures
   are outstanding.
 
 ## Required tests and gate

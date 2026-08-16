@@ -1,4 +1,4 @@
-# Slice #220 — Two-slot capture and fail-early shared memory
+# Slice #136 — Two-slot capture and fail-early shared memory
 
 ## Commit boundary
 
@@ -13,21 +13,21 @@ Target files are xrdp `common/os_calls.c`, `common/xup_client_info.h`,
 
 ## Requirements
 
-* S220-R1: every active monitor shall own exactly two equal-sized slots inside
+* S136-R1: every active monitor shall own exactly two equal-sized slots inside
   its disjoint region. Slot bases shall derive from checked region and slot
   sizes, never from a global rotating index.
-* S220-R2: admission and rotation are per monitor. Two captures for one
+* S136-R2: admission and rotation are per monitor. Two captures for one
   monitor may be outstanding; a third shall be refused until that monitor
   receives a matching ownership acknowledgement.
-* S220-R3: each slot shall carry the capture/frame identity needed to reject a
+* S136-R3: each slot shall carry the capture/frame identity needed to reject a
   stale, duplicate or wrong-monitor acknowledgement. Wrap of the identity
   counter shall preserve unambiguous live ownership.
-* S220-R4: xrdp shall retain a stable slot snapshot until input consumption is
+* S136-R4: xrdp shall retain a stable slot snapshot until input consumption is
   complete. The producer shall not modify an owned slot.
-* S220-R5: the complete shared-memory length shall be allocated and physically
+* S136-R5: the complete shared-memory length shall be allocated and physically
   reservable before the session starts. Allocation or backing-store failure
   shall be reported before mapping use and shall never become a later SIGBUS.
-* S220-R6: cleanup shall unmap/close partial allocations and clear ownership.
+* S136-R6: cleanup shall unmap/close partial allocations and clear ownership.
   Existing single-slot capture codes shall retain their old layout.
 
 ## Required tests and gate

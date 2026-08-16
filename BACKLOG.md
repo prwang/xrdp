@@ -26,51 +26,33 @@ stub at the end of this file and points to its record.
   diverges from the pinned xrdp base and predates the current frontier.
 * The five-arm x031–x035 fleet exists on one paired image and all five arms
   certify. Timing claims from runs carrying xorgxrdp's per-frame
-  `ACK_TRACE cap` logger remain quarantined by #108.
-* T4 is decommissioned. Re-provisioning is conditional work in #93.
+  `ACK_TRACE cap` logger remain quarantined by #121.
+* T4 is decommissioned. Re-provisioning is conditional work in #123.
 
 ## Execution order
 
-1. Complete the paired tracer shipping gate (#200).
-2. Repair the evidence instrument and invalid records (#99, #108).
-3. On the dev pair, close every live acceptance claim retained by the PR
-   (#80, #92, and conditionally #93). Commit the exact procedure, paired
-   source and package identities, configuration, workload, instrument and
-   expected checks as the clean-room replay anchor.
-4. Author the clean-room series in order (#210–#226) against the pinned
-   `PRD/` specifications. A red slice never becomes a commit and the next
-   slice does not start. The final paired tree is an immutable candidate, not
-   a frozen history, until it passes exact replays of the anchored live gates.
-5. Post-port exploratory work follows (#88, #94–#96, #98, #103). Its results
-   may start later work; they cannot change or qualify this clean-room series.
+The open list is one chain. Complete #120 through #143 in numeric order; an
+item does not start until its predecessor is closed. #120–#125 finish and
+anchor the development implementation. #126–#142 re-author it as the
+clean-room commit series. #143 is explicitly later architecture work and
+cannot change or qualify that series.
+
+For every dev qualification, commit the exact procedure, paired source and
+package identities, configuration, workload, instrument and expected checks.
+The clean-room run changes no arm, knob or interpretation: it replays that
+anchor on an immutable candidate tree. A red clean-room slice never becomes a
+commit, and the next slice does not start. The final paired tree is not frozen
+history until all retained replays are green.
 
 ---
 
-# Upstream port
+# Active dependency chain
 
-## #105 — paired upstream port umbrella
+## #120 — complete `common/perf_trace` on the dev pair
 
-**Status: IN PROGRESS.** One xrdp PR and its matching xorgxrdp change are
-re-authored from pinned upstream bases as a bisectable commit series. The
-completed base, scope, tracer-format and default decisions are recorded in
-`docs/experiments/105-port-preparation.md`; they are not repeated here.
-
-**Open scope only:** complete #200, then #210–#226 in order. Every
-slice must name its exact files, dependencies, behavior boundary, targeted
-tests, full-suite gates and paired-repository compatibility gate in its
-normative `PRD/slices/` file before implementation begins.
-
-**Acceptance:** every commit is green in both repositories in every build
-mode that exists at that commit; the ordinary xrdp build contains no trace
-footprint; no intermediate commit advertises or selects an incomplete
-backend; the final paired branches pass CI-equivalent checks and retained live
-client gates. Nothing is pushed by the agent.
-
-## #200 — complete `common/perf_trace` on the dev pair
-
-**Status: TODO; blocks cutting the clean-room worktree.** #107 selected and
-installed the named text byte-ring representation. This item owns the still
-open shipping work.
+**Status: TODO; first open item.** #107 selected and installed the named text
+byte-ring representation. This item owns the still-open shipping work and
+must close before any qualification result is collected.
 
 **Dev source:** `common/perf_trace.{c,h}`, `common/trans.{c,h}`,
 `xrdp/xrdp_listen.c`, `xrdp/xrdp_process.c`, the 34 call sites in
@@ -87,9 +69,112 @@ removed and its producer timestamps cross the versioned xup contract into
 xrdp's single ring. Exact rationale and failure modes:
 `docs/experiments/107-private-tracer-is-pr-scope.md`.
 
-## #210 — paired latent GFX H.264 shared-memory isolation fix
+## #121 — make evidence admissible and retire contaminated timings
 
-**Status: TODO; blocked on #200.** Port the pre-existing AVC420/H.264
+**Status: TODO; blocked on #120.** This merges old #99's missing positive
+fleet checks with old #108's mandatory cleanup. No dev qualification starts
+until both halves close.
+
+**Harness scope:** make `PR-demo/mac_bisect_matrix/e_gate_run.sh` compare the
+dialled arm with the collected pod identity and reject too few trace records
+for the declared run duration. Add deterministic positive, wrong-target,
+empty and too-short cases. An empty trace may not mean an idle session.
+
+**Record scope:** enumerate every capture and conclusion carrying
+xorgxrdp's synchronous per-frame `ACK_TRACE cap` logger; delete timing
+captures/records under the instrument-on-path rule; write one replacement
+record naming what was voided; and reopen or withdraw every dependent claim.
+Preserve independently valid bytes, identities, ordering and correctness with
+explicit provenance. Do not run a logger-vs-no-logger arm.
+
+**Acceptance:** the harness fails loudly on both identity and record-presence
+violations; the inventory is complete; no affected timing remains quotable;
+and the replacement record gives #122–#125 an explicit list of results that
+must be re-established.
+
+## #122 — decide the one-active/one-idle monitor regression on valid evidence
+
+**Status: TODO; blocked on #121.** This is a decision check, not approval to
+implement a changed-pixel heuristic. Old #94's 0.91x timing is quarantined
+until #121 classifies it.
+
+**Scope:** on the dev pair, re-run only the one-active/one-idle case and its
+same-sitting two-active control with the valid tracer. Prove which monitors
+carry real changed pixels and report the distribution, not only a mean. State
+the arm count, variable and wall time for approval before running.
+
+**Acceptance:** if the regression does not reproduce, withdraw the
+hypothesis. If it does, decide before #123 whether no one-active/idle slowdown
+is a requirement to implement and test on dev or a documented limitation
+outside this PR. No screen-selection code is added merely to close this item.
+
+## #123 — T4/NVENC compatibility qualification
+
+**Status: TODO; blocked on #122.** Re-provision the real T4 because the
+user-facing configuration says that profile was tested. This item does not
+retain or recreate a numerical T4 throughput claim.
+
+**Scope:** follow the committed deploy procedure with pinned paired package
+hashes and the real NVENC path. Qualify cold and warm behavioral probing,
+required parameter-set transforms, probe-before-confirm selection, no
+post-confirmation codec fallback, supported AVC modes, one and two monitors,
+resize/restart and Windows/macOS rendering. Record exact client, driver,
+ffmpeg, geometry, configuration and trace-build identities.
+
+**Acceptance:** every supported advertised mode negotiates and renders on the
+real hardware without fallback; cold start and resize either pass or produce
+the specified loud pre-confirmation refusal; byte audits and client checks are
+green. The historical 47–74 ms bimodality and E5-2 ratio are out of scope.
+
+## #124 — credit-frontier client qualification
+
+**Status: TODO; blocked on #123.** The mechanism, frozen-client behavior and
+`C + 2M` bound are anchored by dev tests and recorded in
+`docs/experiments/80-the-credit-frontier.md` and
+`docs/experiments/91-the-multimon-window-and-the-shared-pump.md`.
+
+**Scope:** complete the written six-check visual qualification on identified
+macOS and Windows client products on the dev pair; pin the artifacts and
+expected checks for clean-room replay; and state any upstream performance
+claim as one-monitor only. Do not reopen window tuning: the shipped decision
+is `wire_window=1`, `eager_slot_ack=true`; value 2 is maintainer guidance, not
+a second default.
+
+**Acceptance:** all six checks pass on both named clients, the run identity is
+admissible under #121, and the complete replay procedure is committed before
+#125 starts.
+
+## #125 — sparse-chroma client and bandwidth qualification
+
+**Status: TODO; blocked on #124.** The byte mechanism and offline model are
+anchored by dev tests and recorded in
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
+
+**Scope:** certify an alternating LC=1 / optional LC=2 stream on macOS and
+Windows before quoting rate; rerun the decomposed bandwidth pair with valid
+instrumentation; perform the still-screen 4:4:4 visual check; and pin the
+artifacts and expected checks for clean-room replay. The guarantee is
+`chroma_refresh_ms` plus one frame interval; no extra heuristic is in scope.
+
+**Acceptance:** both clients tolerate the alternating stream, the still image
+restores full-chroma detail, the byte/rate decomposition closes, and the
+committed replay gate is green. A red result is fixed and independently
+tested on dev before #126 starts.
+
+---
+
+# Clean-room commit series
+
+Every slice below is one commit and is blocked on the immediately preceding
+item. Its `PRD/slices/` file is the unique normative implementation and test
+specification. Every commit must be green in both repositories in every build
+mode available at that point; the ordinary xrdp build contains no trace
+footprint; no intermediate commit advertises an incomplete backend; and
+nothing is pushed by the agent.
+
+## #126 — paired latent GFX H.264 shared-memory isolation fix
+
+**Status: TODO; blocked on #125.** Port the pre-existing AVC420/H.264
 multi-monitor plane-overwrite fix before any AVC444 feature.
 
 **Dev source:** xrdp `common/xup_client_info.h`, `xrdp/xrdp_encoder.c`,
@@ -99,25 +184,25 @@ multi-monitor plane-overwrite fix before any AVC444 feature.
 **Acceptance:** standalone behavior for upstream-reachable `CC_GFX_A2`; each
 monitor owns a disjoint region; protocol version and both repositories agree;
 single- and multi-monitor layout tests plus paired builds are green. Normative
-specification: [`PRD/slices/210-shmem-isolation.md`](PRD/slices/210-shmem-isolation.md).
+specification: [`PRD/slices/126-shmem-isolation.md`](PRD/slices/126-shmem-isolation.md).
 
-## #211 — generic compile-time performance tracer foundation
+## #127 — generic compile-time performance tracer foundation
 
-**Status: TODO; blocked on #200.** Re-author the completed generic
+**Status: TODO; blocked on #126.** Re-author the completed generic
 facility without AVC events or diagnostic xup payloads.
 
 **Dev source:** `common/perf_trace.{c,h}` and
-`tests/common/test_perf_trace.c`; lifecycle shape comes from #200. The
-transport queue counter belongs to #224, not this generic slice.
+`tests/common/test_perf_trace.c`; lifecycle shape comes from #120. The
+transport queue counter belongs to #140, not this generic slice.
 
 **Acceptance:** the slice is independently usable; default builds contain no
 trace symbols, strings, state or argument evaluation; enabled builds pass all
 generic lifecycle/security/format/concurrency tests. Normative specification:
-[`PRD/slices/211-perf-trace-foundation.md`](PRD/slices/211-perf-trace-foundation.md).
+[`PRD/slices/127-perf-trace-foundation.md`](PRD/slices/127-perf-trace-foundation.md).
 
-## #212 — paired AVC capture and diagnostic wire contract
+## #128 — paired AVC capture and diagnostic wire contract
 
-**Status: TODO; blocked on #211.** Add the capture capability, versioned xup
+**Status: TODO; blocked on #127.** Add the capture capability, versioned xup
 layout/geometry primitives and optional producer-timestamp fields. No AVC
 backend is selectable.
 
@@ -128,11 +213,11 @@ backend is selectable.
 **Acceptance:** bounds/overflow and serialization tests cover both trace build
 modes; older peers reject incompatible structure versions cleanly; paired
 headers and builds agree. Normative specification:
-[`PRD/slices/212-capture-wire-contract.md`](PRD/slices/212-capture-wire-contract.md).
+[`PRD/slices/128-capture-wire-contract.md`](PRD/slices/128-capture-wire-contract.md).
 
-## #213 — full-chroma view construction and producer packing
+## #129 — full-chroma view construction and producer packing
 
-**Status: TODO; blocked on #212.** Port v1, v2 and main-only AVC420 view
+**Status: TODO; blocked on #128.** Port v1, v2 and main-only AVC420 view
 construction, coded alignment, padding and the vectorized xorgxrdp producer.
 The backend remains unadvertised.
 
@@ -144,11 +229,11 @@ The backend remains unadvertised.
 alignment and AVC420-loss vectors pass; xorgxrdp packed bytes are checked
 against the independent xrdp oracle; scalar and vector paths are identical.
 Normative specification:
-[`PRD/slices/213-view-construction.md`](PRD/slices/213-view-construction.md).
+[`PRD/slices/129-view-construction.md`](PRD/slices/129-view-construction.md).
 
-## #214 — bounded standard-NUT demuxer
+## #130 — bounded standard-NUT demuxer
 
-**Status: TODO; blocked on #200.** Port the independent standard-NUT subset as
+**Status: TODO; blocked on #129.** Port the independent standard-NUT subset as
 a pure leaf.
 
 **Dev source:** `xrdp/xrdp_nut.{c,h}`, `tests/xrdp/test_avc444_nut.c`,
@@ -156,11 +241,11 @@ a pure leaf.
 
 **Acceptance:** valid fixture, byte fragmentation, truncation, CRC, file-id
 and total-ceiling cases pass; no server caller exists. Normative specification:
-[`PRD/slices/214-nut-demuxer.md`](PRD/slices/214-nut-demuxer.md).
+[`PRD/slices/130-nut-demuxer.md`](PRD/slices/130-nut-demuxer.md).
 
-## #215 — Annex-B validation and parameter-set policy
+## #131 — Annex-B validation and parameter-set policy
 
-**Status: TODO; blocked on #200.** Port bounded Annex-B inspection plus the
+**Status: TODO; blocked on #130.** Port bounded Annex-B inspection plus the
 recorded SPS/SEI interoperability transforms used by current hardware
 profiles. LTR rewriting is not in this slice.
 
@@ -170,11 +255,11 @@ in `tests/xrdp/test_avc444_h264.c`.
 **Acceptance:** reset packet, missing/duplicate parameter sets, malformed NAL,
 HRD sanitization and `pic_struct` vectors pass. Explicit `fault_*` injections
 remain dev-only. Normative specification:
-[`PRD/slices/215-annexb-and-parameter-policy.md`](PRD/slices/215-annexb-and-parameter-policy.md).
+[`PRD/slices/131-annexb-and-parameter-policy.md`](PRD/slices/131-annexb-and-parameter-policy.md).
 
-## #216 — pure AVC capability classification
+## #132 — pure AVC capability classification
 
-**Status: TODO; blocked on #200.** Port client-capability classification and
+**Status: TODO; blocked on #131.** Port client-capability classification and
 server mode choice as pure logic. Do not advertise a live backend.
 
 **Dev source:** `xrdp/xrdp_avc444_caps.{c,h}` and
@@ -182,11 +267,11 @@ server mode choice as pure logic. Do not advertise a live backend.
 
 **Acceptance:** table-driven v8/v8.1/v10.0/v10.1/v10.2–10.7, AVC-disabled,
 unknown-version and v2-support cases pass. Normative specification:
-[`PRD/slices/216-capability-classifier.md`](PRD/slices/216-capability-classifier.md).
+[`PRD/slices/132-capability-classifier.md`](PRD/slices/132-capability-classifier.md).
 
-## #217 — secure ffmpeg runner and behavioral probe
+## #133 — secure ffmpeg runner and behavioral probe
 
-**Status: TODO; blocked on #213/#214/#215.** Port spawn, descriptor layout,
+**Status: TODO; blocked on #132.** Port spawn, descriptor layout,
 nonblocking pipe pump, bounded collection, termination/reaping, static
 `dump_extra` verification, one-frame `probesize`, pipe-size negotiation and
 failure classification. LTR and multi-monitor pump-set behavior are later.
@@ -198,11 +283,11 @@ failure classification. LTR and multi-monitor pump-set behavior are later.
 **Acceptance:** pure and real-ffmpeg gates cover probe success, header-policy
 mismatch, duplicate headers, timeout, synchronous pair/single identity,
 resize/reap and small-geometry startup. Normative specification:
-[`PRD/slices/217-ffmpeg-runner.md`](PRD/slices/217-ffmpeg-runner.md).
+[`PRD/slices/133-ffmpeg-runner.md`](PRD/slices/133-ffmpeg-runner.md).
 
-## #218 — inactive server encoder integration
+## #134 — inactive server encoder integration
 
-**Status: TODO; blocked on #213/#216/#217.** Add internal encoder ownership,
+**Status: TODO; blocked on #133.** Add internal encoder ownership,
 mode state and dispatch without making the backend selectable or advertising
 an AVC capability.
 
@@ -212,11 +297,11 @@ an AVC capability.
 **Acceptance:** existing x264/OpenH264 paths are unchanged; internal
 AVC420/444 transactions are unit-testable; no configuration or capability can
 reach the new path. Normative specification:
-[`PRD/slices/218-inactive-encoder-integration.md`](PRD/slices/218-inactive-encoder-integration.md).
+[`PRD/slices/134-inactive-encoder-integration.md`](PRD/slices/134-inactive-encoder-integration.md).
 
-## #219 — LC=1/LC=2 wire serialization
+## #135 — LC=1/LC=2 wire serialization
 
-**Status: TODO; blocked on #218.** Add AVC420 and AVC444 serializers. AVC444
+**Status: TODO; blocked on #134.** Add AVC420 and AVC444 serializers. AVC444
 is born as luma LC=1 followed by chroma LC=2; LC=0 never enters history.
 
 **Dev source:** serializer portions of `xrdp/xrdp_encoder.{c,h}` and
@@ -225,11 +310,11 @@ is born as luma LC=1 followed by chroma LC=2; LC=0 never enters history.
 **Acceptance:** exact metablock, even-origin/even-extent, region, codec-id and
 two-PDU byte vectors pass; the backend remains unadvertised. Normative
 specification:
-[`PRD/slices/219-avc-wire-serialization.md`](PRD/slices/219-avc-wire-serialization.md).
+[`PRD/slices/135-avc-wire-serialization.md`](PRD/slices/135-avc-wire-serialization.md).
 
-## #220 — two-slot capture and fail-early shared memory
+## #136 — two-slot capture and fail-early shared memory
 
-**Status: TODO; blocked on #212/#213.** Port two slots per monitor, per-monitor
+**Status: TODO; blocked on #135.** Port two slots per monitor, per-monitor
 slot rotation, snapshot ownership and up-front backing-store reservation.
 
 **Dev source:** `common/os_calls.c`, `common/xup_client_info.h`, capture portions
@@ -240,11 +325,11 @@ of `xrdp/xrdp_encoder.{c,h}` and `xrdp/xrdp_mm.c`,
 **Acceptance:** layout, alternation, capacity, failure-before-session and
 paired ownership tests pass; allocation failure cannot become a later SIGBUS.
 Normative specification:
-[`PRD/slices/220-two-slot-capture.md`](PRD/slices/220-two-slot-capture.md).
+[`PRD/slices/136-two-slot-capture.md`](PRD/slices/136-two-slot-capture.md).
 
-## #221 — reference-safe AVC444 topology
+## #137 — reference-safe AVC444 topology
 
-**Status: TODO; blocked on #215/#217/#219.** Port the mandatory decode-topology
+**Status: TODO; blocked on #136.** Port the mandatory decode-topology
 invariant: main pictures never reference auxiliary pictures; auxiliary IDRs
 become non-IDR intra leaves on the shared chain.
 
@@ -254,11 +339,11 @@ become non-IDR intra leaves on the shared chain.
 
 **Acceptance:** golden leaf vectors, malformed/truncated rejection and both
 decoder-topology simulations pass. Normative specification:
-[`PRD/slices/221-reference-safe-topology.md`](PRD/slices/221-reference-safe-topology.md).
+[`PRD/slices/137-reference-safe-topology.md`](PRD/slices/137-reference-safe-topology.md).
 
-## #222 — long-term-reference chain, re-key and scheduled intra refresh
+## #138 — long-term-reference chain, re-key and scheduled intra refresh
 
-**Status: TODO; blocked on #221.** Port per-view LT0/LT1 rewriting, bounded
+**Status: TODO; blocked on #137.** Port per-view LT0/LT1 rewriting, bounded
 frame-number re-key without surface churn, and independent scheduled main/aux
 intra refresh.
 
@@ -270,11 +355,11 @@ LTR/re-key/intra cases in `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 **Acceptance:** golden bytes, Windows-field cross-check, both decode modes,
 sparse cadence, wrap/restart, observed-vs-requested cuts and live real-ffmpeg
 cut cases pass. Normative specification:
-[`PRD/slices/222-ltr-rekey-intra.md`](PRD/slices/222-ltr-rekey-intra.md).
+[`PRD/slices/138-ltr-rekey-intra.md`](PRD/slices/138-ltr-rekey-intra.md).
 
-## #223 — one-thread multi-monitor pump set and batch emission
+## #139 — one-thread multi-monitor pump set and batch emission
 
-**Status: TODO; blocked on #220/#222.** Port one encoder pair per monitor,
+**Status: TODO; blocked on #138.** Port one encoder pair per monitor,
 one poll set over all children, shared deadline, per-monitor geometry/LTR state
 and inline batch assembly. The removed emit thread does not return.
 
@@ -286,11 +371,11 @@ and inline batch assembly. The removed emit thread does not return.
 **Acceptance:** independent monitor identity/state, sequence zero, unarmed and
 failure states, four-view pump-set and two-monitor live correctness pass.
 Normative specification:
-[`PRD/slices/223-multimon-pump-set.md`](PRD/slices/223-multimon-pump-set.md).
+[`PRD/slices/139-multimon-pump-set.md`](PRD/slices/139-multimon-pump-set.md).
 
-## #224 — paired credit frontier and split acknowledgement
+## #140 — paired credit frontier and split acknowledgement
 
-**Status: TODO; blocked on #220/#223.** Port per-monitor capture admission,
+**Status: TODO; blocked on #139.** Port per-monitor capture admission,
 slot-only acknowledgements, separate region frontier, bounded wire credit and
 trace-only transport queue accounting. Shipped `wire_window` is 1;
 `eager_slot_ack` is on.
@@ -304,11 +389,11 @@ frontier portions of `xrdp/xrdp_encoder.{c,h}`, `xrdp/xrdp_mm.c`,
 **Acceptance:** every credit term, monotonicity, frozen client, C+2M bound,
 slot/region separation, dropped-region return, per-monitor mask and paired
 wire serialization pass. Normative specification:
-[`PRD/slices/224-credit-frontier.md`](PRD/slices/224-credit-frontier.md).
+[`PRD/slices/140-credit-frontier.md`](PRD/slices/140-credit-frontier.md).
 
-## #225 — sparse auxiliary cadence
+## #141 — sparse auxiliary cadence
 
-**Status: TODO; blocked on #222/#224; live acceptance also depends on #92.**
+**Status: TODO; blocked on #140.**
 Port time-based chroma refresh/idle scheduling and skip auxiliary submission
 before it can advance the encoder DPB.
 
@@ -319,14 +404,14 @@ before it can advance the encoder DPB.
 `test_avc444_ltr.c`, `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 
 **Acceptance:** disabled equivalence, refresh-plus-one-frame bound, settle/rate
-clamps, independent intra schedules and DPB continuity pass; #92's real-client
+clamps, independent intra schedules and DPB continuity pass; #125's real-client
 gates are green before the slice is accepted for handoff. Normative
 specification:
-[`PRD/slices/225-sparse-chroma.md`](PRD/slices/225-sparse-chroma.md).
+[`PRD/slices/141-sparse-chroma.md`](PRD/slices/141-sparse-chroma.md).
 
-## #226 — configuration, activation, operating docs and final paired gate
+## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: TODO; blocked on #210–#225.** Make the fully assembled backend
+**Status: TODO; blocked on #141.** Make the fully assembled backend
 selectable only here. Add the user-facing configuration and documentation for
 the mechanisms already green; do not port `tail_flush` or explicit fault
 injection.
@@ -340,139 +425,19 @@ activation, probe-before-confirm, no fallback, resize lifecycle and all three
 real clients plus multi-monitor pass on builds made from the clean-room paired
 branches. Default and trace-enabled CI-equivalent matrices are green.
 Normative specification:
-[`PRD/slices/226-activation-and-docs.md`](PRD/slices/226-activation-and-docs.md).
+[`PRD/slices/142-activation-and-docs.md`](PRD/slices/142-activation-and-docs.md).
 
----
+## #143 — host pipe setting, comparable baselines and zero-copy decision
 
-# Pre-freeze qualification
-
-These items do not block offline re-authoring, but they do block freezing or
-handing off the slice whose retained claim they test. A dev anchor means a
-green result tied to identified paired commits and package hashes, a committed
-procedure/configuration/workload/instrument, and explicit expected checks.
-The clean-room run changes no arm, knob or interpretation: it replays that
-anchor on an immutable candidate tree. A gate that can still discover a
-product decision or an unbounded implementation defect is not a replay and
-must be completed on dev first.
-
-## #80 — credit-frontier qualification still owed
-
-**Status: PRE-FREEZE DEV QUALIFICATION; does not block offline re-authoring
-#224, but blocks freezing its retained client claim.** The mechanism,
-one-monitor attribution, frozen-client behavior and C+2M bound are anchored by
-the dev tests and recorded in `docs/experiments/80-the-credit-frontier.md` and
-`docs/experiments/91-the-multimon-window-and-the-shared-pump.md`.
-
-**Open:** complete the written six-check visual qualification on identified
-macOS and Windows client products on the dev pair; pin its artifacts and
-expected checks for clean-room replay; and state the upstream performance
-claim as one-monitor only unless new two-monitor evidence supports more. The
-shipped decision is already settled: `wire_window=1`,
-`eager_slot_ack=true`; value 2 is maintainer-facing optional guidance, not a
-second default.
-
-## #92 — sparse-chroma real-client and bandwidth acceptance
-
-**Status: PRE-FREEZE DEV QUALIFICATION; blocks freezing #225, not its offline
-re-authoring.** The byte mechanism and offline model are anchored by the dev
-tests and recorded in
-`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
-
-**Open:** certify an alternating LC=1 / optional LC=2 stream on macOS and
-Windows on the dev pair before quoting rate; rerun the decomposed bandwidth
-pair with valid instrumentation; perform the still-screen 4:4:4 visual check;
-and pin those artifacts and expected checks for clean-room replay. The
-guarantee is `chroma_refresh_ms` plus one frame interval; no extra heuristic
-is in scope.
-
-## #93 — T4 re-establishment and conditional hardware claims
-
-**Status: CONDITIONAL PRE-FREEZE DEV QUALIFICATION.** Re-provision the T4 only
-if the PR retains NVENC/T4 performance or live-compatibility claims. Qualify
-the dev pair before clean-room freeze, pin the result for exact replay, follow
-the committed deploy procedure, use the real hardware path, match bytes per
-picture across paired arms, and resolve or bound the recorded bimodality.
-
-## #99 — evidence gate must prove target identity and record presence
-
-**Status: TODO; blocks all new pre-freeze fleet evidence.** `e_gate_run.sh`
-must compare the dialled arm with the collected pod identity and reject too
-few trace records for the run duration. An empty trace may not be interpreted
-as an idle session. No measurement campaign starts until both positive checks
-pass.
-
-## #108 — retire timing evidence containing xorgxrdp's per-frame logger
-
-**Status: TODO; blocks quoting affected timings and timing qualification.**
-Enumerate all captures and derived conclusions carrying `ACK_TRACE cap`;
-delete timing captures/records as required for an instrument on the measured
-path; write one replacement record naming what was voided; reopen every
-dependent conclusion. Preserve independently valid bytes, identity, ordering
-and correctness evidence with explicit provenance. Do not run a
-logger-vs-no-logger arm. The source removal is #200.
-
----
-
-# Post-port exploratory work
-
-These items are outside the current clean-room series. They are not evidence
-needed to accept it, and a result cannot cause a fixup to #210–#226. If one
-finds a worthwhile behavior or architecture change, that change starts a new
-specified, tested commit series after this PR.
-
-## #88 — attribute the oracle client's 50–150 ms pauses
-
-**Status: TODO; post-port.** Host CPU contention and dump I/O are ruled out.
-Use the cheapest existing instrument: client timing logs, then a bounded
-per-PID `perf record`, then a one-line `/proc/<pid>/stat` delta. Do not add a
-sampler or alter socket buffers. This does not block or qualify the server
-port.
-
-## #94 — arm only monitors with changed pixels
-
-**Status: TODO; post-port.** Prevent an idle monitor's repeated full damage
-from holding an active monitor. Never drop a real update. Acceptance remains
-the recorded one-active-monitor regression returning to at least 1.0x while
-the two-active-monitor result stays within noise, with no screen starved over
-180 seconds.
-
-## #95 — attribute and improve the capture-side handoff
-
-**Status: TODO; post-port.** Determine the per-monitor floor between one
-terminal frame and the next damage and whether both monitors can be handed
-over in one producer cycle. The producer side in `/workUpdateXorgXrdp` is
-mandatory reading; xrdp-only attribution is not accepted.
-
-## #96 — move capture packing off the X server thread
-
-**Status: TODO; post-port.** Evaluate handing xrdp a raw stable snapshot and
-packing on the encoder side. Preserve the current vectorized arithmetic and
-wire bytes. This is an ownership/critical-path change, not a reason to retune
-code outside the repository.
-
-## #98 — transport policy and adaptive-rate roadmap
-
-**Status: OPEN DECISIONS; post-port.** Tier-0 findings live in
-`docs/experiments/98-tier0-bbr-ab.md`; the field survey is
-`docs/research/flow-control-survey-2026-08.md`.
-
-**Open:** decide whether p95/p99 delivery delay, stall rate and quality-delay
-Pareto become normative figures of merit; whether to prototype userspace
-frame pacing/`TCP_NOTSENT_LOWAT`; and whether encoder rate adaptation enters
-the roadmap. The owed LAN and C>1 transport measurements are evidence work,
-not clean-room implementation prerequisites.
-
-## #103 — host pipe setting, comparable baselines and zero-copy decision
-
-**Status: OPEN ENVIRONMENT/ARCHITECTURE; source guard done.** The implemented
-64 KiB pipe requirement and its evidence are in
+**Status: TODO; blocked on #142; outside the port.** The implemented 64 KiB
+pipe requirement and its evidence are in
 `docs/experiments/103-pipe-size-and-host-limit.md`.
 
 **Open:** make or deliberately decline host sysctl persistence; re-establish
 any baseline used across the sysctl boundary; separately decide whether the
 roughly 1.4 ms pipe machinery plus unavoidable copy justifies abandoning the
-stock-ffmpeg child architecture. These do not block or qualify porting the
-fail-loud runner guard; abandoning that architecture would be a later series.
+stock-ffmpeg child architecture. This cannot change or qualify #126–#142;
+abandoning that architecture starts a later normative series.
 
 ---
 
@@ -484,25 +449,29 @@ The record, not this table, owns conditions, measurements and retractions.
 |---|---|---|
 | #45 | One-thread pump-set and per-monitor budget landed; E5 closed through #52. | `docs/experiments/45-intra-refresh-and-pump-set.md` |
 | #52 | Saturated-payload E5-2 reached 2.13x. | `docs/experiments/52-e5-2-saturated-payload.md` |
-| #55 | T4 E5-2 recorded AMBER; later claims moved to conditional #93. | `docs/experiments/55-e5-2-on-the-t4.md` |
-| #59/#60 | T4 attribution corrected; unresolved bimodality moved to #93. | `docs/experiments/59-61-corrected-attribution.md` |
+| #55 | T4 E5-2 recorded AMBER; #123 retains compatibility, not its numerical rerun. | `docs/experiments/55-e5-2-on-the-t4.md` |
+| #59/#60 | T4 attribution corrected; the unresolved timing bimodality is outside #123. | `docs/experiments/59-61-corrected-attribution.md` |
 | #61 | GLAMOR on NVIDIA closed-wontfix after real-path black output. | `docs/experiments/61-glamor-on-nvidia.md` |
 | #61h | Per-frame xrdp logging evidence was voided; the ring replacement landed. | `docs/experiments/61h-the-logger-was-in-the-measurement.md` |
 | #62 | Original textflood result recorded RED and producer-confounded; #83 supplied the replacement payload. | `docs/experiments/62-textflood-payload.md` |
 | #64 | The rect-id ghost hypothesis was refuted. | `docs/experiments/64-rect-id-ack-ghost.md` |
-| #70 | Eager slot release established the mechanism later generalized by #80/#224. | `docs/experiments/70-eager-slot-release-ack.md` |
+| #70 | Eager slot release established the mechanism later generalized by #124/#140. | `docs/experiments/70-eager-slot-release-ack.md` |
 | #75 | LTR rewriting changed from rebuild to payload copy with byte-identical output. | `docs/experiments/75-the-rewrite-was-re-serialising-the-picture.md` |
 | #78 | Split-pump attribution moved the remaining stall to withheld capture credit. | `docs/experiments/78-pump-split-fif1-tail-is-the-ack-gated-slot-release.md` |
-| #79 | The unbounded horizon proposal was rejected and superseded by #80. | `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md` |
+| #79 | The unbounded horizon proposal was rejected and superseded by #124. | `docs/experiments/79-layer1-the-ack-delay-sweep-confirms-the-withheld-slot-credit.md` |
 | #81 | The netem harness was corrected and retained for mechanism tests only. | `docs/experiments/81-the-netem-rtt-harness.md` |
 | #87 | Emit-split requirement retired because its premise measured per-frame logging. | `docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md` |
+| #88 | Oracle-client pause attribution withdrawn; same-sitting controls own port evidence. | `docs/experiments/88-client-pauses-are-not-a-port-gate.md` |
 | #90 | PRD-violating stage threads withdrawn after the prize fell to about 1.25 ms. | `docs/experiments/90-the-eight-ms-prize-was-stale.md` |
-| #91 | Window arithmetic and encoder overlap resolved; producer cadence moved to post-port work. | `docs/experiments/91-the-multimon-window-and-the-shared-pump.md` |
+| #91 | Window arithmetic and encoder overlap resolved; its optional producer-cadence follow-up was withdrawn with #95. | `docs/experiments/91-the-multimon-window-and-the-shared-pump.md` |
+| #95 | Capture-handoff 1.5x target withdrawn as optional optimization. | `docs/experiments/95-capture-handoff-target-withdrawn.md` |
+| #96 | Moving packing across xup withdrawn as architectural scope expansion. | `docs/experiments/96-pack-off-x-thread-withdrawn.md` |
+| #98 | Open transport/adaptation roadmap withdrawn; old timing awaits #121 audit. | `docs/experiments/98-tier0-bbr-ab.md` |
 | #100 | Emit thread removed; inline assembly and old-key warning remain. | `docs/experiments/100-the-emit-thread-bought-nothing.md` |
 | #102 | Client 33-pixel offset documented and closed below the port. | `docs/experiments/102-client-display-offset.md` |
 | #103(a) | Pipe-size negotiation and the 64 KiB fail-loud guard landed. | `docs/experiments/103-pipe-size-and-host-limit.md` |
 | #104 | Five one-image arms built and certified; the stale x035-red paragraph is superseded. | `docs/experiments/104-pr-evidence-matrix.md` |
-| #105 preparation | Base, one-PR, tracer and default decisions completed; implementation remains #200+. | `docs/experiments/105-port-preparation.md` |
-| #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |
+| #105 | Umbrella closed after preparation; its remaining work is the linear #120–#142 chain. | `docs/experiments/105-port-preparation.md` |
 | #106 | External trace equivalence closed RED: 13/34 semantic records had no exact mapping. | `docs/experiments/106-perf-isolation-and-trace-equivalence.md` |
-| #107 | Named text byte ring selected and installed; shipping lifecycle moved to #200. | `docs/experiments/107-private-tracer-is-pr-scope.md` |
+| #107 | Named text byte ring selected and installed; shipping lifecycle moved to #120. | `docs/experiments/107-private-tracer-is-pr-scope.md` |
+| #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |

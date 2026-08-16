@@ -117,3 +117,17 @@ less than modeled (ratio 0.61 vs the 0.70–0.90 band). Practical
 corollary recorded in the capture README: at 40 ms / 200 Mbit, today's
 build is already inside a 100–150 ms interactivity budget at 1080p
 (91 ms), marginal at 1440p (167 ms), not at 4K (436 ms).
+
+---
+
+## Withdrawal of open roadmap work — 2026-08-16
+
+The open LAN/C>1 legs, userspace pacing, `TCP_NOTSENT_LOWAT` and encoder-rate
+adaptation do not qualify the current port. The shipped credit default is
+settled, while pacing and adaptation require their own product objective and
+normative design. Those open tasks are withdrawn from the active backlog.
+
+#121 still decides which timing statements above survive the synchronous
+per-frame-logger audit. No #98 timing is rerun for this PR. If WAN
+quality/latency becomes a later product goal, that work starts a new series and
+re-establishes a valid baseline rather than reopening this item.

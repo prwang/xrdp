@@ -1,4 +1,4 @@
-# Slice #226 — Configuration, activation and final gate
+# Slice #142 — Configuration, activation and final gate
 
 ## Commit boundary
 
@@ -22,25 +22,25 @@ capability-response seam but shall not introduce a new mechanism there.
 
 ## Requirements
 
-* S226-R1: the backend is opt-in through an `[avc444_ffmpeg]` table and codec
+* S142-R1: the backend is opt-in through an `[avc444_ffmpeg]` table and codec
   order. Absence of the table preserves the base behavior exactly.
-* S226-R2: before RDPGFX confirmation, resolve requested mode with #216 and run
-  #217's behavioral probe. Advertise/select only a mode supported by client,
+* S142-R2: before RDPGFX confirmation, resolve requested mode with #132 and run
+  #133's behavioral probe. Advertise/select only a mode supported by client,
   configuration and probe. The selected mode is immutable afterward.
-* S226-R3: document and validate executable path, bounded encoder argv,
+* S142-R3: document and validate executable path, bounded encoder argv,
   `avc_mode` (`auto`, forced AVC444, forced v1, forced AVC420),
   `chroma_align` (16 or 32), `dump_extra`, `strip_sei`, `sanitize_hrd`,
   `strip_pic_struct`, `aux_ltr_chain`, `ltr_rekey_frame_num`,
   `ltr_rekey_surface_reset`, independent main/aux intra intervals, eager slot
   acknowledgement, wire window and sparse-chroma intervals.
-* S226-R4: defaults shall be `avc_mode=auto`, `chroma_align=32`,
+* S142-R4: defaults shall be `avc_mode=auto`, `chroma_align=32`,
   `eager_slot_ack=true`, `wire_window=1`, sparse chroma disabled, and optional
   interoperability/LTR transforms disabled. An operator may enable the
   documented transforms required by a hardware profile. The executable path
   defaults to `/usr/bin/ffmpeg`; the built-in argv is `-c:v`, `libx264`,
   `-bf`, `0`, `-preset`, `ultrafast`, `-tune`, `zerolatency`, `-crf`, `18`,
   `-g`, `240`, `-x264-params`, `repeat-headers=1:aud=1`.
-* S226-R5: invalid mode, alignment, window, interval, dependency or argument
+* S142-R5: invalid mode, alignment, window, interval, dependency or argument
   shall produce a clear warning/error and keep the backend unavailable or the
   documented safe default. It shall never be silently clamped into a
   materially different requested behavior.
@@ -50,15 +50,15 @@ capability-response seam but shall not introduce a new mechanism there.
   built-in default; excess tokens are ignored only with an explicit warning.
   Re-key accepts 64 through 65024 and defaults to 65024; each nonzero intra
   interval accepts 24 through 4096 and defaults to 250.
-* S226-R6: the removed `emit_thread` key shall produce one migration warning
+* S142-R6: the removed `emit_thread` key shall produce one migration warning
   and have no effect. `tail_flush`, `fault_aux_delay` and
   `fault_strip_mmco` shall not be accepted or documented.
   `ltr_rekey_surface_reset` defaults false; true is documented only as a
   diagnostic reproduction of the known client-visible surface-churn flash,
   not as the normal wrap-protection mechanism.
-* S226-R7: runtime failure shall not switch codec. It shall preserve damage,
+* S142-R7: runtime failure shall not switch codec. It shall preserve damage,
   tear down children and fail the affected connection/path visibly.
-* S226-R8: the man page and sample config shall state process cardinality,
+* S142-R8: the man page and sample config shall state process cardinality,
   required host pipe capacity, security model, resize behavior, multi-monitor
   support, shipped credit values, sparse guarantee and trace build option.
   Trace instructions shall name `XRDP_PERF_TRACE=<prefix>` as the sink arm,
