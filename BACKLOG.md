@@ -9,21 +9,19 @@ requirements live in `PRD/`; per-run evidence stays with its capture under
 Do not add result tables or completed narratives here. A closed item keeps one
 stub at the end of this file and points to its record.
 
-## Current repository state — 2026-08-17
+## Current repository state — 2026-08-22
 
 * `/work` and `/workUpdateXorgXrdp` are both on
-  `dev/avc444_metablock_checkpoint`; the inventoried source frontiers are
-  xrdp `356a5e1d` and xorgxrdp `10fa3aa`. Documentation commits sit above the
-  xrdp source frontier and do not change the port inventory. The working
-  trees now also contain the completed, uncommitted #120 trace lifecycle and
-  producer-logger removal.
+  `dev/avc444_metablock_checkpoint`; the committed dev-qualification
+  frontiers are xrdp `00bce44e` and xorgxrdp `c190343`. They include the
+  completed #120 trace lifecycle and producer-logger removal.
 * The xrdp clean-room base is pinned to
   `fe850a22c08a624c66bbac07e310251782e6f828`. Its compatibility audit is
   complete and found no breaking AVC API, configuration or wire change.
 * The xorgxrdp clean-room base is pinned to
   `49bf2dd3546dc48b9d5bae62022762fde11793d0`. The paired compatibility audit
   found no upstream capture/xup contract change to reconcile; the development
-  branch's 13 commits are the feature inventory, not base drift.
+  branch's 14 commits are the feature inventory, not base drift.
 * The old `/work-PR` branch at `c74a09e7` is an abandoned reference. It
   diverges from the pinned xrdp base and predates the current frontier.
 * The five-arm x031–x035 baseline fleet and the paired x036/x037 #122
@@ -87,22 +85,28 @@ a second default.
 admissible under #121, and the complete replay procedure is committed before
 #125 starts.
 
-## #125 — sparse-chroma client and bandwidth qualification
+## #125 — sparse-chroma client qualification
 
 **Status: TODO; blocked on #124.** The byte mechanism and offline model are
 anchored by dev tests and recorded in
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
 
-**Scope:** certify an alternating LC=1 / optional LC=2 stream on macOS and
-Windows before quoting rate; rerun the decomposed bandwidth pair with valid
-instrumentation; perform the still-screen 4:4:4 visual check; and pin the
-artifacts and expected checks for clean-room replay. The guarantee is
-`chroma_refresh_ms` plus one frame interval; no extra heuristic is in scope.
+**Scope:** on the dev pair, certify on identified macOS and Windows clients a
+stream which contains both main-only cycles and main-plus-auxiliary cycles.
+Make the intervention observable with an admissible wire audit: report LC=1
+and LC=2 command counts and transmitted bytes, and verify that their sum is
+the audited video-command total. This is byte accounting, not a bandwidth or
+frame-rate claim. Perform the still-screen 4:4:4 visual check, then record the
+exact artifacts, procedure and expected checks for later clean-room replay.
+The guarantee is `chroma_refresh_ms` plus one actual frame interval; no extra
+heuristic is in scope.
 
-**Acceptance:** both clients tolerate the alternating stream, the still image
-restores full-chroma detail, the byte/rate decomposition closes, and the
-committed replay gate is green. A red result is fixed and independently
-tested on dev before #126 starts.
+**Acceptance:** both clients render the alternating stream correctly; the
+still image restores full-chroma detail; the trace confirms the chroma-gap
+bound; both command classes occur and their byte accounting closes exactly;
+the run identity is admissible under #121; and the complete replay procedure
+and expected results are recorded in-tree. A red result is fixed and
+independently tested on dev before #126 starts.
 
 ---
 
@@ -347,9 +351,9 @@ before it can advance the encoder DPB.
 `test_avc444_ltr.c`, `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 
 **Acceptance:** disabled equivalence, refresh-plus-one-frame bound, settle/rate
-clamps, independent intra schedules and DPB continuity pass; #125's real-client
-gates are green before the slice is accepted for handoff. Normative
-specification:
+clamps, independent intra schedules and DPB continuity pass. This internal
+slice has no real-client replay; the activated candidate replays #125 only in
+#142. Normative specification:
 [`PRD/slices/141-sparse-chroma.md`](PRD/slices/141-sparse-chroma.md).
 
 ## #142 — configuration, activation, operating docs and final paired gate
@@ -366,8 +370,9 @@ injection.
 **Acceptance:** bounds/refusals/defaults, removed-key warning, capability
 activation, probe-before-confirm, no fallback, resize lifecycle and all three
 real clients plus multi-monitor pass on builds made from the clean-room paired
-branches. Default and trace-enabled CI-equivalent matrices are green.
-Normative specification:
+branches. The frozen #124 and #125 client procedures pass without changing
+their arms, checks or interpretation. Default and trace-enabled CI-equivalent
+matrices are green. Normative specification:
 [`PRD/slices/142-activation-and-docs.md`](PRD/slices/142-activation-and-docs.md).
 
 ## #143 — host pipe setting, comparable baselines and zero-copy decision

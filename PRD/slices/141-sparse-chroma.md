@@ -48,5 +48,6 @@ settle clamp, rate bound, no-idle behavior, and bootstrap/boundaries. Enable
 the sparse DPB and independent-cut cases in `Avc444Ltr` and
 `test_ffmpeg_sparse_aux_independent_schedules_live`. Configuration tests shall
 be added only when the keys become reachable in #142. Run all affected suites
-and the README gate. Real-client visual/rate acceptance is an explicit handoff
-gate, not a substitute for these deterministic tests.
+and the README gate. This internal slice has no real-client or throughput
+gate. Live client replay occurs only after the backend becomes selectable in
+#142; it is not a substitute for these deterministic tests.

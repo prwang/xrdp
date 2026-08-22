@@ -83,6 +83,11 @@ against the exact header; and verify the default binary has no trace footprint.
 These checks include the complete README gate.
 The retained live gate shall exercise AVC420, AVC444v1 and AVC444v2 where the
 client supports them, Windows and macOS clients, one and two monitors, resize,
-still full-chroma detail and motion. Every run records the paired commit IDs,
-client identity, resolution, selected mode and trace-build state. No timing
-claim derived from a synchronous per-frame logger is admissible.
+still full-chroma detail and motion. For sparse AVC444, the motion run shall
+contain both main-only and main-plus-auxiliary cycles. Its audit shall report
+LC=1 and LC=2 command counts and transmitted bytes, close their sum against
+the audited video-command total, and confirm the configured chroma-gap bound.
+This is an accounting and compatibility gate, not a required bandwidth or
+frame-rate gain. Every run records the paired commit IDs, client identity,
+resolution, selected mode and trace-build state. No timing claim derived from
+a synchronous per-frame logger is admissible.
