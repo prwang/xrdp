@@ -2,7 +2,8 @@
 
 End-to-end, self-driven reproduction of the dual-monitor "1-2px burr residual
 when dragging a window" defect (owner report 2026-07-25, screenshot
-`regression_ghost_edge_2026-07-25 114541.png`): thin stale lines (1px solid,
+`../media_evidences/multimon_drag_ghost/20260725T114541-local_windows-dual-monitor-drag-ghost.png`):
+thin stale lines (1px solid,
 2px/3px dashed, including vertical lines striking through BOTH screens across
 the monitor seam) are left along the drag path on the client and persist
 after motion stops. Single-monitor sessions are clean.
@@ -76,3 +77,29 @@ single run.
   columns (x 786/1286/2286), full primary height, continuing into the 4K
 - MODE=single: clean (only live-edge codec ringing, no persistent lines)
 - Owner visually confirmed same failure class as the mstsc screenshot.
+
+## Resolution (2026-07-25)
+
+Per-frame capture forensics found that every monitor wrote its planes at offset
+zero in one shared-memory allocation. A frame for one geometry therefore
+overwrote the persistent plane bytes of the other monitor; xrdp encoded the
+whole plane, and metablock fringe expansion made the stale bytes visible as
+solid or dashed lines. The cross-seam crop retained at
+`../media_evidences/multimon_drag_ghost/20260725T124124Z_dual-monitor-drag-ghost-monitor-seam.png`
+shows the distinctive consequence.
+
+The paired fix is xrdp `0070ceb5` plus xorgxrdp `dd431cc`: compute disjoint,
+aligned per-monitor capture regions, write each monitor at its assigned offset,
+and carry that offset in the xup frame message. The xup contract version bump
+makes a mixed old/new pair refuse to start rather than silently overlap memory.
+
+After the real ghosts disappeared, the first oracle still false-positived on
+the lossy live window edge and on frames which were merely still in flight.
+Commit `c1c8e03a` parked the window symmetrically and made the later settled
+grab decisive. Both monitor modes then passed, the owner confirmed the
+dual-monitor mstsc drag clean, and the retained fixed client frame is
+`../media_evidences/multimon_drag_ghost/20260725T145013Z_dual-monitor-drag-ghost-fixed-clean.png`.
+
+This resolved shared-memory bug is separate from the later #64 `rect_id`
+acknowledgement hypothesis, which was refuted in
+`docs/experiments/64-rect-id-ack-ghost.md`.

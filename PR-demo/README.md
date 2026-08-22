@@ -83,9 +83,9 @@ realistic payload rather than a diagnostic pattern.
   the answer is the library default; measured 250. Exists because the
   ffmpeg path's scheduled refresh interval should be compared against
   what xrdp has always done, not against a number from memory.
-* **`lib/`** — shared helpers: `capture_codec.sh` asserts the negotiated GFX
-  codec from the xrdp log so a harness fails fast instead of validating the
-  wrong codec; `show_img.sh` displays an image fullscreen in the session.
+* **`lib/`** — shared and target-specific helpers, indexed by `lib/README.md`.
+  The shared codec/display helpers live at its root; Windows-client and legacy
+  Incus-container helpers live in named target subdirectories.
 
 ## Evidence and prose
 
@@ -104,6 +104,13 @@ realistic payload rather than a diagnostic pattern.
 * **`mac_windows_app/`** — screenshots from the macOS Windows App
   (VideoToolbox decoder), which exposed decoder strictness the Linux and
   Windows clients tolerated — the AVC444v2 LC framing blackout.
+* **`media_evidences/`** — the curated visual history of four client bugs,
+  grouped by bug rather than capture run. `media_evidences/README.md` records
+  each bug → failed direction → fix sequence and why each of the ten retained
+  artifacts adds information; `SHA256SUMS` pins the bytes.
+* **`public_pr/`** — BACKLOG #300's reviewer-facing documentation workspace
+  and indexed historical research inputs. It remains a draft until the final
+  clean-room pair exists.
 * **`results/`** — the committed reference outputs of the demo below.
 
 ---

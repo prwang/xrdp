@@ -32,11 +32,13 @@ stub at the end of this file and points to its record.
 
 ## Execution order
 
-The open list is one chain. Complete #123 through #143 in numeric order; an
+The porting list is one chain. Complete #123 through #143 in numeric order; an
 item does not start until its predecessor is closed. #123–#125 finish and
 anchor the development implementation; #120–#122 are closed below.
 #126–#142 re-author it as the clean-room commit series. #143 is explicitly
-later architecture work and cannot change or qualify that series.
+later architecture work and cannot change or qualify that series. #300 is the
+public-PR documentation deliverable after #142; it does not block #143 and is
+not permission to publish or push anything.
 
 For every dev qualification, commit the exact procedure, paired source and
 package identities, configuration, workload, instrument and expected checks.
@@ -386,6 +388,36 @@ any baseline used across the sysctl boundary; separately decide whether the
 roughly 1.4 ms pipe machinery plus unavoidable copy justifies abandoning the
 stock-ffmpeg child architecture. This cannot change or qualify #126–#142;
 abandoning that architecture starts a later normative series.
+
+---
+
+# Public PR deliverable
+
+## #300 — write the public-facing PR documentation and evidence package
+
+**Status: TODO; blocked on #142; independent of #143.** This deliverable was
+previously left implicit inside #142's operating documentation. That was a
+planning omission: operator documentation in the implementation slice and the
+reviewer-facing PR narrative are different artifacts with different readers
+and completion gates.
+
+**Scope:** write the reviewer-facing problem statement, design and commit
+walkthrough, compatibility and security boundaries, configuration/migration
+notes, and claims-to-evidence index for the final clean-room pair. Reconcile
+every implementation claim against the final source and normative `PRD/`
+slices; do not copy stale dev-branch commit identities, test counts or proposed
+runtime A/B results into the final narrative. Inputs and drafts live under
+`PR-demo/public_pr/`; curated visual evidence and bug/fix timelines are in
+`PR-demo/media_evidences/README.md`. Historical research may support the
+narrative only when its provenance and current applicability are stated.
+
+**Acceptance:** `PR-demo/public_pr/README.md` contains a self-contained draft
+PR description and maps every material claim to a final clean-room commit,
+test, experiment record or inventoried media artifact. All linked files exist;
+historical-only material is labelled; no instrument-invalid number or
+unreplayed dev result is presented as final evidence; and the documented
+commands and configuration match the paired tree produced by #142. Publication
+and `git push` remain owner actions.
 
 ---
 

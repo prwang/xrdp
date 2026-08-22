@@ -458,8 +458,10 @@ client structurally cannot show that fringe.
 ### 5c. Onscreen (region-strict) — human step
 Region-strict correctness is confirmed with **mstsc / rdcman / RD Client**: drive
 a high-contrast edge on an odd-origin region and confirm no chroma fringe on the
-region's top/left edge. See `AVC444_metablock_reachability_PROOF.md` for the A/B
-method (before = revert `rect.left/top &= ~1`, after = branch as-is).
+region's top/left edge. See
+`PR-demo/public_pr/research/20260719T155914Z_metablock-origin-alignment-reachability.md`
+for the historical A/B design method (before = revert
+`rect.left/top &= ~1`, after = branch as-is).
 Empirical status 2026-07-22: fringe absent across multiple small width/height
 sessions on the T4 (NVENC, region-strict client, owner-tested).
 

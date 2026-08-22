@@ -84,3 +84,12 @@ PR-demo/mac_bisect_matrix/captures/**/oracle/
 
 # turn pre-flight draft (CLAUDE.md "Turn pre-flight") — scratch, never committed
 .turn_draft.md
+
+# reproducible local caches and helper build products
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+node_modules/
+PR-demo/textflood/textflood
+PR-demo/textflood/ring_recon

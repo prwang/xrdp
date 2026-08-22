@@ -9,9 +9,13 @@
 
 ## Symptom
 
-Client captures (`wierd_red_burr.png`, `red_burr_v2.png`) show magenta/purple
-speckles on and around saturated green terminal text. It appears only on
-high-contrast colored text/edges, accumulates as text is drawn, and persists.
+Client captures
+(`PR-demo/media_evidences/magenta_burr/20260714T012245Z_avc444v1-green-text-magenta-fringe.png`,
+`PR-demo/media_evidences/magenta_burr/20260714T020653Z_avc444v2-green-text-clean.png`)
+show
+magenta/purple speckles on and around saturated green terminal text. It appears
+only on high-contrast colored text/edges, accumulates as text is drawn, and
+persists.
 
 ## How it was reproduced (faithful, deterministic)
 

@@ -31,11 +31,19 @@ differ from the ones the encoder used. Once one MB diverges:
 
 Composition-side theories (stale pairing, recycled buffers) are
 feedback-free: their error is bounded by real content values and cannot
-grow. Measured on the owner's recording (`/tmp/rec.mov`, beam ROI
-crop=1200:600:1800:1500 at t=110s): the beam steps monotonically redder,
+grow. Measured at raw-source t=110s on the owner's recording (retained in
+the two-minute checked-in excerpt as playback 01:38 at
+`PR-demo/media_evidences/mac_wrong_color/20260822T130353Z_macos-windows-app-wrong-color-two-minute-excerpt.mp4`;
+beam ROI crop=1200:600:1800:1500): the beam steps monotonically redder,
 (215.3,4.4,238.4) → (216.2,5.2,238.9) → (230.7,6.4,239.6), at discrete
 session updates. Monotonic growth ⇒ feedback ⇒ the error lives in the
 decoder's DPB. That kills all compose-side candidates in one measurement.
+
+The exact raw source is retained locally at
+`/root/xrdp-media-backups/20260727T201704Z_macos-windows-app-chroma-probe-wrong-color_source.mov`
+(SHA-256
+`6fa727f79c9685d690b3e9eda3c11bfbda61584e17437738b6a41597d191cc26`);
+the media inventory records the transcode recipe and provenance.
 
 ## The error event: reference identity depends on decode topology
 
