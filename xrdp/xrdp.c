@@ -25,6 +25,7 @@
 #include <stdarg.h>
 
 #include "xrdp.h"
+#include "perf_trace.h"
 #include "log.h"
 #include "xrdp_configure_options.h"
 #include "copying_third_party.h"
@@ -800,7 +801,21 @@ main(int argc, char **argv)
             LOG(LOG_LEVEL_WARNING, "error creating g_sync_event");
         }
 
+#if defined(XRDP_PERF_TRACE)
+        if (!startup_params.fork)
+        {
+            /* All connection threads share this one post-fork process. */
+            perf_trace_init();
+        }
+#endif
         exit_status = xrdp_listen_main_loop(g_listen);
+#if defined(XRDP_PERF_TRACE)
+        if (!startup_params.fork)
+        {
+            /* The listen loop has joined all connection threads here. */
+            perf_trace_close();
+        }
+#endif
     }
 
     xrdp_listen_delete(g_listen);

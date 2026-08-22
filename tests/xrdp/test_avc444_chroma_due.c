@@ -154,10 +154,9 @@ END_TEST
 /* THE SAME PROPERTY WITH A FRAME GAP THAT DOES NOT DIVIDE THE BOUND,
  * and it is a different number.
  *
- * ADDED 2026-08-08, announced as its own change, after the first fleet
- * run measured a worst chroma gap of 1022 ms against a configured 1000
- * (capture i92_sparse_aux_ab_20260808_211023_s20). The test above did
- * not and could not catch that: it drives frames exactly 20 ms apart,
+ * ADDED 2026-08-08 as an independent boundary case. The test above does
+ * not and cannot cover non-dividing frame gaps: it drives frames exactly
+ * 20 ms apart,
  * 20 divides 1000, so a frame lands EXACTLY on the bound and the
  * overshoot is unreachable in that fixture. Every assertion in it is
  * correct and derived from the specification -- the fixture chose a

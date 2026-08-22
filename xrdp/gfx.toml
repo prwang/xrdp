@@ -46,8 +46,12 @@ h264_encoder = "x264"
 # # synchronous encode; nothing is left in flight, so this drain no-ops. The
 # # synchronous encode needs a zero-latency encoder pipeline (libx264
 # # -tune zerolatency, or h264_vaapi -async_depth 1); a deeper pipeline fails
-# # loudly at encode instead of lagging silently. To diagnose frame delivery,
-# # start xrdp with XRDP_GFX_TRACE=1 and read the GFX_TRACE lines in the log.
+# # loudly at encode instead of lagging silently. Performance trace is a
+# # compile-time opt-in (`configure --enable-perf-trace`). Set
+# # XRDP_PERF_TRACE=<private-prefix> to arm its mode-0600 text sink and
+# # XRDP_GFX_TRACE=1 to select graphics events. Records are written to
+# # <private-prefix>.<xrdp-pid>, never to the normal log. The prefix directory
+# # must be administrator-owned and writable by xrdp's runtime user.
 # tail_flush = false
 # # wire_window: how far the client may fall behind, in frames, before the
 # # server stops capturing new ones. Default 1, range 1-64; a value outside
@@ -55,13 +59,10 @@ h264_encoder = "x264"
 # #
 # # 1 allows exactly what xrdp allowed before this backend existed, so an
 # # upgrade that changes nothing here puts no more frames on the wire than
-# # it did before. 2 is the value that removes the pause between the
-# # encoder finishing with a frame and the X server being allowed to draw
-# # the next one: measured on one monitor at 3840x2400, that pause falls
-# # from 10.5 ms at the 90th percentile with 16 % of frames waiting, to
-# # 0.04 ms and 1 %. The cost is one more frame in flight -- more memory
-# # queued in the server and one more frame between an action and seeing
-# # it. See `man 5 gfx.toml` for the multi-monitor arithmetic, which is
+# # it did before. 2 permits one additional client frame, which may improve
+# # overlap but costs more queued memory and one more frame between an
+# # action and seeing it. See `man 5 gfx.toml` for the multi-monitor
+# # arithmetic, which is
 # # NOT what it looks like: the window counts monitor-frames, not desktop
 # # refreshes, so adding a screen divides the headroom rather than
 # # duplicating it.
@@ -179,4 +180,3 @@ MaxBitrate =    1_800_000
 EnableFrameSkip = true
 TargetBitrate =   600_000
 MaxBitrate =    1_200_000
-

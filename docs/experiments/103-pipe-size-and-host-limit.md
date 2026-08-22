@@ -13,12 +13,6 @@ The limitation belonged to the host-user pipe-page accounting and the
 container's lack of `CAP_SYS_RESOURCE` in the initial user namespace, not to
 a normal bare-metal xrdp deployment.
 
-After the owner raised `fs.pipe-user-pages-soft`, the same container obtained
-the requested pipe and the 3840x2400 sparse workload's frame period moved from
-about 24.5 ms to about 17.0 ms. Those absolute values are not comparable
-across the sysctl change. Ratios taken within one contemporaneous A/B remain
-valid unless invalidated for another reason.
-
 The size sweep corrected the initial requirement. Performance is flat from
 64 KiB through 1 MiB for this workload; the cost rises below 64 KiB. One
 megabyte is a request and the kernel's common unprivileged ceiling, not the
@@ -37,9 +31,9 @@ pipe below the requirement. An explicit override may collect diagnostics but
 marks the result invalid; it does not suppress the warning.
 
 The mechanism, sweep, commands and surviving raw outputs are under
-`PR-demo/mac_bisect_matrix/captures/i103_pipe_handover_20260808/`. The
-before/after fleet pair is under
-`PR-demo/mac_bisect_matrix/captures/i92_sparse_aux_ab_20260808_233519_s20/`.
+`PR-demo/mac_bisect_matrix/captures/i103_pipe_handover_20260808/`. The later
+before/after fleet pair used the invalid xorgxrdp per-frame logger and was
+deleted by #121; its frame periods are not quotable.
 
 ## Still open elsewhere
 

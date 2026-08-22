@@ -284,26 +284,18 @@ overlapping. With this enabled the acknowledgement is sent as soon as the
 encoder has drained the buffer, and how far ahead the server may run is
 \fBwire_window\fR below.
 
-The shipped \fBwire_window\fR of \fB1\fR reproduces the older rule's
-behaviour: measured on one monitor at 3840x2400, the two are the same within
-run\(hyto\(hyrun spread on frame period, on the wait for permission to
-capture, and on the number of frames the client may have outstanding. An
-installation that upgrades and changes no configuration therefore puts no
-more frames on the wire than it did before.
-
-The benefit appears at \fBwire_window\fR = \fB2\fR, which removes the stall
-almost entirely \(em on that measurement the wait for permission to capture
-falls from 10.5 ms at the 90th percentile, with 16 % of frames waiting, to
-0.04 ms and 1 %. It is not the default because it allows one more frame
-outstanding than xrdp has previously allowed. Administrators willing to
-accept that in exchange for the throughput should set it.
+The shipped \fBwire_window\fR of \fB1\fR reproduces the older bound on client
+frames outstanding. An installation that upgrades and changes no
+configuration therefore puts no more frames on the wire than it did before.
+Setting \fB2\fR permits one additional client frame; it may improve overlap,
+but increases queued memory and input-to-display latency by that inventory.
 
 .TP
 \fBwire_window\fR = \fI<integer>\fR
 How far the client is allowed to fall behind, in frames, before the server
 stops capturing new ones. Default: \fB1\fR, which is what the mechanism this
-replaces allowed; see \fBeager_slot_ack\fR above for why \fB2\fR is the
-interesting value and what it costs. Accepted range is \fB1\fR to \fB64\fR; a
+replaces allowed; see \fBeager_slot_ack\fR above for what \fB2\fR costs.
+Accepted range is \fB1\fR to \fB64\fR; a
 value outside it is refused with a warning and the default is kept. Applies
 only when \fBeager_slot_ack\fR is enabled; the legacy path is unaffected.
 
@@ -476,6 +468,31 @@ started with a minimal environment (\fBPATH=/usr/bin:/bin\fR only); libva
 normally autodetects the driver from the render node, but a GPU that needs an
 explicit \fBLIBVA_DRIVER_NAME\fR cannot currently be steered through
 \fBgfx.toml\fR.
+
+.SH "PERFORMANCE TRACE"
+
+Performance trace is available only in a build configured with
+\fB\-\-enable-perf-trace\fR. It is absent from a default build. Set
+\fBXRDP_PERF_TRACE=\fR\fIprefix\fR in xrdp's environment to arm the sink.
+\fBXRDP_GFX_TRACE=1\fR selects graphics events and
+\fBXRDP_ACK_TRACE=1\fR selects credit-frontier events. A selector without an
+armed sink records nothing and produces one warning; per-frame events never
+fall back to the normal log.
+
+The connection process exclusively creates \fIprefix.pid\fR as mode 0600,
+without following symlinks. The prefix directory must be owned by the
+administrator and writable by xrdp's post-drop runtime user. Records are
+newline-terminated \fBschema=1\fR key/value text. They contain monotonic time,
+process and thread identity, event name, frame/monitor identities and bounded
+integer metadata; they contain no captured pixels or input events. A separate
+sink thread performs file I/O and final drain. Open, write, drain or close
+failure is reported once at human rate.
+
+No diagnostic timestamp crosses the xup connection from xorgxrdp. Capture
+characterization uses xrdp's receive, encode and egress endpoints. The normal
+forking configuration creates one trace lifecycle and file per connection.
+With \fBfork=false\fR simultaneous sessions share one process and one file;
+use that mode for characterization only with one active session.
 
 .SH "CONNECTION TYPES"
 

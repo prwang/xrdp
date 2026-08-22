@@ -386,6 +386,24 @@ This order lets performance regressions be caught at the slice which creates
 them without claiming that the complete 34-event AVC444 manifest exists before
 the feature code it describes.
 
+## 2026-08-17 superseding decision -- no producer timestamp bridge
+
+The xorgxrdp `ACK_TRACE cap` endpoint was introduced by our development
+commit `10fa3aa2`; it is absent from pinned upstream `49bf2dd`. The open
+qualification metrics were audited before implementing the bridge described
+above. They need xrdp's damage, receive, encode, batch and egress endpoints,
+paired by frame and monitor identity. None needs producer capture or packing
+duration.
+
+The endpoint is therefore removed, not transported. xorgxrdp does not link a
+tracer, take trace-only clocks or grow the xup contract with diagnostic
+timestamps. #121 deleted the seven timing-capture directories which carried
+the synchronous logger and replaced their conclusions with explicit new
+owners. This supersedes sections 1, 5, 6 and the sequencing paragraph only
+where they prescribe `ACK_TRACE cap` or a producer timestamp bridge; the
+generic xrdp trace lifecycle, compile-time erasure and named text ring remain
+the selected design.
+
 ## 2026-08-14 amendment — measure direct `snprintf` text against fixed objects
 
 ### Why JSON Lines is no longer the prescribed format

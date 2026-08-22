@@ -6,7 +6,7 @@ This commit adds a generic performance telemetry facility. It contains no
 AVC event schema and changes no normal-build behavior.
 
 Target files are `configure.ac`, `common/perf_trace.c`,
-`common/perf_trace.h`, `xrdp/xrdp_listen.c`, `xrdp/xrdp_process.c`, and
+`common/perf_trace.h`, `xrdp/xrdp_listen.c`, `xrdp/xrdp.c`, and
 `tests/common/test_perf_trace.c`. Register source and suite in
 `common/Makefile.am`, `tests/common/Makefile.am`,
 `tests/common/test_common.h` and `tests/common/test_common_main.c`.

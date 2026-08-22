@@ -60,7 +60,9 @@ int main (void)
     srunner_add_suite(sr, make_suite_test_scancode());
     srunner_add_suite(sr, make_suite_test_timers());
     srunner_add_suite(sr, make_suite_test_log());
+#if defined(XRDP_PERF_TRACE)
     srunner_add_suite(sr, make_suite_test_perf_trace());
+#endif
 
     srunner_set_tap(sr, "-");
     /*

@@ -21,7 +21,9 @@ Suite *make_suite_test_guid(void);
 Suite *make_suite_test_scancode(void);
 Suite *make_suite_test_timers(void);
 Suite *make_suite_test_log(void);
+#if defined(XRDP_PERF_TRACE)
 Suite *make_suite_test_perf_trace(void);
+#endif
 
 TCase *make_tcase_test_os_calls_signals(void);
 

@@ -131,7 +131,8 @@ main(int argc, char **argv)
 
     frames = argc > 1 ? atoi(argv[1]) : DEFAULT_FRAMES;
     period_ms = argc > 2 ? atoi(argv[2]) : DEFAULT_PERIOD_MS;
-    if (frames < 1 || period_ms < 1 || !perf_trace_on())
+    if (frames < 1 || period_ms < 1 ||
+            perf_trace_init() != PERF_TRACE_INIT_ARMED)
     {
         fprintf(stderr, "usage: XRDP_PERF_TRACE=/path/prefix %s "
                 "[frames] [period_ms]\n", argv[0]);

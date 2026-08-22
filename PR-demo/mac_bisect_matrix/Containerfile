@@ -31,11 +31,11 @@ FROM debian:trixie AS textflood-build
 ENV DEBIAN_FRONTEND=noninteractive
 RUN apt-get update && apt-get install -y --no-install-recommends \
         build-essential pkg-config \
-        libcairo2-dev libx11-dev libxext-dev \
+        libcairo2-dev libx11-dev libxext-dev libxrandr-dev \
     && rm -rf /var/lib/apt/lists/*
 COPY textflood.c /src/textflood.c
 RUN cc -O2 -Wall -Wextra -Wno-unused-parameter -o /src/textflood \
-        /src/textflood.c $(pkg-config --cflags --libs cairo x11 xext)
+        /src/textflood.c $(pkg-config --cflags --libs cairo x11 xext xrandr)
 
 # The onscreen probes a human judges the session with. They were being
 # copied into running pods by hand on 2026-08-08, which meant they died
@@ -62,7 +62,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         x11-xserver-utils xterm xfonts-base fonts-dejavu-core \
         dbus procps openssl ca-certificates \
         xdotool \
-        libcairo2 libx11-6 libxext6 \
+        libcairo2 libx11-6 libxext6 libxrandr2 \
         python3-tk \
     && rm -rf /var/lib/apt/lists/*
 # python3-tk is chroma-probe's ONLY dependency and it is not pulled in by

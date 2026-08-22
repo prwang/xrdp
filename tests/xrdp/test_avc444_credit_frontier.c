@@ -115,13 +115,13 @@ START_TEST(test_credit_frontier_is_monotone)
                  * what an absorb, an egress or a client ack does --
                  * may never lower the credit */
                 ck_assert_int_ge(xrdp_gfx_credit_frontier(consumed + 1,
-                                                          server, client, 2),
+                                 server, client, 2),
                                  here);
                 ck_assert_int_ge(xrdp_gfx_credit_frontier(consumed,
-                                                          server + 1, client,
-                                                          2), here);
+                                 server + 1, client,
+                                 2), here);
                 ck_assert_int_ge(xrdp_gfx_credit_frontier(consumed, server,
-                                                          client + 1, 2),
+                                 client + 1, 2),
                                  here);
                 /* and it is never above any of the three terms */
                 ck_assert_int_le(here, consumed);
@@ -437,8 +437,8 @@ START_TEST(test_joint_machine_enumeration)
              * three terms permit. This is the property the shipped
              * cross-layer gate does not have. */
             ck_assert_int_le(xrdp_gfx_credit_frontier(cur.consumed,
-                                                      cur.server,
-                                                      cur.client, c),
+                             cur.server,
+                             cur.client, c),
                              cur.ack);
 
             /* INV-HELD: regions the producer is holding, i.e. captured
@@ -1088,6 +1088,7 @@ END_TEST
  * bit positions and the unknown-monitor rule are the contract, and they
  * are pinned here rather than by reading a live capture.
  */
+#if defined(XRDP_PERF_TRACE)
 START_TEST(test_credit_mask_names_the_permitted_monitors)
 {
     struct xrdp_encoder enc;
@@ -1137,6 +1138,7 @@ START_TEST(test_credit_mask_names_the_permitted_monitors)
     ck_assert_int_eq(gfx_batch_credit_mask(&enc, 0), 0);
 }
 END_TEST
+#endif
 
 /****************************************************************************/
 Suite *
@@ -1164,7 +1166,9 @@ make_suite_avc444_credit_frontier(void)
     tcase_add_test(tc, test_credit_permits_capture_from_the_producers_contract);
     tcase_add_test(tc,
                    test_credit_permits_capture_agrees_with_the_producer_budget);
+#if defined(XRDP_PERF_TRACE)
     tcase_add_test(tc, test_credit_mask_names_the_permitted_monitors);
+#endif
 
     return s;
 }

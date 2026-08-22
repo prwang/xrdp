@@ -24,10 +24,11 @@ OUT=${1:-$D}
 : "${CC:=cc}"
 CFLAGS="-O2 -Wall -Wextra -Wno-unused-parameter"
 
-PKGS="cairo x11 xext"
+PKGS="cairo x11 xext xrandr"
 if ! pkg-config --exists $PKGS; then
     echo "build.sh: missing dev packages. On Debian/Ubuntu:" >&2
-    echo "  sudo apt-get install -y libcairo2-dev libx11-dev libxext-dev" >&2
+    echo "  sudo apt-get install -y libcairo2-dev libx11-dev libxext-dev \\" >&2
+    echo "      libxrandr-dev" >&2
     exit 1
 fi
 

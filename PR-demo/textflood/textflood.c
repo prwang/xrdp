@@ -101,7 +101,8 @@
  *                 own standalone frame rate with no RDP session, printed
  *                 beside the pipeline period it has to beat by 2x.
  *
- * Build: PR-demo/textflood/build.sh   (cairo + X11 + Xext, no toolkit)
+ * Build: PR-demo/textflood/build.sh   (cairo + X11 + Xext + RandR,
+ *                                      no toolkit)
  * Usage: textflood [options]; -h for the list.
  */
 
@@ -110,6 +111,7 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/extensions/XShm.h>
+#include <X11/extensions/Xrandr.h>
 #include <cairo/cairo.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -122,6 +124,109 @@
    run can verify saturation instead of assuming it. Default ON; the
    file is one short line per frame (~8/s), overridable with --stamps. */
 #define DEF_STAMPS "/tmp/e52_textflood_stamps.tsv"
+
+struct monitor_geometry
+{
+    int x;
+    int y;
+    int width;
+    int height;
+};
+
+static int
+monitor_geometry_compare(const void *a, const void *b)
+{
+    const struct monitor_geometry *ma = a;
+    const struct monitor_geometry *mb = b;
+
+    if (ma->x != mb->x)
+    {
+        return ma->x < mb->x ? -1 : 1;
+    }
+    if (ma->y != mb->y)
+    {
+        return ma->y < mb->y ? -1 : 1;
+    }
+    return 0;
+}
+
+/* Xorgxrdp exposes one Xinerama screen covering the whole desktop, so
+   Xinerama cannot select a client monitor. Its RandR outputs retain the
+   client rectangles. Sort those rectangles into deterministic desktop order
+   and ignore cloned outputs which name the same rectangle. */
+static int
+query_monitor_geometry(Display *dpy, Window root, int monitor,
+                       struct monitor_geometry *selected)
+{
+    struct monitor_geometry geometries[16];
+    XRRScreenResources *resources;
+    int count;
+    int oi;
+
+    count = 0;
+    resources = XRRGetScreenResourcesCurrent(dpy, root);
+    if (resources == NULL)
+    {
+        return 0;
+    }
+    for (oi = 0; oi < resources->noutput && count < 16; oi++)
+    {
+        XRROutputInfo *output;
+        XRRCrtcInfo *crtc;
+        int duplicate;
+        int gi;
+
+        output = XRRGetOutputInfo(dpy, resources, resources->outputs[oi]);
+        if (output == NULL || output->connection != RR_Connected
+                || output->crtc == None)
+        {
+            if (output != NULL)
+            {
+                XRRFreeOutputInfo(output);
+            }
+            continue;
+        }
+        crtc = XRRGetCrtcInfo(dpy, resources, output->crtc);
+        XRRFreeOutputInfo(output);
+        if (crtc == NULL || crtc->width == 0 || crtc->height == 0)
+        {
+            if (crtc != NULL)
+            {
+                XRRFreeCrtcInfo(crtc);
+            }
+            continue;
+        }
+        duplicate = 0;
+        for (gi = 0; gi < count; gi++)
+        {
+            duplicate = geometries[gi].x == crtc->x
+                        && geometries[gi].y == crtc->y
+                        && geometries[gi].width == (int) crtc->width
+                        && geometries[gi].height == (int) crtc->height;
+            if (duplicate)
+            {
+                break;
+            }
+        }
+        if (!duplicate)
+        {
+            geometries[count].x = crtc->x;
+            geometries[count].y = crtc->y;
+            geometries[count].width = crtc->width;
+            geometries[count].height = crtc->height;
+            count++;
+        }
+        XRRFreeCrtcInfo(crtc);
+    }
+    XRRFreeScreenResources(resources);
+    qsort(geometries, count, sizeof(geometries[0]),
+          monitor_geometry_compare);
+    if (monitor >= 0 && monitor < count)
+    {
+        *selected = geometries[monitor];
+    }
+    return count;
+}
 #define DEF_TITLE "E52FLOOD"
 #define DEF_FONT "DejaVu Sans Mono"
 #define DEF_FONT_SIZE 14.0
@@ -1076,6 +1181,9 @@ usage(void)
            "                  FR-BENCH-1 producer telemetry)\n"
            "  --managed       let the window manager place the window\n"
            "                  (default: override-redirect, full root)\n"
+           "  --monitor N     render only RandR output N (default:\n"
+           "                  all monitors); monitor geometry is queried\n"
+           "                  from the live X server\n"
            "\n"
            "  offline, no X server and no session:\n"
            "  --selftest      measure this payload's own frame rate and\n"
@@ -1145,6 +1253,9 @@ main(int argc, char **argv)
     double acc;
     double t_prev;
     int need_full;
+    int monitor;
+    int origin_x;
+    int origin_y;
 
     stamps_path = DEF_STAMPS;
     corpus_path = DEF_CORPUS;
@@ -1161,6 +1272,7 @@ main(int argc, char **argv)
     off_h = DEF_OFF_H;
     selftest = 0;
     verify_frames = 0;
+    monitor = -1;
     for (ai = 1; ai < argc; ai++)
     {
         if (strcmp(argv[ai], "-h") == 0 || strcmp(argv[ai], "--help") == 0)
@@ -1241,6 +1353,20 @@ main(int argc, char **argv)
         {
             pipeline_ms = atof(argv[++ai]);
         }
+        else if (strcmp(argv[ai], "--monitor") == 0)
+        {
+            char *end;
+            long value;
+
+            value = strtol(argv[++ai], &end, 10);
+            if (*argv[ai] == 0 || *end != 0 || value < 0 || value > 15)
+            {
+                fprintf(stderr, "textflood: --monitor wants an integer "
+                        "within 0..15, not %s\n", argv[ai]);
+                return 1;
+            }
+            monitor = (int) value;
+        }
         else if (strcmp(argv[ai], "--verify") == 0)
         {
             verify_frames = atol(argv[++ai]);
@@ -1288,6 +1414,12 @@ main(int argc, char **argv)
     }
     if (selftest)
     {
+        if (monitor >= 0)
+        {
+            fprintf(stderr, "textflood: --monitor is a live-display "
+                    "option\n");
+            return 1;
+        }
         return run_selftest(&cp, off_w, off_h, font, font_size, mode,
                             step, lines_per_sec,
                             max_frames > 0 ? max_frames : 200,
@@ -1325,22 +1457,53 @@ main(int argc, char **argv)
         fprintf(stderr, "textflood: unexpected visual masks\n");
         return 1;
     }
-    /* THE WHOLE ROOT, NOT ONE MONITOR. The E5-2 gate is about batching
-       two monitors into one pump set, so a payload that inks only one is
-       measuring BACKLOG #53's one-active-one-idle regime instead. Three
-       T4 runs were invalidated that way with the xterm payload, because
-       to xfwm4 "maximized" means the current monitor and it re-snaps a
-       window on its own schedule. An override-redirect window is not
-       managed at all, so there is nothing to re-snap and no span-fixer
-       loop to keep running. */
+    /* The default is the whole root. --monitor deliberately produces the
+       one-active/one-idle condition while keeping the same renderer. Query
+       the live RandR output geometry rather than baking a fleet modeline into
+       the payload. An override-redirect window is not managed, so there is
+       nothing to re-snap and no span-fixer loop to keep running. */
     XGetWindowAttributes(dpy, root, &root_attr);
     width = root_attr.width;
     height = root_attr.height;
+    origin_x = 0;
+    origin_y = 0;
+    if (monitor >= 0)
+    {
+        struct monitor_geometry geometry = {0};
+        int count;
+        int retry;
+
+        /* xorgxrdp initially advertises one union output and replaces it
+           with the client monitor outputs when the RDP layout arrives. Do
+           not mistake that transient union for monitor zero. This wait is
+           before the stamps file and measured render loop are started. */
+        count = 0;
+        for (retry = 0; retry < 100; retry++)
+        {
+            count = query_monitor_geometry(dpy, root, monitor, &geometry);
+            if (count >= 2 && monitor < count)
+            {
+                break;
+            }
+            usleep(100000);
+        }
+        if (count < 2 || monitor >= count)
+        {
+            fprintf(stderr, "textflood: monitor %d unavailable "
+                    "after waiting for the multimon layout (RandR reports "
+                    "%d active outputs)\n", monitor, count);
+            return 1;
+        }
+        origin_x = geometry.x;
+        origin_y = geometry.y;
+        width = geometry.width;
+        height = geometry.height;
+    }
     memset(&attr, 0, sizeof(attr));
     attr.override_redirect = managed ? False : True;
     attr.background_pixel = BlackPixel(dpy, screen);
     attr.event_mask = KeyPressMask | ExposureMask;
-    win = XCreateWindow(dpy, root, 0, 0, width, height, 0, depth,
+    win = XCreateWindow(dpy, root, origin_x, origin_y, width, height, 0, depth,
                         InputOutput, visual,
                         CWOverrideRedirect | CWBackPixel | CWEventMask,
                         &attr);
@@ -1380,7 +1543,7 @@ main(int argc, char **argv)
        killed at logoff */
     shmctl(shminfo.shmid, IPC_RMID, NULL);
     surf = cairo_image_surface_create_for_data((unsigned char *) image->data,
-            CAIRO_FORMAT_RGB24, width, height, image->bytes_per_line);
+           CAIRO_FORMAT_RGB24, width, height, image->bytes_per_line);
     cr = cairo_create(surf);
     fo = setup_font(cr, font, font_size, &fext);
     line_height = fext.height;
@@ -1389,9 +1552,20 @@ main(int argc, char **argv)
         line_height = font_size;
     }
     rows = (int) (height / line_height) + 1;
-    printf("textflood: %dx%d, %d rows, %d corpus lines, step %d, "
-           "font %s %.0fpx, subpixel RGB\n",
-           width, height, rows, cp.nlines, step, font, font_size);
+    if (monitor < 0)
+    {
+        printf("textflood: target=all origin=%d,%d %dx%d, %d rows, "
+               "%d corpus lines, step %d, font %s %.0fpx, subpixel RGB\n",
+               origin_x, origin_y, width, height, rows, cp.nlines, step,
+               font, font_size);
+    }
+    else
+    {
+        printf("textflood: target=monitor-%d origin=%d,%d %dx%d, %d rows, "
+               "%d corpus lines, step %d, font %s %.0fpx, subpixel RGB\n",
+               monitor, origin_x, origin_y, width, height, rows, cp.nlines,
+               step, font, font_size);
+    }
     if (mode == MODE_STRIP)
     {
         if (layout_init(&lay, width, height, &fext, font_size) != 0)
@@ -1420,9 +1594,20 @@ main(int argc, char **argv)
             clock_gettime(CLOCK_REALTIME, &rt);
             /* epoch anchor so a frame's monotonic stamp can be laid
                next to the server's GFX_TRACE wall clock */
-            fprintf(stf, "# textflood %dx%d step=%d epoch_ms=%.3f "
-                    "mono_ms=%.3f\n", width, height, step,
-                    rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
+            if (monitor < 0)
+            {
+                fprintf(stf, "# textflood target=all origin=%d,%d %dx%d "
+                        "step=%d epoch_ms=%.3f mono_ms=%.3f\n", origin_x,
+                        origin_y, width, height, step,
+                        rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
+            }
+            else
+            {
+                fprintf(stf, "# textflood target=monitor-%d origin=%d,%d "
+                        "%dx%d step=%d epoch_ms=%.3f mono_ms=%.3f\n",
+                        monitor, origin_x, origin_y, width, height, step,
+                        rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
+            }
             fprintf(stf, "frame\tloop_start_ms\trender_ms\tblit_ms"
                     "\tsync_ms\n");
         }

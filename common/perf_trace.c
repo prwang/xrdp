@@ -22,21 +22,35 @@
 #include <config_ac.h>
 #endif
 
-#include <stdarg.h>
+#include <errno.h>
 #include <fcntl.h>
+#include <pthread.h>
+#include <stdarg.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
-#include <pthread.h>
 #include <sys/mman.h>
+#include <sys/stat.h>
 #include <sys/types.h>
 
+#include "log.h"
 #include "perf_trace.h"
 
-#define PERF_TRACE_BUF_SIZE (1024 * 1024)
+#define PERF_TRACE_BUFFER_BYTES (1024 * 1024)
 #define PERF_TRACE_DRAIN_MS 10
+
+enum perf_trace_state
+{
+    PERF_TRACE_UNINITIALIZED = 0,
+    PERF_TRACE_DISABLED,
+    PERF_TRACE_ARMED,
+    PERF_TRACE_FAILED,
+    PERF_TRACE_CLOSING,
+    PERF_TRACE_CLOSED
+};
 
 struct perf_trace_ring
 {
@@ -44,23 +58,26 @@ struct perf_trace_ring
     unsigned long long head;
     unsigned long long tail;
     unsigned int dropped;
-    unsigned int drop_seen;
     unsigned int format_failed;
-    unsigned int format_failed_seen;
     int claimed;
 };
 
+static int g_perf_fd = -1;
 static FILE *g_perf_file = NULL;
-static char *g_perf_buf = NULL;
-static int g_perf_armed = 0;
-static pthread_once_t g_perf_once = PTHREAD_ONCE_INIT;
+static char *g_perf_buffer = NULL;
+static int g_perf_state = PERF_TRACE_UNINITIALIZED;
+static int g_perf_failure = 0;
+static int g_perf_error_reported = 0;
 static struct perf_trace_ring *g_perf_rings[PERF_TRACE_MAX_RINGS];
 static int g_perf_ring_count = 0;
 static pthread_t g_perf_sink;
 static int g_perf_sink_live = 0;
-static volatile int g_perf_quit = 0;
-static volatile unsigned int g_perf_no_ring = 0;
+static int g_perf_quit = 0;
+static unsigned int g_perf_no_ring = 0;
 static long long g_perf_pid = 0;
+static pthread_mutex_t g_perf_lifecycle_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_mutex_t g_perf_wake_lock = PTHREAD_MUTEX_INITIALIZER;
+static pthread_cond_t g_perf_wake = PTHREAD_COND_INITIALIZER;
 static __thread struct perf_trace_ring *g_perf_my_ring = NULL;
 static __thread int g_perf_my_ring_done = 0;
 
@@ -75,6 +92,131 @@ perf_trace_now_ns(void)
         return 0;
     }
     return (long long)ts.tv_sec * 1000000000LL + (long long)ts.tv_nsec;
+}
+
+/*****************************************************************************/
+static long long
+perf_trace_tid(void)
+{
+    return (long long)(intptr_t)pthread_self();
+}
+
+/*****************************************************************************/
+static void
+perf_trace_fail(const char *operation)
+{
+    int saved_errno;
+
+    saved_errno = errno;
+    __atomic_store_n(&g_perf_failure, 1, __ATOMIC_RELEASE);
+    if (__sync_bool_compare_and_swap(&g_perf_state, PERF_TRACE_ARMED,
+                                     PERF_TRACE_FAILED))
+    {
+        /* Stop producers before reporting the sink-side failure. */
+    }
+    if (__sync_bool_compare_and_swap(&g_perf_error_reported, 0, 1))
+    {
+        LOG(LOG_LEVEL_ERROR, "performance trace %s failed: %s", operation,
+            strerror(saved_errno));
+    }
+}
+
+/*****************************************************************************/
+static int
+perf_trace_write_all(const char *data, size_t length)
+{
+    if (fwrite(data, 1, length, g_perf_file) != length)
+    {
+        perf_trace_fail("write");
+        return 0;
+    }
+    return 1;
+}
+
+/*****************************************************************************/
+static int
+perf_trace_static_char(int character)
+{
+    return (character >= 'a' && character <= 'z') ||
+           (character >= 'A' && character <= 'Z') ||
+           (character >= '0' && character <= '9') ||
+           character == '_' || character == '-' || character == '.' ||
+           character == ':';
+}
+
+/*****************************************************************************/
+static int
+perf_trace_format_valid(const char *format)
+{
+    const char *p;
+    int event_field;
+    int length;
+
+    if (format == NULL || strncmp(format, "event=", 6) != 0)
+    {
+        return 0;
+    }
+    p = format;
+    event_field = 1;
+    while (*p != '\0')
+    {
+        if (!((*p >= 'a' && *p <= 'z') ||
+                (*p >= 'A' && *p <= 'Z') || *p == '_'))
+        {
+            return 0;
+        }
+        for (p++; *p != '='; p++)
+        {
+            if (!(perf_trace_static_char((unsigned char) * p) && *p != ':') ||
+                    *p == '\0' || *p == ' ')
+            {
+                return 0;
+            }
+        }
+        p++;
+        if (*p == '%')
+        {
+            if (event_field)
+            {
+                return 0;
+            }
+            p++;
+            length = 0;
+            while (*p == 'l' && length < 2)
+            {
+                p++;
+                length++;
+            }
+            if (!(*p == 'd' || *p == 'i' || *p == 'u' || *p == 'o' ||
+                    *p == 'x' || *p == 'X'))
+            {
+                return 0;
+            }
+            p++;
+        }
+        else
+        {
+            if (!perf_trace_static_char((unsigned char) * p))
+            {
+                return 0;
+            }
+            while (perf_trace_static_char((unsigned char) * p))
+            {
+                p++;
+            }
+        }
+        if (*p == '\0')
+        {
+            return 1;
+        }
+        if (*p != ' ' || p[1] == '\0' || p[1] == ' ')
+        {
+            return 0;
+        }
+        p++;
+        event_field = 0;
+    }
+    return 0;
 }
 
 /*****************************************************************************/
@@ -126,7 +268,6 @@ perf_trace_ring_create(void)
         return NULL;
     }
     ring->base = (char *)reserved;
-
     page_size = sysconf(_SC_PAGESIZE);
     if (page_size < 1)
     {
@@ -135,7 +276,7 @@ perf_trace_ring_create(void)
     for (offset = 0; offset < PERF_TRACE_RING_BYTES;
             offset += (size_t)page_size)
     {
-        ring->base[offset] = 0;
+        *(volatile char *)(ring->base + offset) = 0;
     }
     return ring;
 }
@@ -179,7 +320,7 @@ perf_trace_ring_reserve(struct perf_trace_ring *ring)
 static int
 perf_trace_ring_vwrite(struct perf_trace_ring *ring, long long ns,
                        long long pid, long long tid, const char *format,
-                       va_list ap)
+                       va_list ap, int validate)
 {
     char *dest;
     int prefix_length;
@@ -187,8 +328,12 @@ perf_trace_ring_vwrite(struct perf_trace_ring *ring, long long ns,
     int length;
     unsigned long long head;
 
-    if (format == NULL)
+    if (ring == NULL || (validate && !perf_trace_format_valid(format)))
     {
+        if (ring != NULL)
+        {
+            __atomic_add_fetch(&ring->format_failed, 1, __ATOMIC_RELAXED);
+        }
         return 0;
     }
     dest = perf_trace_ring_reserve(ring);
@@ -229,7 +374,7 @@ perf_trace_ring_write(struct perf_trace_ring *ring, long long ns,
     int rv;
 
     va_start(ap, format);
-    rv = perf_trace_ring_vwrite(ring, ns, pid, tid, format, ap);
+    rv = perf_trace_ring_vwrite(ring, ns, pid, tid, format, ap, 1);
     va_end(ap);
     return rv;
 }
@@ -296,42 +441,72 @@ perf_trace_ring_format_failed(const struct perf_trace_ring *ring)
 }
 
 /*****************************************************************************/
-static void
+static int
 perf_trace_drain(void)
 {
     const char *data;
     size_t length;
     int index;
-    unsigned int dropped;
-    unsigned int format_failed;
 
     for (index = 0; index < g_perf_ring_count; index++)
     {
-        struct perf_trace_ring *ring = g_perf_rings[index];
-
-        while (perf_trace_ring_peek(ring, &data, &length))
+        while (perf_trace_ring_peek(g_perf_rings[index], &data, &length))
         {
-            if (fwrite(data, 1, length, g_perf_file) != length)
+            if (!perf_trace_write_all(data, length))
             {
-                return;
+                return 0;
             }
-            perf_trace_ring_consume(ring, length);
+            perf_trace_ring_consume(g_perf_rings[index], length);
         }
-        dropped = perf_trace_ring_dropped(ring);
-        if (dropped != ring->drop_seen)
+    }
+    return 1;
+}
+
+/*****************************************************************************/
+static void
+perf_trace_write_diagnostics(void)
+{
+    char line[PERF_TRACE_RECORD_BYTES];
+    unsigned int count;
+    int index;
+    int length;
+
+    for (index = 0; index < g_perf_ring_count; index++)
+    {
+        count = perf_trace_ring_dropped(g_perf_rings[index]);
+        if (count != 0)
         {
-            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
-                    "event=perfdrop dropped=%u ring=%d\n",
-                    perf_trace_now_ns(), g_perf_pid, dropped, index);
-            ring->drop_seen = dropped;
+            length = snprintf(line, sizeof(line), "schema=1 mono_ns=%lld "
+                              "pid=%lld tid=0 event=perfdrop dropped=%u "
+                              "ring=%d\n", perf_trace_now_ns(), g_perf_pid,
+                              count, index);
+            if (length > 0 && length < (int)sizeof(line))
+            {
+                perf_trace_write_all(line, (size_t)length);
+            }
         }
-        format_failed = perf_trace_ring_format_failed(ring);
-        if (format_failed != ring->format_failed_seen)
+        count = perf_trace_ring_format_failed(g_perf_rings[index]);
+        if (count != 0)
         {
-            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
-                    "event=perfformat failed=%u ring=%d\n",
-                    perf_trace_now_ns(), g_perf_pid, format_failed, index);
-            ring->format_failed_seen = format_failed;
+            length = snprintf(line, sizeof(line), "schema=1 mono_ns=%lld "
+                              "pid=%lld tid=0 event=perfformat failed=%u "
+                              "ring=%d\n", perf_trace_now_ns(), g_perf_pid,
+                              count, index);
+            if (length > 0 && length < (int)sizeof(line))
+            {
+                perf_trace_write_all(line, (size_t)length);
+            }
+        }
+    }
+    count = __atomic_load_n(&g_perf_no_ring, __ATOMIC_RELAXED);
+    if (count != 0)
+    {
+        length = snprintf(line, sizeof(line), "schema=1 mono_ns=%lld "
+                          "pid=%lld tid=0 event=perfnoring count=%u\n",
+                          perf_trace_now_ns(), g_perf_pid, count);
+        if (length > 0 && length < (int)sizeof(line))
+        {
+            perf_trace_write_all(line, (size_t)length);
         }
     }
 }
@@ -340,24 +515,34 @@ perf_trace_drain(void)
 static void *
 perf_trace_sink_thread(void *arg)
 {
-    struct timespec ts;
+    struct timespec until;
 
     (void)arg;
-    ts.tv_sec = 0;
-    ts.tv_nsec = PERF_TRACE_DRAIN_MS * 1000000L;
-    while (!g_perf_quit)
+    while (!__atomic_load_n(&g_perf_quit, __ATOMIC_ACQUIRE))
     {
-        perf_trace_drain();
-        nanosleep(&ts, NULL);
+        if (!__atomic_load_n(&g_perf_failure, __ATOMIC_ACQUIRE))
+        {
+            perf_trace_drain();
+        }
+        clock_gettime(CLOCK_REALTIME, &until);
+        until.tv_nsec += PERF_TRACE_DRAIN_MS * 1000000L;
+        if (until.tv_nsec >= 1000000000L)
+        {
+            until.tv_sec++;
+            until.tv_nsec -= 1000000000L;
+        }
+        pthread_mutex_lock(&g_perf_wake_lock);
+        if (!__atomic_load_n(&g_perf_quit, __ATOMIC_ACQUIRE))
+        {
+            pthread_cond_timedwait(&g_perf_wake, &g_perf_wake_lock, &until);
+        }
+        pthread_mutex_unlock(&g_perf_wake_lock);
     }
-    perf_trace_drain();
-    if (g_perf_no_ring != 0)
+    if (!__atomic_load_n(&g_perf_failure, __ATOMIC_ACQUIRE) &&
+            perf_trace_drain())
     {
-        fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
-                "event=perfnoring count=%u\n", perf_trace_now_ns(),
-                g_perf_pid, g_perf_no_ring);
+        perf_trace_write_diagnostics();
     }
-    fflush(g_perf_file);
     return NULL;
 }
 
@@ -376,90 +561,169 @@ perf_trace_delete_rings(void)
 }
 
 /*****************************************************************************/
-static void
-perf_trace_open(void)
+static int
+perf_trace_write_clock_base(void)
+{
+    struct timespec mono;
+    struct timespec real;
+    char line[PERF_TRACE_RECORD_BYTES];
+    int length;
+
+    if (clock_gettime(CLOCK_MONOTONIC, &mono) != 0 ||
+            clock_gettime(CLOCK_REALTIME, &real) != 0)
+    {
+        perf_trace_fail("clock-base timestamp");
+        return 0;
+    }
+    length = snprintf(line, sizeof(line), "schema=1 mono_ns=%lld pid=%lld "
+                      "tid=0 event=clock_base real_ns=%lld\n",
+                      (long long)mono.tv_sec * 1000000000LL + mono.tv_nsec,
+                      g_perf_pid,
+                      (long long)real.tv_sec * 1000000000LL + real.tv_nsec);
+    return length > 0 && length < (int)sizeof(line) &&
+           perf_trace_write_all(line, (size_t)length);
+}
+
+/*****************************************************************************/
+int
+perf_trace_init(void)
 {
     const char *prefix;
     char path[512];
-    int fd;
     int index;
+    int rv;
 
+    pthread_mutex_lock(&g_perf_lifecycle_lock);
+    rv = __atomic_load_n(&g_perf_state, __ATOMIC_ACQUIRE);
+    if (rv != PERF_TRACE_UNINITIALIZED)
+    {
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return rv == PERF_TRACE_ARMED ? PERF_TRACE_INIT_ARMED :
+               (rv == PERF_TRACE_DISABLED ? PERF_TRACE_INIT_DISABLED :
+                PERF_TRACE_INIT_ERROR);
+    }
     prefix = getenv("XRDP_PERF_TRACE");
     if (prefix == NULL || prefix[0] == '\0')
     {
-        return;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_DISABLED,
+                         __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_DISABLED;
     }
     g_perf_pid = (long long)getpid();
-    if (snprintf(path, sizeof(path), "%s.%d", prefix, (int)g_perf_pid)
-            >= (int)sizeof(path))
+    rv = snprintf(path, sizeof(path), "%s.%d", prefix, (int)g_perf_pid);
+    if (rv < 0 || rv >= (int)sizeof(path))
     {
-        return;
+        errno = ENAMETOOLONG;
+        perf_trace_fail("path construction");
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
     }
-    fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
-              0600);
-    if (fd < 0)
+    g_perf_fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC |
+                     O_NOFOLLOW, 0600);
+    if (g_perf_fd < 0)
     {
-        return;
+        perf_trace_fail("create");
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
     }
-    g_perf_file = fdopen(fd, "w");
+    g_perf_file = fdopen(g_perf_fd, "w");
     if (g_perf_file == NULL)
     {
-        close(fd);
-        return;
+        perf_trace_fail("stream setup");
+        close(g_perf_fd);
+        g_perf_fd = -1;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
     }
-    g_perf_buf = (char *)malloc(PERF_TRACE_BUF_SIZE);
-    if (g_perf_buf != NULL)
+    g_perf_buffer = (char *)malloc(PERF_TRACE_BUFFER_BYTES);
+    if (g_perf_buffer == NULL ||
+            setvbuf(g_perf_file, g_perf_buffer, _IOFBF,
+                    PERF_TRACE_BUFFER_BYTES) != 0)
     {
-        setvbuf(g_perf_file, g_perf_buf, _IOFBF, PERF_TRACE_BUF_SIZE);
+        perf_trace_fail("buffer setup");
+        fclose(g_perf_file);
+        g_perf_file = NULL;
+        g_perf_fd = -1;
+        free(g_perf_buffer);
+        g_perf_buffer = NULL;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
+    }
+    if (fchmod(g_perf_fd, 0600) != 0)
+    {
+        perf_trace_fail("mode setup");
+        fclose(g_perf_file);
+        g_perf_file = NULL;
+        g_perf_fd = -1;
+        free(g_perf_buffer);
+        g_perf_buffer = NULL;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
     }
     for (index = 0; index < PERF_TRACE_MAX_RINGS; index++)
     {
         g_perf_rings[index] = perf_trace_ring_create();
         if (g_perf_rings[index] == NULL)
         {
+            perf_trace_fail("ring allocation");
             perf_trace_delete_rings();
             fclose(g_perf_file);
             g_perf_file = NULL;
-            free(g_perf_buf);
-            g_perf_buf = NULL;
-            return;
+            g_perf_fd = -1;
+            free(g_perf_buffer);
+            g_perf_buffer = NULL;
+            __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED,
+                             __ATOMIC_RELEASE);
+            pthread_mutex_unlock(&g_perf_lifecycle_lock);
+            return PERF_TRACE_INIT_ERROR;
         }
         g_perf_ring_count++;
     }
-    {
-        struct timespec mono;
-        struct timespec real;
-
-        if (clock_gettime(CLOCK_MONOTONIC, &mono) == 0 &&
-                clock_gettime(CLOCK_REALTIME, &real) == 0)
-        {
-            fprintf(g_perf_file, "schema=1 mono_ns=%lld pid=%lld tid=0 "
-                    "event=clock_base real_ns=%lld\n",
-                    (long long)mono.tv_sec * 1000000000LL + mono.tv_nsec,
-                    g_perf_pid,
-                    (long long)real.tv_sec * 1000000000LL + real.tv_nsec);
-        }
-    }
-    if (pthread_create(&g_perf_sink, NULL, perf_trace_sink_thread,
-                       NULL) != 0)
+    if (!perf_trace_write_clock_base())
     {
         perf_trace_delete_rings();
         fclose(g_perf_file);
         g_perf_file = NULL;
-        free(g_perf_buf);
-        g_perf_buf = NULL;
-        return;
+        g_perf_fd = -1;
+        free(g_perf_buffer);
+        g_perf_buffer = NULL;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
+    }
+    __atomic_store_n(&g_perf_quit, 0, __ATOMIC_RELEASE);
+    if (pthread_create(&g_perf_sink, NULL, perf_trace_sink_thread, NULL) != 0)
+    {
+        errno = EAGAIN;
+        perf_trace_fail("sink thread start");
+        perf_trace_delete_rings();
+        fclose(g_perf_file);
+        g_perf_file = NULL;
+        g_perf_fd = -1;
+        free(g_perf_buffer);
+        g_perf_buffer = NULL;
+        __atomic_store_n(&g_perf_state, PERF_TRACE_FAILED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return PERF_TRACE_INIT_ERROR;
     }
     g_perf_sink_live = 1;
-    g_perf_armed = 1;
+    __atomic_store_n(&g_perf_state, PERF_TRACE_ARMED, __ATOMIC_RELEASE);
+    pthread_mutex_unlock(&g_perf_lifecycle_lock);
+    return PERF_TRACE_INIT_ARMED;
 }
 
 /*****************************************************************************/
 int
 perf_trace_on(void)
 {
-    pthread_once(&g_perf_once, perf_trace_open);
-    return g_perf_armed;
+    return __atomic_load_n(&g_perf_state, __ATOMIC_ACQUIRE) ==
+           PERF_TRACE_ARMED;
 }
 
 /*****************************************************************************/
@@ -481,7 +745,7 @@ perf_trace_my_ring(void)
             return g_perf_my_ring;
         }
     }
-    __sync_fetch_and_add(&g_perf_no_ring, 1);
+    __atomic_add_fetch(&g_perf_no_ring, 1, __ATOMIC_RELAXED);
     return NULL;
 }
 
@@ -492,7 +756,7 @@ perf_trace_ev(const char *format, ...)
     struct perf_trace_ring *ring;
     va_list ap;
 
-    if (!g_perf_armed || format == NULL)
+    if (!perf_trace_on() || format == NULL)
     {
         return;
     }
@@ -502,33 +766,70 @@ perf_trace_ev(const char *format, ...)
         return;
     }
     va_start(ap, format);
+    /* Shipped call sites are compile-time literals checked in review and by
+     * the printf attribute. The public ring primitive validates the complete
+     * restricted grammar; repeating that scan on every frame would measure
+     * the schema validator rather than publication. */
     perf_trace_ring_vwrite(ring, perf_trace_now_ns(), g_perf_pid,
-                           (long long)pthread_self(), format, ap);
+                           perf_trace_tid(), format, ap, 0);
     va_end(ap);
 }
 
 /*****************************************************************************/
-void
+int
 perf_trace_close(void)
 {
+    int state;
+    int rv;
+
+    pthread_mutex_lock(&g_perf_lifecycle_lock);
+    state = __atomic_load_n(&g_perf_state, __ATOMIC_ACQUIRE);
+    if (state == PERF_TRACE_CLOSED || state == PERF_TRACE_DISABLED)
+    {
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return 0;
+    }
+    if (state == PERF_TRACE_UNINITIALIZED)
+    {
+        __atomic_store_n(&g_perf_state, PERF_TRACE_CLOSED, __ATOMIC_RELEASE);
+        pthread_mutex_unlock(&g_perf_lifecycle_lock);
+        return 0;
+    }
+    __atomic_store_n(&g_perf_state, PERF_TRACE_CLOSING, __ATOMIC_RELEASE);
+    __atomic_store_n(&g_perf_quit, 1, __ATOMIC_RELEASE);
+    pthread_mutex_lock(&g_perf_wake_lock);
+    pthread_cond_signal(&g_perf_wake);
+    pthread_mutex_unlock(&g_perf_wake_lock);
     if (g_perf_sink_live)
     {
-        g_perf_armed = 0;
-        g_perf_quit = 1;
         pthread_join(g_perf_sink, NULL);
         g_perf_sink_live = 0;
     }
-    g_perf_armed = 0;
-    if (g_perf_file != NULL)
+    rv = __atomic_load_n(&g_perf_failure, __ATOMIC_ACQUIRE) ? -1 : 0;
+    if (g_perf_fd >= 0)
     {
-        fflush(g_perf_file);
-        fclose(g_perf_file);
+        if (fflush(g_perf_file) != 0)
+        {
+            perf_trace_fail("flush");
+            rv = -1;
+        }
+        if (fsync(g_perf_fd) != 0)
+        {
+            perf_trace_fail("flush");
+            rv = -1;
+        }
+        if (fclose(g_perf_file) != 0)
+        {
+            perf_trace_fail("close");
+            rv = -1;
+        }
         g_perf_file = NULL;
+        g_perf_fd = -1;
     }
+    free(g_perf_buffer);
+    g_perf_buffer = NULL;
     perf_trace_delete_rings();
-    if (g_perf_buf != NULL)
-    {
-        free(g_perf_buf);
-        g_perf_buf = NULL;
-    }
+    __atomic_store_n(&g_perf_state, PERF_TRACE_CLOSED, __ATOMIC_RELEASE);
+    pthread_mutex_unlock(&g_perf_lifecycle_lock);
+    return rv;
 }

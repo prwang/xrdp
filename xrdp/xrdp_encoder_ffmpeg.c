@@ -157,7 +157,9 @@ struct xrdp_ffmpeg_avc444
 
     /* BACKLOG #78: cleared at submit so drain_stdout can stamp the
      * FIRST output byte of the submitted picture exactly once */
+#if defined(XRDP_PERF_TRACE)
     int trace_out_seen;
+#endif
 
     /* completed-packet FIFO (in coded-picture order) */
     struct ff_pkt *pk;
@@ -654,9 +656,9 @@ spawn_child(const struct xrdp_ffmpeg_avc444_config *cfg, int cw, int ch,
      * the INITIAL user namespace; the pipe then stays at the kernel
      * minimum of two pages. Measured 2026-08-08 (BACKLOG #103) inside
      * an unprivileged container whose root maps to an ordinary host
-     * uid: an 8192-byte pipe carried a 13.8 MB picture in 1688 round
-     * trips instead of 14 and cost 7.5 ms of a 24.5 ms frame at
-     * 3840x2400. xrdp does not change system settings -- not a sysctl,
+     * uid: the standalone #103 reproducer carried a 13.8 MB picture in
+     * 1688 round trips instead of 14 and took 5.84 ms. xrdp does not
+     * change system settings -- not a sysctl,
      * not a capability -- so the only correct response is to be loud
      * about it and let the administrator decide. */
     got_pipe = negotiate_in_pipe_size(inpipe[1]);
@@ -837,6 +839,7 @@ pk_available(struct xrdp_ffmpeg_avc444 *self)
  * (the seq FIFO front), truncated to the record's int payload. -1 when
  * no picture is in flight (records so tagged are discarded by the
  * reader rather than mis-paired -- 2c gate). */
+#if defined(XRDP_PERF_TRACE)
 static int
 trace_seq_front(const struct xrdp_ffmpeg_avc444 *self)
 {
@@ -846,6 +849,7 @@ trace_seq_front(const struct xrdp_ffmpeg_avc444 *self)
     }
     return (int)(self->seq[self->seq_head] & 0x3fffffff);
 }
+#endif
 
 /*****************************************************************************/
 /* read stdout, feed NUT, append completed packets to the FIFO.            */
@@ -881,6 +885,7 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
             return -1;
         }
         total += n;
+#if defined(XRDP_PERF_TRACE)
         if (!self->trace_out_seen)
         {
             /* BACKLOG #78: first output byte since submit == the child
@@ -894,6 +899,7 @@ drain_stdout(struct xrdp_ffmpeg_avc444 *self)
                        "monitor=%d", trace_seq_front(self),
                        self->leaf == NULL, n, self->cfg.monitor_index);
         }
+#endif
         if (xrdp_nut_feed(self->nut, (unsigned char *)tmp, n) != 0)
         {
             self->metrics.parser_errors++;
@@ -1650,7 +1656,9 @@ xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
         return XRDP_FFMPEG_PAIR_ERROR;
     }
     self->pairs_submitted++;
+#if defined(XRDP_PERF_TRACE)
     self->trace_out_seen = 0;
+#endif
     /* BACKLOG #92 / FR-H264-9: aux_nv12 NULL means "chroma is not due
      * this frame". The aux child is simply not fed -- no picture, no
      * sequence entry -- so it has nothing outstanding and pump_pairs
@@ -1668,7 +1676,9 @@ xrdp_ffmpeg_avc444_submit_pair(struct xrdp_ffmpeg_avc444 *self,
         return XRDP_FFMPEG_PAIR_ERROR;
     }
     self->leaf->pairs_submitted++;
+#if defined(XRDP_PERF_TRACE)
     self->leaf->trace_out_seen = 0;
+#endif
     return XRDP_FFMPEG_PAIR_READY;
 }
 

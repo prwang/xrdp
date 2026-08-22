@@ -191,10 +191,9 @@ kubectl -n "$NS" exec "$POD" -- bash -lc \
 # so they take turns and each turn costs a pair of context switches
 # (PRD FR-PROC-6 clause 4). A uid over the HOST's fs/pipe-user-pages-
 # soft, without CAP_SYS_RESOURCE in the initial user namespace, is
-# refused every resize and gets two pages. Measured 2026-08-08 on this
-# fleet: 1688 turns per 13.8 MB picture instead of 14, 7.5 ms of a
-# 24.5 ms frame at 3840x2400, 41 fps against 59 for the same build and
-# config once the host limit was raised. xrdp does not warn about a pipe
+# refused every resize and gets two pages. The standalone #103 reproducer
+# measured 1688 turns per 13.8 MB picture instead of 14, taking 5.84 ms.
+# xrdp does not warn about a pipe
 # that is merely smaller than it asked for, so this check has no false
 # alarm on a host with a lowered fs/pipe-max-size.
 #
@@ -237,9 +236,8 @@ not apply)")"
         echo "requires, so it cannot hold enough for xrdp and the encoder"
         echo "to run at the same time: they take turns, and each turn"
         echo "costs a pair of context switches. On this fleet that alone"
-        echo "was 7.5 ms of a 24.5 ms frame at 3840x2400 — 41 fps where"
-        echo "the same build and config did 59 once the host limit was"
-        echo "raised. It depresses every rate by an amount that has"
+        echo "was 5.84 ms per 13.8 MB picture in the standalone #103"
+        echo "reproducer. It depresses every rate by an amount that has"
         echo "nothing to do with what is under test."
         echo
         echo "OWNER ACTION REQUIRED: raise fs/pipe-user-pages-soft on the"

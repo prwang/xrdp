@@ -22,6 +22,7 @@ fi
 
 echo "${ARM_LABEL:-unlabeled-arm}" > /etc/arm_label
 echo "${SESSION_KIND:-banner}" > /etc/session_kind
+echo "${TEXTFLOOD_MONITOR:-all}" > /etc/textflood_monitor
 
 # BACKLOG #70: the ack trace has two halves and they live in two
 # processes. xrdp reads XRDP_ACK_TRACE straight out of the pod

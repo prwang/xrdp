@@ -33,7 +33,7 @@ x035 then certified. The five-arm fleet was therefore complete; the stale
 “RED AND OPEN” paragraph which remained in `BACKLOG.md` did not describe the
 repository after `3ca9ae9f`.
 
-This closes fleet construction only. BACKLOG #108 separately invalidates
-timing evidence collected with xorgxrdp's per-frame `ACK_TRACE cap` logger,
-and the evidence matrix document must be updated before it can specify the
-final PR campaign.
+This closes fleet construction only. #121 later deleted timing evidence
+collected with xorgxrdp's per-frame `ACK_TRACE cap` logger and made target
+identity and record sufficiency fail-loud. The fleet definitions remain a
+construction anchor, not performance evidence.

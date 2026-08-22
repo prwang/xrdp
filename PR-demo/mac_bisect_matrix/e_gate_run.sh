@@ -12,7 +12,11 @@
 #                             This is the gate metric. The baseline is
 #                             E5_BASE_MS (default 51.1 ms, the 2026-07-29
 #                             pre-steps-5..7 run at this geometry);
-#                             >= 2.0x of it passes.
+#                             >= 2.0x of it passes. Set E5_BASE_MS=none
+#                             for a characterization that has no
+#                             apples-to-apples historical baseline; the
+#                             distribution is still reported, but no E5
+#                             ratio or gate verdict is fabricated.
 #
 #                             E5_BASE_MS EXISTS BECAUSE A BASELINE IS ONLY
 #                             COMPARABLE UNDER THE SAME PAYLOAD. The 51.1
@@ -97,7 +101,8 @@
 #       E_CRED_FILE=/root/.t4_rdp_cred E_MODE=oracle e_gate_run.sh 180
 #
 # Env: E_TARGET pod|ssh · E_SSH_HOST (else /root/.t4_host) · E_SSH_KEY ·
-#   E_ARM/E_NS (pod only) · E_PORT · E_USER · E_CRED_FILE · E_MODE
+#   E_ARM/E_NS (pod only) · E_PORT · E_USER · E_CRED_FILE · E_MODE ·
+#   E5_BASE_MS (milliseconds, or "none")
 #   oracle|render · E_REFRESH · E5_BASE_MS · E_OUT · E_COLD 0|1 ·
 #   E_MODE0/E_MODE1/E_POS1/E_MODELINE0/E_MODELINE1 (client geometry) ·
 #   E_FREEZE_AT (BACKLOG #80 freeze leg, default OFF — see below) ·
@@ -254,6 +259,33 @@ if [ "$TARGET" = pod ]; then
     kubectl -n "$NS" get pod "$POD" \
         -o jsonpath='{.spec.containers[0].image}{"\n"}' \
         > "$OUT/deployed_image.txt" 2>&1
+    # Resolve the endpoint the client will actually dial independently of
+    # the pod selected for log collection. An E_PORT override used to let
+    # those name different arms while the resulting empty trace was reported
+    # as an idle session.
+    POD_ENDPOINTS=$OUT/pod_endpoints.tsv
+    kubectl -n "$NS" get pods -o \
+        jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.labels.arm}{"\t"}{range .spec.containers[*].ports[*]}{.hostPort}{","}{end}{"\n"}{end}' \
+        > "$POD_ENDPOINTS"
+    DIAL_ID=$(awk -F '\t' -v port="$PORT" '
+        {
+            n = split($3, ports, ",")
+            for (i = 1; i <= n; i++)
+                if (ports[i] == port) print $1 "\t" $2
+        }' "$POD_ENDPOINTS")
+    [ "$(printf '%s\n' "$DIAL_ID" | sed '/^$/d' | wc -l)" -eq 1 ] \
+        || fail "port $PORT resolves to zero or multiple running pods; see \
+$POD_ENDPOINTS"
+    DIAL_POD=$(printf '%s\n' "$DIAL_ID" | cut -f1)
+    DIAL_ARM=$(printf '%s\n' "$DIAL_ID" | cut -f2)
+    SELECTED_ARM=$(kubectl -n "$NS" get pod "$POD" \
+                   -o jsonpath='{.metadata.labels.arm}')
+    python3 "$D/gate_evidence_check.py" identity \
+        --requested-arm "$ARM" --selected-pod "$POD" \
+        --selected-arm "$SELECTED_ARM" --dialed-pod "$DIAL_POD" \
+        --dialed-arm "$DIAL_ARM" | tee "$OUT/target_identity.txt" \
+        || fail "dialled endpoint and collected pod identity disagree; see \
+$OUT/target_identity.txt"
 else
     { echo "host install (no image): $SSH_HOST"
       srv 'uname -srm; nvidia-smi --query-gpu=name --format=csv,noheader \
@@ -271,6 +303,8 @@ srv 'cat /etc/session_kind 2>/dev/null || cat /etc/xrdp-e52-payload \
 grep -q UNKNOWN "$OUT/deployed_session_kind.txt" && echo \
     "WARNING: the payload is not declared on $SRV_NAME — record what was" \
     "on screen by hand, or the interval cannot be compared to anything" >&2
+srv 'cat /etc/textflood_monitor 2>/dev/null || echo all' \
+    > "$OUT/deployed_textflood_monitor.txt" 2>&1
 # the recon build must be GONE (its gate is answered); if it is still
 # there the arm is the wrong one
 if srv 'grep -qc R1SLOT /usr/lib/xorg/modules/libxorgxrdp.so' >/dev/null 2>&1
@@ -374,8 +408,7 @@ echo "log marks: session-xorg $MARK_X lines, xrdp.log $MARK_P lines"
 # resize and the pipe stays at two pages. That is not a small effect and
 # it is not visible in any rate: measured 2026-08-08 in this fleet, an
 # 8192-byte pipe carried each 13.8 MB picture in 1688 turns instead of 14
-# and cost 7.5 ms of a 24.5 ms frame at 3840x2400 -- 41 fps where the
-# same build and the same config did 59 with the sysctl raised.
+# and took 5.84 ms in the standalone #103 reproducer.
 #
 # xrdp does not and must not change a system setting to fix this (owner
 # directive, 2026-08-09). It logs PIPE_TOO_SMALL instead, and THIS is the
@@ -658,6 +691,7 @@ fi
 # common/perf_trace's ring now. Pull the ring file and render it back into
 # the line shapes every analysis here already reads.
 PERF_DIR=/var/log/xrdp-perf
+EVIDENCE_ERROR=
 mkdir -p "$OUT/perf"
 PERF_FILES=$(srv "ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" | tr -d '\r')
 if [ -n "$PERF_FILES" ]; then
@@ -675,6 +709,16 @@ if [ -n "$PERF_FILES" ]; then
     # gfx_trace.txt. Both get the rendered records.
     grep -a "ACK_TRACE" "$OUT/perf_trace_lines.txt" >> "$OUT/xrdp.log"
     grep -a "GFX_TRACE" "$OUT/perf_trace_lines.txt" > "$OUT/gfx_trace.txt"
+    TRACE_RECORDS=$(wc -l < "$OUT/perf_trace_lines.txt" | tr -d ' ')
+    if ! python3 "$D/gate_evidence_check.py" records \
+             --seconds "$SECS" --records "$TRACE_RECORDS" \
+             > "$OUT/trace_presence.txt" 2>&1
+    then
+        cat "$OUT/trace_presence.txt" >&2
+        EVIDENCE_ERROR="trace record-presence gate failed"
+    else
+        cat "$OUT/trace_presence.txt"
+    fi
     # SPAN GUARD. The rendered trace must cover roughly the run and not
     # much more. This is what catches a window that failed to apply --
     # the failure mode is silent and severe: on 2026-08-01 an unwindowed
@@ -699,9 +743,10 @@ numbers."
     fi
     echo "trace span: ${SPAN:-?}s for a ${SECS}s run"
 else
-    echo "WARNING: no perf ring file under $PERF_DIR on $SRV_NAME —" \
+    echo "RED: no perf ring file under $PERF_DIR on $SRV_NAME —" \
          "is XRDP_PERF_TRACE set for this arm? Since #61h the per-frame" \
          "trace lives ONLY there, so E5/E4 will read an empty trace" >&2
+    EVIDENCE_ERROR="no perf ring file was collected"
     : > "$OUT/gfx_trace.txt"
 fi
 
@@ -741,6 +786,8 @@ ${FREEZE_AT:+, FREEZE LEG at +${FREEZE_AT}s} ==="
         | awk '{print "package: " $2 " " $3}'
     echo "monitors: $(tail -1 "$OUT/client-monitors.txt")"
     echo "payload:  SESSION_KIND = $(cat "$OUT/deployed_session_kind.txt")"
+    echo "selector: TEXTFLOOD_MONITOR = \
+$(cat "$OUT/deployed_textflood_monitor.txt")"
     echo "refresh:  intra_refresh_frames = \
 $(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
   "$OUT/gfx.toml" | head -1)"
@@ -754,8 +801,8 @@ $(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
         echo "          64 KiB minimum xrdp requires, $PIPE_N times."
         echo "          The pipe cannot then hold enough for xrdp and"
         echo "          the encoder to run at the same time, so they"
-        echo "          take turns; on this fleet that alone was 7.5 ms"
-        echo "          of a 24.5 ms frame at 3840x2400. Every rate below is"
+        echo "          take turns; the standalone #103 reproducer measured"
+        echo "          5.84 ms per 13.8 MB picture. Every rate is then"
         echo "          depressed by an amount that has nothing to do"
         echo "          with the build or the config under test."
         echo "          OWNER ACTION: raise fs/pipe-user-pages-soft on"
@@ -1058,19 +1105,23 @@ if span > 0 and busy > 0:
 print()
 
 if sys.argv[2] == "oracle":
-    base = float(sys.argv[3])
-    print("E5 GATE: baseline %.1f ms mean per send (SAME payload — see "
-          "E5_BASE_MS)" % base)
-    print("         measured %.1f ms  ->  %.2fx" % (mean, base / mean))
-    if mean <= base / 2.0:
-        print("         >= 2.0x: PASS")
-    elif mean <= base / 1.5:
-        print("         between 1.5x and 2.0x: SHORT OF THE PREDICTION -- "
-              "record it as such, do not re-tune until it looks better")
+    if sys.argv[3].lower() in ("none", "na", "n/a"):
+        print("E5 GATE: NOT REQUESTED — this characterization has no "
+              "same-payload serialized baseline")
     else:
-        print("         under 1.5x: RED. The stop rule applies: attribute "
-              "the remainder (capture, vmsplice feed, NUT demux, LTR "
-              "rewrite, EGFX assembly) before anything ships")
+        base = float(sys.argv[3])
+        print("E5 GATE: baseline %.1f ms mean per send (SAME payload — see "
+              "E5_BASE_MS)" % base)
+        print("         measured %.1f ms  ->  %.2fx" % (mean, base / mean))
+        if mean <= base / 2.0:
+            print("         >= 2.0x: PASS")
+        elif mean <= base / 1.5:
+            print("         between 1.5x and 2.0x: SHORT OF THE PREDICTION -- "
+                  "record it as such, do not re-tune until it looks better")
+        else:
+            print("         under 1.5x: RED. The stop rule applies: attribute "
+                  "the remainder (capture, vmsplice feed, NUT demux, LTR "
+                  "rewrite, EGFX assembly) before anything ships")
 else:
     print()
     print("CONTEXT ONLY (rendering client): this is the end-to-end rate, "
@@ -1166,6 +1217,11 @@ fi
 
 echo
 echo "evidence: $OUT"
+
+if [ -n "$EVIDENCE_ERROR" ]; then
+    fail "$EVIDENCE_ERROR; the session was logged off and no result from \
+this run is admissible"
+fi
 
 # A clamped pipe found only AFTER the run (cold pod: this run's session
 # was the first to spawn children) still invalidates it, and a caller

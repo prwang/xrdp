@@ -1,0 +1,99 @@
+# Arm x036 -- BACKLOG #122 textflood spans both monitors.
+#
+# x036 and x037 use one paired image and byte-identical gfx.toml files.
+# Their only condition difference is TEXTFLOOD_MONITOR: this arm leaves the
+# payload at its default `all` target. The client supplies the historical
+# 2560x1440 + 3840x2400 modelines. Endpoint: 127.0.0.1:40052.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x036
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x036
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x036
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x036
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "textflood_strip"
+            - name: TEXTFLOOD_MONITOR
+              value: "all"
+            - name: ARM_LABEL
+              value: "x036: BACKLOG #122 textflood spans both monitors (port 40052)"
+            - name: XRDP_GFX_FRAMES_IN_FLIGHT
+              value: "2"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40052
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: dri
+              mountPath: /dev/dri
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+            - name: banner
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          # k8s defaults /dev/shm to 64Mi, which an AVC444 session blows
+          # past instantly -- and an undersized tmpfs SIGBUSes Xorg
+          # mid-session (2026-07-28 multimon incident). The capture arena
+          # is exactly width*height*1.5 * 2 views * 2 slots, summed over
+          # monitors: 9,437,184 B measured at 2x1024x768, 77,414,400 B
+          # (73.8 MiB) at the #45 E3 target 2560x1440 + 3840x2400. 1Gi is
+          # ~13.9x that -- deliberately flat and generous rather than
+          # tuned, because the failure mode is a hard mid-session SIGBUS
+          # and the memory is a tmpfs ceiling, not an allocation
+          # (BACKLOG #45 recon gate R2, owner directive 2026-07-29).
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: dri
+          hostPath:
+            path: /dev/dri
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x036

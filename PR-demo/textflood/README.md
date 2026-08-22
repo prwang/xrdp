@@ -242,11 +242,32 @@ in the loop. Projecting 2.68 + 2.80 ms from the numbers above gives
 ~5.5 ms, which would be a margin of 3.4× against an 18.476 ms
 pipeline — a projection, not a result, and it is stated as one.
 
+## Selecting one monitor
+
+`--monitor N` confines the override-redirect window to one live RandR output;
+the default still spans the whole root. This supplies the one-active/one-idle
+condition without changing renderer, corpus or scroll mode. Outputs are
+ordered by desktop x/y position, so monitor 0 is the leftmost output in the
+committed #122 geometry.
+
+Xorgxrdp first exposes one union output and replaces it with the client
+monitor outputs when the RDP layout arrives. Selected-monitor startup waits
+for that two-output RandR topology before it creates the stamps file or enters
+the measured loop. It fails after ten seconds instead of silently treating
+the union as monitor 0. Xinerama is not used: xorgxrdp deliberately exposes
+the full desktop as one Xinerama screen.
+
+The stamps header records `target=monitor-N`, origin and geometry. #122's
+2560x1440 selection produced 1043 damage events on surface 0 and only the
+initial fill on surface 1; see
+`docs/experiments/122-one-active-monitor.md`.
+
 ## Build and run
 
 ```sh
-./build.sh                     # needs libcairo2-dev libx11-dev libxext-dev
+./build.sh                     # also needs libxrandr-dev
 ./textflood --corpus ../mac_bisect_matrix/code_corpus.ansi
+./textflood --corpus ../mac_bisect_matrix/code_corpus.ansi --monitor 0
 ./textflood --help
 
 # offline, no X server, seconds of CPU:

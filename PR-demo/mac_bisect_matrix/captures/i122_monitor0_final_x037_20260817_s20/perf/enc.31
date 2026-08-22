@@ -1,0 +1,40 @@
+schema=1 mono_ns=2970672161536545 pid=31 tid=0 event=clock_base real_ns=1786936065534262364
+schema=1 mono_ns=2970672413655089 pid=31 tid=131760420591296 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=2970672428182007 pid=31 tid=131760452097920 event=ack class=GFX_TRACE frame_id=1 queue_depth=0 decoded=1 id_server=0 ack_off=0
+schema=1 mono_ns=2970675009949746 pid=31 tid=131760420591296 event=wait_end
+schema=1 mono_ns=2970675009953056 pid=31 tid=131760420591296 event=drain_beg n_items=0
+schema=1 mono_ns=2970675009954956 pid=31 tid=131760420591296 event=drain_end n_items=1 drain_full=0
+schema=1 mono_ns=2970675009955466 pid=31 tid=131760420591296 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=2970675009956166 pid=31 tid=131760420591296 event=subm_beg set_n=1
+schema=1 mono_ns=2970675009933437 pid=31 tid=131760452097920 event=msgin class=ACK_TRACE id=1 bytes=4718592
+schema=1 mono_ns=2970675009937567 pid=31 tid=131760452097920 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=2970675022341761 pid=31 tid=131760420591296 event=submit class=ACK_TRACE id=1 monitor=0
+schema=1 mono_ns=2970675022343351 pid=31 tid=131760420591296 event=subm_end n_handles=1
+schema=1 mono_ns=2970675022343851 pid=31 tid=131760420591296 event=pump_beg n_handles=1 kids_armed=0 monitor_mask=1 credit_mask=1 credit=0
+schema=1 mono_ns=2970675118546761 pid=31 tid=131760420591296 event=feedend sequence=0 main=1 monitor=0
+schema=1 mono_ns=2970675120639306 pid=31 tid=131760420591296 event=feedend sequence=0 main=0 monitor=0
+schema=1 mono_ns=2970675121210775 pid=31 tid=131760420591296 event=outfirst sequence=0 main=1 bytes=296 monitor=0
+schema=1 mono_ns=2970675122564127 pid=31 tid=131760420591296 event=outfirst sequence=0 main=0 bytes=296 monitor=0
+schema=1 mono_ns=2970675127904044 pid=31 tid=131760420591296 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=0
+schema=1 mono_ns=2970675127905444 pid=31 tid=131760420591296 event=book_beg n_handles=1
+schema=1 mono_ns=2970675127910694 pid=31 tid=131760420591296 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=2970675127911374 pid=31 tid=131760420591296 event=book_end n_handles=1
+schema=1 mono_ns=2970675127911774 pid=31 tid=131760420591296 event=coll_beg monitor=0
+schema=1 mono_ns=2970675127938283 pid=31 tid=131760420591296 event=coll_end monitor=0
+schema=1 mono_ns=2970675127938473 pid=31 tid=131760420591296 event=rel_beg set_n=1
+schema=1 mono_ns=2970675127939353 pid=31 tid=131760420591296 event=absorb class=ACK_TRACE id=1 monitor=0
+schema=1 mono_ns=2970675127946763 pid=31 tid=131760420591296 event=rel_end set_n=1
+schema=1 mono_ns=2970675127946933 pid=31 tid=131760420591296 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=2970675127950443 pid=31 tid=131760420591296 event=dmg class=GFX_TRACE surface=0 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=2970675127951793 pid=31 tid=131760420591296 event=enc class=GFX_TRACE submitted_seq=0 returned_seq=0 ready=1 inflight=-1 center_y=-1
+schema=1 mono_ns=2970675127962262 pid=31 tid=131760420591296 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=2970675127962512 pid=31 tid=131760420591296 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=2970675127969072 pid=31 tid=131760452097920 event=ack class=ACK_TRACE id=1 kind=slot egress=0 absorbed=1 client=0 window=2
+schema=1 mono_ns=2970675128078078 pid=31 tid=131760452097920 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 id_server=0 id_client=0 fif=2
+schema=1 mono_ns=2970675128086088 pid=31 tid=131760452097920 event=send class=GFX_TRACE bytes=474 last=0 frame_id=0 id_server=0 id_client=0 fif=2
+schema=1 mono_ns=2970675128091528 pid=31 tid=131760452097920 event=send class=GFX_TRACE bytes=257 last=0 frame_id=0 id_server=0 id_client=0 fif=2
+schema=1 mono_ns=2970675128095378 pid=31 tid=131760452097920 event=send class=GFX_TRACE bytes=14 last=0 frame_id=0 id_server=0 id_client=0 fif=2
+schema=1 mono_ns=2970675128095918 pid=31 tid=131760452097920 event=egress class=ACK_TRACE id=1 shown=1 pending_kib=0 client=0
+schema=1 mono_ns=2970675128096338 pid=31 tid=131760452097920 event=ack class=ACK_TRACE id=1 kind=region egress=1 absorbed=1 client=0 window=2
+schema=1 mono_ns=2970675128300000 pid=31 tid=131760452097920 event=ack class=GFX_TRACE frame_id=1 queue_depth=0 decoded=2 id_server=1 ack_off=0
+schema=1 mono_ns=2970679125352506 pid=31 tid=131760420591296 event=wait_end

@@ -23,6 +23,7 @@
 #endif
 
 #include "xrdp.h"
+#include "perf_trace.h"
 #include "log.h"
 #include "string_calls.h"
 
@@ -696,6 +697,10 @@ xrdp_listen_fork(struct xrdp_listen *self, struct trans *server_trans)
         /* child */
         /* recreate some main globals */
         xrdp_child_fork();
+#if defined(XRDP_PERF_TRACE)
+        /* The listener parent must never own a sink thread across fork. */
+        perf_trace_init();
+#endif
         /* recreate the process done wait object, not used in fork mode */
         /* close, don't delete this */
         g_close_wait_obj(self->pro_done_event);
@@ -715,6 +720,9 @@ xrdp_listen_fork(struct xrdp_listen *self, struct trans *server_trans)
         xrdp_process_run(0);
         tc_sem_dec(g_process_sem);
         xrdp_process_delete(process);
+#if defined(XRDP_PERF_TRACE)
+        perf_trace_close();
+#endif
         /* mark this process to exit */
         g_set_term(1);
         return 1;

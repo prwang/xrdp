@@ -260,7 +260,9 @@ trans_send_waiting(struct trans *self, int block)
                 if (sent > 0)
                 {
                     temp_s->p += sent;
+#if defined(XRDP_PERF_TRACE)
                     self->wait_bytes -= sent;
+#endif
                     if (temp_s->source != 0)
                     {
                         temp_s->source[0] -= sent;
@@ -663,7 +665,9 @@ trans_write_copy_s(struct trans *self, struct stream *out_s)
     wait_s->p = wait_s->data;
     /* BACKLOG #80: keep the O(1) byte count of the wait list in step
      * with the list itself; see struct trans::wait_bytes */
+#if defined(XRDP_PERF_TRACE)
     self->wait_bytes += size;
+#endif
     if (self->wait_s == 0)
     {
         self->wait_s = wait_s;

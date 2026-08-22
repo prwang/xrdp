@@ -1660,6 +1660,7 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
  * per frame on the egress path and coding rule 5 forbids anything with
  * a per-frame cost there -- walking the wait_s list would be exactly
  * that. Returns 0 when there is no session yet. */
+#if defined(XRDP_PERF_TRACE)
 static int
 xrdp_mm_egress_pending_kib(struct xrdp_mm *self)
 {
@@ -1670,6 +1671,7 @@ xrdp_mm_egress_pending_kib(struct xrdp_mm *self)
     }
     return (int) (self->wm->session->trans->wait_bytes / 1024);
 }
+#endif
 
 /*****************************************************************************/
 /* BACKLOG #80 / PRD FR-FLOW-1 -- emit the credit frontier.
@@ -1887,6 +1889,7 @@ xrdp_mm_note_frame_consumed(struct xrdp_mm *self, int frame_id)
  * FRAME_ACK arrives. Lets an on-screen test (mstsc etc.) localise a withheld
  * tail frame: a "send" line for the last update but no display => client/
  * transport; no "send" line until the next damage => server/encoder hold. */
+#if defined(XRDP_PERF_TRACE)
 static int
 gfx_trace_on(void)
 {
@@ -1907,6 +1910,9 @@ gfx_trace_on(void)
     }
     return cached;
 }
+#else
+#define gfx_trace_on() 0
+#endif
 
 /*****************************************************************************/
 static int
@@ -5127,9 +5133,11 @@ server_egfx_cmd(struct xrdp_mod *mod,
     XRDP_ENC_DATA *enc;
     struct xrdp_wm *wm;
     struct xrdp_mm *mm;
+#if defined(XRDP_PERF_TRACE)
     int enq_depth;
 
     enq_depth = 0;
+#endif
     wm = (struct xrdp_wm *)(mod->wm);
     mm = wm->mm;
     if (mm->encoder == NULL)
@@ -5180,7 +5188,9 @@ server_egfx_cmd(struct xrdp_mod *mod,
     tc_mutex_lock(mm->encoder->mutex);
     fifo_add_item(mm->encoder->fifo_to_proc, enc);
     mm->encoder->fifo_to_proc_depth++;
+#if defined(XRDP_PERF_TRACE)
     enq_depth = mm->encoder->fifo_to_proc_depth;
+#endif
     /* FR-CAPTURE-8: the two-slot producer gate bounds the queue to the
        outstanding-rect budget; more means a leaked ack or a broken
        gate on the xorgxrdp side (loud, mandated local assertion).

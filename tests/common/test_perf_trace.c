@@ -24,7 +24,16 @@
 #endif
 
 #include <limits.h>
+#include <pthread.h>
+#include <signal.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
+#include <sys/resource.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <sys/wait.h>
 
 #include "perf_trace.h"
 #include "test_common.h"
@@ -40,6 +49,59 @@ assert_one_record(struct perf_trace_ring *ring, const char *expected)
     ck_assert_int_eq(memcmp(data, expected, length), 0);
     perf_trace_ring_consume(ring, length);
     ck_assert_int_eq(perf_trace_ring_peek(ring, &data, &length), 0);
+}
+
+static void
+make_trace_path(char *directory, size_t directory_bytes,
+                char *prefix, size_t prefix_bytes,
+                char *path, size_t path_bytes, long long pid)
+{
+    char template[] = "/tmp/xrdp-perf-trace-test-XXXXXX";
+
+    ck_assert_ptr_ne(mkdtemp(template), NULL);
+    ck_assert_int_lt(snprintf(directory, directory_bytes, "%s", template),
+                     (int)directory_bytes);
+    ck_assert_int_lt(snprintf(prefix, prefix_bytes, "%s/trace", directory),
+                     (int)prefix_bytes);
+    ck_assert_int_lt(snprintf(path, path_bytes, "%s.%lld", prefix, pid),
+                     (int)path_bytes);
+}
+
+static char *
+read_whole_file(const char *path)
+{
+    FILE *file;
+    char *data;
+    long length;
+
+    file = fopen(path, "rb");
+    ck_assert_ptr_ne(file, NULL);
+    ck_assert_int_eq(fseek(file, 0, SEEK_END), 0);
+    length = ftell(file);
+    ck_assert_int_ge(length, 0);
+    ck_assert_int_eq(fseek(file, 0, SEEK_SET), 0);
+    data = (char *)malloc((size_t)length + 1);
+    ck_assert_ptr_ne(data, NULL);
+    ck_assert_uint_eq(fread(data, 1, (size_t)length, file), (size_t)length);
+    data[length] = '\0';
+    ck_assert_int_eq(fclose(file), 0);
+    return data;
+}
+
+static int
+count_text(const char *text, const char *needle)
+{
+    int count;
+    size_t needle_length;
+
+    count = 0;
+    needle_length = strlen(needle);
+    while ((text = strstr(text, needle)) != NULL)
+    {
+        count++;
+        text += needle_length;
+    }
+    return count;
 }
 
 START_TEST(test_perf_trace_named_schema)
@@ -102,12 +164,219 @@ START_TEST(test_perf_trace_rejects_truncated_record)
 }
 END_TEST
 
+START_TEST(test_perf_trace_rejects_unsafe_formats)
+{
+    struct perf_trace_ring *ring;
+
+    ring = perf_trace_ring_create();
+    ck_assert_ptr_ne(ring, NULL);
+    ck_assert_int_eq(perf_trace_ring_write(
+                         ring, 1, 2, 3, "event=bad value=%s", "text"), 0);
+    ck_assert_int_eq(perf_trace_ring_write(
+                         ring, 1, 2, 3, "event=bad value=%1$d", 1), 0);
+    ck_assert_int_eq(perf_trace_ring_write(
+                         ring, 1, 2, 3, "event=bad value=%*d", 2, 1), 0);
+    ck_assert_int_eq(perf_trace_ring_write(
+                         ring, 1, 2, 3, "event=bad value=%f", 1.0), 0);
+    ck_assert_uint_eq(perf_trace_ring_format_failed(ring), 4);
+    perf_trace_ring_delete(ring);
+}
+END_TEST
+
 START_TEST(test_perf_trace_disarmed_by_default)
 {
+    ck_assert_int_eq(perf_trace_init(), PERF_TRACE_INIT_DISABLED);
     ck_assert_int_eq(perf_trace_on(), 0);
     perf_trace_ev("event=emit_beg frame_id=%d monitor=%d", 1, 2);
     perf_trace_close();
     ck_assert_int_eq(perf_trace_on(), 0);
+}
+END_TEST
+
+START_TEST(test_perf_trace_does_not_initialize_lazily)
+{
+    char directory[128];
+    char prefix[160];
+    char path[192];
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), (long long)getpid());
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    ck_assert_int_eq(perf_trace_on(), 0);
+    PERF_TRACE("event=lazy_sentinel value=%d", 1);
+    ck_assert_int_eq(access(path, F_OK), -1);
+    ck_assert_int_eq(perf_trace_close(), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
+}
+END_TEST
+
+START_TEST(test_perf_trace_explicit_lifecycle_and_final_drain)
+{
+    struct stat st;
+    char directory[128];
+    char prefix[160];
+    char path[192];
+    char *data;
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), (long long)getpid());
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    ck_assert_int_eq(perf_trace_init(), PERF_TRACE_INIT_ARMED);
+    ck_assert_int_eq(perf_trace_on(), 1);
+    PERF_TRACE("event=final_drain value=%d", 73);
+    ck_assert_int_eq(perf_trace_close(), 0);
+    ck_assert_int_eq(perf_trace_on(), 0);
+    PERF_TRACE("event=after_close value=%d", 74);
+    ck_assert_int_eq(perf_trace_close(), 0);
+    ck_assert_int_eq(stat(path, &st), 0);
+    ck_assert_int_eq(st.st_mode & 0777, 0600);
+    data = read_whole_file(path);
+    ck_assert_ptr_ne(strstr(data, "event=clock_base real_ns="), NULL);
+    ck_assert_ptr_ne(strstr(data, "event=final_drain value=73\n"), NULL);
+    ck_assert_ptr_eq(strstr(data, "event=after_close"), NULL);
+    free(data);
+    ck_assert_int_eq(unlink(path), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
+}
+END_TEST
+
+START_TEST(test_perf_trace_refuses_existing_symlink)
+{
+    char directory[128];
+    char prefix[160];
+    char path[192];
+    struct stat st;
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), (long long)getpid());
+    ck_assert_int_eq(symlink("/dev/null", path), 0);
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    ck_assert_int_eq(perf_trace_init(), PERF_TRACE_INIT_ERROR);
+    ck_assert_int_eq(lstat(path, &st), 0);
+    ck_assert(S_ISLNK(st.st_mode));
+    ck_assert_int_eq(perf_trace_close(), -1);
+    ck_assert_int_eq(unlink(path), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
+}
+END_TEST
+
+struct writer_args
+{
+    int writer;
+    int records;
+};
+
+static void *
+write_records(void *arg)
+{
+    struct writer_args *args;
+    int index;
+
+    args = (struct writer_args *)arg;
+    for (index = 0; index < args->records; index++)
+    {
+        PERF_TRACE("event=thread_record writer=%d sequence=%d",
+                   args->writer, index);
+    }
+    return NULL;
+}
+
+START_TEST(test_perf_trace_concurrent_thread_rings)
+{
+    struct writer_args args[4];
+    pthread_t threads[4];
+    char directory[128];
+    char prefix[160];
+    char path[192];
+    char *data;
+    int index;
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), (long long)getpid());
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    ck_assert_int_eq(perf_trace_init(), PERF_TRACE_INIT_ARMED);
+    for (index = 0; index < 4; index++)
+    {
+        args[index].writer = index;
+        args[index].records = 100;
+        ck_assert_int_eq(pthread_create(&threads[index], NULL, write_records,
+                                        &args[index]), 0);
+    }
+    for (index = 0; index < 4; index++)
+    {
+        ck_assert_int_eq(pthread_join(threads[index], NULL), 0);
+    }
+    ck_assert_int_eq(perf_trace_close(), 0);
+    data = read_whole_file(path);
+    ck_assert_int_eq(count_text(data, "event=thread_record "), 400);
+    ck_assert_ptr_eq(strstr(data, "event=perfdrop"), NULL);
+    ck_assert_ptr_eq(strstr(data, "event=perfnoring"), NULL);
+    free(data);
+    ck_assert_int_eq(unlink(path), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
+}
+END_TEST
+
+START_TEST(test_perf_trace_post_fork_initialization)
+{
+    char directory[128];
+    char prefix[160];
+    char path[192];
+    char *data;
+    pid_t pid;
+    int status;
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), 0);
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    pid = fork();
+    ck_assert_int_ne(pid, -1);
+    if (pid == 0)
+    {
+        if (perf_trace_init() != PERF_TRACE_INIT_ARMED)
+        {
+            _exit(10);
+        }
+        PERF_TRACE("event=post_fork value=%d", 81);
+        _exit(perf_trace_close() == 0 ? 0 : 11);
+    }
+    ck_assert_int_eq(waitpid(pid, &status, 0), pid);
+    ck_assert(WIFEXITED(status));
+    ck_assert_int_eq(WEXITSTATUS(status), 0);
+    ck_assert_int_lt(snprintf(path, sizeof(path), "%s.%d", prefix, (int)pid),
+                     (int)sizeof(path));
+    data = read_whole_file(path);
+    ck_assert_ptr_ne(strstr(data, "event=post_fork value=81\n"), NULL);
+    free(data);
+    ck_assert_int_eq(unlink(path), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
+}
+END_TEST
+
+START_TEST(test_perf_trace_sink_write_failure_is_visible)
+{
+    struct rlimit limit;
+    char directory[128];
+    char prefix[160];
+    char path[192];
+    int index;
+
+    make_trace_path(directory, sizeof(directory), prefix, sizeof(prefix),
+                    path, sizeof(path), (long long)getpid());
+    ck_assert_int_eq(setenv("XRDP_PERF_TRACE", prefix, 1), 0);
+    ck_assert_int_eq(perf_trace_init(), PERF_TRACE_INIT_ARMED);
+    ck_assert_ptr_ne(signal(SIGXFSZ, SIG_IGN), SIG_ERR);
+    limit.rlim_cur = 512;
+    limit.rlim_max = 512;
+    ck_assert_int_eq(setrlimit(RLIMIT_FSIZE, &limit), 0);
+    for (index = 0; index < 1000; index++)
+    {
+        PERF_TRACE("event=write_failure sequence=%d value=%d", index,
+                   index * 2);
+    }
+    ck_assert_int_eq(perf_trace_close(), -1);
+    ck_assert_int_eq(unlink(path), 0);
+    ck_assert_int_eq(rmdir(directory), 0);
 }
 END_TEST
 
@@ -231,7 +500,14 @@ make_suite_test_perf_trace(void)
     tcase_add_test(tc, test_perf_trace_named_schema);
     tcase_add_test(tc, test_perf_trace_64_bit_and_negative_values);
     tcase_add_test(tc, test_perf_trace_rejects_truncated_record);
+    tcase_add_test(tc, test_perf_trace_rejects_unsafe_formats);
     tcase_add_test(tc, test_perf_trace_disarmed_by_default);
+    tcase_add_test(tc, test_perf_trace_does_not_initialize_lazily);
+    tcase_add_test(tc, test_perf_trace_explicit_lifecycle_and_final_drain);
+    tcase_add_test(tc, test_perf_trace_refuses_existing_symlink);
+    tcase_add_test(tc, test_perf_trace_concurrent_thread_rings);
+    tcase_add_test(tc, test_perf_trace_post_fork_initialization);
+    tcase_add_test(tc, test_perf_trace_sink_write_failure_is_visible);
     tcase_add_test(tc, test_perf_trace_ring_fifo_bytes);
     tcase_add_test(tc, test_perf_trace_ring_wraps_without_copy);
     tcase_add_test(tc, test_perf_trace_ring_counts_whole_record_drops);

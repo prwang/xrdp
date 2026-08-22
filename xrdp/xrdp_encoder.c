@@ -836,6 +836,7 @@ process_enc_rfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
 }
 #endif
 
+#if defined(XRDP_PERF_TRACE)
 /*****************************************************************************/
 /* A trace knob is armed but the ring is not: every per-frame record the
  * knob selects goes to the perf sink (BACKLOG #61h), so without
@@ -875,18 +876,6 @@ gfx_enc_trace_on(void)
     return cached;
 }
 
-/*****************************************************************************/
-/* BACKLOG #70 -- see xrdp_encoder.h */
-long long
-xrdp_mono_us(void)
-{
-    struct timespec ts;
-
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (long long)ts.tv_sec * 1000000 + ts.tv_nsec / 1000;
-}
-
-/*****************************************************************************/
 int
 xrdp_ack_trace_on(void)
 {
@@ -932,6 +921,10 @@ gfx_trace_rects(const char *tag, int surface_id, int num_rects,
                "x1=%d y1=%d x2=%d y2=%d",
                surface_id, num_rects, bx1, by1, bx2, by2);
 }
+#else
+#define gfx_enc_trace_on() 0
+#define gfx_trace_rects(...) do { } while (0)
+#endif
 
 /* #45 step 7 -- the xorgxrdp AVC444 xup blob is EXACTLY three EGFX
  * commands (rdpClientCon.c, the CC_GFX_AVC444 arm):
@@ -1678,6 +1671,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     main_view = (const unsigned char *)enc_gfx_cmd->data + shmem_offset;
     enc_rv = xrdp_ffmpeg_avc444_encode_single(ff, main_view,
              nv12_bytes, self->avc444_seq++, &pic);
+#if defined(XRDP_PERF_TRACE)
     if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
     {
         int t_cw = xrdp_ffmpeg_avc444_coded_width(ff);
@@ -1692,6 +1686,7 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
                    xrdp_ffmpeg_avc444_inflight(ff),
                    (int)main_view[cy_off]);
     }
+#endif
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
         xrdp_ffmpeg_avc444_delete(ff);
@@ -2205,6 +2200,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         enc_rv = xrdp_ffmpeg_avc444_encode_pair(ff, main_view, aux_view,
                                                 nv12_bytes, seq, &pair);
     }
+#if defined(XRDP_PERF_TRACE)
     if (gfx_enc_trace_on() && enc_rv != XRDP_FFMPEG_PAIR_ERROR)
     {
         /* centre luma of the CURRENT capture: proves which colour this
@@ -2230,6 +2226,7 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
                    ff != NULL ? xrdp_ffmpeg_avc444_inflight(ff) : -1,
                    center_y);
     }
+#endif
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
         /* only reachable from the inline encode above, which is the
@@ -2623,6 +2620,7 @@ gfx_batch_publish(struct xrdp_encoder *self,
  * path neither walks the set again nor writes this state. The walk is
  * over the SET (at most one item per monitor), not over the monitors,
  * and each item costs one already-shape-checked STARTFRAME peek. */
+#if defined(XRDP_PERF_TRACE)
 static void
 gfx_batch_note_frame_ids(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                          const int *set_mon, int set_n)
@@ -2708,6 +2706,7 @@ gfx_batch_credit_mask(const struct xrdp_encoder *self, int credit)
     }
     return mask;
 }
+#endif
 
 /*****************************************************************************/
 static void
@@ -2740,6 +2739,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * rides on is emitted whenever the perf trace is armed, so a field
      * that were only filled in under a second knob would read as
      * "no monitors" on a plain trace. */
+#if defined(XRDP_PERF_TRACE)
     int pump_mon_mask;
     /* BACKLOG #91, on the pump record: the credit frontier xrdp most
      * recently granted, and the per-monitor mask derived from it.
@@ -2747,6 +2747,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
      * disarmed, in which case no record is emitted anyway. */
     int credit;
     int credit_mask;
+#endif
 
     g_memset(sub_seq, 0, sizeof(sub_seq));
     g_memset(sub_state, 0, sizeof(sub_state));
@@ -2777,6 +2778,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     n_handles = 0;
     kids_armed = 0;
     bad_handle = -1;
+#if defined(XRDP_PERF_TRACE)
     pump_mon_mask = 0;
     credit = -1;
     credit_mask = 0;
@@ -2787,6 +2789,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
          * whether or not xrdp managed to encode it */
         gfx_batch_note_frame_ids(self, set, set_mon, set_n);
     }
+#endif
     /* SUBMIT pass, in fifo order. The sequence counter is handed out HERE,
      * one value per armed monitor, in fifo (= xorgxrdp rotation) order --
      * the same order and the same single global counter as before this
@@ -2845,7 +2848,9 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         }
         handles[n_handles] = ff;
         handle_mon[n_handles] = mon;
+#if defined(XRDP_PERF_TRACE)
         pump_mon_mask |= 1 << mon;
+#endif
         n_handles++;
     }
     PERF_TRACE("event=subm_end n_handles=%d", n_handles);
@@ -2856,6 +2861,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         return;
     }
     /* ONE pump over the whole set (D2/D10) */
+#if defined(XRDP_PERF_TRACE)
     if (perf_trace_on())
     {
         /* BACKLOG #91: the value the producer actually holds as its
@@ -2869,6 +2875,7 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
         credit = self->frame_id_server_sent;
         credit_mask = gfx_batch_credit_mask(self, credit);
     }
+#endif
     /* c = monitors in this poll set, d = monitors the granted credit
      * would have permitted to capture, e = that credit. See
      * gfx_batch_credit_mask() for what (c, d) together may and may not
@@ -3303,10 +3310,10 @@ gfx_wiretosurface2(struct xrdp_encoder *self,
     if (self->codec_handle_prfx_gfx[mon_index] == NULL)
     {
         self->codec_handle_prfx_gfx[mon_index] = rfxcodec_encode_create(
-                    width,
-                    height,
-                    RFX_FORMAT_YUV,
-                    RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
+                width,
+                height,
+                RFX_FORMAT_YUV,
+                RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
         if (self->codec_handle_prfx_gfx[mon_index] == NULL)
         {
             g_free(tiles);
@@ -3764,22 +3771,28 @@ gfx_emit_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                  const int *set_mon, int set_n)
 {
     int index;
+#if defined(XRDP_PERF_TRACE)
     int pf_id;
+#endif
 
     for (index = 0; index < set_n; index++)
     {
         /* the id is read only when the sink is armed: peeking costs
          * a bounds check and a few bytes, but a disarmed build must
          * pay exactly one branch */
+#if defined(XRDP_PERF_TRACE)
         pf_id = perf_trace_on()
                 ? gfx_egfx_batch_peek_frame_id(set[index]->u.gfx.cmd,
                                                set[index]->u.gfx.cmd_bytes)
                 : 0;
         PERF_TRACE("event=emit_beg frame_id=%d monitor=%d", pf_id,
                    set_mon[index]);
+#endif
         self->process_enc(self, set[index]);
+#if defined(XRDP_PERF_TRACE)
         PERF_TRACE("event=emit_end frame_id=%d monitor=%d", pf_id,
                    set_mon[index]);
+#endif
     }
 }
 

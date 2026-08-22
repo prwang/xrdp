@@ -1,0 +1,48 @@
+=== #45 gate run: x037, oracle client, 20s ===
+image:    localhost/xrdp-bisect:edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7
+package: xorgxrdp-dev 1:0.10.80+git20260731212221.10fa3aa23033+dirty
+package: xrdp-dev 0.10.80+git20260816151351.edfd0e5c80a6+dirty2
+monitors: OK: 2 monitors (2560x1440_60 at 0x0, 3840x2400R at 2560x0)
+payload:  SESSION_KIND = textflood_strip
+selector: TEXTFLOOD_MONITOR = 0
+refresh:  intra_refresh_frames = 250
+pipe:     encoder input pipe at or above the 64 KiB
+          minimum (no PIPE_TOO_SMALL in xrdp-x037-fc58bdd6b-j8jhh's log)
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 1044 over 16.8 s
+send-to-send gap: mean 16.1 ms  p50 16 ms  p90 17 ms  p99 19 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 14753 of 17889 session frames — inside this leg): mean 1.1 ms  p50 0.9 ms  p90 1.4 ms
+FR-BENCH-1 margin = pipeline mean 16.1 ms / producer mean 1.1 ms = 14.90x
+         OK (>= 2.0x floor): the payload kept damage pending at every pipeline completion, so throughput, regression AND stage-overlap claims from this run are all valid.
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 1044 damage records
+62.04 sends/s = 31.02 pairs/s per monitor (2 monitors)
+surface 0 own period: n=1043 mean 16.1 ms  p50 16.0 ms
+damage coverage: surface 0: 1043  surface 1: 1
+         COVERAGE WARNING: one monitor carried the run (1043 vs 1). This is the one-active-one-idle regime (BACKLOG #53), NOT two-monitor batching — an E5 ratio from it is not an E5-2 result.
+cycles: 1044   kids_armed: 2:1044 (100%)
+
+E5 GATE: NOT REQUESTED — this characterization has no same-payload serialized baseline
+
+=== E4 — poll-set size the worker actually armed ===
+   1044 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+unsupported              0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x037
+mode:   AVC444
+image:  localhost/xrdp-bisect:edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7
+gfx:    sha256:adb69e6e518902f7
+key:    localhost/xrdp-bisect:edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7|adb69e6e518902f7
+when:   2026-08-17T03:07:53Z
+  ASSERT VERDICT: PASS -- 7 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/certs/x037.cert

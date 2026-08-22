@@ -65,7 +65,6 @@ libcommon_la_SOURCES = \
   os_calls.h \
   parse.c \
   parse.h \
-  perf_trace.c \
   perf_trace.h \
   rail.h \
   scancode.c \
@@ -84,6 +83,10 @@ libcommon_la_SOURCES = \
   trans.h \
   unicode_defines.h \
   $(PIXMAN_SOURCES)
+
+if XRDP_PERF_TRACE
+libcommon_la_SOURCES += perf_trace.c
+endif
 
 libcommon_la_LIBADD = \
   -lpthread \

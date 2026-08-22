@@ -63,9 +63,9 @@ capability-response seam but shall not introduce a new mechanism there.
   support, shipped credit values, sparse guarantee and trace build option.
   Trace instructions shall name `XRDP_PERF_TRACE=<prefix>` as the sink arm,
   `XRDP_GFX_TRACE=1` as the graphics-event selector and
-  `XRDP_ACK_TRACE=1` as the paired producer/credit selector. Records are in
-  `<prefix>.<pid>`, not the normal log. The documentation shall explain how
-  the producer selector reaches the xorgxrdp session and the one-active-session
+  `XRDP_ACK_TRACE=1` as the xrdp credit selector. Records are in
+  `<prefix>.<pid>`, not the normal log. The documentation shall state that no
+  producer timestamp crosses xup and explain the one-active-session
   limitation of a non-forking xrdp test configuration.
 
 ## Required tests and final gate

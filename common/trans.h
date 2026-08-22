@@ -120,7 +120,9 @@ struct trans
      * "the queue is bounded" was a claim with no instrument behind it.
      * long long, not int: the failure this measures is unbounded growth
      * at ~3.4 MB per 4K AVC444 frame, which passes 2 GB in seconds. */
+#if defined(XRDP_PERF_TRACE)
     long long wait_bytes;
+#endif
     int no_stream_init_on_data_in;
     int extra_flags; /* user defined */
     void *extra_data; /* user defined */

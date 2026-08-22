@@ -37,6 +37,8 @@
 #ifndef _PERF_TRACE_H
 #define _PERF_TRACE_H
 
+#if defined(XRDP_PERF_TRACE)
+
 #include <stddef.h>
 
 #define PERF_TRACE_RING_BYTES (512 * 1024)
@@ -50,11 +52,24 @@
 #define PERF_TRACE_PRINTF(format_arg, first_arg)
 #endif
 
+#define PERF_TRACE_INIT_ERROR (-1)
+#define PERF_TRACE_INIT_DISABLED 0
+#define PERF_TRACE_INIT_ARMED 1
+
 struct perf_trace_ring;
 
 /**
- * Is the sink armed? Cheap after the first call (a cached flag); safe to call
- * from any thread. Opens the sink on first use.
+ * Initialize the sink explicitly after the last process fork and before any
+ * measured work. Returns PERF_TRACE_INIT_DISABLED when the environment does
+ * not request a sink, PERF_TRACE_INIT_ARMED on success, or
+ * PERF_TRACE_INIT_ERROR after reporting a one-shot human-rate error.
+ */
+int
+perf_trace_init(void);
+
+/**
+ * Is the explicitly initialized sink armed? This is one atomic state read;
+ * it never initializes, allocates, locks or performs I/O.
  */
 int
 perf_trace_on(void);
@@ -71,7 +86,7 @@ perf_trace_ev(const char *format, ...) PERF_TRACE_PRINTF(1, 2);
 /**
  * Flush and close the sink. Safe to call when never armed.
  */
-void
+int
 perf_trace_close(void);
 
 /**
@@ -113,5 +128,14 @@ perf_trace_ring_format_failed(const struct perf_trace_ring *ring);
         }                            \
     }                                \
     while (0)
+
+#else
+
+#define perf_trace_init() 0
+#define perf_trace_on() 0
+#define perf_trace_close() 0
+#define PERF_TRACE(...) do { } while (0)
+
+#endif
 
 #endif

@@ -118,6 +118,13 @@ AC_ARG_ENABLE(devel_logging, AS_HELP_STRING([--enable-devel-logging],
 AC_ARG_ENABLE(devel_streamcheck, AS_HELP_STRING([--enable-devel-streamcheck],
               [Add range-check/abort to stream primitives (default: no)]),
               [devel_streamcheck=$enableval], [devel_streamcheck=$devel_all])
+AC_ARG_ENABLE(perf_trace, AS_HELP_STRING([--enable-perf-trace],
+              [Build performance trace support (default: no)]),
+              [enable_perf_trace=$enableval], [enable_perf_trace=no])
+AS_IF([test x$enable_perf_trace = xyes],
+      [AC_DEFINE([XRDP_PERF_TRACE], [1],
+                 [Define to build performance trace support])])
+AM_CONDITIONAL(XRDP_PERF_TRACE, [test x$enable_perf_trace = xyes])
 
 AC_ARG_ENABLE(neutrinordp, AS_HELP_STRING([--enable-neutrinordp],
               [Build neutrinordp module (default: no)]),

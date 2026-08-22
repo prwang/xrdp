@@ -1,8 +1,0 @@
-t0 1786232186
-t1 1786232217
-arm x030
-port 40046
-secs 20
-leg a2
-body gfx_off.toml
-gfx_sha 83f0ae6c5a9d422c

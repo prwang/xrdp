@@ -9,8 +9,9 @@ the host is never touched by this rig.
 
 ## Current matrix
 
-**See "The arm set (BACKLOG #104)" below — five arms, `x031`-`x035`, on
-one image.** Everything before them was garbage-collected on 2026-08-10.
+**See "The arm set" below — the five-arm `x031`-`x035` baseline plus the
+paired `x036`/`x037` #122 characterization.** Everything before x031 was
+garbage-collected on 2026-08-10.
 
 *History, in two lines, because the rig exists because of it:* this
 folder was built on 2026-07-26 for the macOS blackout bisect, arms A-E
@@ -20,9 +21,11 @@ arm-e carried the `xrdp_h264_sanitize_hrd()` fix, which is pinned by a
 golden unit test and has shipped since. Those arms are gone; the current
 normative policy is in `PRD/slices/215-annexb-and-parameter-policy.md`.
 
-Every arm's session is the same deterministic payload, so a frozen or
-black screen is a pipeline failure by construction and the tester always
-knows which arm is on screen.
+Every comparison names its deterministic payload and changed condition.
+Most arms flood both monitors; `x036` and `x037` deliberately compare
+both-monitor flood against monitor-0-only flood for #122. A frozen or black
+target surface is a pipeline failure by construction. In the selected-monitor
+arm the unselected surface is intentionally static and the banner names it.
 
 ## Files
 
@@ -93,8 +96,8 @@ knows which arm is on screen.
   is not a fleet setting — this LXC's root maps to host uid 1000, so
   every pod's xrdp counts against that one host account's 64 MiB default.
   Over it, the kernel refuses `F_SETPIPE_SZ` and each encoder child gets
-  a two-page input pipe; measured 2026-08-08 that alone was 7.5 ms of a
-  24.5 ms frame at 3840x2400 (BACKLOG #103). The owner raised it to
+  a two-page input pipe; the standalone #103 reproducer measured 5.84 ms
+  to hand over one 13.8 MB picture. The owner raised it to
   262144 pages the same day, with `sysctl -w` — **which is lost on
   reboot**. Nothing here re-applies it and xrdp will not touch a system
   setting; what happens instead is that `arm_certify.sh` fails the next
@@ -133,10 +136,11 @@ Edit/add `gfx/arm-X.toml` + `k8s/arm-X.yaml` (next port), map the arm in
 the yaml/toml with the bisect log entry in `BACKLOG.md` — the matrix in git
 must always describe what is actually listening.
 
-## The arm set (BACKLOG #104, 2026-08-10)
+## The arm set (#104 baseline, #122 selected-monitor pair)
 
-The fleet is **five arms on ONE image**, `x031`–`x035`, differing only in
-`gfx/<arm>.toml`. Everything before them was garbage-collected: 30 arm
+The baseline is **five arms on one image**, `x031`–`x035`, differing only in
+`gfx/<arm>.toml`. The #122 `x036`/`x037` pair shares a second image and differs
+only in `TEXTFLOOD_MONITOR`. Everything before x031 was garbage-collected: 30 arm
 configs, 89 capture directories (32 GB down to 32 MB) and every
 certificate. The reason is in `docs/pr_evidence_matrix.md` — the old
 fleet was 17 pods across five images, so no two of them were comparable,
@@ -149,8 +153,10 @@ and every timing in them predates the encoder-input-pipe fix (#103).
 | x033 | 40049 | frontier, `wire_window` 2 | every frame | 444 | the frontier as proposed to ship |
 | x034 | 40050 | frontier, `wire_window` 2 | sparse 1000/100 ms | 444 | the byte lever, against x033 |
 | x035 | 40051 | frontier, `wire_window` 2 | n/a | 420 | what 4:4:4 costs, against x033 |
+| x036 | 40052 | frontier, `wire_window` 2 | every frame | 444 | #122 both-monitors-active control |
+| x037 | 40053 | frontier, `wire_window` 2 | every frame | 444 | #122 monitor-0-active / monitor-1-idle arm |
 
-All five run `SESSION_KIND=textflood_strip`. The slow `textflood`
+All seven run `SESSION_KIND=textflood_strip`. The slow `textflood`
 payload is retired as an instrument: at 16.2 ms/frame it is the same
 speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
 1.04× against the 2.0× floor.
@@ -159,7 +165,7 @@ speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
 conditions, never arms.** A WAN leg is `netem_rtt.sh` on x032 and x033,
 not two more pods.
 
-**All five arms are certified.** x035 needed a fix first: the certifier
+**All seven arms are certified.** x035 needed a fix first: the certifier
 ran the AVC444 two-view wire audit against a single-view AVC420 stream,
 read the whole thing as "aux", reported `main pictures=0` and failed
 A1–A6 — on bytes that were correct for the configuration. Owner ruling,

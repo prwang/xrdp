@@ -1,0 +1,1 @@
+named text source, 12 events/frame: mean 14.198 us p50 14.460 us p90 14.919 us p99 24.369 us max 35.259 us

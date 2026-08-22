@@ -1,15 +1,14 @@
-# Slice #128 — Paired AVC capture and diagnostic wire contract
+# Slice #128 — Paired AVC capture wire contract
 
 ## Commit boundary
 
 This paired commit defines, but does not activate, the full-chroma capture
-contract and trace timestamp transport.
+contract.
 
 Target files are xrdp `common/xrdp_client_info.h`,
 `common/xup_client_info.h`, `xup/xup.c`,
 `tests/xrdp/test_avc444_multimon.c`; and xorgxrdp
-`configure.ac`, `module/Makefile.am`, `module/rdpClientCon.c`,
-`module/rdpClientCon.h`.
+`module/rdpClientCon.c`, `module/rdpClientCon.h`.
 
 ## Requirements
 
@@ -26,29 +25,16 @@ Target files are xrdp `common/xrdp_client_info.h`,
   capture width or height above 16384 is rejected. At most 15 dirty rectangles
   are transported per monitor; a more complex region is coalesced to its
   checked extent.
-* S128-R5: in a paired trace-enabled build, the per-frame paint message shall
-  append capture-begin, packing-complete and send timestamps from
-  `CLOCK_MONOTONIC`, plus monitor/frame identity and the producer's slot and
-  displayed-region acknowledgement frontiers. The exact extension and
-  trace-build bit shall participate in the version agreement. xorgxrdp shall
-  expose the matching `--enable-perf-trace` configure option, disabled by
-  default. In that build `XRDP_ACK_TRACE=1` arms the timestamp reads; without
-  it the fields are zero and the producer does not read the clock.
-* S128-R6: a default build shall contain no timestamp fields in the paint
-  message and shall perform no trace-only clock read. Mixed trace modes shall
-  fail version agreement rather than parse different layouts.
-* S128-R7: the consumer shall emit the transported values as the `capture`
-  event with `frame_id`, `monitor`, `begin_ns`, `packed_ns`, `sent_ns`,
-  `slot_ack` and `region_ack`, and static `class=ACK_TRACE` through the one
-  #127 sink. The producer shall not write a per-frame normal log.
-* S128-R8: no capability response or encoder dispatch shall select this
+* S128-R5: the paired producer shall not read a diagnostic clock, emit a
+  per-frame normal log or append trace-only timestamps to the xup contract.
+  Performance characterization uses xrdp's receive, encode and egress
+  brackets with explicit frame and monitor identities.
+* S128-R6: no capability response or encoder dispatch shall select this
   capture code in this commit.
 
 ## Required tests and gate
 
 `tests/xrdp/test_avc444_multimon.c` shall cover exact serialization, version
 mismatch, all three formats, monitor limits, invalid and overflowing
-geometry, disjoint containment, exact trace extension and rejection of mixed
-trace-build contracts.
-Run `CK_RUN_SUITE=Avc444Multimon tests/xrdp/test_xrdp`, then both trace modes
-and the paired README gate.
+geometry and disjoint containment. Run
+`CK_RUN_SUITE=Avc444Multimon tests/xrdp/test_xrdp` and the paired README gate.

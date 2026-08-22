@@ -8,7 +8,8 @@ LOG_DRIVER = env AM_TAP_AWK='$(AWK)' $(SHELL) \
 
 PACKAGE_STRING = "libcommon"
 
-TESTS = test_common
+TESTS = test_common test_perf_trace_disabled.sh
+EXTRA_DIST = test_perf_trace_disabled.sh
 check_PROGRAMS = test_common
 
 test_common_SOURCES = \
@@ -28,8 +29,11 @@ test_common_SOURCES = \
     test_guid.c \
     test_scancode.c \
     test_timers.c \
-    test_perf_trace.c \
     test_log.c
+
+if XRDP_PERF_TRACE
+test_common_SOURCES += test_perf_trace.c
+endif
 
 test_common_CFLAGS = \
     @CHECK_CFLAGS@ \

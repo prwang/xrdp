@@ -534,7 +534,9 @@ struct xrdp_encoder
      * have let monitor m capture again" needs m's own outstanding ids.
      * Fed from the frame id in each set item's STARTFRAME, which is the
      * same id the producer's own budget is keyed on. Worker-only. */
+#if defined(XRDP_PERF_TRACE)
     int avc444_mon_frame_id[16][XRDP_GFX_CAPTURE_SLOTS];
+#endif
     /* tail-flush (OPT-IN last resort, gfx.toml tail_flush; default off): a deep
      * encoder pipeline (e.g. -async_depth > 1) withholds the last frame of an
      * idle-bounded burst until the next input. The root-cause fix is a shallow
@@ -728,10 +730,12 @@ gfx_egfx_batch_group(XRDP_ENC_DATA **in, int n_in,
  * these encode/egress legs live on ONE timeline and can be intersected
  * to answer "how many ms of capture ran concurrently with the tail of
  * the previous frame" -- the unit the concurrency claim is made in. */
-long long
-xrdp_mono_us(void);
+#if defined(XRDP_PERF_TRACE)
 int
 xrdp_ack_trace_on(void);
+#else
+#define xrdp_ack_trace_on() 0
+#endif
 
 /* BACKLOG #70 -- the ECHOED frame id (the producer's rect_id) carried in
  * a batchable blob's STARTFRAME, or -1 if the blob does not open with a
@@ -749,8 +753,10 @@ gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes);
  * received a frame for gets no bit. Not static so the mask's SEMANTICS
  * -- bit positions, the unknown-monitor rule -- are pinned by CI rather
  * than by a live two-monitor run. */
+#if defined(XRDP_PERF_TRACE)
 int
 gfx_batch_credit_mask(const struct xrdp_encoder *self, int credit);
+#endif
 
 struct xrdp_egfx_rect;
 struct stream;

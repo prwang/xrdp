@@ -105,7 +105,11 @@ textflood)
                 || sleep 5
         done
     fi
+    MONITOR=$(cat /etc/textflood_monitor 2>/dev/null || echo all)
+    MONITOR_ARG=()
+    [ "$MONITOR" = all ] || MONITOR_ARG=(--monitor "$MONITOR")
     exec /usr/local/bin/textflood --corpus "$CORPUS" \
+        "${MONITOR_ARG[@]}" \
         --stamps /tmp/e52_textflood_stamps.tsv
     ;;
 textflood_strip)
@@ -134,7 +138,11 @@ textflood_strip)
                 || sleep 5
         done
     fi
+    MONITOR=$(cat /etc/textflood_monitor 2>/dev/null || echo all)
+    MONITOR_ARG=()
+    [ "$MONITOR" = all ] || MONITOR_ARG=(--monitor "$MONITOR")
     exec /usr/local/bin/textflood --corpus "$CORPUS" \
+        "${MONITOR_ARG[@]}" \
         --scroll strip --lines-per-sec 1479.2 \
         --stamps /tmp/e52_textflood_stamps.tsv
     ;;

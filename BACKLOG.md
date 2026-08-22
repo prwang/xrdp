@@ -9,12 +9,14 @@ requirements live in `PRD/`; per-run evidence stays with its capture under
 Do not add result tables or completed narratives here. A closed item keeps one
 stub at the end of this file and points to its record.
 
-## Current repository state — 2026-08-16
+## Current repository state — 2026-08-17
 
 * `/work` and `/workUpdateXorgXrdp` are both on
   `dev/avc444_metablock_checkpoint`; the inventoried source frontiers are
   xrdp `356a5e1d` and xorgxrdp `10fa3aa`. Documentation commits sit above the
-  xrdp source frontier and do not change the port inventory.
+  xrdp source frontier and do not change the port inventory. The working
+  trees now also contain the completed, uncommitted #120 trace lifecycle and
+  producer-logger removal.
 * The xrdp clean-room base is pinned to
   `fe850a22c08a624c66bbac07e310251782e6f828`. Its compatibility audit is
   complete and found no breaking AVC API, configuration or wire change.
@@ -24,18 +26,19 @@ stub at the end of this file and points to its record.
   branch's 13 commits are the feature inventory, not base drift.
 * The old `/work-PR` branch at `c74a09e7` is an abandoned reference. It
   diverges from the pinned xrdp base and predates the current frontier.
-* The five-arm x031–x035 fleet exists on one paired image and all five arms
-  certify. Timing claims from runs carrying xorgxrdp's per-frame
-  `ACK_TRACE cap` logger remain quarantined by #121.
+* The five-arm x031–x035 baseline fleet and the paired x036/x037 #122
+  characterization arms certify. #121 deleted timing captures carrying
+  xorgxrdp's per-frame `ACK_TRACE cap` logger; none of their numerical claims
+  is quotable.
 * T4 is decommissioned. Re-provisioning is conditional work in #123.
 
 ## Execution order
 
-The open list is one chain. Complete #120 through #143 in numeric order; an
-item does not start until its predecessor is closed. #120–#125 finish and
-anchor the development implementation. #126–#142 re-author it as the
-clean-room commit series. #143 is explicitly later architecture work and
-cannot change or qualify that series.
+The open list is one chain. Complete #123 through #143 in numeric order; an
+item does not start until its predecessor is closed. #123–#125 finish and
+anchor the development implementation; #120–#122 are closed below.
+#126–#142 re-author it as the clean-room commit series. #143 is explicitly
+later architecture work and cannot change or qualify that series.
 
 For every dev qualification, commit the exact procedure, paired source and
 package identities, configuration, workload, instrument and expected checks.
@@ -48,69 +51,9 @@ history until all retained replays are green.
 
 # Active dependency chain
 
-## #120 — complete `common/perf_trace` on the dev pair
-
-**Status: TODO; first open item.** #107 selected and installed the named text
-byte-ring representation. This item owns the still-open shipping work and
-must close before any qualification result is collected.
-
-**Dev source:** `common/perf_trace.{c,h}`, `common/trans.{c,h}`,
-`xrdp/xrdp_listen.c`, `xrdp/xrdp_process.c`, the 34 call sites in
-`xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder_ffmpeg.c` and `xrdp/xrdp_mm.c`,
-`tests/common/test_perf_trace.c`, and xorgxrdp
-`module/rdpClientCon.{c,h}`.
-
-**Acceptance:** explicit post-fork initialization before the measured path;
-quiescent close, join and final drain; complete atomic lifecycle/ring state;
-visible one-shot open/write/flush failures; default-off configure and build
-erasure; disabled macros evaluate no arguments; enabled lifecycle, security,
-format, concurrency and overhead tests pass; xorgxrdp's per-frame logger is
-removed and its producer timestamps cross the versioned xup contract into
-xrdp's single ring. Exact rationale and failure modes:
-`docs/experiments/107-private-tracer-is-pr-scope.md`.
-
-## #121 — make evidence admissible and retire contaminated timings
-
-**Status: TODO; blocked on #120.** This merges old #99's missing positive
-fleet checks with old #108's mandatory cleanup. No dev qualification starts
-until both halves close.
-
-**Harness scope:** make `PR-demo/mac_bisect_matrix/e_gate_run.sh` compare the
-dialled arm with the collected pod identity and reject too few trace records
-for the declared run duration. Add deterministic positive, wrong-target,
-empty and too-short cases. An empty trace may not mean an idle session.
-
-**Record scope:** enumerate every capture and conclusion carrying
-xorgxrdp's synchronous per-frame `ACK_TRACE cap` logger; delete timing
-captures/records under the instrument-on-path rule; write one replacement
-record naming what was voided; and reopen or withdraw every dependent claim.
-Preserve independently valid bytes, identities, ordering and correctness with
-explicit provenance. Do not run a logger-vs-no-logger arm.
-
-**Acceptance:** the harness fails loudly on both identity and record-presence
-violations; the inventory is complete; no affected timing remains quotable;
-and the replacement record gives #122–#125 an explicit list of results that
-must be re-established.
-
-## #122 — decide the one-active/one-idle monitor regression on valid evidence
-
-**Status: TODO; blocked on #121.** This is a decision check, not approval to
-implement a changed-pixel heuristic. Old #94's 0.91x timing is quarantined
-until #121 classifies it.
-
-**Scope:** on the dev pair, re-run only the one-active/one-idle case and its
-same-sitting two-active control with the valid tracer. Prove which monitors
-carry real changed pixels and report the distribution, not only a mean. State
-the arm count, variable and wall time for approval before running.
-
-**Acceptance:** if the regression does not reproduce, withdraw the
-hypothesis. If it does, decide before #123 whether no one-active/idle slowdown
-is a requirement to implement and test on dev or a documented limitation
-outside this PR. No screen-selection code is added merely to close this item.
-
 ## #123 — T4/NVENC compatibility qualification
 
-**Status: TODO; blocked on #122.** Re-provision the real T4 because the
+**Status: TODO; first open item.** Re-provision the real T4 because the
 user-facing configuration says that profile was tested. This item does not
 retain or recreate a numerical T4 throughput claim.
 
@@ -462,11 +405,11 @@ The record, not this table, owns conditions, measurements and retractions.
 | #81 | The netem harness was corrected and retained for mechanism tests only. | `docs/experiments/81-the-netem-rtt-harness.md` |
 | #87 | Emit-split requirement retired because its premise measured per-frame logging. | `docs/experiments/87-the-emit-split-was-measuring-its-own-logger.md` |
 | #88 | Oracle-client pause attribution withdrawn; same-sitting controls own port evidence. | `docs/experiments/88-client-pauses-are-not-a-port-gate.md` |
-| #90 | PRD-violating stage threads withdrawn after the prize fell to about 1.25 ms. | `docs/experiments/90-the-eight-ms-prize-was-stale.md` |
+| #90 | PRD-violating stage threads withdrawn without admissible evidence of sufficient ROI. | `docs/experiments/90-the-eight-ms-prize-was-stale.md` |
 | #91 | Window arithmetic and encoder overlap resolved; its optional producer-cadence follow-up was withdrawn with #95. | `docs/experiments/91-the-multimon-window-and-the-shared-pump.md` |
 | #95 | Capture-handoff 1.5x target withdrawn as optional optimization. | `docs/experiments/95-capture-handoff-target-withdrawn.md` |
 | #96 | Moving packing across xup withdrawn as architectural scope expansion. | `docs/experiments/96-pack-off-x-thread-withdrawn.md` |
-| #98 | Open transport/adaptation roadmap withdrawn; old timing awaits #121 audit. | `docs/experiments/98-tier0-bbr-ab.md` |
+| #98 | Open transport/adaptation roadmap withdrawn; contaminated timing deleted. | `docs/experiments/98-tier0-bbr-ab.md` |
 | #100 | Emit thread removed; inline assembly and old-key warning remain. | `docs/experiments/100-the-emit-thread-bought-nothing.md` |
 | #102 | Client 33-pixel offset documented and closed below the port. | `docs/experiments/102-client-display-offset.md` |
 | #103(a) | Pipe-size negotiation and the 64 KiB fail-loud guard landed. | `docs/experiments/103-pipe-size-and-host-limit.md` |
@@ -474,4 +417,7 @@ The record, not this table, owns conditions, measurements and retractions.
 | #105 | Umbrella closed after preparation; its remaining work is the linear #120–#142 chain. | `docs/experiments/105-port-preparation.md` |
 | #106 | External trace equivalence closed RED: 13/34 semantic records had no exact mapping. | `docs/experiments/106-perf-isolation-and-trace-equivalence.md` |
 | #107 | Named text byte ring selected and installed; shipping lifecycle moved to #120. | `docs/experiments/107-private-tracer-is-pr-scope.md` |
+| #120 | Compile-time-erased trace shipped on dev; unnecessary producer logger removed. | `docs/experiments/120-perf-trace-shipping.md` |
+| #121 | Contaminated captures deleted; identity and minimum-record gates made fail-loud. | `docs/experiments/121-evidence-admissibility-cleanup.md` |
+| #122 | Valid selected-monitor evidence refuted the one-active slowdown hypothesis. | `docs/experiments/122-one-active-monitor.md` |
 | #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |
