@@ -60,6 +60,12 @@ that overlap a slice shall retain these changes and their tests.
   switch or a fallback inside an established connection.
 * AVC444v1 uses codec ID `RDPGFX_CODECID_AVC444`; AVC444v2 uses
   `RDPGFX_CODECID_AVC444v2`. AVC420 uses `RDPGFX_CODECID_AVC420`.
+* `auto` is the normal operator mode and shall prefer AVC444v2 whenever the
+  client advertises it. AVC444v1 remains implemented for clients whose
+  advertised capability permits v1 but not v2. Forced `444v1` is a legacy
+  interoperability and diagnostic control, not a generally recommended
+  deployment mode; no post-confirmation fallback may hide a client-specific
+  rendering defect.
 
 ### Color, geometry and ownership
 

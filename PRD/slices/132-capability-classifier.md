@@ -23,7 +23,10 @@ Register source and suite in `xrdp/Makefile.am`,
 * S132-R3: forced `444` shall choose v2 when the client signals it and
   otherwise v1 when available; forced `444v1` shall never select v2; forced
   `420` shall require AVC420 support. Auto shall choose the highest configured
-  compatible mode, not invent client support.
+  compatible mode, not invent client support. Forced `444v1` exists only for
+  legacy interoperability and diagnosis; ordinary configuration shall use
+  `auto`, which prefers v2 and reaches v1 only for a v1-only advertised
+  capability.
 * S132-R4: global AVC disable or backend-unavailable input shall return
   unavailable. The classifier shall not fall back to another server codec.
 * S132-R5: no symbol in this slice shall make the new backend selectable.

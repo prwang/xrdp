@@ -184,8 +184,8 @@ alignments at a non\(hy32\(hyaligned width simultaneously.
 .TP
 \fBavc_mode\fR = \fI<string>\fR
 Selects AVC444 versus plain AVC420 (codec id \fB0x000B\fR, a single YUV420 view)
-over the same \fBffmpeg\fR backend. One of \fB"auto"\fR, \fB"444"\fR or
-\fB"420"\fR. Default: \fB"auto"\fR.
+over the same \fBffmpeg\fR backend. One of \fB"auto"\fR, \fB"444"\fR,
+\fB"444v1"\fR or \fB"420"\fR. Default: \fB"auto"\fR.
 
 .RS
 .IP \(bu 3
@@ -194,6 +194,13 @@ This is the recommended setting.
 .IP \(bu 3
 \fB"444"\fR \(em serve AVC444 only; a client that advertises solely AVC420 gets
 no H.264 (the next configured codec, if any, is used).
+.IP \(bu 3
+\fB"444v1"\fR \(em pin legacy AVC444 v1 (codec id \fB0x000E\fR) even when the
+client advertises v2. This is an interoperability and diagnostic control, not
+a generally recommended deployment mode. The qualified macOS client rendered
+one\(hypixel alternating red/blue detail as red when v1 was forced; normal
+\fBauto\fR selection used v2 and preserved the detail. A v1 implementation is
+still required for clients which advertise v1 without v2.
 .IP \(bu 3
 \fB"420"\fR \(em force AVC420 for any H.264\(hycapable client. Because the RDP
 client, not the server, has no user\(hyfacing 420/444 switch (it advertises a

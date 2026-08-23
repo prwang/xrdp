@@ -33,6 +33,11 @@ capability-response seam but shall not introduce a new mechanism there.
   `strip_pic_struct`, `aux_ltr_chain`, `ltr_rekey_frame_num`,
   `ltr_rekey_surface_reset`, independent main/aux intra intervals, eager slot
   acknowledgement, wire window and sparse-chroma intervals.
+  The sample and man page shall recommend `auto`; they shall label forced v1
+  as a legacy interoperability/diagnostic mode and record that the qualified
+  macOS client rendered one-pixel red/blue detail incorrectly when v1 was
+  forced. The v1 implementation remains required for clients which advertise
+  v1 without v2.
 * S142-R4: defaults shall be `avc_mode=auto`, `chroma_align=32`,
   `eager_slot_ack=true`, `wire_window=1`, sparse chroma disabled, and optional
   interoperability/LTR transforms disabled. An operator may enable the

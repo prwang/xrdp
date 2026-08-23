@@ -9,7 +9,7 @@ requirements live in `PRD/`; per-run evidence stays with its capture under
 Do not add result tables or completed narratives here. A closed item keeps one
 stub at the end of this file and points to its record.
 
-## Current repository state — 2026-08-22
+## Current repository state — 2026-08-23
 
 * `/work` and `/workUpdateXorgXrdp` are both on
   `dev/avc444_metablock_checkpoint`; the committed dev-qualification
@@ -30,15 +30,17 @@ stub at the end of this file and points to its record.
   is quotable.
 * A real Tesla T4 host was re-provisioned on 2026-08-22 with the exact
   xrdp `00bce44e` / xorgxrdp `c190343` pair. The server-side #123 preflight
-  and dense AVC444v2 real-client result are recorded under
-  `PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/`;
-  forced AVC444v1 and AVC420 real-client qualification remains open.
+  and evidence are recorded under
+  `PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/`.
+  The same instance has migrated to `100.55.149.97`. #123 is closed with the
+  forced-AVC444v1 macOS fidelity limitation preserved; `auto` still prefers
+  v2 and v1 remains only the v10.0 compatibility tier.
 
 ## Execution order
 
-The porting list is one chain. Complete #123 through #143 in numeric order; an
-item does not start until its predecessor is closed. #123–#125 finish and
-anchor the development implementation; #120–#122 are closed below.
+The porting list is one chain. Complete #124B, #124 and #125 before #126; an
+item does not start until its predecessor is closed. #123 and #120–#122 are
+closed below. #124B repairs the visual instrument before #124 continues.
 #126–#142 re-author it as the clean-room commit series. #143 is explicitly
 later architecture work and cannot change or qualify that series. #300 is the
 public-PR documentation deliverable after #142; it does not block #143 and is
@@ -55,33 +57,10 @@ history until all retained replays are green.
 
 # Active dependency chain
 
-## #123 — T4/NVENC compatibility qualification
-
-**Status: IN PROGRESS; first open item.** The real T4 is provisioned with the
-pinned development pair and the server-side one-monitor, two-monitor, AVC420,
-AVC444 and NVENC/LTR preflight is green. Windows and macOS both negotiated
-dense AVC444v2 and preserved visibly distinct one-pixel red/blue stripes;
-Windows dynamic resize and its real two-monitor layout are also recorded.
-Forced AVC444v1 and AVC420 remain open on both clients. This item does not
-retain or recreate a numerical T4 throughput claim.
-
-**Scope:** follow the committed deploy procedure with pinned paired package
-hashes and the real NVENC path. Qualify cold and warm behavioral probing,
-required parameter-set transforms, probe-before-confirm selection, no
-post-confirmation codec fallback, supported AVC modes, one and two monitors,
-resize/restart and Windows/macOS rendering. Record exact client, driver,
-ffmpeg, geometry, configuration and trace-build identities.
-
-**Acceptance:** every supported advertised mode negotiates and renders on the
-real hardware without fallback; cold start and resize either pass or produce
-the specified loud pre-confirmation refusal; byte audits and client checks are
-green. The historical 47–74 ms bimodality and E5-2 ratio are out of scope.
-Current procedure and partial evidence:
-`PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/README.md`.
-
 ## #124 — credit-frontier client qualification
 
-**Status: TODO; blocked on #123.** The mechanism, frozen-client behavior and
+**Status: IN PROGRESS; first open qualification, blocked on #124B.** The
+mechanism, frozen-client behavior and
 `C + 2M` bound are anchored by dev tests and recorded in
 `docs/experiments/80-the-credit-frontier.md` and
 `docs/experiments/91-the-multimon-window-and-the-shared-pump.md`.
@@ -99,13 +78,46 @@ and contains no codec fallback or encoder fault, and the complete replay
 procedure is committed before #125 starts. The compile-time trace is retained
 passively for agent-owned diagnosis, but exercising a particular credit
 distance is not a condition on the owner's visual verdict and does not cause a
-visual rerun.
+visual rerun. The owner has already observed `colorkey_x11` green on both
+clients. The code-scroll result is not yet valid because the terminal did not
+establish the specified dark-blue background, and textflood exposed the
+#124B helper defects. Repeat the corrected payloads before closing this item.
+
+## #124B — interactive textflood correctness
+
+**Status: IN PROGRESS; immediate repair for #124.** The first client walk was
+not admissible for code-scroll qualification: the helper silently ignored a
+requested line rate outside strip mode, repeated each source line to the right
+edge by default, destroyed its window after `--frames N`, and the terminal
+payload did not establish its own Solarized Dark background.
+
+**Scope:** make a natural, one-copy code line the textflood default; retain the
+saturated repeat-to-edge workload only behind an explicit option and update
+every benchmark caller to request it. Make an explicitly requested live line
+rate control the content advance instead of being silently ignored. In live
+limited-frame mode, hold the last completed frame until Escape or `q`; offline
+self-tests still terminate. Make `codescroll10.sh` paint Solarized base03
+independently of terminal configuration. Do not add a sampler, logger or trace
+arm.
+
+**Acceptance:** compiler warnings, offline rendering equivalence and argument
+validation are green; both natural and explicit repeat-to-edge modes are
+covered; limited live mode remains present after its last frame until a quit
+key; historical benchmark entry points explicitly preserve their saturated
+workload. Install the standalone corrected helpers on the pinned T4 without
+restarting or manipulating the live GUI session, then repeat #124's code-scroll
+and textflood visual checks on both clients.
 
 ## #125 — sparse-chroma client qualification
 
-**Status: TODO; blocked on #124.** The byte mechanism and offline model are
+**Status: TODO; blocked on #124; Scope A already has a RED early
+observation.** The byte mechanism and offline model are
 anchored by dev tests and recorded in
-`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`. The
+approximately one-hertz flicker of static red/blue stripes seen strongly on
+Windows is preserved in
+`docs/experiments/125-sparse-chroma-qualification.md`; do not continue to
+Scope B until the isolated visual replay explains and fixes it.
 
 **Scope A — real-client correctness:** on the dev pair, certify on identified
 macOS and Windows clients a stream which contains both main-only cycles and
@@ -491,4 +503,5 @@ The record, not this table, owns conditions, measurements and retractions.
 | #120 | Compile-time-erased trace shipped on dev; unnecessary producer logger removed. | `docs/experiments/120-perf-trace-shipping.md` |
 | #121 | Contaminated captures deleted; identity and minimum-record gates made fail-loud. | `docs/experiments/121-evidence-admissibility-cleanup.md` |
 | #122 | Valid selected-monitor evidence refuted the one-active slowdown hypothesis. | `docs/experiments/122-one-active-monitor.md` |
+| #123 | T4/client compatibility closed with forced-v1 macOS per-pixel fidelity RED; auto prefers v2 and v1 remains a legacy capability tier. | `docs/experiments/123-t4-nvenc-compatibility.md` |
 | #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |

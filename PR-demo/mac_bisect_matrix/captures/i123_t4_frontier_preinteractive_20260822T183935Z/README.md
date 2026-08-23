@@ -227,3 +227,13 @@ for #125.
   dynamic-resize trace and the explicitly rejected cross-epoch analysis;
 * `perf-trace*.txt`, `perf-trace-lines-*-summary.txt`, `ack-*.txt`: raw
   compile-time opt-in trace, formatter summaries and derived credit reports.
+
+## Superseding follow-on — 2026-08-23
+
+The final handoff paragraph above describes this capture's state on
+2026-08-22 and is retained as recorded. The same instance later migrated to
+`100.55.149.97`; #123 is now closed by
+`docs/experiments/123-t4-nvenc-compatibility.md`. AVC444v2 and AVC420 were
+accepted on both real clients. Forced AVC444v1 was accepted on Windows but is
+RED for one-pixel chroma fidelity on the qualified macOS client, and is
+retained only as a legacy compatibility/diagnostic mode.

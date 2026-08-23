@@ -23,10 +23,12 @@ h264_encoder = "x264"
 # (logoff -> login), not on disconnect/reconnect to an existing session.
 # [avc444_ffmpeg]
 # path = "/usr/bin/ffmpeg"
-# # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
-# # e.g. to exercise 420 on mstsc, which always advertises AVC444) | "444v1"
-# # (AVC444 with codec id 0x000E even for v2-capable clients -- per-client
-# # compatibility knob; e.g. the macOS Windows App mis-renders v2/ChromaV2).
+# # avc_mode: "auto" (recommended: prefer AVC444v2, use AVC444v1 only for a
+# # v1-only advertised capability, else AVC420) | "444" | "420" (force 420,
+# # e.g. to exercise 420 on mstsc, which advertises AVC444) | "444v1" (legacy
+# # interoperability/diagnostic: pin codec id 0x000E even for a v2-capable
+# # client). Forced v1 is not recommended for general deployment: the
+# # qualified macOS client rendered one-pixel red/blue detail incorrectly.
 # # Default auto.
 # avc_mode = "auto"
 # # dump_extra: STATIC in-band parameter-set policy; set it to match the
