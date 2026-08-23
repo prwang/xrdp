@@ -68,6 +68,10 @@ Only after that gate is green can #125 return to representative hardware and
 real clients. The T4 used for this observation has been imaged and
 decommissioned.
 
+This source correction diagnoses the permanent Color-B final state only. It
+does not diagnose or close the separately observed approximately one-hertz
+red/blue stripe flicker.
+
 ## 2026-08-23 local reproduction and repair — deterministic GREEN
 
 `test_sparse_main_only_stalls_at_420_until_restore` independently applies the
@@ -93,3 +97,18 @@ and overflow safety. The full xrdp suite passes 211/211 in the trace-enabled
 development build. This is local implementation evidence, not a replacement
 for the Windows/macOS replay: #125 remains open until a representative rig
 confirms Color B no longer persists and the expected one-shot request appears.
+
+## 2026-08-23 defect-order decision
+
+The permanent dim-text final state and the transient red/blue stripe flicker
+are tracked as separate correctness failures. Scope A1 first qualifies the
+trailing restoration above. Only after a representative client proves that a
+still surface converges to Color A does Scope A2 investigate the flicker.
+
+The original flicker was approximately one hertz under
+`chroma_refresh_ms=1000` and `chroma_idle_ms=100`. Its cadence points first at
+the one-second refresh boundary, not the 100 ms settle threshold, but that is
+only a hypothesis: the observation cannot yet distinguish server emission,
+main/aux pairing or client presentation. The new 100 ms one-shot restoration
+has not been deployed to any hardware arm and is not credited as a flicker
+fix.

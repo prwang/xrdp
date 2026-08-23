@@ -60,8 +60,10 @@ history until all retained replays are green.
 
 ## #125 — sparse-chroma client qualification
 
-**Status: IN PROGRESS; first open item; Scope A's client replay remains RED,
-but its cause is reproduced and its repair is green locally.** The byte mechanism and offline model are
+**Status: IN PROGRESS; first open item; Scope A1's client replay remains RED,
+but its cause is reproduced and its repair is green locally. Scope A2 remains
+RED and deliberately undiagnosed until A1 passes.** The byte mechanism and
+offline model are
 anchored by dev tests and recorded in
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`. The
 approximately one-hertz flicker and the stable Color-A/Color-B states of a
@@ -73,9 +75,11 @@ later corresponding LC=2 update reaching that static region. The former tests
 only covered when a future frame was selected for auxiliary work. The new
 display-state model proves LC=1 leaves Color B until an auxiliary update, and
 the new trailing-deadline tests prove the restoration request is rearmed,
-cancelled and fired once as specified.
+cancelled and fired once as specified. That repair addresses the permanent
+Color-B final state only; it does not claim to fix the separately observed
+approximately one-hertz red/blue flicker.
 
-**Scope A — local correctness before real-client replay:** first add an
+**Scope A1 — permanent final-state restoration:** first add an
 independent deterministic display-state regression for a full-chroma frame
 followed by a main-only update and no subsequent damage. Read the actual LC
 semantics and region masks rather than inferring them from the scheduler. Fix
@@ -98,9 +102,19 @@ the exact artifacts and procedure for later clean-room replay. The guarantee
 is `chroma_refresh_ms` plus one actual frame interval; no extra heuristic is in
 scope.
 
-**Scope B — future T4 oracle numerical qualification:** after Scope A, and
-only if the correctness fix retains a meaningful sparse mechanism, the agent runs
-the existing oracle-client and `textflood` harness on the same pinned T4 pair
+**Scope A2 — transient red/blue flicker, only after A1 passes:** reproduce the
+approximately one-hertz stripe flicker with the permanent Color-B case first
+proven absent. Treat it as an independent defect unless evidence establishes a
+shared cause. The old observation's cadence is closer to the configured
+`chroma_refresh_ms=1000` boundary than to `chroma_idle_ms=100`, but cadence
+alone does not distinguish server emission, main/aux pairing or client
+presentation. Do not credit A1's one-shot 100 ms restoration as a flicker fix,
+and do not alter that restoration merely to hide a transient symptom.
+
+**Scope B — future T4 oracle numerical qualification:** after Scopes A1 and
+A2, and only if the correctness fix retains a meaningful sparse mechanism,
+the agent runs the existing oracle-client and `textflood` harness on the same
+pinned T4 pair
 at the recorded 3840x2400 modeline. Run exactly four 20-second legs in
 dense/sparse/dense/sparse order; the only configuration difference is
 `chroma_refresh_ms=0, chroma_idle_ms=0` against
@@ -116,10 +130,12 @@ before making a server-throughput claim. Also report main-only and
 main-plus-auxiliary command counts and transmitted bytes and close their sum
 against the audited video-command total.
 
-**Acceptance:** in Scope A both clients render the alternating stream
-correctly and the still image restores distinct one-pixel red/blue chroma
-detail after the one-shot trailing capture; the trace contains the associated
-`chroma_restore_request` and the server log has no request failure. In Scope B
+**Acceptance:** in Scope A1 both clients leave the still image with distinct
+one-pixel red/blue chroma detail after the one-shot trailing capture; the trace
+contains the associated `chroma_restore_request` and the server log has no
+request failure. In Scope A2 both clients render the alternating stream
+without the reported periodic stripe flicker, and the cause and independent
+regression are recorded rather than inferred from A1. In Scope B
 both dense repetitions and both sparse repetitions are
 internally consistent; the sparse decision is observed on the mechanism's own
 records; the chroma-gap bound holds; both command classes occur; byte
