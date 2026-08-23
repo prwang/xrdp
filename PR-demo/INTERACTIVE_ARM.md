@@ -1,14 +1,15 @@
-# The interactive arm — looking at the credit frontier with your own clients
+# The interactive arm — T4 frontier qualification with real clients
 
-An XFCE desktop running the **shipped defaults as of 2026-08-07**, for
-judging correctness by eye from a Windows (UWP) or macOS RDP client.
+An XFCE desktop on the real Tesla T4, running the pinned development frontier
+for BACKLOG #123--#125. Use an identified Windows RDP client and an identified
+macOS RDP client; record each product name and version/build in the capture.
 
-**This is not a benchmark and no number from it means anything about the
-server.** A visible client decodes and presents every frame, and the
-client side is the known bottleneck in that configuration — measured
-repeatedly on this project. If it looks smooth, that tells you the
-pipeline is correct, not how fast it is. Rates come from the offscreen
-oracle harness, never from here.
+**The visible cadence is not a throughput benchmark.** A visible client
+decodes and presents every frame, and the client side is a known bottleneck
+in this configuration. If it looks smooth, that establishes client
+correctness, not the server's maximum rate. The perf ring still supplies
+agent-owned diagnostics and the separate numerical qualification; it does not
+gate a human visual verdict.
 
 ---
 
@@ -16,100 +17,131 @@ oracle harness, never from here.
 
 | | |
 |---|---|
-| arm | `x027`, host port **40043** (loopback only) |
-| image | `localhost/xrdp-bisect:821218e54c24.xx10fa3aa-xfce.pc0097388` |
-| xrdp build | commit `821218e54c24` — the credit frontier ON by default at `wire_window = 2`, and **no emit thread in the binary at all** |
-| xorgxrdp | `10fa3aa23033` |
-| desktop | XFCE (`SESSION_KIND=xfce`) |
-| certificate | 7 checks clean, 0 black frames, at deploy |
-| smoke gate | **PASS** at 1920×1080 and 1024×768: 8 of 8 keys correct, 0 lagged frames, colour-edge fidelity 0.998, 0 encoder errors |
+| host | `98.93.137.204`, RDP port **3389** (loopback only) |
+| GPU | NVIDIA Tesla T4, driver 580.173.02 |
+| xrdp build | `00bce44e8fea`, package `0.10.80+git20260822114412.00bce44e8fea` |
+| xorgxrdp | `c190343ff28a`, package `1:0.10.80+git20260822114312.c190343ff28a` |
+| desktop | XFCE; `chroma-probe` starts through the installed XDG autostart |
+| baseline profile | AVC444, NVENC, aux LTR chain, `wire_window=1`, eager slot acknowledgement, sparse chroma off |
+| staged #123 profiles | forced AVC444v1 and forced AVC420, otherwise byte-identical to the baseline |
+| staged #125 profile | the same profile with `chroma_refresh_ms=1000`, `chroma_idle_ms=100` |
+| retained preflight | `mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/` |
 
-`aux_ltr_chain` is ON in this arm's `gfx.toml`, and it has to be: the
+`aux_ltr_chain` is ON in this host's `gfx.toml`, and it has to be: the
 credit frontier is ANDed with it, so with it off the arm would silently
 be running the old acknowledgement path and you would be looking at the
 wrong thing.
 
 ## Connecting
 
-The port is bound to **127.0.0.1 on this box**, deliberately — the fleet
-is never exposed. So from your laptop, forward it first:
+The port is bound to **127.0.0.1 on the T4**, deliberately. From the client
+machine, forward it first:
 
 ```
-ssh -N -L 43389:127.0.0.1:40043 <this-box>
+ssh -N -L 43389:127.0.0.1:3389 -i tmp_access_T4 \
+    ubuntu@98.93.137.204
 ```
 
-Then point the client at `127.0.0.1:43389`.
+Then point the RDP client at `127.0.0.1:43389`.
 
-**Log in as `tester`.** Its password inside the pod is the same one the
-`tester` account on this box uses — the deploy copies that hash in, so
-there is no separate credential to look up and nothing to write down.
+**Log in as `ubuntu` with the existing T4 credential.** The credential is not
+written into this repository or this procedure.
 
-**Windows / UWP client.** Add a PC, host `127.0.0.1:43389`. Before
+**Windows client.** Add a PC, host `127.0.0.1:43389`. Before
 connecting, set the display size explicitly rather than leaving it on
 "match this device": a 4K client negotiating a scaled resolution makes
 what you see depend on the client's DPI handling as much as on the
-server. 1920×1080 and 2560×1440 are the two sizes worth trying.
+server. Use 2560×1440 for the remaining single-monitor checks.
 
 **macOS client.** Same host and port. Turn OFF any "optimise for
-Retina / scaled" option for the same reason. If the window is resized
-mid-session the session does not follow — log off and reconnect at the
-size you want to judge.
+Retina / scaled" option for the same reason. Use 2560×1440 for the remaining
+single-monitor checks.
 
-Both clients: connect **once per size**. A reconnect to an existing
-session reuses the negotiated geometry, so the size you asked for on the
-second connection may not be the size you get.
+Do not log off merely to change client or payload when the server profile is
+unchanged. Disconnect one client and reconnect the other to the same XFCE
+session. Log off only before a profile change, because `gfx.toml` is loaded for
+a fresh session.
 
-## The acceptance criterion has two halves, and only one is yours
+## Finish #123 before the six-check walk
 
-Written 2026-08-08, after the first walk, because the doc previously said
-what to look at and never what a pass is.
+The server preflight exercised AVC420, AVC444v2, one monitor and the exact
+recorded two-monitor modelines. The owner then checked dense AVC444v2 through
+Windows host `5Q77` and macOS host `Signals-iMac`: on both, the alternating
+one-pixel red/blue stripes remained visibly distinct rather than becoming a
+flat colour. The server log confirms AVC444v2 (`0x000F`) for both, Windows
+dynamic resize, and a real Windows two-monitor connection at 3840×2400 plus
+2560×1440. Those baseline checks are complete.
 
-**Your half — the outcome.** The six checks below, on BOTH clients
-(Windows UWP and macOS), at BOTH sizes (1920×1080 and 2560×1440),
-connecting fresh per size.
+Only these real-client mode checks remain for #123:
 
-**The server's half — the premise, which no client-side observation can
-see.** Every fleet measurement of this mechanism used the oracle client,
-which acknowledges a frame BEFORE decoding it, so the frontier's
-`frame_id_client + C` term — how far ahead of the client we may run —
-has never been exercised. A real client acknowledges after decoding and
-presenting. Whether that actually happened during your walk is read off
-the server's ring, not the screen:
+1. Log the current XFCE session off. From a client-side terminal run
+   `ssh -t -i tmp_access_T4 ubuntu@98.93.137.204 '~/xrdp-profile 444v1'`.
+   Connect Windows at 2560×1440 and confirm coherent colour, motion and
+   distinct one-pixel red/blue stripes. Disconnect without logging off, then
+   make the same observation from macOS. The server must report AVC444v1
+   (`0x000E`), with no fallback.
+2. Log the XFCE session off, then run the same command with `420`. Connect
+   Windows, disconnect, and connect macOS to the same session. The desktop,
+   clocks and motion must remain coherent. Under 4:2:0 the one-pixel red/blue
+   detail is expected to merge; wrong colours, displaced chroma, black output
+   or fallback are failures. The server must report AVC420 (`0x000B`).
+3. Log the session off and run `~/xrdp-profile 444` to restore the dense
+   profile before #124.
 
-* acknowledgement latency realistically late (the oracle client's is
-  ~9 ms; a real client's should be several times that);
-* the window actually reached — frames at distance `wire_window + 2×M`
-  and just below it must be a real fraction, not a handful;
-* zero encoder restarts, sequence mismatches, parser errors or pair
-  timeouts for the whole walk.
+`~/xrdp-profile status` prints the live fields. The switcher refuses to change
+configuration while an `ubuntu` X11 session exists. A mode the client does not
+advertise must fail before codec confirmation and be recorded as unsupported;
+it must never confirm another mode and fall back afterward.
 
-Run it with `PR-demo/mac_bisect_matrix/i80_ack_latency.py` over the arm's
-perf ring, passing the monitor count from the session log.
+## Visual acceptance and passive server evidence
 
-**The rule that ties them: a clean visual walk is evidence ONLY if the
-trace shows the window was exercised.** If nothing looked wrong and the
-distance histogram sits at 1–2, the walk proved the client was fast, not
-that the frontier is safe, and it has to be repeated under something
-slower.
+Your acceptance is the visible outcome of the six checks below on both
+clients. Run one payload at a time at 2560×1440; quit it before starting the
+next. Do not run `textflood`, a sampler or another GUI sidecar during this
+walk. With the dense profile unchanged, changing client or payload does not
+require a logoff.
 
-First result, 2026-08-08: premise half PASSED (ack p50 68 ms and 53 ms;
-the bound reached 173 times at one monitor and 73 times at two, held
-exactly in both; zero faults). Visual half PARTIAL — the owner reported
-no lag on the payload they ran, not the full six across both clients.
-Record: `captures/i80_onscreen_walk_x027_20260808/`.
+The agent separately checks the human-rate xrdp log for the intended codec,
+fallbacks and faults, and may harvest the compile-time perf trace after a
+normal disconnect. A particular acknowledgement latency or credit distance
+is not a visual acceptance criterion and does not make you repeat a clean
+walk. This separation is deliberate: the current credit analyzer assumes one
+encoder epoch, so a dynamic resize which recreates the encoder can make its
+reset client frontier look like a large distance even though the stable
+segments are bounded. Historical quantitative results remain with their
+captures rather than being acceptance thresholds for this walk.
 
-## What to look at
+## The six #124 checks
 
-Open a terminal in XFCE (Applications → Terminal Emulator) and run each
-in turn. All are at `/usr/local/bin` in the running pod.
+Run all six on Windows at 2560×1440, one payload at a time. Disconnect without
+logging off, connect macOS to the same session at 2560×1440, and repeat. Record
+pass/fail separately for each client.
 
-All of them ship **in the image** as of 2026-08-08, including
-`chroma-probe`'s `python3-tk`. They were briefly copied into a running
-pod by hand, which meant they died with it; `Containerfile` and
-`build_and_deploy.sh` now build and install all three, and the build
-aborts if any probe source is missing. An arm built before that date
-does not have `chroma-probe` or `colorkey_x11` — check with
-`ls /usr/local/bin/` before handing it over.
+1. `chroma-probe`: watch both luma/chroma clocks continuously for two minutes.
+2. `colorkey.sh`, keys `r g b w`: every key changes colour immediately and
+   increments the displayed count by exactly one.
+3. `colorkey.sh`, key `e`: the one-pixel red/blue stripes remain saturated and
+   distinct, not grey or blurred together.
+4. `colorkey_x11`, key `c`: all eight named colours arrive in order with no
+   missing, repeated or miscoloured step.
+5. `colorkey_x11`, key `s`: the block advances in even 8-pixel steps, without
+   pause-and-catch-up, skipped positions or a torn top/bottom edge.
+6. `codescroll10.sh`: the 10 Hz scroll is evenly paced, syntax-colour fringes
+   remain stable, and the title counter increments by one.
+
+Checks 1--6 are qualitative client correctness. The server log must confirm
+AVC444/NVENC and contain no fallback, encoder restart, sequence mismatch,
+parser failure or pair timeout.
+
+## What to look at in detail
+
+`chroma-probe` starts automatically. Open a terminal in XFCE (Applications →
+Terminal Emulator) and run the remaining payloads in turn. All are at
+`/usr/local/bin` on the T4.
+
+The 2026-08-22 deployment installed all four payloads from the committed
+sources. `textflood` is also installed for a later benchmark arm, but is
+deliberately disarmed for this visual walk.
 
 ### 0. Main/aux pairing — `chroma-probe`
 
@@ -169,9 +201,8 @@ cells, so its block hops ~24 px; `colorkey_x11` owns the pixels and steps
   jump to a position the block was never drawn at means frames were
   dropped or coalesced. The top and bottom of the block at different
   horizontal positions in one screen is a torn frame.
-  **It steps whole character cells, not pixels** — a terminal cannot do
-  better, and the app says so on screen. Judge it for stutter and
-  tearing, not for sub-pixel smoothness.
+  The X11 app advances by 8 pixels per frame; judge those even steps, not
+  the character-cell motion of the older shell payload.
 
 `q` quits. Both animated modes stop on any key, so you can go straight
 from `c` to `s`.
@@ -192,22 +223,46 @@ Both apps take arguments if you want to push them (`codescroll10.sh 10
 0.1` for a fast scroll, `CK_SLIDE_MS=20` for a faster block), but the
 defaults are the ones the descriptions above are written against.
 
+## #125 sparse-chroma follow-on
+
+Do not start #125 until the #124 walk is green on both clients. Log the current
+XFCE session off, then activate the staged sparse profile from a client-side
+terminal:
+
+```
+ssh -t -i tmp_access_T4 ubuntu@98.93.137.204 '~/xrdp-profile sparse'
+```
+
+Make one fresh Windows session and run only the autostarted `chroma-probe`.
+After the observation, disconnect without logging off and reconnect from
+macOS to the same session. Do not run the six #124 payloads or `textflood`
+beside it. On each client, watch the moving block, then stop interacting and
+judge the one-pixel red/blue stripes on the still screen. Required
+observations:
+
+* the fast and slow numeral/patch pairs never disagree;
+* the static zone never changes and the moving hue never leaves its outline;
+* after motion settles, full-chroma stripe detail is restored no later than
+  1000 ms plus the first actual frame interval at or after that deadline;
+* no stale chroma, wrong colour, missing update or surface corruption appears.
+
+The visual result does not depend on forcing the trace to drain. After both
+clients are done, one normal logoff lets the agent preserve the trace and run
+the separate command-count, byte, chroma-gap and numerical throughput/latency
+audit specified by BACKLOG #125B. Those machine checks are agent-owned and do
+not add payloads to this visual walk.
+
+After #125, restore the dense baseline with `~/xrdp-profile 444` after the
+session has logged off.
+
 ## If something looks wrong
 
 Capture what you saw and the count on screen — the count is what turns
-"it stuttered" into something reproducible. The server-side trace for
-this arm is in the pod at `/var/log/xrdp-perf/`, and the session log at
-`/var/log/xrdp/xrdp.log`:
-
-```
-kubectl -n bisect-matrix logs $(kubectl -n bisect-matrix get pod \
-    -l arm=x027 -o name | head -1)
-```
-
-To get the OLD acknowledgement behaviour for comparison without
-rebuilding anything, arm **x020** on port 40036 runs the legacy path
-with the same everything else. It has the benchmark payload rather than
-a desktop, so it is a comparison of mechanism, not of what you can see.
+"it stuttered" into something reproducible. The server-side trace is in
+`/var/log/xrdp-perf/`, the xrdp log is `/var/log/xrdp.log`, and the
+session-Xorg log is `/home/ubuntu/.xorgxrdp.<display>.log`. Do not change
+profile, encoder or client after a red result; preserve that exact session's
+artifacts first.
 
 ## Ending the session
 

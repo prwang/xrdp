@@ -28,7 +28,11 @@ stub at the end of this file and points to its record.
   characterization arms certify. #121 deleted timing captures carrying
   xorgxrdp's per-frame `ACK_TRACE cap` logger; none of their numerical claims
   is quotable.
-* T4 is decommissioned. Re-provisioning is conditional work in #123.
+* A real Tesla T4 host was re-provisioned on 2026-08-22 with the exact
+  xrdp `00bce44e` / xorgxrdp `c190343` pair. The server-side #123 preflight
+  and dense AVC444v2 real-client result are recorded under
+  `PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/`;
+  forced AVC444v1 and AVC420 real-client qualification remains open.
 
 ## Execution order
 
@@ -53,8 +57,12 @@ history until all retained replays are green.
 
 ## #123 — T4/NVENC compatibility qualification
 
-**Status: TODO; first open item.** Re-provision the real T4 because the
-user-facing configuration says that profile was tested. This item does not
+**Status: IN PROGRESS; first open item.** The real T4 is provisioned with the
+pinned development pair and the server-side one-monitor, two-monitor, AVC420,
+AVC444 and NVENC/LTR preflight is green. Windows and macOS both negotiated
+dense AVC444v2 and preserved visibly distinct one-pixel red/blue stripes;
+Windows dynamic resize and its real two-monitor layout are also recorded.
+Forced AVC444v1 and AVC420 remain open on both clients. This item does not
 retain or recreate a numerical T4 throughput claim.
 
 **Scope:** follow the committed deploy procedure with pinned paired package
@@ -68,6 +76,8 @@ ffmpeg, geometry, configuration and trace-build identities.
 real hardware without fallback; cold start and resize either pass or produce
 the specified loud pre-confirmation refusal; byte audits and client checks are
 green. The historical 47–74 ms bimodality and E5-2 ratio are out of scope.
+Current procedure and partial evidence:
+`PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/README.md`.
 
 ## #124 — credit-frontier client qualification
 
@@ -83,9 +93,13 @@ claim as one-monitor only. Do not reopen window tuning: the shipped decision
 is `wire_window=1`, `eager_slot_ack=true`; value 2 is maintainer guidance, not
 a second default.
 
-**Acceptance:** all six checks pass on both named clients, the run identity is
-admissible under #121, and the complete replay procedure is committed before
-#125 starts.
+**Acceptance:** all six visual checks pass on both named clients with one
+payload active at a time, xrdp's human-rate log confirms the intended codec
+and contains no codec fallback or encoder fault, and the complete replay
+procedure is committed before #125 starts. The compile-time trace is retained
+passively for agent-owned diagnosis, but exercising a particular credit
+distance is not a condition on the owner's visual verdict and does not cause a
+visual rerun.
 
 ## #125 — sparse-chroma client qualification
 
@@ -93,21 +107,41 @@ admissible under #121, and the complete replay procedure is committed before
 anchored by dev tests and recorded in
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`.
 
-**Scope:** on the dev pair, certify on identified macOS and Windows clients a
-stream which contains both main-only cycles and main-plus-auxiliary cycles.
-Make the intervention observable with an admissible wire audit: report LC=1
-and LC=2 command counts and transmitted bytes, and verify that their sum is
-the audited video-command total. This is byte accounting, not a bandwidth or
-frame-rate claim. Perform the still-screen 4:4:4 visual check, then record the
-exact artifacts, procedure and expected checks for later clean-room replay.
-The guarantee is `chroma_refresh_ms` plus one actual frame interval; no extra
-heuristic is in scope.
+**Scope A — real-client correctness:** on the dev pair, certify on identified
+macOS and Windows clients a stream which contains both main-only cycles and
+main-plus-auxiliary cycles. Run only `chroma-probe`; no benchmark payload,
+sampler or unrelated GUI sidecar runs during the observation. A configuration
+change requires a whole-session logoff, but changing clients without changing
+configuration does not. Perform the still-screen 4:4:4 visual check and record
+the exact artifacts and procedure for later clean-room replay. The guarantee
+is `chroma_refresh_ms` plus one actual frame interval; no extra heuristic is in
+scope.
 
-**Acceptance:** both clients render the alternating stream correctly; the
-still image restores full-chroma detail; the trace confirms the chroma-gap
-bound; both command classes occur and their byte accounting closes exactly;
-the run identity is admissible under #121; and the complete replay procedure
-and expected results are recorded in-tree. A red result is fixed and
+**Scope B — T4 oracle numerical qualification:** after Scope A, the agent runs
+the existing oracle-client and `textflood` harness on the same pinned T4 pair
+at the recorded 3840x2400 modeline. Run exactly four 20-second legs in
+dense/sparse/dense/sparse order; the only configuration difference is
+`chroma_refresh_ms=0, chroma_idle_ms=0` against
+`chroma_refresh_ms=1000, chroma_idle_ms=100`. Disable visual autostart payloads
+for these legs. Use only the compile-time `common/perf_trace` instrument: no
+sampler, logger or sidecar tracer. Report mean, p50, p90 and p99 frame interval
+and throughput, plus the latency spent (1) feeding raw pixels to the ffmpeg
+children, (2) waiting for encoded output, (3) draining encoded bytes, and
+(4) collecting, rewriting, handing the frame to the transport and releasing
+credit. Pair child windows by child and sequence identity, make the four
+segments close to the full encoder cycle, and report the producer-idle count
+before making a server-throughput claim. Also report main-only and
+main-plus-auxiliary command counts and transmitted bytes and close their sum
+against the audited video-command total.
+
+**Acceptance:** in Scope A both clients render the alternating stream
+correctly and the still image restores distinct one-pixel red/blue chroma
+detail. In Scope B both dense repetitions and both sparse repetitions are
+internally consistent; the sparse decision is observed on the mechanism's own
+records; the chroma-gap bound holds; both command classes occur; byte
+accounting closes exactly; no latency segment is negative and their sum
+closes to the full cycle. The exact run identity, raw distributions, readable
+breakdown and replay procedure are recorded in-tree. A red result is fixed and
 independently tested on dev before #126 starts.
 
 ---

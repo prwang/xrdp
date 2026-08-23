@@ -68,6 +68,8 @@ realistic payload rather than a diagnostic pattern.
   drag-ghost defect (thin stale 1–3 px lines when dragging across screens).
 * **`t4_profile/`** — everything for the T4 reference box: install, measure,
   the uprobe scripts for the X-server side, and its `gfx.toml` variants.
+  The profile switcher is indexed under `lib/t4/` and installed on that box as
+  `~/xrdp-profile`.
 * **`bench/`** — encoder and conversion throughput measurements backing
   `RESULTS.md`; no live session needed.
 * **`mac_bisect_matrix/i92_sparse_aux_ab.sh`** + `i92_sparse_aux_analyze.py`

@@ -1,0 +1,44 @@
+== packages ==
+xorgxrdp-dev 1:0.10.80+git20260822114312.c190343ff28a ii 
+xrdp-dev 0.10.80+git20260822114412.00bce44e8fea ii 
+== stock package remnants ==
+xorgxrdp  un 
+xrdp  un 
+== services/listener ==
+active
+active
+LISTEN 0      2          127.0.0.1:3389      0.0.0.0:*   
+== live profile ==
+h264_encoder = "ffmpeg"
+avc_mode = "444"
+aux_intra_leaf = false
+aux_ltr_chain = true
+eager_slot_ack = true
+wire_window = 1
+chroma_refresh_ms = 0
+chroma_idle_ms = 0
+d750fbaf8fa01146cf67136fe7d7254823d2b313d515a3ffd4650c3d4af01ef6  /etc/xrdp/gfx.toml
+== sparse staged ==
+avc_mode = "444"
+eager_slot_ack = true
+wire_window = 1
+chroma_refresh_ms = 1000
+chroma_idle_ms = 100
+5df8795e74773836c0eba54791a9c8b10503b7bebc93dc61b6c31294384b4b47  /root/xrdp-frontier-profiles/gfx-frontier-sparse.toml
+== autostart/payload ==
+292a23e493b8c3864f519a8523b5dda6df5d74ea3b80f65a2948159fc07b8cab  /etc/xdg/autostart/chroma-probe.desktop
+7f7c145997538558b6958a5a6e877340e0ccf7aca039cac1f2b26291d267d1ca  /usr/local/bin/chroma-probe
+271a16b5469fa6833c00bcaa47ee3d6fa65dd70855e70e265e0a942328bf93ed  /usr/local/bin/colorkey_x11
+15eb252d21a742a52f48cc709e02ae55a70df856fd447c4a370bd88a828b26ed  /usr/local/bin/textflood
+textflood_payload=disarmed
+== user/device ==
+uid=1000(ubuntu) gid=1000(ubuntu) groups=1000(ubuntu),4(adm),24(cdrom),27(sudo),30(dip),990(render),102(lxd),1001(console)
+crw-rw----+ 1 root render 226, 128 Aug 22 18:20 /dev/dri/renderD128
+ubuntu P
+== live config backups ==
+== backup ==
+drwx------ root:root /root/xrdp-pre-frontier-20260822T183446Z
+== sessions ==
+Remote=yes Type=tty Class=user State=active 
+Remote=yes Type=tty Class=user State=active 
+Remote=no Type=unspecified Class=manager State=active 

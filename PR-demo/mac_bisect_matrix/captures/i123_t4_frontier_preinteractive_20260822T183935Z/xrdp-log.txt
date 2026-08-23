@@ -1,0 +1,72 @@
+[2026-08-22T18:36:31.571+0000] [INFO ] address [127.0.0.1] port [3389] mode 4
+[2026-08-22T18:36:31.575+0000] [INFO ] listening to port 3389 on 127.0.0.1
+[2026-08-22T18:36:31.578+0000] [INFO ] xrdp_listen_pp done
+[2026-08-22T18:36:31.581+0000] [CORE ] You are running xrdp as uid=0 gid=0. This is not recommended.
+[2026-08-22T18:36:31.584+0000] [INFO ] starting xrdp with pid 3534
+[2026-08-22T18:39:35.726+0000] [INFO ] Socket 14: connection accepted from 127.0.0.1:38274
+[2026-08-22T18:39:35.735+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-08-22T18:39:35.739+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-08-22T18:39:35.743+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-08-22T18:39:35.747+0000] [INFO ] Selected TLS security
+[2026-08-22T18:39:35.785+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-08-22T18:39:35.789+0000] [INFO ] client supports gfx protocol
+[2026-08-22T18:39:35.792+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-08-22T18:39:35.796+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-08-22T18:39:35.814+0000] [INFO ] TLS connection established from 127.0.0.1:38274 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-08-22T18:39:35.844+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-08-22T18:39:35.847+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-08-22T18:39:35.850+0000] [INFO ] Client does not support Unicode input
+[2026-08-22T18:39:35.853+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-08-22T18:39:35.862+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-08-22T18:39:35.865+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-08-22T18:39:35.868+0000] [INFO ] Login screen monitor height is 1080 pixels over 1000 mm (27 DPI)
+[2026-08-22T18:39:35.880+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-08-22T18:39:35.916+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-08-22T18:39:35.919+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-08-22T18:39:35.922+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-08-22T18:39:35.925+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-08-22T18:39:35.928+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-08-22T18:39:35.931+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-08-22T18:39:35.933+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-08-22T18:39:35.936+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-08-22T18:39:35.939+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-08-22T18:39:35.942+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-08-22T18:39:35.945+0000] [INFO ] unknown version 0x000a0601
+[2026-08-22T18:39:35.948+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-08-22T18:39:35.950+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 1920x1088 (gfx.toml dump_extra=1)
+[2026-08-22T18:39:36.916+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=1) at 1920x1088 in 952 ms
+[2026-08-22T18:39:36.919+0000] [INFO ] gfx.toml eager_slot_ack is ON (BACKLOG #70): the capture slot is released when the encoder children have absorbed the frame and the previous frame has left for the transport
+[2026-08-22T18:39:36.922+0000] [WARN ] gfx.toml aux_ltr_chain is ON: EXPERIMENTAL FR-H264-8 aux-refs-aux via long-term reference slots (leaf architecture bypassed); scheduled intra refresh every 240 main pictures and every 240 aux pictures, re-key at frame_num 65024
+[2026-08-22T18:39:36.925+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=1)
+[2026-08-22T18:39:36.927+0000] [INFO ] Codec search order is H264, RFX
+[2026-08-22T18:39:36.930+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 9 (0x000a0701)
+[2026-08-22T18:39:36.933+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-08-22T18:39:36.936+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-08-22T18:39:36.939+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-08-22T18:39:36.942+0000] [INFO ] xrdp_egfx_reset_graphics: width 1920 height 1080 monitorcount 1
+[2026-08-22T18:39:36.945+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-08-22T18:39:36.948+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1920 height 1080
+[2026-08-22T18:39:36.950+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-08-22T18:39:36.953+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-08-22T18:39:36.956+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-08-22T18:39:36.959+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-08-22T18:39:36.962+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-08-22T18:39:36.965+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-08-22T18:39:36.967+0000] [INFO ] xrdp_wm_log_msg: Performing login request for ubuntu
+[2026-08-22T18:39:37.072+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-08-22T18:39:39.615+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user ubuntu
+[2026-08-22T18:39:39.618+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-08-22T18:39:39.624+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-08-22T18:39:39.627+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-08-22T18:39:39.631+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-08-22T18:39:39.634+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-08-22T18:39:39.636+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-08-22T18:39:39.640+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-08-22T18:39:39.643+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-08-22T18:39:39.646+0000] [INFO ] lib_mod_log_peer: xrdp_pid=6312 connected to Xorg_pid=6336 Xorg_uid=1000 Xorg_gid=1000 client=127.0.0.1:38274
+[2026-08-22T18:39:39.649+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-08-22T18:39:39.652+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-08-22T18:39:39.655+0000] [INFO ] Received memory_allocation_complete command. width: 1920, height: 1088
+[2026-08-22T18:39:39.664+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 6410 coded 1920x1088 generation 1
+[2026-08-22T18:39:39.668+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 6411 coded 1920x1088 generation 1
+[2026-08-22T18:39:39.671+0000] [INFO ] xrdp_ffmpeg: aux_ltr_chain (EXPERIMENTAL) active (aux child pid 6411)

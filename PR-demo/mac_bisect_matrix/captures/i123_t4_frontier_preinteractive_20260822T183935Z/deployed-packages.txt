@@ -1,0 +1,7 @@
++-- Desired=Unknown/Install/Remove/Purge/Hold
+|+- Status=Not/Inst/Conf-files/Unpacked/halF-conf/Half-inst/trig-aWait/Trig-pend
+||+ Err?=(none)/Reinst-required (Status,Err: uppercase=bad)
+||| Name           Version                                  Architecture Description
++++-==============-========================================-============-=======================================================
+ii  xorgxrdp-dev   1:0.10.80+git20260822114312.c190343ff28a amd64        xorgxrdp development pair for BACKLOG #123-#125
+ii  xrdp-dev       0.10.80+git20260822114412.00bce44e8fea   amd64        xrdp RDP server (developer build from git 00bce44e8fea)

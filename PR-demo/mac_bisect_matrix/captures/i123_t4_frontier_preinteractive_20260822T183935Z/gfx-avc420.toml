@@ -25,7 +25,7 @@ h264_encoder = "ffmpeg"
 path = "/usr/bin/ffmpeg"
 # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
 # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
-avc_mode = "444"
+avc_mode = "420"
 dump_extra = true
 strip_sei = true
 sanitize_hrd = true
@@ -46,13 +46,6 @@ strip_pic_struct = true
 # The gate variant is kept as gfx-t4-nvenc-ltr-g240-gate.toml.
 aux_intra_leaf = false
 aux_ltr_chain = true
-# BACKLOG #124 frontier: make the credit contract explicit instead of
-# relying on parser defaults. BACKLOG #125 enables sparse chroma in its
-# own test profile; zero keeps the #123/#124 interactive baseline dense.
-eager_slot_ack = true
-wire_window = 1
-chroma_refresh_ms = 0
-chroma_idle_ms = 0
 # BACKLOG #45 / PRD FR-H264-6: scheduled paired intra refresh, in
 # pictures per view. The runner spawns BOTH children with the identical
 # frame-indexed -force_key_frames schedule and pins -g to the same value
@@ -156,3 +149,4 @@ MaxBitrate =    1_800_000
 EnableFrameSkip = true
 TargetBitrate =   600_000
 MaxBitrate =    1_200_000
+

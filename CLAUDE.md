@@ -543,6 +543,13 @@ rdp."*
 
 The mechanics, and each one is load-bearing:
 
+* **SSH targets are included, not only the container fleet.** For a remote
+  interactive test host, copy the checked `/work/.turn_draft.md` over that
+  host's transport into the SSH login user's home. Then read back its hash,
+  owner and mode on the target. The chat response may not be sent until the
+  remote hash matches the local file and the login user can read it. On
+  2026-08-22 this rule was applied only to the local `/work` draft while the
+  owner was testing the T4 over SSH; the owner could not see the instructions.
 * **The home of the LOGIN USER, not root's.** In the container fleet
   that is `tester` inside the arm's pod, reached with `kubectl cp`,
   not a path on this box. Getting this wrong puts the file somewhere

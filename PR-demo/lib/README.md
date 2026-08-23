@@ -15,6 +15,10 @@
   and paths before reuse.
 - `incus_user_container/tester_ed25519.pub` — the public SSH key used by that
   historical container helper. It contains no private key material.
+- `t4/xrdp-profile` — installs one of the root-owned T4 frontier profiles as
+  `gfx.toml`, restarts xrdp and reads the effective fields back. It refuses to
+  change configuration while an `ubuntu` X11 session exists. The deployment
+  installs it as `~/xrdp-profile` for the T4 login user.
 
 Helpers in target subdirectories are deliberately environment-specific. Their
 presence here is an inventory and provenance guarantee, not a claim that the

@@ -1,0 +1,13 @@
+=== /work/PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/perf-trace-windows-2mon.txt
+  frames egressed 602, acknowledged 602, still outstanding at the end of the ring 0
+  ACK LATENCY (frame leaves -> client acknowledges it), ms:
+    p10   18.71   p50   29.79   p90   46.06   max  184.42
+  DISTANCE at egress (frames this one is ahead of the client's acknowledged position):
+    1:    243  ( 40.4 %)
+    2:    237  ( 39.4 %)
+    3:    105  ( 17.4 %)
+    4:     13  (  2.2 %)
+    5:      4  (  0.7 %)
+  BOUND wire_window + 2 x monitors = 1 + 2 x 2 = 5; worst observed 5 -- HELD
+  smallest term at emission (243 emissions; ties are common, so this cannot attribute -- see the header):
+    client+C,consumed,server+1: 243 (100.0 %)

@@ -1,0 +1,84 @@
+#!/bin/sh
+
+# Switch the staged T4 frontier profile without copying command fragments.
+# A profile change is refused while an X11 desktop session exists because
+# gfx.toml is a fresh-session contract.
+
+set -eu
+
+profile_dir=/root/xrdp-frontier-profiles
+live_config=/etc/xrdp/gfx.toml
+
+usage()
+{
+    echo "usage: $0 {status|444|444v1|420|sparse}" >&2
+    exit 2
+}
+
+show_status()
+{
+    echo "xrdp service: $(systemctl is-active xrdp 2>/dev/null || true)"
+    echo "live profile fields:"
+    sudo sed -n \
+        -e '/^avc_mode[[:space:]]*=/p' \
+        -e '/^aux_ltr_chain[[:space:]]*=/p' \
+        -e '/^eager_slot_ack[[:space:]]*=/p' \
+        -e '/^wire_window[[:space:]]*=/p' \
+        -e '/^chroma_refresh_ms[[:space:]]*=/p' \
+        -e '/^chroma_idle_ms[[:space:]]*=/p' \
+        "$live_config"
+}
+
+find_x11_session()
+{
+    for session in $(loginctl list-sessions --no-legend 2>/dev/null |
+                     awk '$3 == "ubuntu" {print $1}')
+    do
+        if [ "$(loginctl show-session "$session" -p Type --value)" = "x11" ]
+        then
+            echo "$session"
+            return 0
+        fi
+    done
+    return 1
+}
+
+[ "$#" -eq 1 ] || usage
+
+case "$1" in
+    status)
+        show_status
+        exit 0
+        ;;
+    444)
+        source_config=$profile_dir/gfx-frontier-444.toml
+        ;;
+    444v1)
+        source_config=$profile_dir/gfx-frontier-444v1.toml
+        ;;
+    420)
+        source_config=$profile_dir/gfx-frontier-420.toml
+        ;;
+    sparse)
+        source_config=$profile_dir/gfx-frontier-sparse.toml
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+x11_session=$(find_x11_session || true)
+if [ -n "$x11_session" ]
+then
+    echo "refusing profile change: ubuntu X11 session $x11_session exists" >&2
+    echo "log out that desktop, then run this command again" >&2
+    exit 3
+fi
+
+sudo test -f "$source_config"
+sudo install -m 0644 "$source_config" "$live_config"
+sudo systemctl restart xrdp
+sudo systemctl is-active --quiet xrdp
+
+echo "installed profile: $1"
+show_status

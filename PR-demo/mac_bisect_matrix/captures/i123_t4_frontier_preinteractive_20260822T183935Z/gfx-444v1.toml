@@ -25,7 +25,7 @@ h264_encoder = "ffmpeg"
 path = "/usr/bin/ffmpeg"
 # avc_mode: "auto" (prefer AVC444, else AVC420) | "444" | "420" (force 420,
 # e.g. to exercise 420 on mstsc, which always advertises AVC444). Default auto.
-avc_mode = "444"
+avc_mode = "444v1"
 dump_extra = true
 strip_sei = true
 sanitize_hrd = true

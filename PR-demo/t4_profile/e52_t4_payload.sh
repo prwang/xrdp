@@ -26,6 +26,7 @@ T4_KEY=${T4_KEY:-/root/.ssh/tmp_access_T4}
 D=$(cd "$(dirname "$0")" && pwd)
 CORPUS=$D/../mac_bisect_matrix/code_corpus.ansi
 TFDIR=$D/../textflood
+PROFILE_SWITCH=$D/../lib/t4/xrdp-profile
 ACTION=${1:-status}
 
 rsh() { ssh -n -i "$T4_KEY" "$T4" "$@"; }
@@ -45,6 +46,10 @@ push() {   # push <local file> <installed path> <mode>
 case "$ACTION" in
 install)
     [ -s "$CORPUS" ] || { echo "ABORT: no corpus at $CORPUS" >&2; exit 1; }
+    [ -s "$PROFILE_SWITCH" ] || {
+        echo "ABORT: no profile switcher at $PROFILE_SWITCH" >&2
+        exit 1
+    }
     push "$D/e52_payload.sh"      /usr/local/bin/e52_payload.sh          755
     push "$D/e52-payload.desktop" /etc/xdg/autostart/e52-payload.desktop 644
     push "$CORPUS"                /usr/local/share/code_corpus.ansi      644
@@ -55,11 +60,14 @@ install)
     # not do. The build is checksum-gated like everything else.
     push "$TFDIR/textflood.c"     /usr/local/src/textflood.c             644
     push "$TFDIR/build.sh"        /usr/local/src/textflood_build.sh      755
+    push "$PROFILE_SWITCH"        /home/ubuntu/xrdp-profile              755
+    rsh "sudo chown ubuntu:ubuntu /home/ubuntu/xrdp-profile"
     echo "building textflood on the T4"
     rsh "sudo sh -c 'command -v cc >/dev/null 2>&1 && \
-         pkg-config --exists cairo x11 xext' || \
+         pkg-config --exists cairo x11 xext xrandr' || \
          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y -q \
-         build-essential libcairo2-dev libx11-dev libxext-dev >/dev/null"
+         build-essential pkg-config libcairo2-dev libx11-dev libxext-dev \
+         libxrandr-dev >/dev/null"
     rsh "sudo sh -c 'cd /usr/local/src && CC=cc sh ./textflood_build.sh /usr/local/bin'"
     rsh "/usr/local/bin/textflood --help >/dev/null && echo 'textflood: OK'"
     echo "installed. Nothing runs until it is armed:"
