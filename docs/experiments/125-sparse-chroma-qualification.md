@@ -112,3 +112,104 @@ only a hypothesis: the observation cannot yet distinguish server emission,
 main/aux pairing or client presentation. The new 100 ms one-shot restoration
 has not been deployed to any hardware arm and is not credited as a flicker
 fix.
+
+## 2026-08-23 local x034/x038 interactive handoff
+
+The first deployment of the repair is a local-container A/B, not a new T4
+arm. x034 retains pre-fix xrdp `3ca17beaa84d` on host port 40050. x038 runs
+xrdp `386ca6951a3d` on host port 40054; no functional source changed between
+the repair commit `23b6235d` and that package's documentation-only HEAD.
+
+The conditions intentionally held equal are xorgxrdp package
+`10fa3aa23033`, AVC444v2, aux LTR chain, eager acknowledgement, wire window 2,
+`chroma_refresh_ms=1000`, `chroma_idle_ms=100`, and the interactive payload.
+The live `gfx.toml` SHA-256 is
+`a9256c7ec5d3ea5342691ab3a4cd6a3cf0c763b6b8d3899a1f12a58f23a5a71e` on
+both. The mounted current `codescroll10.sh` SHA-256 is
+`20c62ab26dc7cd63cfb7e33a4a3ebe51d7ddfe704cb0c97c62013311dbd7612a` on
+both, and its corpus hash is
+`bc4a13c3f4dbcff9616e3cb5bd92df6286728de420fb8349f8561dff66696ef5`.
+
+Both final deployments passed the repository's 1920x1080 and 1024x768 smoke
+connections: eight of eight colour transitions, no lag, settled chroma above
+the required edge-fidelity floor, and zero encoder restart/sequence errors.
+Both real-byte deployment certificates pass and are keyed to the identical
+config hash. This smoke proves the final arms are connectable and encode
+conforming bytes; it does not prove the Windows final-state defect fixed.
+
+This is the owner's requested retained-deployment comparison, not a
+one-commit causal isolate. x034 predates x038's perf-trace representation and
+compile-out cleanup as well as the repair. The explicit `wire_window=2`
+neutralizes the intervening default change, and the payload, producer and
+encoder config are held equal, but a visual pass can establish only that the
+current frontier no longer shows the old baseline symptom. The deterministic
+display-state and deadline regressions remain the independent evidence that
+attributes final-state restoration to the new timer.
+
+## 2026-08-23 superseding note — interactive terminal was not equivalent
+
+The local handoff above correctly identified server packages and wire
+configuration, but its interactive visual condition is withdrawn. It launched
+a bare xterm with forced Xft font, size, foreground, background and scrollback
+instead of the regular XFCE desktop and LXTerminal used on the T4. It also
+handled resizing and session exit differently. Therefore its successful
+certificate and smoke checks remain evidence about connectivity and encoded
+bytes only; no visual comparison made in that special xterm can qualify A1.
+
+Both arms are rebuilt from fresh images with `SESSION_KIND=xfce` and
+LXTerminal installed. The versioned `codescroll10.sh` remains the identical
+payload and is run inside LXTerminal, which supplies the GTK/VTE antialiased
+text path. No X resources, fontconfig override or xterm appearance arguments
+are installed. An xterm opened from XFCE consequently retains its
+package-default white background, small bitmap font and non-antialiased text,
+matching the control observed on T4. The prior payload fix which paints blank
+cells Solarized Dark remains necessary for the payload, but did not by itself
+establish equivalence of the terminal renderer or desktop session.
+
+The corrected deployments are:
+
+| condition | endpoint | xrdp package | image |
+|---|---|---|---|
+| pre-repair baseline | `127.0.0.1:40050` | `3ca17beaa84d` | `3ca17beaa84d.xx10fa3aa-tf-xfce.p0796eea3` |
+| trailing-restoration treatment | `127.0.0.1:40054` | `386ca6951a3d` | `386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3` |
+
+Both report `SESSION_KIND=xfce`, XFCE 4.20.1, LXTerminal 0.4.1, xterm 398,
+and xorgxrdp `10fa3aa23033`. No `.Xresources`, `.Xdefaults` or user
+fontconfig override exists in either fresh tester home. Their live config,
+codescroll script and ANSI corpus hashes are respectively
+`a9256c7ec5d3ea5342691ab3a4cd6a3cf0c763b6b8d3899a1f12a58f23a5a71e`,
+`20c62ab26dc7cd63cfb7e33a4a3ebe51d7ddfe704cb0c97c62013311dbd7612a`
+and
+`bc4a13c3f4dbcff9616e3cb5bd92df6286728de420fb8349f8561dff66696ef5`.
+
+Fresh real-byte certificates pass for both final image/config keys. The
+mandatory post-roll smoke also passes at both sizes on both arms: every leg
+delivered eight of eight colour transitions with no lag and no encoder
+restart or sequence error. Settled stripe-edge fidelity was 0.643 and 0.642
+on the pre-repair arm, and 0.999 and 0.998 on the treatment at 1920x1080 and
+1024x768 respectively, against the 0.50 smoke floor. This test uses its own
+xterm colour-key stimulus, so the difference is consistent with the repair's
+trailing full-chroma update but is not the requested Windows/LXTerminal
+visual acceptance. The owner must compare `codescroll10.sh` inside
+LXTerminal under otherwise identical client geometry.
+
+## 2026-08-23 corrected Windows A/B — final convergence GREEN
+
+The owner repeated the comparison on the corrected regular XFCE desktops,
+running the common payload in LXTerminal. On the pre-repair endpoint at port
+40050, the defect reproduced: after motion stopped, the magenta `#` could
+remain permanently in faint Color B. On the repaired endpoint at port 40054,
+the same `#` could appear faint while windows were being dragged, but returned
+to normal Color A once movement stopped.
+
+This is the load-bearing distinction. Sparse mode is permitted to show the
+main-only reconstruction while content is moving; Scope A1 requires the final
+static surface to regain full chroma. The baseline failed that condition and
+the repaired arm passed it. Together with the independent display-state and
+deadline tests, the corrected Windows A/B closes the permanent-convergence
+defect as fixed by trailing restoration.
+
+This result does not close or explain the separately observed approximately
+one-hertz red/blue flicker. The next #125 correctness action is to reproduce
+and understand that transient defect with `chroma-probe` on the repaired arm,
+without an unrelated payload or sidecar.

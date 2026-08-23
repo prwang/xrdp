@@ -1,43 +1,38 @@
-# Arm x034 -- FRONTIER + SPARSE AUX. BACKLOG #104, the PR evidence matrix.
+# Arm x038 -- BACKLOG #125 A1 trailing chroma restoration.
 #
-# x033 plus the sparse-chroma cadence (PRD FR-H264-9): the aux view is sent when the screen settles and at least once a second, and every other frame ships the luma view alone. The byte lever, measured against x033.
+# Treatment for x034. Both arms use the same xorgxrdp, byte-identical
+# gfx.toml, explicit sparse 1000/100 ms settings, fresh XFCE desktop,
+# LXTerminal and ConfigMap-mounted current codescroll10.sh.
+# x034 retains pre-fix xrdp 3ca17beaa84d; x038 uses committed xrdp
+# 386ca6951a3d, whose source includes repair 23b6235d.
 #
-# ONE IMAGE ACROSS x031-x035. Every arm in this matrix is built from the
-# SAME xrdp commit and the SAME xorgxrdp, and differs ONLY in its
-# gfx.toml. That is the property the old fleet did not have -- 17 pods
-# across five images, none comparable with another -- and it is what
-# makes a cross-arm number evidence rather than an anecdote.
+# No xterm resources or command-line appearance overrides are installed.
 #
-# For #125 A1 this retained pre-fix xrdp is the bug baseline against x038.
-# Both use fresh XFCE desktops with LXTerminal and the ConfigMap-mounted
-# current codescroll10.sh. No xterm resources or command-line appearance
-# overrides are installed; the xrdp binary is not modified in this arm.
-#
-# One monitor at 3840x2400. RDP endpoint on the host: 127.0.0.1:40050.
+# One monitor at 3840x2400. RDP endpoint on the host: 127.0.0.1:40054.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: xrdp-x034
+  name: xrdp-x038
   namespace: bisect-matrix
   labels:
     app: xrdp-bisect
-    arm: x034
+    arm: x038
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      arm: x034
+      arm: x038
   template:
     metadata:
       labels:
         app: xrdp-bisect
-        arm: x034
+        arm: x038
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf-xfce.p0796eea3
+          image: localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -45,7 +40,7 @@ spec:
             - name: SESSION_KIND
               value: "xfce"
             - name: ARM_LABEL
-              value: "x034: #125 pre-fix sparse baseline 1000/100 (port 40050)"
+              value: "x038: #125 fixed trailing chroma restoration, sparse 1000/100 (port 40054)"
             - name: XRDP_GFX_FRAMES_IN_FLIGHT
               value: "2"
             - name: XRDP_GFX_TRACE
@@ -56,7 +51,7 @@ spec:
               value: "/var/log/xrdp-perf/enc"
           ports:
             - containerPort: 3389
-              hostPort: 40050
+              hostPort: 40054
               hostIP: 127.0.0.1
               protocol: TCP
           volumeMounts:
@@ -107,4 +102,4 @@ spec:
             defaultMode: 0o755
         - name: gfx
           configMap:
-            name: xrdp-gfx-x034
+            name: xrdp-gfx-x038

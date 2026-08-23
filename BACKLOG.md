@@ -60,10 +60,10 @@ history until all retained replays are green.
 
 ## #125 — sparse-chroma client qualification
 
-**Status: IN PROGRESS; first open item; Scope A1's client replay remains RED,
-but its cause is reproduced and its repair is green locally. Scope A2 remains
-RED and deliberately undiagnosed until A1 passes.** The byte mechanism and
-offline model are
+**Status: IN PROGRESS; first open item; Scope A1 is GREEN on the corrected
+Windows/XFCE/LXTerminal A/B. Scope A2, understanding the independent
+approximately one-hertz `chroma-probe` flicker, is the next action.** The byte
+mechanism and offline model are
 anchored by dev tests and recorded in
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`. The
 approximately one-hertz flicker and the stable Color-A/Color-B states of a
@@ -79,37 +79,37 @@ cancelled and fired once as specified. That repair addresses the permanent
 Color-B final state only; it does not claim to fix the separately observed
 approximately one-hertz red/blue flicker.
 
-**Scope A1 — permanent final-state restoration:** first add an
-independent deterministic display-state regression for a full-chroma frame
-followed by a main-only update and no subsequent damage. Read the actual LC
-semantics and region masks rather than inferring them from the scheduler. Fix
-the development path so an AVC444 surface cannot remain at Color B after
-motion stops. The local repair shall arm a trailing-edge timer after a
-main-only update; expiry requests one full-screen capture from xorgxrdp, whose
-gap makes it a main-plus-auxiliary update. This uses the producer's current
-pixels and preserves borrowed capture-page ownership; it neither copies a
-full capture per moving frame nor silently treats a requested sparse
-configuration as dense. Unit tests shall prove the timer is rearmed by motion,
-cancelled by a full-chroma update, and fires once without later application
-damage. The local implementation and all 211 xrdp tests are green. When
-representative hardware exists again, certify on identified
-macOS and Windows clients a stream which contains both main-only cycles and
-main-plus-auxiliary cycles. Run only `chroma-probe`; no benchmark payload,
-sampler or unrelated GUI sidecar runs during the observation. A configuration
-change requires a whole-session logoff, but changing clients without changing
-configuration does not. Perform the still-screen 4:4:4 visual check and record
-the exact artifacts and procedure for later clean-room replay. The guarantee
-is `chroma_refresh_ms` plus one actual frame interval; no extra heuristic is in
-scope.
+**Scope A1 — permanent final-state restoration: DONE.** The deterministic
+display-state and trailing-deadline regressions, implementation, corrected
+interactive setup and Windows-client A/B are recorded in
+`docs/experiments/125-sparse-chroma-qualification.md`. The pre-repair arm can
+remain at faint Color B after motion stops; the repaired arm can be faint
+during motion but converges to normal Color A after motion stops. The
+guarantee is final convergence, not dense chroma during motion.
 
-**Scope A2 — transient red/blue flicker, only after A1 passes:** reproduce the
-approximately one-hertz stripe flicker with the permanent Color-B case first
-proven absent. Treat it as an independent defect unless evidence establishes a
-shared cause. The old observation's cadence is closer to the configured
-`chroma_refresh_ms=1000` boundary than to `chroma_idle_ms=100`, but cadence
-alone does not distinguish server emission, main/aux pairing or client
-presentation. Do not credit A1's one-shot 100 ms restoration as a flicker fix,
-and do not alter that restoration merely to hide a transient symptom.
+The local interactive A/B is staged without claiming client acceptance:
+x034 at `127.0.0.1:40050` retains pre-fix xrdp `3ca17beaa84d`; x038 at
+`127.0.0.1:40054` runs committed xrdp `386ca6951a3d`, whose functional source
+includes repair `23b6235d`. Both use byte-identical sparse 1000/100 ms
+`gfx.toml`, xorgxrdp `10fa3aa23033`, fresh regular XFCE desktops, LXTerminal,
+and the same current Solarized Dark `codescroll10.sh` payload. The earlier
+special xterm handoff is invalid for visual comparison: its forced font,
+colours and session shape did not reproduce the T4 desktop pipeline. Xterm is
+now left at package defaults and is not the A/B payload. The pair is a local
+AMD reproduction aid, not a substitute for the later representative-client
+gate or a one-commit causal isolate; the deterministic regressions carry the
+timer attribution.
+
+**Scope A2 — transient red/blue flicker: NEXT.** Reproduce and understand the
+approximately one-hertz stripe flicker with `chroma-probe` on the repaired arm,
+with the permanent Color-B case now proven absent. Run no benchmark payload,
+sampler or unrelated GUI sidecar during the observation. Treat the flicker as
+an independent defect unless evidence establishes a shared cause. Its cadence
+is closer to the configured `chroma_refresh_ms=1000` boundary than to
+`chroma_idle_ms=100`, but cadence alone does not distinguish server emission,
+main/aux pairing or client presentation. Do not credit A1's trailing
+restoration as a flicker fix, and do not alter that restoration merely to hide
+a transient symptom.
 
 **Scope B — future T4 oracle numerical qualification:** after Scopes A1 and
 A2, and only if the correctness fix retains a meaningful sparse mechanism,

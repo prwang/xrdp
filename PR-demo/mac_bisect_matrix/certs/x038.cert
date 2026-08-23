@@ -1,10 +1,10 @@
-arm:    x034
+arm:    x038
 mode:   AVC444
-image:  localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf-xfce.p0796eea3
+image:  localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3
 gfx:    sha256:a9256c7ec5d3ea53
-key:    localhost/xrdp-bisect:3ca17beaa84d.xx10fa3aa-tf-xfce.p0796eea3|a9256c7ec5d3ea53
-when:   2026-08-23T19:36:46Z
-window: 3s at 1920x1080, 54089 bytes
+key:    localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3|a9256c7ec5d3ea53
+when:   2026-08-23T19:36:58Z
+window: 3s at 1920x1080, 54484 bytes
 
 === encoder input pipe (BACKLOG #103) ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
@@ -17,16 +17,16 @@ whole of the requirement.
 === wire audit (--assert) ===
       P slices retargeted to OTHER slot    : 0
       P slices with NO list modification   : 0
-      pictures self-marking into LT0      : 1/2
-      avg P size=578B   avg I/IDR size=27532B   inter share of pictures=50.0%
-aux  pictures=2      P(inter)=1      I(intra)=1     IDR=0
-      P slices retargeted to OWN slot LT1 : 1/1
+      pictures self-marking into LT0      : 2/3
+      avg P size=366B   avg I/IDR size=27532B   inter share of pictures=66.7%
+aux  pictures=3      P(inter)=2      I(intra)=1     IDR=0
+      P slices retargeted to OWN slot LT1 : 2/2
       P slices retargeted to OTHER slot    : 0
       P slices with NO list modification   : 0
-      pictures self-marking into LT1      : 2/2
-      avg P size=559B   avg I/IDR size=25098B   inter share of pictures=50.0%
+      pictures self-marking into LT1      : 3/3
+      avg P size=364B   avg I/IDR size=25098B   inter share of pictures=66.7%
 
-merged decode-order frame_num chain: 4 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+merged decode-order frame_num chain: 6 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
 
 VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
 
@@ -37,15 +37,15 @@ VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, 
   A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
   A5 own-slot refs and self-marks          PASS  all pictures conform
   A6 one contiguous frame_num chain        PASS  0 gap(s)
-  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 1 (bound 250) aux 1 (bound 250)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 2 (bound 250) aux 2 (bound 250)
 
 ASSERT VERDICT: PASS -- 7 checks, all clean
 wire audit exit: 0
 
 === black-frame check ===
 cert.bin
-  pictures in capture     : 4
-  frames decoded          : 4
+  pictures in capture     : 6
+  frames decoded          : 6
   black frames (any view) : 0 []
   black MAIN-view frames  : 0 []
   ... mid-stream          : 0 []

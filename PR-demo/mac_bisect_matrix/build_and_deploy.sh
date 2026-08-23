@@ -103,6 +103,8 @@ declare -A ARM_XORG_DEB=(
     [x035]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
     [x036]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033+dirty_amd64.deb"
     [x037]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033+dirty_amd64.deb"
+    # #125 A1 keeps x034's exact producer while changing xrdp.
+    [x038]="xorgxrdp-dev_1%3a0.10.80+git20260731212221.10fa3aa23033_amd64.deb"
 )
 declare -A ARM_TAG=(
     # ONE TAG FOR THE WHOLE MATRIX. If these five ever differ, the
@@ -112,10 +114,11 @@ declare -A ARM_TAG=(
     [x031]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
     [x032]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
     [x033]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
-    [x034]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
+    [x034]=3ca17beaa84d.xx10fa3aa-tf-xfce.p0796eea3
     [x035]=3ca17beaa84d.xx10fa3aa-tf.p2fde5531
     [x036]=edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7
     [x037]=edfd0e5c80a6d.xx10fa3aa23033d-tf.r2.p11d2c5a7
+    [x038]=386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3
 )
 declare -A TAG_DEB=(
     # BACKLOG #104: xrdp at 3ca17bea -- the encoder-input-pipe
@@ -123,6 +126,7 @@ declare -A TAG_DEB=(
     [3ca17beaa84d.xx10fa3aa-tf]="xrdp-dev_0.10.80+git20260810000106.3ca17beaa84d_amd64.deb"
     [edfd0e5c80a6d.xx10fa3aa23033d-tf]="xrdp-dev_0.10.80+git20260816151351.edfd0e5c80a6+dirty_amd64.deb"
     [edfd0e5c80a6d.xx10fa3aa23033d-tf.r2]="xrdp-dev_0.10.80+git20260816151351.edfd0e5c80a6+dirty2_amd64.deb"
+    [386ca6951a3d.xx10fa3aa23033-tf]="xrdp-dev_0.10.80+git20260823115532.386ca6951a3d_amd64.deb"
 )
 
 # --- tester credential hash (root-only, host -> pods) ---
@@ -294,6 +298,7 @@ kubectl apply -f "$D/k8s/namespace.yaml"
 # last-applied-configuration annotation limit (256KB)
 kubectl -n bisect-matrix create configmap xrdp-banner \
     --from-file=banner.sh="$D/banner.sh" \
+    --from-file=codescroll10.sh="$D/../smoke_gate/codescroll10.sh" \
     --from-file=code_corpus.ansi="$D/code_corpus.ansi" \
     --dry-run=client -o yaml \
     | kubectl apply --server-side --force-conflicts -f -

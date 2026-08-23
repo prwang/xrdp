@@ -155,9 +155,22 @@ and every timing in them predates the encoder-input-pipe fix (#103).
 | x035 | 40051 | frontier, `wire_window` 2 | n/a | 420 | what 4:4:4 costs, against x033 |
 | x036 | 40052 | frontier, `wire_window` 2 | every frame | 444 | #122 both-monitors-active control |
 | x037 | 40053 | frontier, `wire_window` 2 | every frame | 444 | #122 monitor-0-active / monitor-1-idle arm |
+| x038 | 40054 | frontier, `wire_window` 2 | sparse 1000/100 ms | 444 | #125 A1 trailing-restoration treatment against x034 |
 
-All seven run `SESSION_KIND=textflood_strip`. The slow `textflood`
-payload is retired as an instrument: at 16.2 ms/frame it is the same
+For #125's interactive A/B, x034 and x038 both use a fresh regular XFCE
+desktop with LXTerminal installed, plus the current `codescroll10.sh` and
+`code_corpus.ansi` from the shared ConfigMap. Run the visual payload in
+LXTerminal. No xterm resources or appearance options are installed: an xterm
+opened from XFCE retains the package-default white background, small bitmap
+font and non-antialiased rendering and is only a control, not the A/B payload.
+Their `gfx.toml` bodies and xorgxrdp package are byte-identical. x034 retains
+the pre-fix xrdp; x038 uses committed xrdp `386ca6951a3d` (the source is
+unchanged from repair commit `23b6235d`).
+
+The throughput matrix normally runs `SESSION_KIND=textflood_strip`; x034 and
+x038 are temporarily assigned `SESSION_KIND=xfce` for #125's interactive
+visual A/B. The slow `textflood` payload is retired as an instrument: at
+16.2 ms/frame it is the same
 speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
 1.04× against the 2.0× floor.
 
@@ -165,7 +178,7 @@ speed as the pipeline now the pipe is unclamped, an FR-BENCH-1 margin of
 conditions, never arms.** A WAN leg is `netem_rtt.sh` on x032 and x033,
 not two more pods.
 
-**All seven arms are certified.** x035 needed a fix first: the certifier
+**All eight arms are certified.** x035 needed a fix first: the certifier
 ran the AVC444 two-view wire audit against a single-view AVC420 stream,
 read the whole thing as "aux", reported `main pictures=0` and failed
 A1–A6 — on bytes that were correct for the configuration. Owner ruling,

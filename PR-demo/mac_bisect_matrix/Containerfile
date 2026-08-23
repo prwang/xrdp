@@ -94,7 +94,7 @@ RUN chmod 755 /usr/local/bin/colorkey_x11 \
 ARG INSTALL_XFCE=0
 RUN if [ "$INSTALL_XFCE" = "1" ]; then \
         apt-get update \
-        && apt-get install -y xfce4 xfce4-terminal dbus-x11 \
+        && apt-get install -y xfce4 xfce4-terminal lxterminal dbus-x11 \
         && rm -rf /var/lib/apt/lists/*; \
     fi
 
