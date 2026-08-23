@@ -65,9 +65,12 @@
  *                      0 DISABLES the whole feature -- the aux view is
  *                      sent on every frame, which is today's behaviour
  *                      exactly.
- *   chroma_idle_ms     when the screen settles, how long the pipeline
- *                      must have been quiet before the aux view is sent
- *                      again. It also bounds the aux RATE: aux cannot
+ *   chroma_idle_ms     after a main-only frame, how long the pipeline
+ *                      must stay quiet before one full-screen capture
+ *                      is requested to restore current chroma. A real
+ *                      frame arriving after the same quiet gap carries
+ *                      aux directly and cancels that request. It also
+ *                      bounds the aux RATE: aux cannot
  *                      be sent more often than once per this interval,
  *                      so 100 ms clamps chroma to <= 10 per second
  *                      while the main view runs at whatever rate it
@@ -77,8 +80,8 @@
  * WHAT chroma_refresh_ms REALLY BOUNDS, corrected 2026-08-08 after the
  * first fleet run measured 1022 ms against a configured 1000 (owner
  * ruling: state the achievable bound rather than add a heuristic).
- * The decision exists only AT A FRAME -- there is no mechanism to send
- * chroma between frames -- so once the interval expires, the earliest
+ * The refresh decision exists only AT A FRAME, so once that interval
+ * expires, the earliest
  * chroma can go is the next frame. The bound an administrator gets is
  *
  *      chroma_refresh_ms + one frame interval

@@ -289,6 +289,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
                  * hour-old idle screen */
                 self->avc444_last_aux_ms[ci] = -1;
                 self->avc444_prev_frame_ms[ci] = -1;
+                self->avc444_chroma_restore_due_ms[ci] = -1;
             }
         }
         /* cache the EGFX surface origins the re-key reset re-maps with;
@@ -1417,6 +1418,28 @@ gfx_send_consumed(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
 }
 
 /*****************************************************************************/
+/* BACKLOG #125: ask the main thread to request one current full capture from
+ * xorgxrdp. This is a control marker, not an encoded frame, and owns no
+ * XRDP_ENC_DATA. The worker cannot call the module transport itself. */
+static int
+gfx_send_chroma_invalidate(struct xrdp_encoder *self)
+{
+    XRDP_ENC_DATA_DONE *enc_done;
+
+    enc_done = g_new0(XRDP_ENC_DATA_DONE, 1);
+    if (enc_done == NULL)
+    {
+        return 1;
+    }
+    ENC_SET_BIT(enc_done->flags, ENC_DONE_FLAGS_CHROMA_INVALIDATE_BIT);
+    tc_mutex_lock(self->mutex);
+    fifo_add_item(self->fifo_processed, enc_done);
+    tc_mutex_unlock(self->mutex);
+    g_set_wait_obj(self->xrdp_encoder_event_processed);
+    return 0;
+}
+
+/*****************************************************************************/
 /* Debug-only capture (env XRDP_AVC444_DUMP=<dir>): write the exact main/aux
  * Annex-B H.264 substreams the client receives, plus the surface dimensions and
  * damage rects, one set of files per emitted frame keyed by desktop sequence.
@@ -2325,10 +2348,10 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         {
             /* BACKLOG #92 / FR-H264-9: chroma was not due for this
              * monitor on this frame, so this gfx frame is the luma PDU
-             * and nothing else. LC=1 means exactly that on the wire --
-             * "this bitstream is the luma view, the chroma view is not
-             * present" -- so a conforming client updates luma and keeps
-             * the chroma it already has, which is the whole feature.
+             * and nothing else. LC=1 replaces this damage region with
+             * its 4:2:0 reconstruction. #125's trailing timer requests
+             * a current full capture after motion stops so the region
+             * cannot remain in that state indefinitely.
              * The PDU is RETURNED rather than queued as a non-last
              * enc_done, because with no LC=2 PDU behind it, it is this
              * command's last one. */
@@ -2477,7 +2500,84 @@ gfx_avc444_aux_due(struct xrdp_encoder *self, int mon)
     {
         self->avc444_last_aux_ms[mon] = now;
     }
+    self->avc444_chroma_restore_due_ms[mon] =
+        xrdp_gfx_chroma_restore_deadline(self->avc444_chroma_refresh_ms,
+                                         self->avc444_chroma_idle_ms,
+                                         now, due);
     return due;
+}
+
+/*****************************************************************************/
+/* Earliest outstanding trailing-chroma deadline, as a wait-object timeout. */
+static int
+gfx_avc444_restore_wait_ms(struct xrdp_encoder *self)
+{
+    long long now;
+    int wait_ms;
+    int candidate;
+    int mon;
+
+    if (self->avc444_chroma_refresh_ms <= 0 ||
+            self->avc444_chroma_idle_ms <= 0)
+    {
+        return -1;
+    }
+    now = enc_now_ms();
+    wait_ms = -1;
+    for (mon = 0; mon < 16; mon++)
+    {
+        candidate = xrdp_gfx_chroma_restore_wait_ms(
+                        now, self->avc444_chroma_restore_due_ms[mon]);
+        if (candidate >= 0 && (wait_ms < 0 || candidate < wait_ms))
+        {
+            wait_ms = candidate;
+        }
+    }
+    return wait_ms;
+}
+
+/*****************************************************************************/
+/* Consume every deadline reached by this one full-screen request. A monitor
+ * whose newer frame rearmed a later deadline is deliberately left armed. */
+static void
+gfx_avc444_request_restore_due(struct xrdp_encoder *self)
+{
+    long long now;
+    int request_mask;
+    int mon;
+
+    now = enc_now_ms();
+    request_mask = 0;
+    for (mon = 0; mon < 16; mon++)
+    {
+        if (xrdp_gfx_chroma_restore_take_due(
+                    now, &self->avc444_chroma_restore_due_ms[mon]))
+        {
+            request_mask |= 1 << mon;
+        }
+    }
+    if (request_mask == 0)
+    {
+        return;
+    }
+    PERF_TRACE("event=chroma_restore_request monitor_mask=%d", request_mask);
+    if (gfx_send_chroma_invalidate(self) != 0)
+    {
+        LOG(LOG_LEVEL_ERROR, "gfx_avc444_request_restore_due: could not "
+            "queue the trailing full-chroma capture request");
+        /* Allocation failed before a request existed. Retry after one settle
+         * interval rather than losing restoration or spinning at timeout 0. */
+        for (mon = 0; mon < 16; mon++)
+        {
+            if ((request_mask & (1 << mon)) != 0)
+            {
+                self->avc444_chroma_restore_due_ms[mon] =
+                    xrdp_gfx_chroma_restore_deadline(
+                        self->avc444_chroma_refresh_ms,
+                        self->avc444_chroma_idle_ms, now, 0);
+            }
+        }
+    }
 }
 
 /*****************************************************************************/
@@ -3830,6 +3930,7 @@ proc_enc_msg(void *arg)
     int batching;
     int drain_full;
     int n_carried;
+    int work_ready;
 
     LOG_DEVEL(LOG_LEVEL_INFO, "proc_enc_msg: thread is running");
 
@@ -3859,7 +3960,7 @@ proc_enc_msg(void *arg)
         if (n_items == 0 && !drain_full)
         {
             /* nothing in hand: block for work exactly as before */
-            timeout = -1;
+            timeout = batching ? gfx_avc444_restore_wait_ms(self) : -1;
             robjs_count = 0;
             wobjs_count = 0;
             robjs[robjs_count++] = term_obj;
@@ -3905,10 +4006,19 @@ proc_enc_msg(void *arg)
             break;
         }
 
-        if (g_is_wait_obj_set(event_to_proc))
+        work_ready = g_is_wait_obj_set(event_to_proc);
+        if (work_ready)
         {
             /* clear it right away */
             g_reset_wait_obj(event_to_proc);
+        }
+        else if (batching && n_items == 0 && !drain_full)
+        {
+            /* A timeout, not a work wake. Request the trailing capture
+             * before returning to the blocking wait. A simultaneous frame
+             * sets event_to_proc and takes the branch above, so its newer
+             * timestamp gets to cancel or rearm this deadline first. */
+            gfx_avc444_request_restore_due(self);
         }
         /* NON-BLOCKING drain, taking the mutex once, decrementing the
          * depth exactly as before. If the bound is hit there may be

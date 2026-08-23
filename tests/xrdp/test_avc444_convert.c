@@ -328,6 +328,77 @@ exp_sample(const unsigned char *xrgb, int stride, int w, int h,
                                 px & 0xff, Y, U, V);
 }
 
+/* Independent AVC444v2 display model for BACKLOG #125. Applying main-only
+ * first replaces the destination chroma with the 2x2 4:2:0 samples. Applying
+ * aux afterwards fills the three missing samples in each block from the v2
+ * packing described by MS-RDPEGFX 3.3.8.3.2. */
+static void
+display_apply_v2(struct xrdp_avc444_conv *c, int w, int h, int with_aux,
+                 unsigned char *ud, unsigned char *vd)
+{
+    const unsigned char *yp;
+    const unsigned char *uvp;
+    int cx;
+    int cy;
+    int x;
+    int y;
+
+    for (cy = 0; cy < (h + 1) / 2; cy++)
+    {
+        for (cx = 0; cx < (w + 1) / 2; cx++)
+        {
+            int dx;
+            int dy;
+            for (dy = 0; dy < 2; dy++)
+            {
+                for (dx = 0; dx < 2; dx++)
+                {
+                    x = 2 * cx + dx;
+                    y = 2 * cy + dy;
+                    if (x < w && y < h)
+                    {
+                        ud[y * w + x] = main_u(c, cx, cy);
+                        vd[y * w + x] = main_v(c, cx, cy);
+                    }
+                }
+            }
+        }
+    }
+    if (!with_aux)
+    {
+        return;
+    }
+
+    yp = c->aux_nv12;
+    uvp = c->aux_nv12 + c->coded_width * c->coded_height;
+    for (y = 0; y < h; y++)
+    {
+        for (cx = 0; 2 * cx + 1 < w; cx++)
+        {
+            x = 2 * cx + 1;
+            ud[y * w + x] = yp[y * c->coded_width + cx];
+            vd[y * w + x] = yp[y * c->coded_width +
+                               c->coded_width / 2 + cx];
+        }
+    }
+    for (cy = 0; 2 * cy + 1 < h; cy++)
+    {
+        y = 2 * cy + 1;
+        for (x = 0; 4 * x + 2 < w; x++)
+        {
+            ud[y * w + 4 * x] = uvp[cy * c->coded_width + 2 * x];
+            ud[y * w + 4 * x + 2] =
+                uvp[cy * c->coded_width + 2 * x + 1];
+            vd[y * w + 4 * x] =
+                uvp[cy * c->coded_width +
+                    2 * (c->coded_width / 4 + x)];
+            vd[y * w + 4 * x + 2] =
+                uvp[cy * c->coded_width +
+                    2 * (c->coded_width / 4 + x) + 1];
+        }
+    }
+}
+
 START_TEST(test_avc444_v2_packing)
 {
     const int w = 16;
@@ -597,6 +668,80 @@ START_TEST(test_avc420_isoluminant_chroma_loss)
 }
 END_TEST
 
+/* The deterministic display-state reproduction of #125's Color A -> Color B
+ * screenshots. The source has one-pixel chroma detail and nearly constant
+ * luma. A complete v2 pair displays the detail; a later LC=1 update replaces
+ * it with flat 4:2:0, and doing nothing afterwards leaves that flat state
+ * indefinitely. Only a later auxiliary update restores Color A. */
+START_TEST(test_sparse_main_only_stalls_at_420_until_restore)
+{
+    const int w = 16;
+    const int h = 16;
+    const int stride = w * 4;
+    unsigned char xrgb[16 * 16 * 4];
+    unsigned char ud[16 * 16];
+    unsigned char vd[16 * 16];
+    unsigned char stalled_ud[16 * 16];
+    unsigned char stalled_vd[16 * 16];
+    struct xrdp_avc444_conv *c;
+    unsigned int mag = (200u << 16) | (100u << 8) | 200u;
+    unsigned int grn = (70u << 16) | (150u << 8) | 70u;
+    int full_span;
+    int main_span;
+    int restored_span;
+    int x;
+    int y;
+
+    for (y = 0; y < h; y++)
+    {
+        for (x = 0; x < w; x++)
+        {
+            unsigned int px = (x % 2 == 0) ? mag : grn;
+            memcpy(xrgb + y * stride + x * 4, &px, 4);
+        }
+    }
+    c = xrdp_avc444_conv_create(w, h, 16);
+    ck_assert_ptr_ne(c, NULL);
+    c->chroma_v2 = 1;
+    ck_assert_int_eq(conv_update_rgb(c, xrgb, stride, w, h), 0);
+
+    display_apply_v2(c, w, h, 1, ud, vd);
+    full_span = ud[0] - ud[1];
+    if (full_span < 0)
+    {
+        full_span = -full_span;
+    }
+    /* The even/even sample remains the 2x2 average. From the source
+     * vectors above, U is about 166 for magenta and 97 for green, so
+     * |average - green| is about 34.5. Require only the independently
+     * derived lower bound, not a value read from this implementation. */
+    ck_assert_int_gt(full_span, 30);
+
+    display_apply_v2(c, w, h, 0, ud, vd);
+    main_span = ud[0] - ud[1];
+    if (main_span < 0)
+    {
+        main_span = -main_span;
+    }
+    ck_assert_int_eq(main_span, 0);
+    memcpy(stalled_ud, ud, sizeof(ud));
+    memcpy(stalled_vd, vd, sizeof(vd));
+
+    /* No protocol update means no display-state transition. */
+    ck_assert_int_eq(memcmp(ud, stalled_ud, sizeof(ud)), 0);
+    ck_assert_int_eq(memcmp(vd, stalled_vd, sizeof(vd)), 0);
+
+    display_apply_v2(c, w, h, 1, ud, vd);
+    restored_span = ud[0] - ud[1];
+    if (restored_span < 0)
+    {
+        restored_span = -restored_span;
+    }
+    ck_assert_int_eq(restored_span, full_span);
+    xrdp_avc444_conv_delete(c);
+}
+END_TEST
+
 START_TEST(test_avc444_dims_and_padding)
 {
     struct xrdp_avc444_conv *c;
@@ -849,6 +994,7 @@ make_suite_avc444_convert(void)
     tcase_add_test(tc, test_avc444_v2_default_is_v1);
     tcase_add_test(tc, test_avc444_main_only_420);
     tcase_add_test(tc, test_avc420_isoluminant_chroma_loss);
+    tcase_add_test(tc, test_sparse_main_only_stalls_at_420_until_restore);
     tcase_add_test(tc, test_avc444_dims_and_padding);
     tcase_add_test(tc, test_avc444_odd_dims_alignment);
     tcase_add_test(tc, test_avc444_odd_padding_edge_replicated);

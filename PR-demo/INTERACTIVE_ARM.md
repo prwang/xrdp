@@ -1,5 +1,10 @@
 # The interactive arm — T4 frontier qualification with real clients
 
+> **Historical rig notice (2026-08-23):** the instance described below was
+> imaged and decommissioned after #124 closed and #125 reproduced RED. Its
+> addresses and commands are retained for provenance only. Do not attempt
+> remote work from this file until BACKLOG #125 records a replacement rig.
+
 An XFCE desktop on the real Tesla T4, running the pinned development frontier
 for BACKLOG #123--#125. Use an identified Windows RDP client and an identified
 macOS RDP client; record each product name and version/build in the capture.

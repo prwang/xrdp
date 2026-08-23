@@ -2,6 +2,8 @@
 #ifndef _XRDP_ENCODER_H
 #define _XRDP_ENCODER_H
 
+#include <limits.h>
+
 #include "arch.h"
 #include "fifo.h"
 #include "xrdp_client_info.h"
@@ -204,6 +206,69 @@ xrdp_gfx_chroma_due(int refresh_ms, int idle_ms, long long now_ms,
     if (idle_ms > 0 && now_ms - prev_frame_ms >= idle_ms)
     {
         return 1;               /* the screen settled */
+    }
+    return 0;
+}
+
+/**
+ * BACKLOG #125 -- deadline for repairing a main-only AVC444 update.
+ *
+ * LC=1 replaces the damaged region with its 4:2:0 reconstruction. A future
+ * LC=2 can restore the missing chroma, but there may be no future application
+ * damage after motion stops. A main-only update therefore arms a trailing
+ * full-capture request. A full-chroma update disarms it. The request captures
+ * current producer pixels instead of retaining borrowed capture pages.
+ *
+ * @return monotonic deadline, or -1 when no restoration is armed
+ */
+static inline long long
+xrdp_gfx_chroma_restore_deadline(int refresh_ms, int idle_ms,
+                                 long long now_ms, int aux_sent)
+{
+    if (refresh_ms <= 0 || idle_ms <= 0 || aux_sent)
+    {
+        return -1;
+    }
+    if (now_ms > LLONG_MAX - idle_ms)
+    {
+        return LLONG_MAX;
+    }
+    return now_ms + idle_ms;
+}
+
+/**
+ * Return the bounded wait until a restoration deadline. -1 means disarmed;
+ * zero means due now. The encoder wait primitive accepts an int timeout.
+ */
+static inline int
+xrdp_gfx_chroma_restore_wait_ms(long long now_ms, long long deadline_ms)
+{
+    long long wait_ms;
+
+    if (deadline_ms < 0)
+    {
+        return -1;
+    }
+    if (deadline_ms <= now_ms)
+    {
+        return 0;
+    }
+    wait_ms = deadline_ms - now_ms;
+    return wait_ms > INT_MAX ? INT_MAX : (int)wait_ms;
+}
+
+/**
+ * Consume one expired restoration deadline. Clearing it before the request
+ * is queued makes a quiet screen generate one capture, not a fixed-rate loop.
+ */
+static inline int
+xrdp_gfx_chroma_restore_take_due(long long now_ms, long long *deadline_ms)
+{
+    if (deadline_ms != NULL && *deadline_ms >= 0 &&
+            *deadline_ms <= now_ms)
+    {
+        *deadline_ms = -1;
+        return 1;
     }
     return 0;
 }
@@ -443,6 +508,11 @@ struct xrdp_encoder
      * screen cannot hold chroma back on a still one. */
     long long avc444_last_aux_ms[16];
     long long avc444_prev_frame_ms[16];
+    /* #125: a main-only LC=1 update replaces its damaged region with 4:2:0.
+     * On expiry the worker asks the main thread to invalidate the full Xorg
+     * screen once, producing a current main+aux repaint even when the
+     * application generates no later damage. -1 means disarmed. */
+    long long avc444_chroma_restore_due_ms[16];
     /* aux_ltr_chain re-key (BACKLOG #48): when the shared frame_num
      * counter hits the threshold the encoder pair is destroyed, and the
      * NEXT frame for that monitor rebuilds the client's decoder by
@@ -644,6 +714,10 @@ typedef struct xrdp_enc_data XRDP_ENC_DATA;
  * does not release the XRDP_ENC_DATA. Set only together with
  * ENC_DONE_FLAGS_FRAME_ID_BIT. */
 #define ENC_DONE_FLAGS_CONSUMED_BIT 3
+/* BACKLOG #125: encoder-worker timer request. This marker carries no bytes,
+ * frame id or XRDP_ENC_DATA ownership; the main thread asks xorgxrdp for one
+ * full capture so a trailing main+aux frame restores static chroma. */
+#define ENC_DONE_FLAGS_CHROMA_INVALIDATE_BIT 4
 
 /* used when scheduling tasks from xrdp_encoder.c */
 struct xrdp_enc_data_done

@@ -34,13 +34,14 @@ stub at the end of this file and points to its record.
   `PR-demo/mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/`.
   The same instance has migrated to `100.55.149.97`. #123 is closed with the
   forced-AVC444v1 macOS fidelity limitation preserved; `auto` still prefers
-  v2 and v1 remains only the v10.0 compatibility tier.
+  v2 and v1 remains only the v10.0 compatibility tier. That instance was
+  imaged and decommissioned on 2026-08-23; its addresses are historical and
+  no remote work is possible until a replacement is provisioned.
 
 ## Execution order
 
-The porting list is one chain. Complete #124B, #124 and #125 before #126; an
-item does not start until its predecessor is closed. #123 and #120–#122 are
-closed below. #124B repairs the visual instrument before #124 continues.
+The porting list is one chain. Complete #125 before #126; an item does not
+start until its predecessor is closed. #120–#124B are closed below.
 #126–#142 re-author it as the clean-room commit series. #143 is explicitly
 later architecture work and cannot change or qualify that series. #300 is the
 public-PR documentation deliverable after #142; it does not block #143 and is
@@ -57,73 +58,37 @@ history until all retained replays are green.
 
 # Active dependency chain
 
-## #124 — credit-frontier client qualification
-
-**Status: IN PROGRESS; first open qualification, blocked on #124B.** The
-mechanism, frozen-client behavior and
-`C + 2M` bound are anchored by dev tests and recorded in
-`docs/experiments/80-the-credit-frontier.md` and
-`docs/experiments/91-the-multimon-window-and-the-shared-pump.md`.
-
-**Scope:** complete the written six-check visual qualification on identified
-macOS and Windows client products on the dev pair; pin the artifacts and
-expected checks for clean-room replay; and state any upstream performance
-claim as one-monitor only. Do not reopen window tuning: the shipped decision
-is `wire_window=1`, `eager_slot_ack=true`; value 2 is maintainer guidance, not
-a second default.
-
-**Acceptance:** all six visual checks pass on both named clients with one
-payload active at a time, xrdp's human-rate log confirms the intended codec
-and contains no codec fallback or encoder fault, and the complete replay
-procedure is committed before #125 starts. The compile-time trace is retained
-passively for agent-owned diagnosis, but exercising a particular credit
-distance is not a condition on the owner's visual verdict and does not cause a
-visual rerun. The owner has already observed `colorkey_x11` green on both
-clients. The code-scroll result is not yet valid because the terminal did not
-establish the specified dark-blue background, and textflood exposed the
-#124B helper defects. Repeat the corrected payloads before closing this item.
-
-## #124B — interactive textflood correctness
-
-**Status: IN PROGRESS; implementation and deploy green, awaiting the owner’s
-two-client visual replay.** The first client walk was
-not admissible for code-scroll qualification: the helper silently ignored a
-requested line rate outside strip mode, repeated each source line to the right
-edge by default, destroyed its window after `--frames N`, and the terminal
-payload did not establish its own Solarized Dark background.
-
-**Scope:** make a natural, one-copy code line the textflood default; retain the
-saturated repeat-to-edge workload only behind an explicit option and update
-every benchmark caller to request it. Make an explicitly requested live line
-rate control the content advance instead of being silently ignored. In live
-limited-frame mode, hold the last completed frame until Escape or `q`; offline
-self-tests still terminate. Make `codescroll10.sh` paint Solarized base03
-independently of terminal configuration. Do not add a sampler, logger or trace
-arm. The compiler, both offline render modes, live 5-lines/s cadence and
-finite-frame hold/quit checks are green; the committed source and corrected
-code-scroll helper are installed checksum-identically on `100.55.149.97`
-without changing its profile or live GUI session.
-
-**Acceptance:** compiler warnings, offline rendering equivalence and argument
-validation are green; both natural and explicit repeat-to-edge modes are
-covered; limited live mode remains present after its last frame until a quit
-key; historical benchmark entry points explicitly preserve their saturated
-workload. Install the standalone corrected helpers on the pinned T4 without
-restarting or manipulating the live GUI session, then repeat #124's code-scroll
-and textflood visual checks on both clients.
-
 ## #125 — sparse-chroma client qualification
 
-**Status: TODO; blocked on #124; Scope A already has a RED early
-observation.** The byte mechanism and offline model are
+**Status: IN PROGRESS; first open item; Scope A's client replay remains RED,
+but its cause is reproduced and its repair is green locally.** The byte mechanism and offline model are
 anchored by dev tests and recorded in
 `docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`. The
-approximately one-hertz flicker of static red/blue stripes seen strongly on
-Windows is preserved in
-`docs/experiments/125-sparse-chroma-qualification.md`; do not continue to
-Scope B until the isolated visual replay explains and fixes it.
+approximately one-hertz flicker and the stable Color-A/Color-B states of a
+magenta `#include` glyph seen on Windows are preserved in
+`docs/experiments/125-sparse-chroma-qualification.md` and
+`PR-demo/media_evidences/sparse_chroma_stall/`. Color B is consistent with an
+LC=1 main view replacing full chroma with its 4:2:0 reconstruction and no
+later corresponding LC=2 update reaching that static region. The former tests
+only covered when a future frame was selected for auxiliary work. The new
+display-state model proves LC=1 leaves Color B until an auxiliary update, and
+the new trailing-deadline tests prove the restoration request is rearmed,
+cancelled and fired once as specified.
 
-**Scope A — real-client correctness:** on the dev pair, certify on identified
+**Scope A — local correctness before real-client replay:** first add an
+independent deterministic display-state regression for a full-chroma frame
+followed by a main-only update and no subsequent damage. Read the actual LC
+semantics and region masks rather than inferring them from the scheduler. Fix
+the development path so an AVC444 surface cannot remain at Color B after
+motion stops. The local repair shall arm a trailing-edge timer after a
+main-only update; expiry requests one full-screen capture from xorgxrdp, whose
+gap makes it a main-plus-auxiliary update. This uses the producer's current
+pixels and preserves borrowed capture-page ownership; it neither copies a
+full capture per moving frame nor silently treats a requested sparse
+configuration as dense. Unit tests shall prove the timer is rearmed by motion,
+cancelled by a full-chroma update, and fires once without later application
+damage. The local implementation and all 211 xrdp tests are green. When
+representative hardware exists again, certify on identified
 macOS and Windows clients a stream which contains both main-only cycles and
 main-plus-auxiliary cycles. Run only `chroma-probe`; no benchmark payload,
 sampler or unrelated GUI sidecar runs during the observation. A configuration
@@ -133,7 +98,8 @@ the exact artifacts and procedure for later clean-room replay. The guarantee
 is `chroma_refresh_ms` plus one actual frame interval; no extra heuristic is in
 scope.
 
-**Scope B — T4 oracle numerical qualification:** after Scope A, the agent runs
+**Scope B — future T4 oracle numerical qualification:** after Scope A, and
+only if the correctness fix retains a meaningful sparse mechanism, the agent runs
 the existing oracle-client and `textflood` harness on the same pinned T4 pair
 at the recorded 3840x2400 modeline. Run exactly four 20-second legs in
 dense/sparse/dense/sparse order; the only configuration difference is
@@ -152,7 +118,9 @@ against the audited video-command total.
 
 **Acceptance:** in Scope A both clients render the alternating stream
 correctly and the still image restores distinct one-pixel red/blue chroma
-detail. In Scope B both dense repetitions and both sparse repetitions are
+detail after the one-shot trailing capture; the trace contains the associated
+`chroma_restore_request` and the server log has no request failure. In Scope B
+both dense repetitions and both sparse repetitions are
 internally consistent; the sparse decision is observed on the mechanism's own
 records; the chroma-gap bound holds; both command classes occur; byte
 accounting closes exactly; no latency segment is negative and their sum
@@ -399,11 +367,12 @@ before it can advance the encoder DPB.
 **Dev source:** sparse portions of `xrdp/xrdp_encoder.{c,h}`,
 `xrdp/xrdp_encoder_ffmpeg.{c,h}`, `xrdp/xrdp_h264_annexb.{c,h}`,
 `xrdp/xrdp_mm.c`, `xrdp/xrdp_tconfig.{c,h}`,
-`tests/xrdp/test_avc444_chroma_due.c`, sparse cases in
+`tests/xrdp/test_avc444_chroma_due.c`, `test_avc444_convert.c`, sparse cases in
 `test_avc444_ltr.c`, `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 
 **Acceptance:** disabled equivalence, refresh-plus-one-frame bound, settle/rate
-clamps, independent intra schedules and DPB continuity pass. This internal
+clamps, one-shot trailing restoration without future damage, independent
+intra schedules and DPB continuity pass. This internal
 slice has no real-client replay; the activated candidate replays #125 only in
 #142. Normative specification:
 [`PRD/slices/141-sparse-chroma.md`](PRD/slices/141-sparse-chroma.md).
@@ -508,4 +477,5 @@ The record, not this table, owns conditions, measurements and retractions.
 | #121 | Contaminated captures deleted; identity and minimum-record gates made fail-loud. | `docs/experiments/121-evidence-admissibility-cleanup.md` |
 | #122 | Valid selected-monitor evidence refuted the one-active slowdown hypothesis. | `docs/experiments/122-one-active-monitor.md` |
 | #123 | T4/client compatibility closed with forced-v1 macOS per-pixel fidelity RED; auto prefers v2 and v1 remains a legacy capability tier. | `docs/experiments/123-t4-nvenc-compatibility.md` |
+| #124/#124B | Windows/macOS AVC444v2 visual qualification and both corrected flood payloads passed. | `docs/experiments/124-credit-frontier-client-qualification.md` |
 | #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |

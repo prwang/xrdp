@@ -327,6 +327,66 @@ START_TEST(test_chroma_due_bootstrap_and_boundaries)
 END_TEST
 
 /*****************************************************************************/
+/* BACKLOG #125: a main-only LC=1 update is a displayed 4:2:0 update, not a
+ * promise that the client preserves older chroma. With no later application
+ * damage, the trailing deadline is the only event that can request current
+ * pixels and restore the surface. Expected times below are derived directly
+ * from IDLE_MS = 100, not from the implementation. */
+START_TEST(test_chroma_restore_trailing_deadline)
+{
+    long long deadline;
+
+    deadline = xrdp_gfx_chroma_restore_deadline(REFRESH_MS, IDLE_MS,
+               20, 0);
+    ck_assert_int_eq((int)deadline, 120);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_wait_ms(20, deadline), 100);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_wait_ms(119, deadline), 1);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_take_due(119, &deadline), 0);
+
+    /* Motion rearms the trailing edge from the newest main-only frame. */
+    deadline = xrdp_gfx_chroma_restore_deadline(REFRESH_MS, IDLE_MS,
+               60, 0);
+    ck_assert_int_eq((int)deadline, 160);
+
+    /* A main+aux update has already restored chroma and cancels the timer. */
+    deadline = xrdp_gfx_chroma_restore_deadline(REFRESH_MS, IDLE_MS,
+               70, 1);
+    ck_assert_int_eq((int)deadline, -1);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_wait_ms(70, deadline), -1);
+
+    /* With no later damage, expiry fires exactly once and disarms itself. */
+    deadline = xrdp_gfx_chroma_restore_deadline(REFRESH_MS, IDLE_MS,
+               80, 0);
+    ck_assert_int_eq((int)deadline, 180);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_take_due(180, &deadline), 1);
+    ck_assert_int_eq((int)deadline, -1);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_take_due(1000, &deadline), 0);
+
+    /* Dense mode and a disabled settle trigger never arm a request. */
+    ck_assert_int_eq((int)xrdp_gfx_chroma_restore_deadline(0, IDLE_MS,
+                     20, 0), -1);
+    ck_assert_int_eq((int)xrdp_gfx_chroma_restore_deadline(REFRESH_MS, 0,
+                     20, 0), -1);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_chroma_restore_deadline_is_overflow_safe)
+{
+    long long deadline;
+
+    deadline = xrdp_gfx_chroma_restore_deadline(REFRESH_MS, IDLE_MS,
+               LLONG_MAX - 50, 0);
+    ck_assert(deadline == LLONG_MAX);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_wait_ms(LLONG_MAX - 1,
+                     deadline), 1);
+    ck_assert_int_eq(xrdp_gfx_chroma_restore_take_due(LLONG_MAX,
+                     &deadline), 1);
+    ck_assert_int_eq((int)deadline, -1);
+}
+END_TEST
+
+/*****************************************************************************/
 Suite *
 make_suite_avc444_chroma_due(void)
 {
@@ -345,6 +405,8 @@ make_suite_avc444_chroma_due(void)
     tcase_add_test(tc, test_chroma_due_aux_rate_is_bounded_by_the_idle_interval);
     tcase_add_test(tc, test_chroma_due_without_idle_only_the_guarantee_fires);
     tcase_add_test(tc, test_chroma_due_bootstrap_and_boundaries);
+    tcase_add_test(tc, test_chroma_restore_trailing_deadline);
+    tcase_add_test(tc, test_chroma_restore_deadline_is_overflow_safe);
 
     return s;
 }

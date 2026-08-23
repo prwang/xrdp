@@ -1,6 +1,6 @@
 # Curated media evidence
 
-This is a minimal visual history of four distinct client bugs. Media is kept
+This is a minimal visual history of five distinct client bugs. Media is kept
 only when it shows a different evidentiary stage: the reported symptom, a
 material failed direction, a decisive diagnostic behavior, or the fixed
 result. The source and test records, not screenshots alone, establish cause.
@@ -10,7 +10,8 @@ the package's first commit: one color-key screenshot with no recoverable defect
 identity, six duplicate full/cropped views of the dual-monitor ghost, one
 Windows case-H quality screenshot unrelated to the Mac color fault, and one
 still frame duplicated by the retained source recording. The remaining ten
-files tell the four progressions below without repeating a stage.
+files tell the first four progressions below without repeating a stage. Four
+later #125 artifacts add two source states and their exact enlarged crops.
 
 ## Naming, time and integrity
 
@@ -22,7 +23,7 @@ Names use `<timestamp>_<observed-content>.<ext>`.
   filename. Its timezone was not embedded, so it is not guessed.
 * Renaming and categorization did not alter the screenshots. The retained
   movie is the deliberately shortened and transcoded excerpt documented
-  below. `SHA256SUMS` pins all ten checked-in artifacts.
+  below. `SHA256SUMS` pins all fourteen checked-in artifacts.
 * Every retained artifact is an ordinary Git object. The 3,465,528-byte MP4
   does not require Git LFS.
 
@@ -92,6 +93,19 @@ ffmpeg -copyts -ss 0:0:12 -to 0:2:12 -i input.mov \
     -enc_time_base:v demux -fps_mode:v passthrough \
     -video_track_timescale 90000 -tag:v hvc1 -c:a aac -b:a 128k output.mp4
 ```
+
+## 5. Sparse AVC444v2 static chroma stall
+
+Record: `docs/experiments/125-sparse-chroma-qualification.md`.
+
+| time | stage | evidence or change | meaning |
+|---|---|---|---|
+| 2026-08-23 01:40:49 local | intended state | `sparse_chroma_stall/20260823T014049-local_sparse-codescroll-color-a.png` and its `hash-crop-x64-nearest` derivative | The Solarized `#` glyph is bright magenta with full chroma. |
+| 2026-08-23 01:40:44 local | bug | `sparse_chroma_stall/20260823T014044-local_sparse-codescroll-color-b.png` and its `hash-crop-x64-nearest` derivative | After sparse updates and motion stops, the same glyph can remain faint and chroma-reduced. |
+
+The category README records the exact inclusive crop, deterministic ffmpeg
+operation, pixel statistics and source names. The enlarged files are views of
+the same two evidence states, not two additional chronological stages.
 
 ## Use in the public PR
 

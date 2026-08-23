@@ -337,7 +337,10 @@ xrdp_ffmpeg_avc444_coded_width(struct xrdp_ffmpeg_avc444 *self);
  * fed, not armed in the poll set, not waited for and not popped, and
  * collect_pair returns the pair with aux_data NULL and aux_len 0. The
  * caller then emits the LC=1 luma PDU alone, which is what the AVC444
- * wire format's LC field exists for. Nothing else changes -- the aux
+ * wire format's LC field exists for. LC=1 visibly replaces that damage
+ * region with its 4:2:0 reconstruction; the caller owns #125's later
+ * full-capture request which restores current chroma after motion stops.
+ * Nothing else changes -- the aux
  * child stays alive, its long-term reference LT1 still holds the last
  * chroma picture, and the next aux picture predicts from it. The aux
  * child's input index does not advance on a skipped frame, which is why

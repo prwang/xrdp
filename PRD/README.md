@@ -112,7 +112,10 @@ that overlap a slice shall retain these changes and their tests.
   Outstanding work shall be bounded by `wire_window + 2 * monitor_count`.
 * Sparse auxiliary scheduling shall skip submission before the auxiliary
   encoder can advance. With a nonzero refresh interval, the maximum chroma
-  gap is that interval plus one frame period.
+  gap during continuing updates is that interval plus one frame period. A
+  final main-only update shall arm a one-shot trailing full capture after the
+  idle interval so static regions return to current 4:4:4 even when the
+  application produces no later damage.
 
 ### Security, diagnostics and failure
 

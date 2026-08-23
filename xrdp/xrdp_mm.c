@@ -4301,6 +4301,33 @@ xrdp_mm_process_enc_done(struct xrdp_mm *self)
         {
             break;
         }
+        if (ENC_IS_BIT_SET(enc_done->flags,
+                           ENC_DONE_FLAGS_CHROMA_INVALIDATE_BIT))
+        {
+            /* BACKLOG #125: the sparse encoder's trailing-edge timer
+             * expired after a main-only update. Ask the producer for its
+             * current full screen so the resulting main+aux frame restores
+             * every static region. Module I/O belongs to this main thread,
+             * never to the encoder worker which queued the marker. */
+            const struct display_size_description *ds =
+                    &self->wm->client_info->display_sizes;
+            if (self->mod == NULL ||
+                    self->mod->mod_server_monitor_full_invalidate == NULL)
+            {
+                LOG(LOG_LEVEL_ERROR, "xrdp_mm_process_enc_done: cannot "
+                    "request trailing full-chroma capture: module is not "
+                    "available");
+            }
+            else if (self->mod->mod_server_monitor_full_invalidate(
+                         self->mod, ds->session_width,
+                         ds->session_height) != 0)
+            {
+                LOG(LOG_LEVEL_ERROR, "xrdp_mm_process_enc_done: trailing "
+                    "full-chroma capture request failed");
+            }
+            g_free(enc_done);
+            continue;
+        }
         if (ENC_IS_BIT_SET(enc_done->flags, ENC_DONE_FLAGS_CONSUMED_BIT))
         {
             /* BACKLOG #70: not a frame -- the encoder children have
