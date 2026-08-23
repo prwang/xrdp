@@ -17,13 +17,13 @@ gate a human visual verdict.
 
 | | |
 |---|---|
-| host | `98.93.137.204`, RDP port **3389** (loopback only) |
+| host | `100.55.149.97`, RDP port **3389** (loopback only) |
 | GPU | NVIDIA Tesla T4, driver 580.173.02 |
 | xrdp build | `00bce44e8fea`, package `0.10.80+git20260822114412.00bce44e8fea` |
 | xorgxrdp | `c190343ff28a`, package `1:0.10.80+git20260822114312.c190343ff28a` |
 | desktop | XFCE; `chroma-probe` starts through the installed XDG autostart |
 | baseline profile | AVC444, NVENC, aux LTR chain, `wire_window=1`, eager slot acknowledgement, sparse chroma off |
-| staged #123 profiles | forced AVC444v1 and forced AVC420, otherwise byte-identical to the baseline |
+| retained compatibility profiles | forced AVC444v1 and forced AVC420, otherwise byte-identical to the baseline |
 | staged #125 profile | the same profile with `chroma_refresh_ms=1000`, `chroma_idle_ms=100` |
 | retained preflight | `mac_bisect_matrix/captures/i123_t4_frontier_preinteractive_20260822T183935Z/` |
 
@@ -39,7 +39,7 @@ machine, forward it first:
 
 ```
 ssh -N -L 43389:127.0.0.1:3389 -i tmp_access_T4 \
-    ubuntu@98.93.137.204
+    ubuntu@100.55.149.97
 ```
 
 Then point the RDP client at `127.0.0.1:43389`.
@@ -62,7 +62,7 @@ unchanged. Disconnect one client and reconnect the other to the same XFCE
 session. Log off only before a profile change, because `gfx.toml` is loaded for
 a fresh session.
 
-## Finish #123 before the six-check walk
+## #123 is closed; start with the #124B helper replay
 
 The server preflight exercised AVC420, AVC444v2, one monitor and the exact
 recorded two-monitor modelines. The owner then checked dense AVC444v2 through
@@ -72,21 +72,34 @@ flat colour. The server log confirms AVC444v2 (`0x000F`) for both, Windows
 dynamic resize, and a real Windows two-monitor connection at 3840×2400 plus
 2560×1440. Those baseline checks are complete.
 
-Only these real-client mode checks remain for #123:
+#123's forced AVC444v1 and AVC420 checks are complete. The full matrix and the
+decision to retain v1 only as a legacy capability tier are in
+`docs/experiments/123-t4-nvenc-compatibility.md`.
 
-1. Log the current XFCE session off. From a client-side terminal run
-   `ssh -t -i tmp_access_T4 ubuntu@98.93.137.204 '~/xrdp-profile 444v1'`.
-   Connect Windows at 2560×1440 and confirm coherent colour, motion and
-   distinct one-pixel red/blue stripes. Disconnect without logging off, then
-   make the same observation from macOS. The server must report AVC444v1
-   (`0x000E`), with no fallback.
-2. Log the XFCE session off, then run the same command with `420`. Connect
-   Windows, disconnect, and connect macOS to the same session. The desktop,
-   clocks and motion must remain coherent. Under 4:2:0 the one-pixel red/blue
-   detail is expected to merge; wrong colours, displaced chroma, black output
-   or fallback are failures. The server must report AVC420 (`0x000B`).
-3. Log the session off and run `~/xrdp-profile 444` to restore the dense
-   profile before #124.
+The T4 instance has migrated to `100.55.149.97`. It currently has a retained
+live session using the sparse profile. The corrected standalone helpers can be
+checked in that session without a logoff because installing or launching them
+does not change `gfx.toml`:
+
+1. In an XFCE terminal, run `codescroll10.sh`. Its whole terminal background,
+   including blank space after short source lines, must be Solarized base03
+   dark blue (`#002b36`). It advances one source line every 0.1 seconds and
+   `q` quits.
+2. Quit codescroll, then run
+   `textflood --lines-per-sec 10 --frames 40 --stamps ''`. Each source line
+   appears once rather than repeating fragments to the right edge. The content
+   advances at ten lines per second for four seconds, then the last frame
+   remains visible until Escape or `q`.
+
+Do not use `--repeat-to-edge` for this visual check. That option deliberately
+restores the saturated full-width benchmark pattern and is not the natural
+code-view default.
+
+These two checks validate #124B's payload behavior, not the dense #124 server
+profile. Before completing the final #124 matrix, log the sparse session off,
+run `ssh -t -i tmp_access_T4 ubuntu@100.55.149.97 '~/xrdp-profile 444'`, and
+start one fresh session. A profile change still requires a whole-session
+logoff; switching clients or payloads under an unchanged profile does not.
 
 `~/xrdp-profile status` prints the live fields. The switcher refuses to change
 configuration while an `ubuntu` X11 session exists. A mode the client does not
@@ -230,7 +243,7 @@ XFCE session off, then activate the staged sparse profile from a client-side
 terminal:
 
 ```
-ssh -t -i tmp_access_T4 ubuntu@98.93.137.204 '~/xrdp-profile sparse'
+ssh -t -i tmp_access_T4 ubuntu@100.55.149.97 '~/xrdp-profile sparse'
 ```
 
 Make one fresh Windows session and run only the autostarted `chroma-probe`.
@@ -254,6 +267,13 @@ not add payloads to this visual walk.
 
 After #125, restore the dense baseline with `~/xrdp-profile 444` after the
 session has logged off.
+
+The first sparse observation is already RED: on Windows the nominally static
+one-pixel red/blue stripes flickered strongly at approximately the configured
+one-second refresh cadence; the effect was uncertain on macOS. The 4:2:0
+recording path erased the symptom, so there is no admissible MP4. Preserve the
+live profile and logs; this must be explained and fixed on the development
+pair before #125 can close.
 
 ## If something looks wrong
 

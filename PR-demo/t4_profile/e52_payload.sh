@@ -209,7 +209,8 @@ if [ "$KIND" = textflood ]; then
     # desktop passes through an all-black state that the oracle
     # black-frame check catches (1 black frame, pictures 62-68, three
     # runs in a row; zero without the wait).
-    exec textflood --corpus "$CORPUS" --title "$E52_TITLE" --step 25
+    exec textflood --corpus "$CORPUS" --title "$E52_TITLE" --step 25 \
+        --repeat-to-edge
 fi
 
 FLOOD='

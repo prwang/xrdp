@@ -94,11 +94,13 @@ quits.
 
 ## The fast producer: `--scroll strip` (BACKLOG #83)
 
-`--scroll full` is the default and is the loop every archived capture
-was measured with: every visible row re-rendered every frame, and the
-corpus advanced `--step` lines **per rendered frame**. It is unchanged,
-and it still draws the same bytes — a 6-frame byte-for-byte comparison
-against the committed pre-#83 `draw_frame` at 3840×2400 is identical.
+`--scroll full` is the default and re-renders every visible row every frame.
+For interactive use, each source line now appears once on its row. Every
+archived saturated capture tiled each line to the right edge; the benchmark
+launchers preserve that exact workload explicitly with `--repeat-to-edge`.
+Without an explicit `--lines-per-sec`, full mode advances `--step` lines per
+rendered frame as before. An explicit live rate controls full mode too, rather
+than being silently ignored.
 
 `--scroll strip` is PRD FR-BENCH-1's **design B**: move the picture up
 by the scroll distance with one `memmove` and render only the newly
@@ -142,6 +144,19 @@ all of them antialiasing fringe from ink that crossed a row boundary.
 Frame zero always takes the full-redraw path, as does any frame after
 an `Expose`, and any advance large enough that nothing would survive
 the scroll.
+
+At a requested rate below the render rate, the live loop now waits until a
+whole line is due. It does not clamp the advance to one line and damage the
+screen with extra frames. `--step` and `--lines-per-sec` are mutually
+exclusive so an ambiguous request fails loudly.
+
+## Interactive fixture behavior (#124B)
+
+`--frames N` has two deliberately different meanings. A live X11 run renders
+N frames and then holds the last frame until Escape or `q`, so the operator
+can inspect or capture it. An offline `--selftest --frames N` remains a batch
+test and exits. Natural one-copy lines are the default; use
+`--repeat-to-edge` only for the saturated benchmark workload.
 
 ### `--verify N` — the same picture, computed two ways
 
@@ -268,6 +283,8 @@ initial fill on surface 1; see
 ./build.sh                     # also needs libxrandr-dev
 ./textflood --corpus ../mac_bisect_matrix/code_corpus.ansi
 ./textflood --corpus ../mac_bisect_matrix/code_corpus.ansi --monitor 0
+./textflood --corpus ../mac_bisect_matrix/code_corpus.ansi \
+    --lines-per-sec 10 --frames 40 --stamps ''
 ./textflood --help
 
 # offline, no X server, seconds of CPU:

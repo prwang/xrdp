@@ -85,7 +85,8 @@ establish the specified dark-blue background, and textflood exposed the
 
 ## #124B — interactive textflood correctness
 
-**Status: IN PROGRESS; immediate repair for #124.** The first client walk was
+**Status: IN PROGRESS; implementation and deploy green, awaiting the owner’s
+two-client visual replay.** The first client walk was
 not admissible for code-scroll qualification: the helper silently ignored a
 requested line rate outside strip mode, repeated each source line to the right
 edge by default, destroyed its window after `--frames N`, and the terminal
@@ -98,7 +99,10 @@ rate control the content advance instead of being silently ignored. In live
 limited-frame mode, hold the last completed frame until Escape or `q`; offline
 self-tests still terminate. Make `codescroll10.sh` paint Solarized base03
 independently of terminal configuration. Do not add a sampler, logger or trace
-arm.
+arm. The compiler, both offline render modes, live 5-lines/s cadence and
+finite-frame hold/quit checks are green; the committed source and corrected
+code-scroll helper are installed checksum-identically on `100.55.149.97`
+without changing its profile or live GUI session.
 
 **Acceptance:** compiler warnings, offline rendering equivalence and argument
 validation are green; both natural and explicit repeat-to-edge modes are

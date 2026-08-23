@@ -110,6 +110,7 @@ textflood)
     [ "$MONITOR" = all ] || MONITOR_ARG=(--monitor "$MONITOR")
     exec /usr/local/bin/textflood --corpus "$CORPUS" \
         "${MONITOR_ARG[@]}" \
+        --repeat-to-edge \
         --stamps /tmp/e52_textflood_stamps.tsv
     ;;
 textflood_strip)
@@ -143,6 +144,7 @@ textflood_strip)
     [ "$MONITOR" = all ] || MONITOR_ARG=(--monitor "$MONITOR")
     exec /usr/local/bin/textflood --corpus "$CORPUS" \
         "${MONITOR_ARG[@]}" \
+        --repeat-to-edge \
         --scroll strip --lines-per-sec 1479.2 \
         --stamps /tmp/e52_textflood_stamps.tsv
     ;;

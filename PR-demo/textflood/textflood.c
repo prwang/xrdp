@@ -56,11 +56,12 @@
  *
  * THE TWO SCROLL MODES (BACKLOG #83)
  *
- * --scroll full (DEFAULT) is the historical loop, unchanged: every
- * visible row is re-rendered every frame and the corpus advances --step
- * lines PER RENDERED FRAME. Every archived capture was measured with
- * this loop, so it must keep producing the same pixels; nothing in the
- * strip path runs when it is selected.
+ * --scroll full (DEFAULT) re-renders every visible row every frame. The
+ * natural interactive default draws each corpus line once. Historical
+ * saturated captures used repeated text across the whole row; their
+ * callers request that explicitly with --repeat-to-edge. With no
+ * --lines-per-sec option the corpus advances --step lines per rendered
+ * frame; an explicit rate makes live motion time-based.
  *
  * --scroll strip is PRD FR-BENCH-1's design B: the surface is moved up
  * by the scroll distance with one memmove and only the newly exposed
@@ -501,13 +502,12 @@ corpus_load(struct corpus *cp, const char *path)
 }
 
 /*****************************************************************************/
-/* Draw one row of text: corpus line (offset + row), repeated across the
-   full width. The xterm payload got the same effect by repeating each
-   line 32 times and letting the terminal wrap it, and the point is the
-   same: no row is mostly background, so a frame is a full-width content
-   change rather than a sparse one. */
+/* Draw one row of text. Natural interactive mode draws the corpus line
+   once. --repeat-to-edge repeats it across the width to preserve the
+   historical saturated benchmark workload. */
 static void
-draw_row_text(cairo_t *cr, const struct line *ln, int width, double y)
+draw_row_text(cairo_t *cr, const struct line *ln, int width, double y,
+              int repeat_to_edge)
 {
     int ri;
     double x;
@@ -536,6 +536,10 @@ draw_row_text(cairo_t *cr, const struct line *ln, int width, double y)
         {
             break;
         }
+        if (!repeat_to_edge)
+        {
+            break;
+        }
         x += 8.0;
     }
 }
@@ -546,7 +550,8 @@ draw_row_text(cairo_t *cr, const struct line *ln, int width, double y)
    and nothing else. */
 static void
 draw_frame(cairo_t *cr, const struct corpus *cp, int offset,
-           int width, int rows, double line_height, double baseline)
+           int width, int rows, double line_height, double baseline,
+           int repeat_to_edge)
 {
     int row;
     int li;
@@ -563,7 +568,8 @@ draw_frame(cairo_t *cr, const struct corpus *cp, int offset,
         {
             continue;
         }
-        draw_row_text(cr, ln, width, row * line_height + baseline);
+        draw_row_text(cr, ln, width, row * line_height + baseline,
+                      repeat_to_edge);
     }
 }
 
@@ -573,7 +579,8 @@ draw_frame(cairo_t *cr, const struct corpus *cp, int offset,
    band the same pixels — see the header note on --scroll strip. */
 static void
 draw_rows_banded(cairo_t *cr, const struct corpus *cp, int offset,
-                 const struct layout *lay, int row_from, int row_to)
+                 const struct layout *lay, int row_from, int row_to,
+                 int repeat_to_edge)
 {
     int row;
     int li;
@@ -593,7 +600,8 @@ draw_rows_banded(cairo_t *cr, const struct corpus *cp, int offset,
                         lay->line_px);
         cairo_clip(cr);
         draw_row_text(cr, ln, lay->width,
-                      row * lay->line_px + lay->baseline);
+                      row * lay->line_px + lay->baseline,
+                      repeat_to_edge);
         cairo_restore(cr);
     }
 }
@@ -604,11 +612,11 @@ draw_rows_banded(cairo_t *cr, const struct corpus *cp, int offset,
    scroll to leave anything on screen. */
 static void
 render_full_banded(cairo_t *cr, const struct corpus *cp, int offset,
-                   const struct layout *lay)
+                   const struct layout *lay, int repeat_to_edge)
 {
     cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
     cairo_paint(cr);
-    draw_rows_banded(cr, cp, offset, lay, 0, lay->rows);
+    draw_rows_banded(cr, cp, offset, lay, 0, lay->rows, repeat_to_edge);
 }
 
 /*****************************************************************************/
@@ -638,7 +646,8 @@ render_full_banded(cairo_t *cr, const struct corpus *cp, int offset,
  */
 static int
 render_scroll(cairo_t *cr, cairo_surface_t *surf, const struct corpus *cp,
-              int offset, int advance, const struct layout *lay)
+              int offset, int advance, const struct layout *lay,
+              int repeat_to_edge)
 {
     unsigned char *data;
     int stride;
@@ -679,7 +688,7 @@ render_scroll(cairo_t *cr, cairo_surface_t *surf, const struct corpus *cp,
     cairo_set_source_rgb(cr, BG_R, BG_G, BG_B);
     cairo_paint(cr);
     cairo_restore(cr);
-    draw_rows_banded(cr, cp, offset, lay, rb, lay->rows);
+    draw_rows_banded(cr, cp, offset, lay, rb, lay->rows, repeat_to_edge);
     return 0;
 }
 
@@ -761,11 +770,10 @@ layout_init(struct layout *lay, int width, int height,
 
 /*****************************************************************************/
 /* How many corpus lines the content should have advanced by now.
-   Time-based, so the picture moves at DEF_LINES_PER_SEC whatever the
+   Time-based, so the picture moves at the requested rate whatever the
    frame rate is; `acc` carries the fractional remainder so the long-run
-   rate is exact. Clamped to at least one line — at the rates this
-   payload runs (0.676 ms per line) the clamp does not fire, but a frame
-   that advanced nothing would present identical pixels. */
+   rate is exact. Zero means the next line is not due yet and the live
+   loop must wait rather than damage the screen with identical pixels. */
 static int
 advance_lines(double *acc, double dt_ms, double lines_per_sec)
 {
@@ -774,15 +782,7 @@ advance_lines(double *acc, double dt_ms, double lines_per_sec)
 
     owed = *acc + lines_per_sec * dt_ms / 1000.0;
     adv = (int) owed;
-    if (adv < 1)
-    {
-        adv = 1;
-        *acc = 0.0;
-    }
-    else
-    {
-        *acc = owed - adv;
-    }
+    *acc = owed - adv;
     return adv;
 }
 
@@ -823,7 +823,8 @@ offline_surface(int width, int height, unsigned char **buf_out)
  */
 static int
 run_verify(const struct corpus *cp, int width, int height,
-           const char *font, double font_size, long nframes)
+           const char *font, double font_size, long nframes,
+           int repeat_to_edge)
 {
     static const int adv_seq[] = {1, 2, 7, 13, 25, 40, 3, 100000};
     struct layout lay;
@@ -864,8 +865,8 @@ run_verify(const struct corpus *cp, int width, int height,
            "%ld frames\n", width, height, lay.line_px, fext.height,
            lay.rows, nframes);
     offset = 0;
-    render_full_banded(ca, cp, offset, &lay);
-    render_full_banded(cb, cp, offset, &lay);
+    render_full_banded(ca, cp, offset, &lay, repeat_to_edge);
+    render_full_banded(cb, cp, offset, &lay, repeat_to_edge);
     cairo_surface_flush(sa);
     cairo_surface_flush(sb);
     rc = 0;
@@ -877,8 +878,9 @@ run_verify(const struct corpus *cp, int width, int height,
 
         adv = adv_seq[f % (long) (sizeof(adv_seq) / sizeof(adv_seq[0]))];
         offset = (offset + adv) % cp->nlines;
-        render_full_banded(ca, cp, offset, &lay);
-        scrolled = render_scroll(cb, sb, cp, offset, adv, &lay) == 0;
+        render_full_banded(ca, cp, offset, &lay, repeat_to_edge);
+        scrolled = render_scroll(cb, sb, cp, offset, adv, &lay,
+                                 repeat_to_edge) == 0;
         if (!scrolled)
         {
             /* Falling back to the full redraw here would make the two
@@ -894,7 +896,7 @@ run_verify(const struct corpus *cp, int width, int height,
                 rc = 1;
                 break;
             }
-            render_full_banded(cb, cp, offset, &lay);
+            render_full_banded(cb, cp, offset, &lay, repeat_to_edge);
         }
         cairo_surface_flush(sa);
         cairo_surface_flush(sb);
@@ -995,7 +997,8 @@ pctl(const double *sorted, long n, double q)
 static int
 run_selftest(const struct corpus *cp, int width, int height,
              const char *font, double font_size, int mode, int step,
-             double lines_per_sec, long frames, double pipeline_ms)
+             double lines_per_sec, long frames, double pipeline_ms,
+             int repeat_to_edge)
 {
     struct layout lay;
     cairo_surface_t *surf;
@@ -1085,29 +1088,36 @@ run_selftest(const struct corpus *cp, int width, int height,
             {
                 adv = 0;
                 acc = 0.0;
-                render_full_banded(cr, cp, offset, &lay);
+                render_full_banded(cr, cp, offset, &lay, repeat_to_edge);
             }
             else
             {
                 int rc;
 
                 adv = advance_lines(&acc, t0 - t_prev, lines_per_sec);
+                if (adv < 1)
+                {
+                    adv = 1;
+                    acc = 0.0;
+                }
                 offset = (offset + adv) % cp->nlines;
-                rc = render_scroll(cr, surf, cp, offset, adv, &lay);
+                rc = render_scroll(cr, surf, cp, offset, adv, &lay,
+                                   repeat_to_edge);
                 if (rc < 0)
                 {
                     return 1;
                 }
                 if (rc > 0)
                 {
-                    render_full_banded(cr, cp, offset, &lay);
+                    render_full_banded(cr, cp, offset, &lay,
+                                       repeat_to_edge);
                 }
             }
         }
         else
         {
             draw_frame(cr, cp, offset, width, rows_full, line_height,
-                       fext.ascent);
+                       fext.ascent, repeat_to_edge);
             offset = (offset + step) % cp->nlines;
         }
         cairo_surface_flush(surf);
@@ -1158,6 +1168,37 @@ run_selftest(const struct corpus *cp, int width, int height,
 }
 
 /*****************************************************************************/
+/* A live limited-frame run is a visual fixture, not a batch renderer. Keep
+   its last completed image visible until the operator explicitly quits. */
+static void
+hold_last_frame(Display *dpy, Window win, GC gc, XImage *image,
+                int width, int height)
+{
+    for (;;)
+    {
+        XEvent ev;
+
+        XNextEvent(dpy, &ev);
+        if (ev.type == KeyPress)
+        {
+            KeySym ks;
+
+            ks = XLookupKeysym(&ev.xkey, 0);
+            if (ks == XK_Escape || ks == XK_q)
+            {
+                return;
+            }
+        }
+        else if (ev.type == Expose && ev.xexpose.count == 0)
+        {
+            XShmPutImage(dpy, win, gc, image, 0, 0, 0, 0, width, height,
+                         False);
+            XSync(dpy, False);
+        }
+    }
+}
+
+/*****************************************************************************/
 static void
 usage(void)
 {
@@ -1171,12 +1212,15 @@ usage(void)
            "                  with) or strip (BACKLOG #83 design B:\n"
            "                  memmove the frame up, render only the\n"
            "                  newly exposed bottom strip)\n"
-           "  --step N        lines advanced per frame, --scroll full\n"
-           "                  only (default %d)\n"
-           "  --lines-per-sec R  content speed, --scroll strip only\n"
-           "                  (default %.1f = %d lines / 16.901 ms, the\n"
+           "  --step N        lines advanced per frame in live full mode\n"
+           "                  when no rate is requested (default %d)\n"
+           "  --lines-per-sec R  live content speed in either scroll mode\n"
+           "                  (strip default %.1f = %d lines / 16.901 ms,\n"
            "                  speed the full-redraw payload ran at)\n"
-           "  --frames N      stop after N frames (default: forever)\n"
+           "  --repeat-to-edge  repeat each line across the row (historical\n"
+           "                  saturated benchmark; default: one copy)\n"
+           "  --frames N      freeze after N live frames until Escape or q;\n"
+           "                  limits and exits an offline selftest\n"
            "  --stamps PATH   per-frame timing tsv (default %s;\n"
            "                  FR-BENCH-1 producer telemetry)\n"
            "  --managed       let the window manager place the window\n"
@@ -1256,6 +1300,9 @@ main(int argc, char **argv)
     int monitor;
     int origin_x;
     int origin_y;
+    int repeat_to_edge;
+    int lines_per_sec_set;
+    int step_set;
 
     stamps_path = DEF_STAMPS;
     corpus_path = DEF_CORPUS;
@@ -1273,6 +1320,9 @@ main(int argc, char **argv)
     selftest = 0;
     verify_frames = 0;
     monitor = -1;
+    repeat_to_edge = 0;
+    lines_per_sec_set = 0;
+    step_set = 0;
     for (ai = 1; ai < argc; ai++)
     {
         if (strcmp(argv[ai], "-h") == 0 || strcmp(argv[ai], "--help") == 0)
@@ -1287,6 +1337,10 @@ main(int argc, char **argv)
         else if (strcmp(argv[ai], "--selftest") == 0)
         {
             selftest = 1;
+        }
+        else if (strcmp(argv[ai], "--repeat-to-edge") == 0)
+        {
+            repeat_to_edge = 1;
         }
         else if (ai + 1 >= argc)
         {
@@ -1312,6 +1366,7 @@ main(int argc, char **argv)
         else if (strcmp(argv[ai], "--step") == 0)
         {
             step = atoi(argv[++ai]);
+            step_set = 1;
         }
         else if (strcmp(argv[ai], "--frames") == 0)
         {
@@ -1342,6 +1397,7 @@ main(int argc, char **argv)
         else if (strcmp(argv[ai], "--lines-per-sec") == 0)
         {
             lines_per_sec = atof(argv[++ai]);
+            lines_per_sec_set = 1;
             if (!(lines_per_sec > 0.0))
             {
                 fprintf(stderr, "textflood: --lines-per-sec must be "
@@ -1400,6 +1456,24 @@ main(int argc, char **argv)
         fprintf(stderr, "textflood: --step must be at least 1\n");
         return 1;
     }
+    if (step_set && lines_per_sec_set)
+    {
+        fprintf(stderr, "textflood: --step and --lines-per-sec select "
+                "different live pacing modes; use only one\n");
+        return 1;
+    }
+    if (mode == MODE_STRIP && step_set)
+    {
+        fprintf(stderr, "textflood: --scroll strip uses "
+                "--lines-per-sec, not --step\n");
+        return 1;
+    }
+    if (selftest && mode == MODE_FULL && lines_per_sec_set)
+    {
+        fprintf(stderr, "textflood: --lines-per-sec is live pacing; "
+                "full-redraw --selftest uses --step\n");
+        return 1;
+    }
     if (corpus_load(&cp, corpus_path) != 0)
     {
         return 1;
@@ -1410,7 +1484,7 @@ main(int argc, char **argv)
     if (verify_frames > 0)
     {
         return run_verify(&cp, off_w, off_h, font, font_size,
-                          verify_frames);
+                          verify_frames, repeat_to_edge);
     }
     if (selftest)
     {
@@ -1423,7 +1497,7 @@ main(int argc, char **argv)
         return run_selftest(&cp, off_w, off_h, font, font_size, mode,
                             step, lines_per_sec,
                             max_frames > 0 ? max_frames : 200,
-                            pipeline_ms);
+                            pipeline_ms, repeat_to_edge);
     }
     dpy = XOpenDisplay(NULL);
     if (dpy == NULL)
@@ -1543,7 +1617,7 @@ main(int argc, char **argv)
        killed at logoff */
     shmctl(shminfo.shmid, IPC_RMID, NULL);
     surf = cairo_image_surface_create_for_data((unsigned char *) image->data,
-           CAIRO_FORMAT_RGB24, width, height, image->bytes_per_line);
+            CAIRO_FORMAT_RGB24, width, height, image->bytes_per_line);
     cr = cairo_create(surf);
     fo = setup_font(cr, font, font_size, &fext);
     line_height = fext.height;
@@ -1555,16 +1629,30 @@ main(int argc, char **argv)
     if (monitor < 0)
     {
         printf("textflood: target=all origin=%d,%d %dx%d, %d rows, "
-               "%d corpus lines, step %d, font %s %.0fpx, subpixel RGB\n",
-               origin_x, origin_y, width, height, rows, cp.nlines, step,
+               "%d corpus lines, %s, font %s %.0fpx, subpixel RGB\n",
+               origin_x, origin_y, width, height, rows, cp.nlines,
+               repeat_to_edge ? "repeat-to-edge" : "natural lines",
                font, font_size);
     }
     else
     {
         printf("textflood: target=monitor-%d origin=%d,%d %dx%d, %d rows, "
-               "%d corpus lines, step %d, font %s %.0fpx, subpixel RGB\n",
+               "%d corpus lines, %s, font %s %.0fpx, subpixel RGB\n",
                monitor, origin_x, origin_y, width, height, rows, cp.nlines,
-               step, font, font_size);
+               repeat_to_edge ? "repeat-to-edge" : "natural lines",
+               font, font_size);
+    }
+    if (mode == MODE_FULL)
+    {
+        if (lines_per_sec_set)
+        {
+            printf("textflood: --scroll full: content %.1f lines/s\n",
+                   lines_per_sec);
+        }
+        else
+        {
+            printf("textflood: --scroll full: %d lines/frame\n", step);
+        }
     }
     if (mode == MODE_STRIP)
     {
@@ -1597,15 +1685,19 @@ main(int argc, char **argv)
             if (monitor < 0)
             {
                 fprintf(stf, "# textflood target=all origin=%d,%d %dx%d "
-                        "step=%d epoch_ms=%.3f mono_ms=%.3f\n", origin_x,
-                        origin_y, width, height, step,
+                        "step=%d lines_per_sec=%.1f rate_set=%d "
+                        "repeat_to_edge=%d epoch_ms=%.3f mono_ms=%.3f\n",
+                        origin_x, origin_y, width, height, step,
+                        lines_per_sec, lines_per_sec_set, repeat_to_edge,
                         rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
             }
             else
             {
                 fprintf(stf, "# textflood target=monitor-%d origin=%d,%d "
-                        "%dx%d step=%d epoch_ms=%.3f mono_ms=%.3f\n",
+                        "%dx%d step=%d lines_per_sec=%.1f rate_set=%d "
+                        "repeat_to_edge=%d epoch_ms=%.3f mono_ms=%.3f\n",
                         monitor, origin_x, origin_y, width, height, step,
+                        lines_per_sec, lines_per_sec_set, repeat_to_edge,
                         rt.tv_sec * 1000.0 + rt.tv_nsec / 1e6, now_ms());
             }
             fprintf(stf, "frame\tloop_start_ms\trender_ms\tblit_ms"
@@ -1648,20 +1740,29 @@ main(int argc, char **argv)
         {
             int adv;
 
-            adv = advance_lines(&acc, t_loop - t_prev, lines_per_sec);
-            t_prev = t_loop;
             if (need_full)
             {
                 acc = 0.0;
-                render_full_banded(cr, &cp, offset, &lay);
+                t_prev = t_loop;
+                render_full_banded(cr, &cp, offset, &lay,
+                                   repeat_to_edge);
                 need_full = 0;
             }
             else
             {
                 int rc;
 
+                adv = advance_lines(&acc, t_loop - t_prev,
+                                    lines_per_sec);
+                t_prev = t_loop;
+                if (adv == 0)
+                {
+                    usleep(1000);
+                    continue;
+                }
                 offset = (offset + adv) % cp.nlines;
-                rc = render_scroll(cr, surf, &cp, offset, adv, &lay);
+                rc = render_scroll(cr, surf, &cp, offset, adv, &lay,
+                                   repeat_to_edge);
                 if (rc < 0)
                 {
                     /* a broken invariant is a bug in this file, and a
@@ -1671,14 +1772,33 @@ main(int argc, char **argv)
                 }
                 if (rc > 0)
                 {
-                    render_full_banded(cr, &cp, offset, &lay);
+                    render_full_banded(cr, &cp, offset, &lay,
+                                       repeat_to_edge);
                 }
             }
         }
         else
         {
+            if (lines_per_sec_set && frame > 0)
+            {
+                int adv;
+
+                adv = advance_lines(&acc, t_loop - t_prev,
+                                    lines_per_sec);
+                t_prev = t_loop;
+                if (adv == 0)
+                {
+                    usleep(1000);
+                    continue;
+                }
+                offset = (offset + adv) % cp.nlines;
+            }
+            else if (frame == 0)
+            {
+                t_prev = t_loop;
+            }
             draw_frame(cr, &cp, offset, width, rows, line_height,
-                       fext.ascent);
+                       fext.ascent, repeat_to_edge);
         }
         cairo_surface_flush(surf);
         t_render = now_ms();
@@ -1709,14 +1829,15 @@ main(int argc, char **argv)
                 fflush(stf);
             }
         }
-        if (mode == MODE_FULL)
+        if (mode == MODE_FULL && !lines_per_sec_set)
         {
             offset = (offset + step) % cp.nlines;
         }
         frame++;
         if (max_frames > 0 && frame >= max_frames)
         {
-            break;
+            hold_last_frame(dpy, win, gc, image, width, height);
+            goto done;
         }
     }
 done:

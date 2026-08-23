@@ -40,6 +40,8 @@ set -u
 CORPUS=${CK_CORPUS:-/usr/local/share/code_corpus.ansi}
 STEP=${1:-1}
 DELAY=${2:-0.1}
+BG=$'\033[48;2;0;43;54m'
+FG=$'\033[38;2;131;148;150m'
 
 case "$STEP" in
     ''|*[!0-9]*) STEP=1 ;;
@@ -72,7 +74,7 @@ cleanup()
 }
 trap cleanup EXIT INT TERM
 
-printf '\033[2J\033[H'
+printf '%s%s\033[2J\033[H' "$BG" "$FG"
 printf 'codescroll10 -- %s lines every %ss (%s corpus lines). q quits.\n' \
     "$STEP" "$DELAY" "$N"
 sleep 1
@@ -81,7 +83,7 @@ while true; do
     k=0
     out=''
     while [ "$k" -lt "$STEP" ]; do
-        out="$out${L[$((i % N))]}"$'\n'
+        out="$out$BG${L[$((i % N))]}$BG"$'\n'
         i=$((i + 1))
         k=$((k + 1))
     done

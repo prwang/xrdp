@@ -27,6 +27,7 @@ D=$(cd "$(dirname "$0")" && pwd)
 CORPUS=$D/../mac_bisect_matrix/code_corpus.ansi
 TFDIR=$D/../textflood
 PROFILE_SWITCH=$D/../lib/t4/xrdp-profile
+CODESCROLL=$D/../smoke_gate/codescroll10.sh
 ACTION=${1:-status}
 
 rsh() { ssh -n -i "$T4_KEY" "$T4" "$@"; }
@@ -50,6 +51,10 @@ install)
         echo "ABORT: no profile switcher at $PROFILE_SWITCH" >&2
         exit 1
     }
+    [ -s "$CODESCROLL" ] || {
+        echo "ABORT: no code-scroll helper at $CODESCROLL" >&2
+        exit 1
+    }
     push "$D/e52_payload.sh"      /usr/local/bin/e52_payload.sh          755
     push "$D/e52-payload.desktop" /etc/xdg/autostart/e52-payload.desktop 644
     push "$CORPUS"                /usr/local/share/code_corpus.ansi      644
@@ -60,6 +65,7 @@ install)
     # not do. The build is checksum-gated like everything else.
     push "$TFDIR/textflood.c"     /usr/local/src/textflood.c             644
     push "$TFDIR/build.sh"        /usr/local/src/textflood_build.sh      755
+    push "$CODESCROLL"            /usr/local/bin/codescroll10.sh         755
     push "$PROFILE_SWITCH"        /home/ubuntu/xrdp-profile              755
     rsh "sudo chown ubuntu:ubuntu /home/ubuntu/xrdp-profile"
     echo "building textflood on the T4"
@@ -70,6 +76,7 @@ install)
          libxrandr-dev >/dev/null"
     rsh "sudo sh -c 'cd /usr/local/src && CC=cc sh ./textflood_build.sh /usr/local/bin'"
     rsh "/usr/local/bin/textflood --help >/dev/null && echo 'textflood: OK'"
+    rsh "bash -n /usr/local/bin/codescroll10.sh && echo 'codescroll10: OK'"
     echo "installed. Nothing runs until it is armed:"
     echo "  $0 arm codeflood   (then log the RDP session off and back in)"
     ;;
@@ -94,7 +101,8 @@ status)
     rsh "echo -n 'marker: '; cat /etc/xrdp-e52-payload 2>/dev/null \
          || echo '(disarmed)'; \
          md5sum /usr/local/bin/e52_payload.sh /usr/local/share/code_corpus.ansi \
-         /etc/xdg/autostart/e52-payload.desktop /usr/local/bin/textflood 2>&1; \
+         /etc/xdg/autostart/e52-payload.desktop /usr/local/bin/textflood \
+         /usr/local/bin/codescroll10.sh 2>&1; \
          pgrep -a -f e52_payload.sh || echo 'payload not running'"
     ;;
 *)
