@@ -51,6 +51,15 @@ encoder suites. Register `Avc444ChromaDue` in
   past collect nor copy a full capture per moving frame. Module transport I/O
   shall remain on the xrdp main thread. Failure to queue or send a restoration
   request shall be logged as an error, not masked by silently switching dense.
+* S141-R10: sparse selection is a time-only per-monitor policy. It shall not
+  inspect pixels or attempt to classify application objects, motion or
+  content. Dense mode remains the default and quality-preserving mode. Sparse
+  mode is an opt-in bandwidth/quality tradeoff: while damage continues,
+  fine-chroma content inside an affected update may visibly alternate between
+  its 4:2:0 main-only reconstruction and later full-chroma restoration. No
+  fixed refresh or idle interval guarantees stable chroma during recurrent
+  damage. The guaranteed state is full-chroma convergence after actual
+  quiescence, plus the bounded refresh in S141-R3.
 
 ## Required tests and gate
 
@@ -64,5 +73,7 @@ the sparse DPB and independent-cut cases in `Avc444Ltr` and
 `test_ffmpeg_sparse_aux_independent_schedules_live`. Configuration tests shall
 be added only when the keys become reachable in #142. Run all affected suites
 and the README gate. This internal slice has no real-client or throughput
-gate. Live client replay occurs only after the backend becomes selectable in
-#142; it is not a substitute for these deterministic tests.
+gate. In particular, absence of visible 4:2:0/4:4:4 churn during ongoing
+damage is not an acceptance condition. Live client replay occurs only after
+the backend becomes selectable in #142; it is not a substitute for these
+deterministic tests.

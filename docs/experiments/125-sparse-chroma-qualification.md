@@ -213,3 +213,42 @@ This result does not close or explain the separately observed approximately
 one-hertz red/blue flicker. The next #125 correctness action is to reproduce
 and understand that transient defect with `chroma-probe` on the repaired arm,
 without an unrelated payload or sidecar.
+
+## 2026-08-23 Scope A2 withdrawal — sparse-mode limitation
+
+The owner observed a faster flicker after running `chroma-probe` on the
+repaired x038 arm at port 40054. The probe advances its motion zone every
+125 ms, while the profile uses `chroma_idle_ms=100`. Source inspection gives
+the resulting cycle without needing a semantic hypothesis: a main-only update
+arms restoration at 100 ms; restoration supplies full chroma; the next probe
+update arrives about 25 ms later and is therefore main-only; the cycle repeats.
+The server cannot know at the 100 ms deadline that another update will arrive
+25 ms later.
+
+The same limitation exists on the periodic refresh boundary. During damage
+which remains faster than the idle threshold, `chroma_refresh_ms=1000`
+periodically produces a full-chroma frame and a following main-only frame may
+replace fine detail with its 4:2:0 reconstruction again. This is consistent
+with the earlier approximately one-hertz T4 observation, but that run did not
+retain sufficient trace to prove the specific attribution. The observation
+is preserved; only its classification changes.
+
+The sparse decision is deliberately based on two clocks per monitor and does
+not inspect pixels. Damage geometry can spare content outside an update, but
+cannot identify a previously static object inside a coalesced or broad update
+caused by other activity. No fixed timeout distinguishes “motion has stopped”
+from “the next motion update has not arrived yet.” Eliminating all visible
+transition churn would require a different feature: spatial history/ROI,
+content or object classification, or remaining dense after restoration. The
+first two violate the selected time-only design and materially expand scope;
+the last gives up the sparse byte lever for those workloads.
+
+Scope A2 is therefore withdrawn as a fix target. Sparse mode explicitly
+permits visible 4:2:0/4:4:4 transitions in fine-chroma content inside an
+affected update while recurrent damage continues. Dense mode, selected by
+`chroma_refresh_ms=0`, remains the default and quality-preserving mode. The
+correctness requirements which remain are bounded refresh, correct main/aux
+pairing and full-chroma convergence after actual quiescence. Scope A1 proved
+the last of these. Scope B now measures whether the opt-in mode provides enough
+byte or throughput value to justify retaining it; insufficient value withdraws
+the sparse slice instead of reopening semantic heuristics.

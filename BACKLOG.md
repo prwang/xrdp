@@ -60,62 +60,36 @@ history until all retained replays are green.
 
 ## #125 — sparse-chroma client qualification
 
-**Status: IN PROGRESS; first open item; Scope A1 is GREEN on the corrected
-Windows/XFCE/LXTerminal A/B. Scope A2, understanding the independent
-approximately one-hertz `chroma-probe` flicker, is the next action.** The byte
-mechanism and offline model are
-anchored by dev tests and recorded in
-`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md`. The
-approximately one-hertz flicker and the stable Color-A/Color-B states of a
-magenta `#include` glyph seen on Windows are preserved in
-`docs/experiments/125-sparse-chroma-qualification.md` and
-`PR-demo/media_evidences/sparse_chroma_stall/`. Color B is consistent with an
-LC=1 main view replacing full chroma with its 4:2:0 reconstruction and no
-later corresponding LC=2 update reaching that static region. The former tests
-only covered when a future frame was selected for auxiliary work. The new
-display-state model proves LC=1 leaves Color B until an auxiliary update, and
-the new trailing-deadline tests prove the restoration request is rearmed,
-cancelled and fired once as specified. That repair addresses the permanent
-Color-B final state only; it does not claim to fix the separately observed
-approximately one-hertz red/blue flicker.
+**Status: IN PROGRESS; first open item; Scope B is the current action.** The
+sparse byte mechanism, corrected final-state behavior and client observations
+are recorded in
+`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md` and
+`docs/experiments/125-sparse-chroma-qualification.md`.
 
-**Scope A1 — permanent final-state restoration: DONE.** The deterministic
-display-state and trailing-deadline regressions, implementation, corrected
-interactive setup and Windows-client A/B are recorded in
-`docs/experiments/125-sparse-chroma-qualification.md`. The pre-repair arm can
-remain at faint Color B after motion stops; the repaired arm can be faint
-during motion but converges to normal Color A after motion stops. The
-guarantee is final convergence, not dense chroma during motion.
+**Scope A1 — permanent final-state restoration: DONE.** Deterministic tests
+and the corrected Windows/XFCE/LXTerminal A/B prove that the repaired arm may
+show 4:2:0 detail during motion but converges to full chroma after motion
+stops.
 
-The local interactive A/B is staged without claiming client acceptance:
-x034 at `127.0.0.1:40050` retains pre-fix xrdp `3ca17beaa84d`; x038 at
-`127.0.0.1:40054` runs committed xrdp `386ca6951a3d`, whose functional source
-includes repair `23b6235d`. Both use byte-identical sparse 1000/100 ms
-`gfx.toml`, xorgxrdp `10fa3aa23033`, fresh regular XFCE desktops, LXTerminal,
-and the same current Solarized Dark `codescroll10.sh` payload. The earlier
-special xterm handoff is invalid for visual comparison: its forced font,
-colours and session shape did not reproduce the T4 desktop pipeline. Xterm is
-now left at package defaults and is not the A/B payload. The pair is a local
-AMD reproduction aid, not a substitute for the later representative-client
-gate or a one-commit causal isolate; the deterministic regressions carry the
-timer attribution.
+**Scope A2 — transient red/blue flicker: WITHDRAWN AS A FIX TARGET.** A
+time-only per-monitor policy cannot distinguish a moving object from static
+fine-chroma content inside the same affected update. Periodic or trailing
+full-chroma updates followed by main-only updates may therefore produce
+visible 4:2:0/4:4:4 churn while damage continues. This is an explicit
+limitation of opt-in sparse mode, not a correctness gate. Dense mode remains
+the default and quality-preserving choice. The decision and the 100/125 ms
+boundary case are preserved in the #125 experiment record.
 
-**Scope A2 — transient red/blue flicker: NEXT.** Reproduce and understand the
-approximately one-hertz stripe flicker with `chroma-probe` on the repaired arm,
-with the permanent Color-B case now proven absent. Run no benchmark payload,
-sampler or unrelated GUI sidecar during the observation. Treat the flicker as
-an independent defect unless evidence establishes a shared cause. Its cadence
-is closer to the configured `chroma_refresh_ms=1000` boundary than to
-`chroma_idle_ms=100`, but cadence alone does not distinguish server emission,
-main/aux pairing or client presentation. Do not credit A1's trailing
-restoration as a flicker fix, and do not alter that restoration merely to hide
-a transient symptom.
-
-**Scope B — future T4 oracle numerical qualification:** after Scopes A1 and
-A2, and only if the correctness fix retains a meaningful sparse mechanism,
-the agent runs the existing oracle-client and `textflood` harness on the same
-pinned T4 pair
-at the recorded 3840x2400 modeline. Run exactly four 20-second legs in
+**Scope B — T4 oracle numerical qualification: IN PROGRESS.** On the newly
+provisioned T4, first upgrade xrdp and xorgxrdp to the same functional source,
+configuration and helper state as the qualified x038 treatment at port 40054.
+Use the current documentation-only xrdp HEAD over functional source
+`386ca6951a3d` and current xorgxrdp `c190343`. The latter differs from x038's
+`10fa3aa23033` only by deleting the forbidden synchronous per-frame capture
+logger, so it preserves capture behavior while making Scope B timing
+admissible. Use AVC444v2, auxiliary LTR, eager slot acknowledgement,
+`wire_window=2` and the recorded 3840x2400 modeline. Then run the existing
+oracle-client and `textflood` harness in exactly four 20-second legs in
 dense/sparse/dense/sparse order; the only configuration difference is
 `chroma_refresh_ms=0, chroma_idle_ms=0` against
 `chroma_refresh_ms=1000, chroma_idle_ms=100`. Disable visual autostart payloads
@@ -130,19 +104,16 @@ before making a server-throughput claim. Also report main-only and
 main-plus-auxiliary command counts and transmitted bytes and close their sum
 against the audited video-command total.
 
-**Acceptance:** in Scope A1 both clients leave the still image with distinct
-one-pixel red/blue chroma detail after the one-shot trailing capture; the trace
-contains the associated `chroma_restore_request` and the server log has no
-request failure. In Scope A2 both clients render the alternating stream
-without the reported periodic stripe flicker, and the cause and independent
-regression are recorded rather than inferred from A1. In Scope B
-both dense repetitions and both sparse repetitions are
+**Acceptance:** both dense repetitions and both sparse repetitions are
 internally consistent; the sparse decision is observed on the mechanism's own
 records; the chroma-gap bound holds; both command classes occur; byte
 accounting closes exactly; no latency segment is negative and their sum
 closes to the full cycle. The exact run identity, raw distributions, readable
-breakdown and replay procedure are recorded in-tree. A red result is fixed and
-independently tested on dev before #126 starts.
+breakdown and replay procedure are recorded in-tree. The result must decide
+whether sparse mode provides enough byte or throughput value to retain as an
+opt-in feature. If not, withdraw the sparse slice rather than add content- or
+object-aware heuristics. A red retained mechanism is fixed and independently
+tested on dev before #126 starts.
 
 ---
 

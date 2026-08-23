@@ -65,7 +65,14 @@ capability-response seam but shall not introduce a new mechanism there.
   tear down children and fail the affected connection/path visibly.
 * S142-R8: the man page and sample config shall state process cardinality,
   required host pipe capacity, security model, resize behavior, multi-monitor
-  support, shipped credit values, sparse guarantee and trace build option.
+  support, shipped credit values, sparse guarantee, sparse visual limitation
+  and trace build option. They shall state that dense mode is the default and
+  quality-preserving choice. Sparse mode is an opt-in bandwidth/quality
+  tradeoff: apparently static fine-chroma content inside an affected update
+  may alternate between 4:2:0 and 4:4:4 while other damage continues because
+  the policy tracks per-monitor time, not application objects or pixels. It
+  guarantees bounded chroma refresh and full-chroma convergence after actual
+  quiescence, not stable full chroma during recurrent damage.
   Trace instructions shall name `XRDP_PERF_TRACE=<prefix>` as the sink arm,
   `XRDP_GFX_TRACE=1` as the graphics-event selector and
   `XRDP_ACK_TRACE=1` as the xrdp credit selector. Records are in
@@ -94,7 +101,11 @@ LC=1 and LC=2 command counts and transmitted bytes, close their sum against
 the audited video-command total, confirm the configured chroma-gap bound, and
 show that the one-shot trailing capture restores static one-pixel chroma after
 motion stops without later application damage.
-This is an accounting and compatibility gate, not a required bandwidth or
-frame-rate gain. Every run records the paired commit IDs, client identity,
-resolution, selected mode and trace-build state. No timing claim derived from
-a synchronous per-frame logger is admissible.
+Visible 4:2:0/4:4:4 churn inside an affected update while damage continues is
+the documented sparse-mode limitation, not a failing visual gate. This final
+slice is an accounting and compatibility replay of the already-qualified
+development design; #125B decides on the development branch whether sparse
+mode has enough byte or throughput value to be included here at all. Every run
+records the paired commit IDs, client identity, resolution, selected mode and
+trace-build state. No timing claim derived from a synchronous per-frame logger
+is admissible.
