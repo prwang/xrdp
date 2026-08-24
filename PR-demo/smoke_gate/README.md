@@ -9,8 +9,8 @@ that passed before the last deployment step counts for nothing.
   probesize hold, passed every 1920x1080 run while freezing every 1024x768
   login) and asserts zero encoder restarts in the xrdp log during the run.
   Exit 0 + "SMOKE PASS" = safe to hand over.
-- `keytest.sh` — the workhorse: fresh xfreerdp3 login on Xvfb :99, launches a
-  fullscreen `colorkey.sh` in the tester session, presses r/g/b/w twice each
+- `keytest.sh` — the workhorse: arms the versioned XDG autostart, makes a
+  fresh xfreerdp3 login on Xvfb :98, presses r/g/b/w twice each
   through the RDP client, screenshots the CLIENT framebuffer after each press
   and asserts the centre shows that key's colour ("LAG" = withheld/stale
   frame). Env knobs: KEYTEST_SIZE, KEYTEST_CLIENT_SIZE, KEYTEST_USER,
@@ -29,6 +29,11 @@ that passed before the last deployment step counts for nothing.
   key is then acted on. Rates and sizes: `CK_CYCLE_MS` (250), `CK_SLIDE_MS`
   (40), `CK_SLIDE_STEP` (4 cols), `CK_BLOCK_W`/`CK_BLOCK_H` (default: a tenth
   of the screen, capped at 40x20 cells).
+- `colorkey-autostart.sh` and `xrdp-smoke-colorkey.desktop` — persistent but
+  normally inert login-time wrapper. `keytest.sh` arms it with the requested
+  geometry before login and removes the marker before logging off the whole
+  session. SSH never launches, kills or supervises a GUI process in a live
+  desktop.
 
-Box assumptions (env-overridable): tester account, empty password, xrdp on
-127.0.0.1:3389, Xvfb on :99.
+Box assumptions (env-overridable): tester account, its credential in a
+root-owned target-side file, xrdp on 127.0.0.1:3389 and local Xvfb on :98.

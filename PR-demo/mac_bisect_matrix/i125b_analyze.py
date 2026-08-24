@@ -72,8 +72,12 @@ def grouped(records, event):
 
 
 def classify_video_commands(records, frame_ids):
+    in_scope = [record for record in records
+                if record["frame_id"] in frame_ids]
+    boundary = [record for record in records
+                if record["frame_id"] not in frame_ids]
     commands_by_id = {}
-    for record in records:
+    for record in in_scope:
         commands_by_id.setdefault(record["frame_id"], []).append(record)
     main_only_count = 0
     paired_count = 0
@@ -100,10 +104,12 @@ def classify_video_commands(records, frame_ids):
         "main_plus_aux_commands": paired_count * 2,
         "main_only_bytes": main_only_bytes,
         "main_plus_aux_bytes": paired_bytes,
-        "total_commands": len(records),
-        "total_bytes": sum(record["bytes"] for record in records),
+        "total_commands": len(in_scope),
+        "total_bytes": sum(record["bytes"] for record in in_scope),
         "classified_commands": main_only_count + paired_count * 2,
         "classified_bytes": main_only_bytes + paired_bytes,
+        "boundary_commands": len(boundary),
+        "boundary_bytes": sum(record["bytes"] for record in boundary),
         "unclassified": unclassified,
     }
 
@@ -327,6 +333,12 @@ def main():
         assert commands["main_plus_aux_frames"] == 1
         assert commands["total_commands"] == 3
         assert commands["total_bytes"] == 120
+        assert commands["boundary_commands"] == 0
+        boundary = classify_video_commands(
+            [{"frame_id": 3, "view": 1, "bytes": 60}], {1: {}, 2: {}})
+        assert boundary["total_commands"] == 0
+        assert boundary["boundary_commands"] == 1
+        assert boundary["boundary_bytes"] == 60
         assert not commands["unclassified"]
         print("PASS: i125b analyzer arithmetic selftest")
         return 0
@@ -345,23 +357,26 @@ def main():
         stream.write("\n")
 
     print("=== mechanism and accounting ===")
-    print("leg profile    frames aux+/aux- main-only paired commands bytes-MB "
-          "idle>1ms W2-extra")
+    print("leg profile    frames aux+/aux- main-only paired commands edge-cmd "
+          "bytes-MB idle>1ms W2-extra")
     for result in results:
         commands = result["video_commands"]
-        print("%-3s %-10s %6d %4d/%-4d %9d %6d %8d %8s %8d %8d" %
+        print("%-3s %-10s %6d %4d/%-4d %9d %6d %8d %8d %8s %8d %8d" %
               (result["leg"], result["profile"], result["frames"],
                result["aux_sent"], result["aux_skipped"],
                commands["main_only_frames"],
                commands["main_plus_aux_frames"],
                commands["total_commands"],
+               commands["boundary_commands"],
                fmt(commands["total_bytes"] / 1e6, 1),
                result["producer_idle_over_1ms"],
                result["window_two_counterfactual_advances"]))
     print()
     print("Each paired frame contributes two video commands; each main-only "
           "frame contributes one. Their command and byte sums equal the "
-          "audited totals in every row.")
+          "audited totals in every row. Edge commands have an explicit frame "
+          "identity whose terminal egress fell outside the measurement "
+          "window; they are shown but excluded from both sums.")
     print()
     print("=== delivered-frame interval and throughput ===")
     print("leg profile      mean-ms p50-ms p90-ms p99-ms frames/s bytes/frame-MB")

@@ -58,83 +58,13 @@ history until all retained replays are green.
 
 # Active dependency chain
 
-## #125 — sparse-chroma client qualification
+## #125 — DONE — sparse-chroma client and numerical qualification
 
-**Status: IN PROGRESS; first open item; Scope B is the current action.** The
-sparse byte mechanism, corrected final-state behavior and client observations
+Retain sparse chroma as an opt-in bandwidth/quality tradeoff; dense and a
+one-frame wire window remain shipped defaults. Corrected convergence, the
+documented recurrent-damage limitation, real-client results and the T4 matrix
 are recorded in
-`docs/experiments/92-sparse-aux-is-a-byte-lever-not-a-time-one.md` and
-`docs/experiments/125-sparse-chroma-qualification.md`.
-
-**Scope A1 — permanent final-state restoration: DONE.** Deterministic tests
-and the corrected Windows/XFCE/LXTerminal A/B prove that the repaired arm may
-show 4:2:0 detail during motion but converges to full chroma after motion
-stops.
-
-**Scope A2 — transient red/blue flicker: WITHDRAWN AS A FIX TARGET.** A
-time-only per-monitor policy cannot distinguish a moving object from static
-fine-chroma content inside the same affected update. Periodic or trailing
-full-chroma updates followed by main-only updates may therefore produce
-visible 4:2:0/4:4:4 churn while damage continues. This is an explicit
-limitation of opt-in sparse mode, not a correctness gate. Dense mode remains
-the default and quality-preserving choice. The decision and the 100/125 ms
-boundary case are preserved in the #125 experiment record.
-
-**Scope A3 — operator surface and benchmark-plan cleanup: DONE.** The installed
-template is concise and includes the dense default plus sparse quality
-tradeoff; `gfx.toml(5)` documents the supported controls without the voided
-window claim; dead `tail_flush` is no longer advertised; runtime and helper
-output use operator terms. A test rejects internal work labels on those
-surfaces. The audit and corrected Scope B design are recorded in the #125
-experiment record. **Documentation-quality follow-through: DONE.** The
-repository-wide agent rules and common slice contract now require
-self-contained re-authoring and a per-slice prose gate; the plan labels dev
-paths as inventory rather than source text, and #142 owns the deterministic
-operator-surface check.
-
-**Scope B — T4 oracle numerical qualification: IN PROGRESS.** On the
-newly provisioned T4, first upgrade xrdp and xorgxrdp to the same functional
-source, configuration and helper state as the qualified x038 treatment at
-port 40054.
-Use the current A3 xrdp HEAD over unchanged functional source
-`386ca6951a3d` and current xorgxrdp `c190343`. The latter differs from x038's
-`10fa3aa23033` only by deleting the forbidden synchronous per-frame capture
-logger, so it preserves capture behavior while making Scope B timing
-admissible. Use AVC444v2, auxiliary LTR, eager slot acknowledgement and the
-recorded 3840x2400 modeline. Disable visual autostart payloads.
-
-Run a repeated 2-by-2 comparison. Conditions A/B use the shipped
-`wire_window=1`; C/D use `wire_window=2`. A/C are dense
-(`chroma_refresh_ms=0, chroma_idle_ms=0`); B/D are sparse
-(`chroma_refresh_ms=1000, chroma_idle_ms=100`). Run exactly eight 20-second
-legs in `A B C D D C B A` order. The two configuration keys named by the
-condition are the only differences. This produces two repetitions of every
-cell and measures sparse at each window, the window at each chroma policy, and
-their interaction.
-
-Use only the compile-time `common/perf_trace` instrument: no sampler, logger
-or sidecar tracer. Report mean, p50, p90 and p99 frame interval and throughput,
-plus the latency spent (1) feeding raw pixels to the ffmpeg children, (2)
-waiting for encoded output, (3) draining encoded bytes, and (4) collecting,
-rewriting, handing the frame to the transport and releasing credit. Pair child
-windows by child and sequence identity, make the four segments close to the
-full encoder cycle, and report the producer-idle count before making a
-server-throughput claim. Also report main-only and main-plus-auxiliary command
-counts and transmitted bytes and close their sum against the audited
-video-command total.
-
-**Acceptance:** both repetitions of all four conditions are internally
-consistent. Sparse legs contain both skipped and restored auxiliary decisions,
-the chroma-gap bound holds, both command classes occur, and byte accounting
-closes exactly. A window-2 effect may be claimed only if its trace reaches a
-credit/lag state window 1 could not admit; otherwise report that the wider
-window was not exercised at this RTT/load. No latency segment is negative and
-their sum closes to the full cycle. The exact run identity, raw distributions,
-readable breakdown and replay procedure are recorded in-tree. The result must
-decide whether sparse mode provides enough byte or throughput value to retain
-as an opt-in feature. If not, withdraw the sparse slice rather than add
-content- or object-aware heuristics. A red retained mechanism is fixed and
-independently tested on dev before #126 starts.
+[`docs/experiments/125-sparse-chroma-qualification.md`](docs/experiments/125-sparse-chroma-qualification.md).
 
 ---
 

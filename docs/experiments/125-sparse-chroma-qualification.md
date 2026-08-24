@@ -336,3 +336,67 @@ required documented controls and removed-key leakage. The obsolete legacy
 requirement-name map was removed from the normative PRD because it encouraged
 clean-room authors to translate development shorthand instead of implementing
 the self-contained specification.
+
+## 2026-08-24 Scope B — T4 numerical qualification: GREEN
+
+The retained capture is
+`PR-demo/mac_bisect_matrix/captures/i125b_t4_matrix_20260824T141827Z/`.
+It ran the predeclared repeated 2-by-2 matrix on a Tesla T4 at 3840x2400 with
+the oracle client and full-screen textflood. xrdp was clean package
+`4cf5063e05d3`; xorgxrdp remained `c190343ff28a`. Only `wire_window` and the
+two sparse intervals differed among the four complete profiles.
+
+Sparse chroma reduced exact video-command bytes per delivered frame by 42.1%
+at window 1 and 41.7% at window 2. Mean full latency from encoder-pump start
+through transport egress and slot-credit completion fell from 115--119 ms
+dense to 77--78 ms sparse. The reduction appears in every named stage, and
+all eight decompositions contain zero negative segments and close with a
+maximum absolute residual of `1.14e-13` ms.
+
+The observed sparse frame rate was about 35% higher, but it is not a
+server-ceiling claim. Sparse repetitions had producer margins of 0.96--0.98x
+and 67--73 encoder waits longer than 1 ms for producer work. Dense repetitions
+had margins of 1.19--1.31x and 17--23 such waits. The payload constrained the
+sparse arms, so the retained value claim is bytes per delivered frame and
+per-frame stage latency, not maximum throughput.
+
+Window 2 was not merely configured. Its traces contain 4/13 dense and 20/26
+sparse credit-frontier advances which window 1 could not admit. Nevertheless,
+window 2 changed throughput by -0.3% dense and -0.7% sparse, and bytes per
+frame by -0.2% dense and +0.7% sparse. It therefore supplies no performance
+reason to change the shipped window-1 default under this one-monitor
+loopback-oracle condition. The requested live T4 handoff remains sparse/window
+2 so its interactive behavior can be inspected separately.
+
+Exact accounting uses the compile-time-only `video_cmd` event added after the
+first complete run exposed that transport-fragment `send` records do not carry
+the current frame identity. Each record carries echoed frame ID, view and
+command bytes. Main-only and paired counts and bytes close exactly for every
+leg. Commands straddling the measurement cutoff are named by identity and
+reported separately rather than paired by time. Every sparse leg independently
+contains both skipped and restored auxiliary work and holds the chroma bound.
+
+Four preceding attempts remain red in this history and contribute no number.
+Three stopped at A1 on SSH harness faults: a malformed payload marker, a
+trace-prefix mismatch and two forms of root-directory listing failure. The
+first also exposed a cold NVENC initialization of 8.513 s against a warm
+0.708 s repeat, exceeding xrdp's four-second probe deadline. The first complete
+matrix then failed exact byte closure because the necessary identity did not
+exist in the trace. The event was added, tests and packaging were green, and
+the entire matrix was rerun; the old capture was not promoted by reparsing a
+non-identity field.
+
+The retained matrix itself ran after that warm-up while NVIDIA persistence
+mode was still disabled. Persistence mode was enabled afterward, following the
+standing T4 deployment requirement recorded by #55, and the final 1920x1080
+and 1024x768 smoke tests were both green in that handoff state. The
+matrix-only service override which enabled the trace streams was archived and
+removed from activation before this final smoke, so the interactive handoff
+does not run the measurement sink.
+
+Decision: retain sparse chroma as an opt-in bandwidth/quality tradeoff. A
+roughly 42% byte reduction and roughly one-third per-frame pipeline-latency
+reduction are sufficient value without inventing content or object heuristics.
+Dense remains the default and quality-preserving choice, the recurrent-damage
+transition limitation remains explicit, and window 1 remains the shipped
+default. #125 is complete.

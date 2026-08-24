@@ -54,8 +54,9 @@ realistic payload rather than a diagnostic pattern.
   colour-key test at **two** session sizes (1920×1080 and 1024×768, both
   required: the ffmpeg probesize hold passed every 1080p run and froze
   every 1024×768 login) and asserts zero encoder restarts. `keytest.sh` is
-  the workhorse — fresh `xfreerdp3` login on its own Xvfb, presses keys
-  through RDP, screenshots the client framebuffer and asserts the colour.
+  the workhorse — it arms the versioned XDG-autostart payload before a fresh
+  `xfreerdp3` login on its own Xvfb, presses keys through RDP, screenshots the
+  client framebuffer and asserts the colour. It logs off only whole sessions.
 * **`mac_bisect_matrix/`** — the containerised per-arm fleet. Every variant
   is its own k3s pod with its own pinned deb and `gfx.toml`, all up at
   once on `127.0.0.1:400xx`, so the host install is never mutated for a

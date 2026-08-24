@@ -1,0 +1,9 @@
+installed profile: sparse-w2
+xrdp service: active
+active graphics settings:
+avc_mode = "444"
+aux_ltr_chain = true
+eager_slot_ack = true
+wire_window = 2
+chroma_refresh_ms = 1000
+chroma_idle_ms = 100

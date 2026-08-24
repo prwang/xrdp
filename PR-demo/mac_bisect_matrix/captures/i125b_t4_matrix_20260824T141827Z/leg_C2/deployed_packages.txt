@@ -1,0 +1,2 @@
+ii  xorgxrdp-dev                          1:0.10.80+git20260822114312.c190343ff28a   amd64        xorgxrdp development pair for BACKLOG #123-#125
+ii  xrdp-dev                              0.10.80+git20260824141733.4cf5063e05d3     amd64        xrdp RDP server (developer build from git 4cf5063e05d3)

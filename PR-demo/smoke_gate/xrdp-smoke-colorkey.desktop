@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=xrdp smoke colour key
+Exec=/usr/local/bin/xrdp-smoke-colorkey
+OnlyShowIn=XFCE;
+Terminal=false
+NoDisplay=true

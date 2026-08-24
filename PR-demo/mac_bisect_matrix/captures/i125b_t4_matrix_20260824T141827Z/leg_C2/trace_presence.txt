@@ -1,0 +1,1 @@
+trace presence OK: 2569 records (minimum 100 for 20s)

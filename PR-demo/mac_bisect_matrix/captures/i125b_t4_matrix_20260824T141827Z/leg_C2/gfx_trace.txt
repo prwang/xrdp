@@ -1,0 +1,1467 @@
+[2026-08-24T14:25:43.947+0000] [INFO ] GFX_TRACE ack frame_id=1 queue_depth=0 decoded=1 id_server=0 ack_off=0 us=3683922447
+[2026-08-24T14:25:47.353+0000] [INFO ] GFX_TRACE batch cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687328515
+[2026-08-24T14:25:47.368+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687343642
+[2026-08-24T14:25:47.368+0000] [INFO ] GFX_TRACE enc submitted_seq=0 returned_seq=0 ready=1 inflight=-1 center_y=-1 us=3687343644
+[2026-08-24T14:25:47.368+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=0 id_client=0 fif=2 us=3687344111
+[2026-08-24T14:25:47.408+0000] [INFO ] GFX_TRACE send bytes=3514877 last=0 frame_id=0 id_server=0 id_client=0 fif=2 us=3687384068
+[2026-08-24T14:25:47.427+0000] [INFO ] GFX_TRACE send bytes=2522789 last=0 frame_id=0 id_server=0 id_client=0 fif=2 us=3687402487
+[2026-08-24T14:25:47.427+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=0 id_client=0 fif=2 us=3687402690
+[2026-08-24T14:25:47.474+0000] [INFO ] GFX_TRACE batch cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687449963
+[2026-08-24T14:25:47.479+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687455130
+[2026-08-24T14:25:47.479+0000] [INFO ] GFX_TRACE enc submitted_seq=1 returned_seq=1 ready=1 inflight=-1 center_y=-1 us=3687455132
+[2026-08-24T14:25:47.480+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=1 id_client=0 fif=2 us=3687456055
+[2026-08-24T14:25:47.515+0000] [INFO ] GFX_TRACE send bytes=2202995 last=0 frame_id=0 id_server=1 id_client=0 fif=2 us=3687490722
+[2026-08-24T14:25:47.529+0000] [INFO ] GFX_TRACE send bytes=1678014 last=0 frame_id=0 id_server=1 id_client=0 fif=2 us=3687505235
+[2026-08-24T14:25:47.529+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=1 id_client=0 fif=2 us=3687505267
+[2026-08-24T14:25:47.553+0000] [INFO ] GFX_TRACE ack frame_id=1 queue_depth=0 decoded=2 id_server=2 ack_off=0 us=3687529234
+[2026-08-24T14:25:47.585+0000] [INFO ] GFX_TRACE batch cycle=3 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687561315
+[2026-08-24T14:25:47.590+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687566395
+[2026-08-24T14:25:47.590+0000] [INFO ] GFX_TRACE enc submitted_seq=2 returned_seq=2 ready=1 inflight=-1 center_y=-1 us=3687566397
+[2026-08-24T14:25:47.591+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=2 id_client=1 fif=2 us=3687567082
+[2026-08-24T14:25:47.613+0000] [INFO ] GFX_TRACE send bytes=2027274 last=0 frame_id=0 id_server=2 id_client=1 fif=2 us=3687589140
+[2026-08-24T14:25:47.625+0000] [INFO ] GFX_TRACE send bytes=1731553 last=0 frame_id=0 id_server=2 id_client=1 fif=2 us=3687600522
+[2026-08-24T14:25:47.625+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=2 id_client=1 fif=2 us=3687600531
+[2026-08-24T14:25:47.626+0000] [INFO ] GFX_TRACE ack frame_id=2 queue_depth=0 decoded=3 id_server=3 ack_off=0 us=3687601747
+[2026-08-24T14:25:47.661+0000] [INFO ] GFX_TRACE ack frame_id=3 queue_depth=0 decoded=4 id_server=3 ack_off=0 us=3687636917
+[2026-08-24T14:25:47.669+0000] [INFO ] GFX_TRACE batch cycle=4 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687645219
+[2026-08-24T14:25:47.674+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687650279
+[2026-08-24T14:25:47.674+0000] [INFO ] GFX_TRACE enc submitted_seq=3 returned_seq=3 ready=1 inflight=-1 center_y=-1 us=3687650281
+[2026-08-24T14:25:47.675+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=3 id_client=3 fif=2 us=3687651139
+[2026-08-24T14:25:47.687+0000] [INFO ] GFX_TRACE send bytes=2110468 last=0 frame_id=0 id_server=3 id_client=3 fif=2 us=3687662518
+[2026-08-24T14:25:47.694+0000] [INFO ] GFX_TRACE send bytes=1747430 last=0 frame_id=0 id_server=3 id_client=3 fif=2 us=3687670257
+[2026-08-24T14:25:47.694+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=3 id_client=3 fif=2 us=3687670266
+[2026-08-24T14:25:47.738+0000] [INFO ] GFX_TRACE ack frame_id=4 queue_depth=0 decoded=5 id_server=4 ack_off=0 us=3687714138
+[2026-08-24T14:25:47.790+0000] [INFO ] GFX_TRACE batch cycle=5 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687765825
+[2026-08-24T14:25:47.795+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687770717
+[2026-08-24T14:25:47.795+0000] [INFO ] GFX_TRACE enc submitted_seq=4 returned_seq=4 ready=1 inflight=-1 center_y=-1 us=3687770719
+[2026-08-24T14:25:47.795+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=4 id_client=4 fif=2 us=3687771125
+[2026-08-24T14:25:47.811+0000] [INFO ] GFX_TRACE send bytes=1998294 last=0 frame_id=0 id_server=4 id_client=4 fif=2 us=3687786430
+[2026-08-24T14:25:47.823+0000] [INFO ] GFX_TRACE send bytes=1674348 last=0 frame_id=0 id_server=4 id_client=4 fif=2 us=3687799292
+[2026-08-24T14:25:47.823+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=4 id_client=4 fif=2 us=3687799305
+[2026-08-24T14:25:47.845+0000] [INFO ] GFX_TRACE ack frame_id=5 queue_depth=0 decoded=6 id_server=5 ack_off=0 us=3687821098
+[2026-08-24T14:25:47.936+0000] [INFO ] GFX_TRACE batch cycle=6 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3687912194
+[2026-08-24T14:25:47.941+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3687917056
+[2026-08-24T14:25:47.941+0000] [INFO ] GFX_TRACE enc submitted_seq=5 returned_seq=5 ready=1 inflight=-1 center_y=-1 us=3687917058
+[2026-08-24T14:25:47.942+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=5 id_client=5 fif=2 us=3687918178
+[2026-08-24T14:25:47.956+0000] [INFO ] GFX_TRACE send bytes=2017596 last=0 frame_id=0 id_server=5 id_client=5 fif=2 us=3687931539
+[2026-08-24T14:25:47.972+0000] [INFO ] GFX_TRACE send bytes=1683387 last=0 frame_id=0 id_server=5 id_client=5 fif=2 us=3687947917
+[2026-08-24T14:25:47.972+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=5 id_client=5 fif=2 us=3687947932
+[2026-08-24T14:25:47.993+0000] [INFO ] GFX_TRACE ack frame_id=6 queue_depth=0 decoded=7 id_server=6 ack_off=0 us=3687969096
+[2026-08-24T14:25:48.063+0000] [INFO ] GFX_TRACE batch cycle=7 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688039171
+[2026-08-24T14:25:48.069+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688044498
+[2026-08-24T14:25:48.069+0000] [INFO ] GFX_TRACE enc submitted_seq=6 returned_seq=6 ready=1 inflight=-1 center_y=-1 us=3688044500
+[2026-08-24T14:25:48.069+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=6 id_client=6 fif=2 us=3688045113
+[2026-08-24T14:25:48.083+0000] [INFO ] GFX_TRACE send bytes=2144816 last=0 frame_id=0 id_server=6 id_client=6 fif=2 us=3688058924
+[2026-08-24T14:25:48.093+0000] [INFO ] GFX_TRACE send bytes=1792532 last=0 frame_id=0 id_server=6 id_client=6 fif=2 us=3688068945
+[2026-08-24T14:25:48.093+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=6 id_client=6 fif=2 us=3688068955
+[2026-08-24T14:25:48.120+0000] [INFO ] GFX_TRACE ack frame_id=7 queue_depth=0 decoded=8 id_server=7 ack_off=0 us=3688096045
+[2026-08-24T14:25:48.171+0000] [INFO ] GFX_TRACE batch cycle=8 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688146520
+[2026-08-24T14:25:48.175+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688151317
+[2026-08-24T14:25:48.175+0000] [INFO ] GFX_TRACE enc submitted_seq=7 returned_seq=7 ready=1 inflight=-1 center_y=-1 us=3688151318
+[2026-08-24T14:25:48.176+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=7 id_client=7 fif=2 us=3688152129
+[2026-08-24T14:25:48.199+0000] [INFO ] GFX_TRACE send bytes=2094784 last=0 frame_id=0 id_server=7 id_client=7 fif=2 us=3688174469
+[2026-08-24T14:25:48.208+0000] [INFO ] GFX_TRACE send bytes=1756999 last=0 frame_id=0 id_server=7 id_client=7 fif=2 us=3688183805
+[2026-08-24T14:25:48.208+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=7 id_client=7 fif=2 us=3688183816
+[2026-08-24T14:25:48.234+0000] [INFO ] GFX_TRACE batch cycle=9 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688209988
+[2026-08-24T14:25:48.238+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688214243
+[2026-08-24T14:25:48.238+0000] [INFO ] GFX_TRACE enc submitted_seq=8 returned_seq=8 ready=1 inflight=-1 center_y=-1 us=3688214245
+[2026-08-24T14:25:48.239+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=8 id_client=7 fif=2 us=3688214465
+[2026-08-24T14:25:48.274+0000] [INFO ] GFX_TRACE send bytes=2161951 last=0 frame_id=0 id_server=8 id_client=7 fif=2 us=3688250392
+[2026-08-24T14:25:48.296+0000] [INFO ] GFX_TRACE batch cycle=10 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688272245
+[2026-08-24T14:25:48.301+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688276818
+[2026-08-24T14:25:48.301+0000] [INFO ] GFX_TRACE enc submitted_seq=9 returned_seq=9 ready=1 inflight=-1 center_y=-1 us=3688276819
+[2026-08-24T14:25:48.297+0000] [INFO ] GFX_TRACE send bytes=1841798 last=0 frame_id=0 id_server=8 id_client=7 fif=2 us=3688273363
+[2026-08-24T14:25:48.297+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=8 id_client=7 fif=2 us=3688273376
+[2026-08-24T14:25:48.299+0000] [INFO ] GFX_TRACE ack frame_id=8 queue_depth=0 decoded=9 id_server=9 ack_off=0 us=3688274564
+[2026-08-24T14:25:48.301+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=9 id_client=8 fif=2 us=3688276969
+[2026-08-24T14:25:48.328+0000] [INFO ] GFX_TRACE send bytes=2146112 last=0 frame_id=0 id_server=9 id_client=8 fif=2 us=3688303674
+[2026-08-24T14:25:48.338+0000] [INFO ] GFX_TRACE send bytes=1725845 last=0 frame_id=0 id_server=9 id_client=8 fif=2 us=3688314126
+[2026-08-24T14:25:48.338+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=9 id_client=8 fif=2 us=3688314139
+[2026-08-24T14:25:48.339+0000] [INFO ] GFX_TRACE ack frame_id=9 queue_depth=0 decoded=10 id_server=10 ack_off=0 us=3688315284
+[2026-08-24T14:25:48.359+0000] [INFO ] GFX_TRACE batch cycle=11 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688335251
+[2026-08-24T14:25:48.364+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688340040
+[2026-08-24T14:25:48.364+0000] [INFO ] GFX_TRACE enc submitted_seq=10 returned_seq=10 ready=1 inflight=-1 center_y=-1 us=3688340042
+[2026-08-24T14:25:48.360+0000] [INFO ] GFX_TRACE ack frame_id=10 queue_depth=0 decoded=11 id_server=10 ack_off=0 us=3688335545
+[2026-08-24T14:25:48.364+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=10 id_client=10 fif=2 us=3688340118
+[2026-08-24T14:25:48.380+0000] [INFO ] GFX_TRACE send bytes=2199879 last=0 frame_id=0 id_server=10 id_client=10 fif=2 us=3688355654
+[2026-08-24T14:25:48.391+0000] [INFO ] GFX_TRACE send bytes=1738181 last=0 frame_id=0 id_server=10 id_client=10 fif=2 us=3688366940
+[2026-08-24T14:25:48.391+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=10 id_client=10 fif=2 us=3688366953
+[2026-08-24T14:25:48.416+0000] [INFO ] GFX_TRACE ack frame_id=11 queue_depth=0 decoded=12 id_server=11 ack_off=0 us=3688392023
+[2026-08-24T14:25:48.424+0000] [INFO ] GFX_TRACE batch cycle=12 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688399674
+[2026-08-24T14:25:48.428+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688404125
+[2026-08-24T14:25:48.428+0000] [INFO ] GFX_TRACE enc submitted_seq=11 returned_seq=11 ready=1 inflight=-1 center_y=-1 us=3688404127
+[2026-08-24T14:25:48.428+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=11 id_client=11 fif=2 us=3688404240
+[2026-08-24T14:25:48.442+0000] [INFO ] GFX_TRACE send bytes=2002062 last=0 frame_id=0 id_server=11 id_client=11 fif=2 us=3688418211
+[2026-08-24T14:25:48.453+0000] [INFO ] GFX_TRACE send bytes=1578350 last=0 frame_id=0 id_server=11 id_client=11 fif=2 us=3688428418
+[2026-08-24T14:25:48.453+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=11 id_client=11 fif=2 us=3688428431
+[2026-08-24T14:25:48.478+0000] [INFO ] GFX_TRACE ack frame_id=12 queue_depth=0 decoded=13 id_server=12 ack_off=0 us=3688454091
+[2026-08-24T14:25:48.496+0000] [INFO ] GFX_TRACE batch cycle=13 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688472212
+[2026-08-24T14:25:48.501+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688476452
+[2026-08-24T14:25:48.501+0000] [INFO ] GFX_TRACE enc submitted_seq=12 returned_seq=12 ready=1 inflight=-1 center_y=-1 us=3688476454
+[2026-08-24T14:25:48.501+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=12 id_client=12 fif=2 us=3688476592
+[2026-08-24T14:25:48.523+0000] [INFO ] GFX_TRACE send bytes=1931255 last=0 frame_id=0 id_server=12 id_client=12 fif=2 us=3688498582
+[2026-08-24T14:25:48.533+0000] [INFO ] GFX_TRACE send bytes=1500891 last=0 frame_id=0 id_server=12 id_client=12 fif=2 us=3688509048
+[2026-08-24T14:25:48.533+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=12 id_client=12 fif=2 us=3688509071
+[2026-08-24T14:25:48.554+0000] [INFO ] GFX_TRACE ack frame_id=13 queue_depth=0 decoded=14 id_server=13 ack_off=0 us=3688529654
+[2026-08-24T14:25:48.564+0000] [INFO ] GFX_TRACE batch cycle=14 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688540284
+[2026-08-24T14:25:48.568+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688544359
+[2026-08-24T14:25:48.568+0000] [INFO ] GFX_TRACE enc submitted_seq=13 returned_seq=13 ready=1 inflight=-1 center_y=-1 us=3688544360
+[2026-08-24T14:25:48.569+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=13 id_client=13 fif=2 us=3688544481
+[2026-08-24T14:25:48.583+0000] [INFO ] GFX_TRACE send bytes=1816219 last=0 frame_id=0 id_server=13 id_client=13 fif=2 us=3688558823
+[2026-08-24T14:25:48.594+0000] [INFO ] GFX_TRACE send bytes=1410652 last=0 frame_id=0 id_server=13 id_client=13 fif=2 us=3688570355
+[2026-08-24T14:25:48.594+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=13 id_client=13 fif=2 us=3688570367
+[2026-08-24T14:25:48.614+0000] [INFO ] GFX_TRACE ack frame_id=14 queue_depth=0 decoded=15 id_server=14 ack_off=0 us=3688589500
+[2026-08-24T14:25:48.634+0000] [INFO ] GFX_TRACE batch cycle=15 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688609539
+[2026-08-24T14:25:48.638+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688613755
+[2026-08-24T14:25:48.638+0000] [INFO ] GFX_TRACE enc submitted_seq=14 returned_seq=14 ready=1 inflight=-1 center_y=-1 us=3688613757
+[2026-08-24T14:25:48.638+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=14 id_client=14 fif=2 us=3688613881
+[2026-08-24T14:25:48.651+0000] [INFO ] GFX_TRACE send bytes=1860204 last=0 frame_id=0 id_server=14 id_client=14 fif=2 us=3688627346
+[2026-08-24T14:25:48.661+0000] [INFO ] GFX_TRACE send bytes=1447038 last=0 frame_id=0 id_server=14 id_client=14 fif=2 us=3688636789
+[2026-08-24T14:25:48.661+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=14 id_client=14 fif=2 us=3688636810
+[2026-08-24T14:25:48.685+0000] [INFO ] GFX_TRACE ack frame_id=15 queue_depth=0 decoded=16 id_server=15 ack_off=0 us=3688660461
+[2026-08-24T14:25:48.729+0000] [INFO ] GFX_TRACE batch cycle=16 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688705108
+[2026-08-24T14:25:48.733+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688709194
+[2026-08-24T14:25:48.733+0000] [INFO ] GFX_TRACE enc submitted_seq=15 returned_seq=15 ready=1 inflight=-1 center_y=-1 us=3688709196
+[2026-08-24T14:25:48.734+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=15 id_client=15 fif=2 us=3688709427
+[2026-08-24T14:25:48.747+0000] [INFO ] GFX_TRACE send bytes=1829536 last=0 frame_id=0 id_server=15 id_client=15 fif=2 us=3688722470
+[2026-08-24T14:25:48.760+0000] [INFO ] GFX_TRACE send bytes=1471130 last=0 frame_id=0 id_server=15 id_client=15 fif=2 us=3688735934
+[2026-08-24T14:25:48.760+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=15 id_client=15 fif=2 us=3688735948
+[2026-08-24T14:25:48.779+0000] [INFO ] GFX_TRACE ack frame_id=16 queue_depth=0 decoded=17 id_server=16 ack_off=0 us=3688755083
+[2026-08-24T14:25:48.853+0000] [INFO ] GFX_TRACE batch cycle=17 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688829015
+[2026-08-24T14:25:48.858+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688833413
+[2026-08-24T14:25:48.858+0000] [INFO ] GFX_TRACE enc submitted_seq=16 returned_seq=16 ready=1 inflight=-1 center_y=-1 us=3688833415
+[2026-08-24T14:25:48.858+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=16 id_client=16 fif=2 us=3688834131
+[2026-08-24T14:25:48.871+0000] [INFO ] GFX_TRACE send bytes=1924277 last=0 frame_id=0 id_server=16 id_client=16 fif=2 us=3688847252
+[2026-08-24T14:25:48.885+0000] [INFO ] GFX_TRACE send bytes=1601183 last=0 frame_id=0 id_server=16 id_client=16 fif=2 us=3688860642
+[2026-08-24T14:25:48.885+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=16 id_client=16 fif=2 us=3688860655
+[2026-08-24T14:25:48.907+0000] [INFO ] GFX_TRACE ack frame_id=17 queue_depth=0 decoded=18 id_server=17 ack_off=0 us=3688883107
+[2026-08-24T14:25:48.949+0000] [INFO ] GFX_TRACE batch cycle=18 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3688924717
+[2026-08-24T14:25:48.954+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3688929920
+[2026-08-24T14:25:48.954+0000] [INFO ] GFX_TRACE enc submitted_seq=17 returned_seq=17 ready=1 inflight=-1 center_y=-1 us=3688929922
+[2026-08-24T14:25:48.954+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=17 id_client=17 fif=2 us=3688930095
+[2026-08-24T14:25:48.969+0000] [INFO ] GFX_TRACE send bytes=2046565 last=0 frame_id=0 id_server=17 id_client=17 fif=2 us=3688945295
+[2026-08-24T14:25:48.981+0000] [INFO ] GFX_TRACE send bytes=1795432 last=0 frame_id=0 id_server=17 id_client=17 fif=2 us=3688956696
+[2026-08-24T14:25:48.981+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=17 id_client=17 fif=2 us=3688956709
+[2026-08-24T14:25:49.007+0000] [INFO ] GFX_TRACE ack frame_id=18 queue_depth=0 decoded=19 id_server=18 ack_off=0 us=3688982662
+[2026-08-24T14:25:49.046+0000] [INFO ] GFX_TRACE batch cycle=19 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689021546
+[2026-08-24T14:25:49.051+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689026741
+[2026-08-24T14:25:49.051+0000] [INFO ] GFX_TRACE enc submitted_seq=18 returned_seq=18 ready=1 inflight=-1 center_y=-1 us=3689026743
+[2026-08-24T14:25:49.051+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=18 id_client=18 fif=2 us=3689027110
+[2026-08-24T14:25:49.067+0000] [INFO ] GFX_TRACE send bytes=2138505 last=0 frame_id=0 id_server=18 id_client=18 fif=2 us=3689042980
+[2026-08-24T14:25:49.078+0000] [INFO ] GFX_TRACE send bytes=1714242 last=0 frame_id=0 id_server=18 id_client=18 fif=2 us=3689053974
+[2026-08-24T14:25:49.078+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=18 id_client=18 fif=2 us=3689053987
+[2026-08-24T14:25:49.105+0000] [INFO ] GFX_TRACE ack frame_id=19 queue_depth=0 decoded=20 id_server=19 ack_off=0 us=3689080661
+[2026-08-24T14:25:49.152+0000] [INFO ] GFX_TRACE batch cycle=20 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689128277
+[2026-08-24T14:25:49.159+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689135287
+[2026-08-24T14:25:49.159+0000] [INFO ] GFX_TRACE enc submitted_seq=19 returned_seq=19 ready=1 inflight=-1 center_y=-1 us=3689135288
+[2026-08-24T14:25:49.160+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=19 id_client=19 fif=2 us=3689136126
+[2026-08-24T14:25:49.174+0000] [INFO ] GFX_TRACE send bytes=2069846 last=0 frame_id=0 id_server=19 id_client=19 fif=2 us=3689150244
+[2026-08-24T14:25:49.188+0000] [INFO ] GFX_TRACE send bytes=1724252 last=0 frame_id=0 id_server=19 id_client=19 fif=2 us=3689164340
+[2026-08-24T14:25:49.188+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=19 id_client=19 fif=2 us=3689164350
+[2026-08-24T14:25:49.226+0000] [INFO ] GFX_TRACE ack frame_id=20 queue_depth=0 decoded=21 id_server=20 ack_off=0 us=3689202067
+[2026-08-24T14:25:49.283+0000] [INFO ] GFX_TRACE batch cycle=21 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689259165
+[2026-08-24T14:25:49.288+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689264267
+[2026-08-24T14:25:49.288+0000] [INFO ] GFX_TRACE enc submitted_seq=20 returned_seq=20 ready=1 inflight=-1 center_y=-1 us=3689264269
+[2026-08-24T14:25:49.289+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=20 id_client=20 fif=2 us=3689265093
+[2026-08-24T14:25:49.311+0000] [INFO ] GFX_TRACE send bytes=2094288 last=0 frame_id=0 id_server=20 id_client=20 fif=2 us=3689286722
+[2026-08-24T14:25:49.323+0000] [INFO ] GFX_TRACE send bytes=1764970 last=0 frame_id=0 id_server=20 id_client=20 fif=2 us=3689298996
+[2026-08-24T14:25:49.323+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=20 id_client=20 fif=2 us=3689299026
+[2026-08-24T14:25:49.347+0000] [INFO ] GFX_TRACE ack frame_id=21 queue_depth=0 decoded=22 id_server=21 ack_off=0 us=3689322552
+[2026-08-24T14:25:49.362+0000] [INFO ] GFX_TRACE batch cycle=22 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689337675
+[2026-08-24T14:25:49.368+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689344395
+[2026-08-24T14:25:49.368+0000] [INFO ] GFX_TRACE enc submitted_seq=21 returned_seq=21 ready=1 inflight=-1 center_y=-1 us=3689344396
+[2026-08-24T14:25:49.370+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=21 id_client=21 fif=2 us=3689345681
+[2026-08-24T14:25:49.385+0000] [INFO ] GFX_TRACE send bytes=2046078 last=0 frame_id=0 id_server=21 id_client=21 fif=2 us=3689361341
+[2026-08-24T14:25:49.398+0000] [INFO ] GFX_TRACE send bytes=1740879 last=0 frame_id=0 id_server=21 id_client=21 fif=2 us=3689373666
+[2026-08-24T14:25:49.398+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=21 id_client=21 fif=2 us=3689373679
+[2026-08-24T14:25:49.421+0000] [INFO ] GFX_TRACE ack frame_id=22 queue_depth=0 decoded=23 id_server=22 ack_off=0 us=3689396463
+[2026-08-24T14:25:49.465+0000] [INFO ] GFX_TRACE batch cycle=23 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689440626
+[2026-08-24T14:25:49.469+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689445139
+[2026-08-24T14:25:49.469+0000] [INFO ] GFX_TRACE enc submitted_seq=22 returned_seq=22 ready=1 inflight=-1 center_y=-1 us=3689445140
+[2026-08-24T14:25:49.469+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=22 id_client=22 fif=2 us=3689445301
+[2026-08-24T14:25:49.494+0000] [INFO ] GFX_TRACE send bytes=1969689 last=0 frame_id=0 id_server=22 id_client=22 fif=2 us=3689470349
+[2026-08-24T14:25:49.507+0000] [INFO ] GFX_TRACE send bytes=1672072 last=0 frame_id=0 id_server=22 id_client=22 fif=2 us=3689483199
+[2026-08-24T14:25:49.507+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=22 id_client=22 fif=2 us=3689483212
+[2026-08-24T14:25:49.528+0000] [INFO ] GFX_TRACE ack frame_id=23 queue_depth=0 decoded=24 id_server=23 ack_off=0 us=3689503465
+[2026-08-24T14:25:49.536+0000] [INFO ] GFX_TRACE batch cycle=24 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689512057
+[2026-08-24T14:25:49.541+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689517250
+[2026-08-24T14:25:49.541+0000] [INFO ] GFX_TRACE enc submitted_seq=23 returned_seq=23 ready=1 inflight=-1 center_y=-1 us=3689517252
+[2026-08-24T14:25:49.541+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=23 id_client=23 fif=2 us=3689517391
+[2026-08-24T14:25:49.571+0000] [INFO ] GFX_TRACE send bytes=1959543 last=0 frame_id=0 id_server=23 id_client=23 fif=2 us=3689546728
+[2026-08-24T14:25:49.584+0000] [INFO ] GFX_TRACE send bytes=1617048 last=0 frame_id=0 id_server=23 id_client=23 fif=2 us=3689560046
+[2026-08-24T14:25:49.584+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=23 id_client=23 fif=2 us=3689560060
+[2026-08-24T14:25:49.603+0000] [INFO ] GFX_TRACE ack frame_id=24 queue_depth=0 decoded=25 id_server=24 ack_off=0 us=3689578543
+[2026-08-24T14:25:49.606+0000] [INFO ] GFX_TRACE batch cycle=25 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689581993
+[2026-08-24T14:25:49.611+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689586544
+[2026-08-24T14:25:49.611+0000] [INFO ] GFX_TRACE enc submitted_seq=24 returned_seq=24 ready=1 inflight=-1 center_y=-1 us=3689586546
+[2026-08-24T14:25:49.611+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=24 id_client=24 fif=2 us=3689586713
+[2026-08-24T14:25:49.633+0000] [INFO ] GFX_TRACE send bytes=1960496 last=0 frame_id=0 id_server=24 id_client=24 fif=2 us=3689609119
+[2026-08-24T14:25:49.644+0000] [INFO ] GFX_TRACE send bytes=1615518 last=0 frame_id=0 id_server=24 id_client=24 fif=2 us=3689619906
+[2026-08-24T14:25:49.644+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=24 id_client=24 fif=2 us=3689619919
+[2026-08-24T14:25:49.671+0000] [INFO ] GFX_TRACE ack frame_id=25 queue_depth=0 decoded=26 id_server=25 ack_off=0 us=3689647220
+[2026-08-24T14:25:49.687+0000] [INFO ] GFX_TRACE batch cycle=26 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689662586
+[2026-08-24T14:25:49.692+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689667539
+[2026-08-24T14:25:49.692+0000] [INFO ] GFX_TRACE enc submitted_seq=25 returned_seq=25 ready=1 inflight=-1 center_y=-1 us=3689667541
+[2026-08-24T14:25:49.692+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=25 id_client=25 fif=2 us=3689668091
+[2026-08-24T14:25:49.721+0000] [INFO ] GFX_TRACE send bytes=2180336 last=0 frame_id=0 id_server=25 id_client=25 fif=2 us=3689696652
+[2026-08-24T14:25:49.727+0000] [INFO ] GFX_TRACE send bytes=1810209 last=0 frame_id=0 id_server=25 id_client=25 fif=2 us=3689702671
+[2026-08-24T14:25:49.727+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=25 id_client=25 fif=2 us=3689702679
+[2026-08-24T14:25:49.767+0000] [INFO ] GFX_TRACE batch cycle=27 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689742882
+[2026-08-24T14:25:49.772+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689748091
+[2026-08-24T14:25:49.772+0000] [INFO ] GFX_TRACE enc submitted_seq=26 returned_seq=26 ready=1 inflight=-1 center_y=-1 us=3689748092
+[2026-08-24T14:25:49.773+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=26 id_client=25 fif=2 us=3689749088
+[2026-08-24T14:25:49.797+0000] [INFO ] GFX_TRACE send bytes=2249158 last=0 frame_id=0 id_server=26 id_client=25 fif=2 us=3689772409
+[2026-08-24T14:25:49.813+0000] [INFO ] GFX_TRACE send bytes=1856906 last=0 frame_id=0 id_server=26 id_client=25 fif=2 us=3689788648
+[2026-08-24T14:25:49.813+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=26 id_client=25 fif=2 us=3689788669
+[2026-08-24T14:25:49.814+0000] [INFO ] GFX_TRACE ack frame_id=26 queue_depth=0 decoded=27 id_server=27 ack_off=0 us=3689789906
+[2026-08-24T14:25:49.832+0000] [INFO ] GFX_TRACE ack frame_id=27 queue_depth=0 decoded=28 id_server=27 ack_off=0 us=3689808096
+[2026-08-24T14:25:49.871+0000] [INFO ] GFX_TRACE batch cycle=28 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689846824
+[2026-08-24T14:25:49.877+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689852492
+[2026-08-24T14:25:49.877+0000] [INFO ] GFX_TRACE enc submitted_seq=27 returned_seq=27 ready=1 inflight=-1 center_y=-1 us=3689852494
+[2026-08-24T14:25:49.877+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=27 id_client=27 fif=2 us=3689853152
+[2026-08-24T14:25:49.949+0000] [INFO ] GFX_TRACE send bytes=2336997 last=0 frame_id=0 id_server=27 id_client=27 fif=2 us=3689924793
+[2026-08-24T14:25:49.962+0000] [INFO ] GFX_TRACE send bytes=1939738 last=0 frame_id=0 id_server=27 id_client=27 fif=2 us=3689937942
+[2026-08-24T14:25:49.962+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=27 id_client=27 fif=2 us=3689937955
+[2026-08-24T14:25:49.972+0000] [INFO ] GFX_TRACE batch cycle=29 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3689947472
+[2026-08-24T14:25:49.980+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3689955776
+[2026-08-24T14:25:49.980+0000] [INFO ] GFX_TRACE enc submitted_seq=28 returned_seq=28 ready=1 inflight=-1 center_y=-1 us=3689955778
+[2026-08-24T14:25:49.980+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=28 id_client=27 fif=2 us=3689956096
+[2026-08-24T14:25:49.998+0000] [INFO ] GFX_TRACE send bytes=2334008 last=0 frame_id=0 id_server=28 id_client=27 fif=2 us=3689973934
+[2026-08-24T14:25:50.011+0000] [INFO ] GFX_TRACE send bytes=1926080 last=0 frame_id=0 id_server=28 id_client=27 fif=2 us=3689987033
+[2026-08-24T14:25:50.011+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=28 id_client=27 fif=2 us=3689987048
+[2026-08-24T14:25:50.012+0000] [INFO ] GFX_TRACE ack frame_id=28 queue_depth=0 decoded=29 id_server=29 ack_off=0 us=3689988161
+[2026-08-24T14:25:50.036+0000] [INFO ] GFX_TRACE ack frame_id=29 queue_depth=0 decoded=30 id_server=29 ack_off=0 us=3690011717
+[2026-08-24T14:25:50.062+0000] [INFO ] GFX_TRACE batch cycle=30 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690037944
+[2026-08-24T14:25:50.068+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690043603
+[2026-08-24T14:25:50.068+0000] [INFO ] GFX_TRACE enc submitted_seq=29 returned_seq=29 ready=1 inflight=-1 center_y=-1 us=3690043604
+[2026-08-24T14:25:50.068+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=29 id_client=29 fif=2 us=3690044133
+[2026-08-24T14:25:50.086+0000] [INFO ] GFX_TRACE send bytes=2308513 last=0 frame_id=0 id_server=29 id_client=29 fif=2 us=3690061680
+[2026-08-24T14:25:50.099+0000] [INFO ] GFX_TRACE send bytes=1923149 last=0 frame_id=0 id_server=29 id_client=29 fif=2 us=3690074671
+[2026-08-24T14:25:50.099+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=29 id_client=29 fif=2 us=3690074685
+[2026-08-24T14:25:50.124+0000] [INFO ] GFX_TRACE ack frame_id=30 queue_depth=0 decoded=31 id_server=30 ack_off=0 us=3690100097
+[2026-08-24T14:25:50.141+0000] [INFO ] GFX_TRACE batch cycle=31 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690117232
+[2026-08-24T14:25:50.147+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690122944
+[2026-08-24T14:25:50.147+0000] [INFO ] GFX_TRACE enc submitted_seq=30 returned_seq=30 ready=1 inflight=-1 center_y=-1 us=3690122945
+[2026-08-24T14:25:50.147+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=30 id_client=30 fif=2 us=3690123129
+[2026-08-24T14:25:50.165+0000] [INFO ] GFX_TRACE send bytes=2299320 last=0 frame_id=0 id_server=30 id_client=30 fif=2 us=3690140710
+[2026-08-24T14:25:50.180+0000] [INFO ] GFX_TRACE send bytes=1900069 last=0 frame_id=0 id_server=30 id_client=30 fif=2 us=3690155441
+[2026-08-24T14:25:50.180+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=30 id_client=30 fif=2 us=3690155454
+[2026-08-24T14:25:50.202+0000] [INFO ] GFX_TRACE ack frame_id=31 queue_depth=0 decoded=32 id_server=31 ack_off=0 us=3690177819
+[2026-08-24T14:25:50.281+0000] [INFO ] GFX_TRACE batch cycle=32 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690257064
+[2026-08-24T14:25:50.286+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690262383
+[2026-08-24T14:25:50.286+0000] [INFO ] GFX_TRACE enc submitted_seq=31 returned_seq=31 ready=1 inflight=-1 center_y=-1 us=3690262384
+[2026-08-24T14:25:50.287+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=31 id_client=31 fif=2 us=3690263131
+[2026-08-24T14:25:50.304+0000] [INFO ] GFX_TRACE send bytes=2204657 last=0 frame_id=0 id_server=31 id_client=31 fif=2 us=3690279678
+[2026-08-24T14:25:50.317+0000] [INFO ] GFX_TRACE send bytes=1816996 last=0 frame_id=0 id_server=31 id_client=31 fif=2 us=3690292737
+[2026-08-24T14:25:50.317+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=31 id_client=31 fif=2 us=3690292751
+[2026-08-24T14:25:50.341+0000] [INFO ] GFX_TRACE ack frame_id=32 queue_depth=0 decoded=33 id_server=32 ack_off=0 us=3690317114
+[2026-08-24T14:25:50.360+0000] [INFO ] GFX_TRACE batch cycle=33 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690336146
+[2026-08-24T14:25:50.365+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690340797
+[2026-08-24T14:25:50.365+0000] [INFO ] GFX_TRACE enc submitted_seq=32 returned_seq=32 ready=1 inflight=-1 center_y=-1 us=3690340798
+[2026-08-24T14:25:50.365+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=32 id_client=32 fif=2 us=3690340904
+[2026-08-24T14:25:50.381+0000] [INFO ] GFX_TRACE send bytes=2020882 last=0 frame_id=0 id_server=32 id_client=32 fif=2 us=3690356738
+[2026-08-24T14:25:50.393+0000] [INFO ] GFX_TRACE send bytes=1685841 last=0 frame_id=0 id_server=32 id_client=32 fif=2 us=3690368440
+[2026-08-24T14:25:50.393+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=32 id_client=32 fif=2 us=3690368453
+[2026-08-24T14:25:50.415+0000] [INFO ] GFX_TRACE ack frame_id=33 queue_depth=0 decoded=34 id_server=33 ack_off=0 us=3690391176
+[2026-08-24T14:25:50.449+0000] [INFO ] GFX_TRACE batch cycle=34 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690424828
+[2026-08-24T14:25:50.454+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690430253
+[2026-08-24T14:25:50.454+0000] [INFO ] GFX_TRACE enc submitted_seq=33 returned_seq=33 ready=1 inflight=-1 center_y=-1 us=3690430255
+[2026-08-24T14:25:50.455+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=33 id_client=33 fif=2 us=3690430447
+[2026-08-24T14:25:50.488+0000] [INFO ] GFX_TRACE send bytes=2013609 last=0 frame_id=0 id_server=33 id_client=33 fif=2 us=3690464202
+[2026-08-24T14:25:50.501+0000] [INFO ] GFX_TRACE send bytes=1706945 last=0 frame_id=0 id_server=33 id_client=33 fif=2 us=3690476704
+[2026-08-24T14:25:50.501+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=33 id_client=33 fif=2 us=3690476718
+[2026-08-24T14:25:50.525+0000] [INFO ] GFX_TRACE batch cycle=35 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690501026
+[2026-08-24T14:25:50.530+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690505885
+[2026-08-24T14:25:50.530+0000] [INFO ] GFX_TRACE enc submitted_seq=34 returned_seq=34 ready=1 inflight=-1 center_y=-1 us=3690505887
+[2026-08-24T14:25:50.532+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=34 id_client=33 fif=2 us=3690508079
+[2026-08-24T14:25:50.549+0000] [INFO ] GFX_TRACE send bytes=2096565 last=0 frame_id=0 id_server=34 id_client=33 fif=2 us=3690524854
+[2026-08-24T14:25:50.561+0000] [INFO ] GFX_TRACE send bytes=1755552 last=0 frame_id=0 id_server=34 id_client=33 fif=2 us=3690536450
+[2026-08-24T14:25:50.561+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=34 id_client=33 fif=2 us=3690536468
+[2026-08-24T14:25:50.562+0000] [INFO ] GFX_TRACE ack frame_id=34 queue_depth=0 decoded=35 id_server=35 ack_off=0 us=3690537615
+[2026-08-24T14:25:50.598+0000] [INFO ] GFX_TRACE ack frame_id=35 queue_depth=0 decoded=36 id_server=35 ack_off=0 us=3690574285
+[2026-08-24T14:25:50.610+0000] [INFO ] GFX_TRACE batch cycle=36 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690586240
+[2026-08-24T14:25:50.615+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690590951
+[2026-08-24T14:25:50.615+0000] [INFO ] GFX_TRACE enc submitted_seq=35 returned_seq=35 ready=1 inflight=-1 center_y=-1 us=3690590953
+[2026-08-24T14:25:50.615+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=35 id_client=35 fif=2 us=3690591063
+[2026-08-24T14:25:50.637+0000] [INFO ] GFX_TRACE send bytes=2049747 last=0 frame_id=0 id_server=35 id_client=35 fif=2 us=3690612581
+[2026-08-24T14:25:50.651+0000] [INFO ] GFX_TRACE send bytes=1768619 last=0 frame_id=0 id_server=35 id_client=35 fif=2 us=3690627070
+[2026-08-24T14:25:50.651+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=35 id_client=35 fif=2 us=3690627085
+[2026-08-24T14:25:50.670+0000] [INFO ] GFX_TRACE ack frame_id=36 queue_depth=0 decoded=37 id_server=36 ack_off=0 us=3690645957
+[2026-08-24T14:25:50.696+0000] [INFO ] GFX_TRACE batch cycle=37 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690671772
+[2026-08-24T14:25:50.701+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690676958
+[2026-08-24T14:25:50.701+0000] [INFO ] GFX_TRACE enc submitted_seq=36 returned_seq=36 ready=1 inflight=-1 center_y=-1 us=3690676960
+[2026-08-24T14:25:50.701+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=36 id_client=36 fif=2 us=3690677116
+[2026-08-24T14:25:50.751+0000] [INFO ] GFX_TRACE send bytes=2141112 last=0 frame_id=0 id_server=36 id_client=36 fif=2 us=3690727268
+[2026-08-24T14:25:50.773+0000] [INFO ] GFX_TRACE send bytes=1802035 last=0 frame_id=0 id_server=36 id_client=36 fif=2 us=3690748717
+[2026-08-24T14:25:50.773+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=36 id_client=36 fif=2 us=3690748733
+[2026-08-24T14:25:50.793+0000] [INFO ] GFX_TRACE ack frame_id=37 queue_depth=0 decoded=38 id_server=37 ack_off=0 us=3690768670
+[2026-08-24T14:25:50.819+0000] [INFO ] GFX_TRACE batch cycle=38 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690794427
+[2026-08-24T14:25:50.824+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690799406
+[2026-08-24T14:25:50.824+0000] [INFO ] GFX_TRACE enc submitted_seq=37 returned_seq=37 ready=1 inflight=-1 center_y=-1 us=3690799408
+[2026-08-24T14:25:50.824+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=37 id_client=37 fif=2 us=3690800113
+[2026-08-24T14:25:50.850+0000] [INFO ] GFX_TRACE send bytes=2069661 last=0 frame_id=0 id_server=37 id_client=37 fif=2 us=3690825531
+[2026-08-24T14:25:50.857+0000] [INFO ] GFX_TRACE send bytes=1748672 last=0 frame_id=0 id_server=37 id_client=37 fif=2 us=3690832420
+[2026-08-24T14:25:50.857+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=37 id_client=37 fif=2 us=3690832432
+[2026-08-24T14:25:50.905+0000] [INFO ] GFX_TRACE ack frame_id=38 queue_depth=0 decoded=39 id_server=38 ack_off=0 us=3690881126
+[2026-08-24T14:25:50.927+0000] [INFO ] GFX_TRACE batch cycle=39 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690902627
+[2026-08-24T14:25:50.932+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690907575
+[2026-08-24T14:25:50.932+0000] [INFO ] GFX_TRACE enc submitted_seq=38 returned_seq=38 ready=1 inflight=-1 center_y=-1 us=3690907577
+[2026-08-24T14:25:50.933+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=38 id_client=38 fif=2 us=3690909140
+[2026-08-24T14:25:50.968+0000] [INFO ] GFX_TRACE send bytes=2186332 last=0 frame_id=0 id_server=38 id_client=38 fif=2 us=3690944081
+[2026-08-24T14:25:50.981+0000] [INFO ] GFX_TRACE send bytes=1748982 last=0 frame_id=0 id_server=38 id_client=38 fif=2 us=3690956798
+[2026-08-24T14:25:50.981+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=38 id_client=38 fif=2 us=3690956814
+[2026-08-24T14:25:51.002+0000] [INFO ] GFX_TRACE batch cycle=40 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3690977754
+[2026-08-24T14:25:51.006+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3690981686
+[2026-08-24T14:25:51.006+0000] [INFO ] GFX_TRACE enc submitted_seq=39 returned_seq=39 ready=1 inflight=-1 center_y=-1 us=3690981687
+[2026-08-24T14:25:51.008+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=39 id_client=38 fif=2 us=3690983458
+[2026-08-24T14:25:51.030+0000] [INFO ] GFX_TRACE send bytes=2023932 last=0 frame_id=0 id_server=39 id_client=38 fif=2 us=3691005992
+[2026-08-24T14:25:51.036+0000] [INFO ] GFX_TRACE send bytes=1614461 last=0 frame_id=0 id_server=39 id_client=38 fif=2 us=3691011616
+[2026-08-24T14:25:51.036+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=39 id_client=38 fif=2 us=3691011622
+[2026-08-24T14:25:51.076+0000] [INFO ] GFX_TRACE ack frame_id=39 queue_depth=0 decoded=40 id_server=40 ack_off=0 us=3691051462
+[2026-08-24T14:25:51.084+0000] [INFO ] GFX_TRACE batch cycle=41 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691060069
+[2026-08-24T14:25:51.089+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691065385
+[2026-08-24T14:25:51.089+0000] [INFO ] GFX_TRACE enc submitted_seq=40 returned_seq=40 ready=1 inflight=-1 center_y=-1 us=3691065386
+[2026-08-24T14:25:51.090+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=40 id_client=39 fif=2 us=3691066117
+[2026-08-24T14:25:51.116+0000] [INFO ] GFX_TRACE send bytes=2072494 last=0 frame_id=0 id_server=40 id_client=39 fif=2 us=3691091829
+[2026-08-24T14:25:51.126+0000] [INFO ] GFX_TRACE send bytes=1567377 last=0 frame_id=0 id_server=40 id_client=39 fif=2 us=3691102272
+[2026-08-24T14:25:51.126+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=40 id_client=39 fif=2 us=3691102286
+[2026-08-24T14:25:51.128+0000] [INFO ] GFX_TRACE ack frame_id=40 queue_depth=0 decoded=41 id_server=41 ack_off=0 us=3691103420
+[2026-08-24T14:25:51.148+0000] [INFO ] GFX_TRACE ack frame_id=41 queue_depth=0 decoded=42 id_server=41 ack_off=0 us=3691124229
+[2026-08-24T14:25:51.161+0000] [INFO ] GFX_TRACE batch cycle=42 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691136737
+[2026-08-24T14:25:51.168+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691144385
+[2026-08-24T14:25:51.168+0000] [INFO ] GFX_TRACE enc submitted_seq=41 returned_seq=41 ready=1 inflight=-1 center_y=-1 us=3691144386
+[2026-08-24T14:25:51.169+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=41 id_client=41 fif=2 us=3691144527
+[2026-08-24T14:25:51.187+0000] [INFO ] GFX_TRACE send bytes=2012453 last=0 frame_id=0 id_server=41 id_client=41 fif=2 us=3691162680
+[2026-08-24T14:25:51.197+0000] [INFO ] GFX_TRACE send bytes=1522880 last=0 frame_id=0 id_server=41 id_client=41 fif=2 us=3691172899
+[2026-08-24T14:25:51.197+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=41 id_client=41 fif=2 us=3691172913
+[2026-08-24T14:25:51.223+0000] [INFO ] GFX_TRACE ack frame_id=42 queue_depth=0 decoded=43 id_server=42 ack_off=0 us=3691199095
+[2026-08-24T14:25:51.245+0000] [INFO ] GFX_TRACE batch cycle=43 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691220832
+[2026-08-24T14:25:51.250+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691225440
+[2026-08-24T14:25:51.250+0000] [INFO ] GFX_TRACE enc submitted_seq=42 returned_seq=42 ready=1 inflight=-1 center_y=-1 us=3691225441
+[2026-08-24T14:25:51.250+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=42 id_client=42 fif=2 us=3691226077
+[2026-08-24T14:25:51.276+0000] [INFO ] GFX_TRACE send bytes=2012126 last=0 frame_id=0 id_server=42 id_client=42 fif=2 us=3691251845
+[2026-08-24T14:25:51.287+0000] [INFO ] GFX_TRACE send bytes=1530506 last=0 frame_id=0 id_server=42 id_client=42 fif=2 us=3691262918
+[2026-08-24T14:25:51.287+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=42 id_client=42 fif=2 us=3691262931
+[2026-08-24T14:25:51.308+0000] [INFO ] GFX_TRACE ack frame_id=43 queue_depth=0 decoded=44 id_server=43 ack_off=0 us=3691283840
+[2026-08-24T14:25:51.329+0000] [INFO ] GFX_TRACE batch cycle=44 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691304898
+[2026-08-24T14:25:51.334+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691309534
+[2026-08-24T14:25:51.334+0000] [INFO ] GFX_TRACE enc submitted_seq=43 returned_seq=43 ready=1 inflight=-1 center_y=-1 us=3691309536
+[2026-08-24T14:25:51.334+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=43 id_client=43 fif=2 us=3691310098
+[2026-08-24T14:25:51.351+0000] [INFO ] GFX_TRACE send bytes=2037110 last=0 frame_id=0 id_server=43 id_client=43 fif=2 us=3691326532
+[2026-08-24T14:25:51.362+0000] [INFO ] GFX_TRACE send bytes=1603445 last=0 frame_id=0 id_server=43 id_client=43 fif=2 us=3691337495
+[2026-08-24T14:25:51.362+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=43 id_client=43 fif=2 us=3691337508
+[2026-08-24T14:25:51.384+0000] [INFO ] GFX_TRACE ack frame_id=44 queue_depth=0 decoded=45 id_server=44 ack_off=0 us=3691360091
+[2026-08-24T14:25:51.455+0000] [INFO ] GFX_TRACE batch cycle=45 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691431197
+[2026-08-24T14:25:51.460+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691436132
+[2026-08-24T14:25:51.460+0000] [INFO ] GFX_TRACE enc submitted_seq=44 returned_seq=44 ready=1 inflight=-1 center_y=-1 us=3691436133
+[2026-08-24T14:25:51.461+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=44 id_client=44 fif=2 us=3691437088
+[2026-08-24T14:25:51.486+0000] [INFO ] GFX_TRACE send bytes=2042763 last=0 frame_id=0 id_server=44 id_client=44 fif=2 us=3691461623
+[2026-08-24T14:25:51.497+0000] [INFO ] GFX_TRACE send bytes=1631017 last=0 frame_id=0 id_server=44 id_client=44 fif=2 us=3691472675
+[2026-08-24T14:25:51.497+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=44 id_client=44 fif=2 us=3691472689
+[2026-08-24T14:25:51.534+0000] [INFO ] GFX_TRACE ack frame_id=45 queue_depth=0 decoded=46 id_server=45 ack_off=0 us=3691509922
+[2026-08-24T14:25:51.543+0000] [INFO ] GFX_TRACE batch cycle=46 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691518562
+[2026-08-24T14:25:51.548+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691523463
+[2026-08-24T14:25:51.548+0000] [INFO ] GFX_TRACE enc submitted_seq=45 returned_seq=45 ready=1 inflight=-1 center_y=-1 us=3691523464
+[2026-08-24T14:25:51.549+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=45 id_client=45 fif=2 us=3691524726
+[2026-08-24T14:25:51.564+0000] [INFO ] GFX_TRACE send bytes=2058580 last=0 frame_id=0 id_server=45 id_client=45 fif=2 us=3691539785
+[2026-08-24T14:25:51.575+0000] [INFO ] GFX_TRACE send bytes=1627907 last=0 frame_id=0 id_server=45 id_client=45 fif=2 us=3691550859
+[2026-08-24T14:25:51.575+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=45 id_client=45 fif=2 us=3691550874
+[2026-08-24T14:25:51.600+0000] [INFO ] GFX_TRACE ack frame_id=46 queue_depth=0 decoded=47 id_server=46 ack_off=0 us=3691576099
+[2026-08-24T14:25:51.646+0000] [INFO ] GFX_TRACE batch cycle=47 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691621557
+[2026-08-24T14:25:51.650+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691626350
+[2026-08-24T14:25:51.650+0000] [INFO ] GFX_TRACE enc submitted_seq=46 returned_seq=46 ready=1 inflight=-1 center_y=-1 us=3691626352
+[2026-08-24T14:25:51.651+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=46 id_client=46 fif=2 us=3691626956
+[2026-08-24T14:25:51.677+0000] [INFO ] GFX_TRACE send bytes=2109785 last=0 frame_id=0 id_server=46 id_client=46 fif=2 us=3691652898
+[2026-08-24T14:25:51.692+0000] [INFO ] GFX_TRACE send bytes=1710736 last=0 frame_id=0 id_server=46 id_client=46 fif=2 us=3691667853
+[2026-08-24T14:25:51.692+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=46 id_client=46 fif=2 us=3691667866
+[2026-08-24T14:25:51.709+0000] [INFO ] GFX_TRACE ack frame_id=47 queue_depth=0 decoded=48 id_server=47 ack_off=0 us=3691684590
+[2026-08-24T14:25:51.722+0000] [INFO ] GFX_TRACE batch cycle=48 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691698293
+[2026-08-24T14:25:51.728+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691703561
+[2026-08-24T14:25:51.728+0000] [INFO ] GFX_TRACE enc submitted_seq=47 returned_seq=47 ready=1 inflight=-1 center_y=-1 us=3691703563
+[2026-08-24T14:25:51.728+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=47 id_client=47 fif=2 us=3691704117
+[2026-08-24T14:25:51.758+0000] [INFO ] GFX_TRACE send bytes=2091715 last=0 frame_id=0 id_server=47 id_client=47 fif=2 us=3691734379
+[2026-08-24T14:25:51.777+0000] [INFO ] GFX_TRACE send bytes=1694294 last=0 frame_id=0 id_server=47 id_client=47 fif=2 us=3691752829
+[2026-08-24T14:25:51.777+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=47 id_client=47 fif=2 us=3691752846
+[2026-08-24T14:25:51.794+0000] [INFO ] GFX_TRACE ack frame_id=48 queue_depth=0 decoded=49 id_server=48 ack_off=0 us=3691769429
+[2026-08-24T14:25:51.803+0000] [INFO ] GFX_TRACE batch cycle=49 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691778628
+[2026-08-24T14:25:51.807+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691782567
+[2026-08-24T14:25:51.807+0000] [INFO ] GFX_TRACE enc submitted_seq=48 returned_seq=48 ready=1 inflight=-1 center_y=-1 us=3691782568
+[2026-08-24T14:25:51.807+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=48 id_client=48 fif=2 us=3691783136
+[2026-08-24T14:25:51.828+0000] [INFO ] GFX_TRACE send bytes=2023258 last=0 frame_id=0 id_server=48 id_client=48 fif=2 us=3691803788
+[2026-08-24T14:25:51.838+0000] [INFO ] GFX_TRACE send bytes=1637600 last=0 frame_id=0 id_server=48 id_client=48 fif=2 us=3691813494
+[2026-08-24T14:25:51.838+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=48 id_client=48 fif=2 us=3691813503
+[2026-08-24T14:25:51.861+0000] [INFO ] GFX_TRACE ack frame_id=49 queue_depth=0 decoded=50 id_server=49 ack_off=0 us=3691836410
+[2026-08-24T14:25:51.886+0000] [INFO ] GFX_TRACE batch cycle=50 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691862172
+[2026-08-24T14:25:51.892+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691868092
+[2026-08-24T14:25:51.892+0000] [INFO ] GFX_TRACE enc submitted_seq=49 returned_seq=49 ready=1 inflight=-1 center_y=-1 us=3691868094
+[2026-08-24T14:25:51.896+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=49 id_client=49 fif=2 us=3691872117
+[2026-08-24T14:25:51.921+0000] [INFO ] GFX_TRACE send bytes=2051169 last=0 frame_id=0 id_server=49 id_client=49 fif=2 us=3691896967
+[2026-08-24T14:25:51.932+0000] [INFO ] GFX_TRACE send bytes=1643909 last=0 frame_id=0 id_server=49 id_client=49 fif=2 us=3691908310
+[2026-08-24T14:25:51.932+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=49 id_client=49 fif=2 us=3691908323
+[2026-08-24T14:25:51.953+0000] [INFO ] GFX_TRACE ack frame_id=50 queue_depth=0 decoded=51 id_server=50 ack_off=0 us=3691928988
+[2026-08-24T14:25:51.975+0000] [INFO ] GFX_TRACE batch cycle=51 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3691950781
+[2026-08-24T14:25:51.980+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3691956391
+[2026-08-24T14:25:51.980+0000] [INFO ] GFX_TRACE enc submitted_seq=50 returned_seq=50 ready=1 inflight=-1 center_y=-1 us=3691956393
+[2026-08-24T14:25:51.980+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=50 id_client=50 fif=2 us=3691956379
+[2026-08-24T14:25:52.006+0000] [INFO ] GFX_TRACE send bytes=2130710 last=0 frame_id=0 id_server=50 id_client=50 fif=2 us=3691981581
+[2026-08-24T14:25:52.013+0000] [INFO ] GFX_TRACE send bytes=1702592 last=0 frame_id=0 id_server=50 id_client=50 fif=2 us=3691988800
+[2026-08-24T14:25:52.013+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=50 id_client=50 fif=2 us=3691988808
+[2026-08-24T14:25:52.056+0000] [INFO ] GFX_TRACE batch cycle=52 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692032142
+[2026-08-24T14:25:52.061+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692036880
+[2026-08-24T14:25:52.061+0000] [INFO ] GFX_TRACE enc submitted_seq=51 returned_seq=51 ready=1 inflight=-1 center_y=-1 us=3692036882
+[2026-08-24T14:25:52.060+0000] [INFO ] GFX_TRACE ack frame_id=51 queue_depth=0 decoded=52 id_server=51 ack_off=0 us=3692035626
+[2026-08-24T14:25:52.061+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=51 id_client=51 fif=2 us=3692036979
+[2026-08-24T14:25:52.082+0000] [INFO ] GFX_TRACE send bytes=2108210 last=0 frame_id=0 id_server=51 id_client=51 fif=2 us=3692057620
+[2026-08-24T14:25:52.095+0000] [INFO ] GFX_TRACE send bytes=1736050 last=0 frame_id=0 id_server=51 id_client=51 fif=2 us=3692070615
+[2026-08-24T14:25:52.095+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=51 id_client=51 fif=2 us=3692070648
+[2026-08-24T14:25:52.117+0000] [INFO ] GFX_TRACE ack frame_id=52 queue_depth=0 decoded=53 id_server=52 ack_off=0 us=3692092676
+[2026-08-24T14:25:52.133+0000] [INFO ] GFX_TRACE batch cycle=53 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692108736
+[2026-08-24T14:25:52.137+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692113304
+[2026-08-24T14:25:52.137+0000] [INFO ] GFX_TRACE enc submitted_seq=52 returned_seq=52 ready=1 inflight=-1 center_y=-1 us=3692113305
+[2026-08-24T14:25:52.138+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=52 id_client=52 fif=2 us=3692113401
+[2026-08-24T14:25:52.161+0000] [INFO ] GFX_TRACE send bytes=1978483 last=0 frame_id=0 id_server=52 id_client=52 fif=2 us=3692136484
+[2026-08-24T14:25:52.170+0000] [INFO ] GFX_TRACE send bytes=1610924 last=0 frame_id=0 id_server=52 id_client=52 fif=2 us=3692145753
+[2026-08-24T14:25:52.170+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=52 id_client=52 fif=2 us=3692145762
+[2026-08-24T14:25:52.195+0000] [INFO ] GFX_TRACE ack frame_id=53 queue_depth=0 decoded=54 id_server=53 ack_off=0 us=3692171142
+[2026-08-24T14:25:52.218+0000] [INFO ] GFX_TRACE batch cycle=54 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692194020
+[2026-08-24T14:25:52.223+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692198803
+[2026-08-24T14:25:52.223+0000] [INFO ] GFX_TRACE enc submitted_seq=53 returned_seq=53 ready=1 inflight=-1 center_y=-1 us=3692198805
+[2026-08-24T14:25:52.224+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=53 id_client=53 fif=2 us=3692200255
+[2026-08-24T14:25:52.245+0000] [INFO ] GFX_TRACE send bytes=2067987 last=0 frame_id=0 id_server=53 id_client=53 fif=2 us=3692221195
+[2026-08-24T14:25:52.255+0000] [INFO ] GFX_TRACE send bytes=1723379 last=0 frame_id=0 id_server=53 id_client=53 fif=2 us=3692231285
+[2026-08-24T14:25:52.255+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=53 id_client=53 fif=2 us=3692231303
+[2026-08-24T14:25:52.298+0000] [INFO ] GFX_TRACE batch cycle=55 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692273755
+[2026-08-24T14:25:52.298+0000] [INFO ] GFX_TRACE ack frame_id=54 queue_depth=0 decoded=55 id_server=54 ack_off=0 us=3692273910
+[2026-08-24T14:25:52.307+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692282620
+[2026-08-24T14:25:52.307+0000] [INFO ] GFX_TRACE enc submitted_seq=54 returned_seq=54 ready=1 inflight=-1 center_y=-1 us=3692282622
+[2026-08-24T14:25:52.307+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=54 id_client=54 fif=2 us=3692282707
+[2026-08-24T14:25:52.330+0000] [INFO ] GFX_TRACE send bytes=2123271 last=0 frame_id=0 id_server=54 id_client=54 fif=2 us=3692305487
+[2026-08-24T14:25:52.342+0000] [INFO ] GFX_TRACE send bytes=1785594 last=0 frame_id=0 id_server=54 id_client=54 fif=2 us=3692318365
+[2026-08-24T14:25:52.342+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=54 id_client=54 fif=2 us=3692318384
+[2026-08-24T14:25:52.366+0000] [INFO ] GFX_TRACE ack frame_id=55 queue_depth=0 decoded=56 id_server=55 ack_off=0 us=3692341437
+[2026-08-24T14:25:52.376+0000] [INFO ] GFX_TRACE batch cycle=56 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692352023
+[2026-08-24T14:25:52.381+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692356867
+[2026-08-24T14:25:52.381+0000] [INFO ] GFX_TRACE enc submitted_seq=55 returned_seq=55 ready=1 inflight=-1 center_y=-1 us=3692356869
+[2026-08-24T14:25:52.381+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=55 id_client=55 fif=2 us=3692356980
+[2026-08-24T14:25:52.403+0000] [INFO ] GFX_TRACE send bytes=2106240 last=0 frame_id=0 id_server=55 id_client=55 fif=2 us=3692379238
+[2026-08-24T14:25:52.415+0000] [INFO ] GFX_TRACE send bytes=1758945 last=0 frame_id=0 id_server=55 id_client=55 fif=2 us=3692391215
+[2026-08-24T14:25:52.415+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=55 id_client=55 fif=2 us=3692391229
+[2026-08-24T14:25:52.450+0000] [INFO ] GFX_TRACE batch cycle=57 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692426074
+[2026-08-24T14:25:52.447+0000] [INFO ] GFX_TRACE ack frame_id=56 queue_depth=0 decoded=57 id_server=56 ack_off=0 us=3692422588
+[2026-08-24T14:25:52.455+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692430914
+[2026-08-24T14:25:52.455+0000] [INFO ] GFX_TRACE enc submitted_seq=56 returned_seq=56 ready=1 inflight=-1 center_y=-1 us=3692430916
+[2026-08-24T14:25:52.455+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=56 id_client=56 fif=2 us=3692431032
+[2026-08-24T14:25:52.472+0000] [INFO ] GFX_TRACE send bytes=2115139 last=0 frame_id=0 id_server=56 id_client=56 fif=2 us=3692448333
+[2026-08-24T14:25:52.488+0000] [INFO ] GFX_TRACE send bytes=1751815 last=0 frame_id=0 id_server=56 id_client=56 fif=2 us=3692463716
+[2026-08-24T14:25:52.488+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=56 id_client=56 fif=2 us=3692463730
+[2026-08-24T14:25:52.507+0000] [INFO ] GFX_TRACE ack frame_id=57 queue_depth=0 decoded=58 id_server=57 ack_off=0 us=3692483301
+[2026-08-24T14:25:52.560+0000] [INFO ] GFX_TRACE batch cycle=58 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692535983
+[2026-08-24T14:25:52.565+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692540844
+[2026-08-24T14:25:52.565+0000] [INFO ] GFX_TRACE enc submitted_seq=57 returned_seq=57 ready=1 inflight=-1 center_y=-1 us=3692540847
+[2026-08-24T14:25:52.565+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=57 id_client=57 fif=2 us=3692540969
+[2026-08-24T14:25:52.585+0000] [INFO ] GFX_TRACE send bytes=2085888 last=0 frame_id=0 id_server=57 id_client=57 fif=2 us=3692560839
+[2026-08-24T14:25:52.593+0000] [INFO ] GFX_TRACE send bytes=1750393 last=0 frame_id=0 id_server=57 id_client=57 fif=2 us=3692568604
+[2026-08-24T14:25:52.593+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=57 id_client=57 fif=2 us=3692568633
+[2026-08-24T14:25:52.642+0000] [INFO ] GFX_TRACE batch cycle=59 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692617560
+[2026-08-24T14:25:52.638+0000] [INFO ] GFX_TRACE ack frame_id=58 queue_depth=0 decoded=59 id_server=58 ack_off=0 us=3692614388
+[2026-08-24T14:25:52.646+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692622346
+[2026-08-24T14:25:52.646+0000] [INFO ] GFX_TRACE enc submitted_seq=58 returned_seq=58 ready=1 inflight=-1 center_y=-1 us=3692622347
+[2026-08-24T14:25:52.647+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=58 id_client=58 fif=2 us=3692623108
+[2026-08-24T14:25:52.664+0000] [INFO ] GFX_TRACE send bytes=1985311 last=0 frame_id=0 id_server=58 id_client=58 fif=2 us=3692640354
+[2026-08-24T14:25:52.675+0000] [INFO ] GFX_TRACE send bytes=1650034 last=0 frame_id=0 id_server=58 id_client=58 fif=2 us=3692651181
+[2026-08-24T14:25:52.675+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=58 id_client=58 fif=2 us=3692651194
+[2026-08-24T14:25:52.742+0000] [INFO ] GFX_TRACE ack frame_id=59 queue_depth=0 decoded=60 id_server=59 ack_off=0 us=3692718388
+[2026-08-24T14:25:52.772+0000] [INFO ] GFX_TRACE batch cycle=60 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692748327
+[2026-08-24T14:25:52.777+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692752906
+[2026-08-24T14:25:52.777+0000] [INFO ] GFX_TRACE enc submitted_seq=59 returned_seq=59 ready=1 inflight=-1 center_y=-1 us=3692752908
+[2026-08-24T14:25:52.777+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=59 id_client=59 fif=2 us=3692753168
+[2026-08-24T14:25:52.797+0000] [INFO ] GFX_TRACE send bytes=1904316 last=0 frame_id=0 id_server=59 id_client=59 fif=2 us=3692772577
+[2026-08-24T14:25:52.808+0000] [INFO ] GFX_TRACE send bytes=1551987 last=0 frame_id=0 id_server=59 id_client=59 fif=2 us=3692783840
+[2026-08-24T14:25:52.808+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=59 id_client=59 fif=2 us=3692783854
+[2026-08-24T14:25:52.836+0000] [INFO ] GFX_TRACE ack frame_id=60 queue_depth=0 decoded=61 id_server=60 ack_off=0 us=3692812097
+[2026-08-24T14:25:52.890+0000] [INFO ] GFX_TRACE batch cycle=61 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692865717
+[2026-08-24T14:25:52.894+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692870247
+[2026-08-24T14:25:52.894+0000] [INFO ] GFX_TRACE enc submitted_seq=60 returned_seq=60 ready=1 inflight=-1 center_y=-1 us=3692870249
+[2026-08-24T14:25:52.895+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=60 id_client=60 fif=2 us=3692871120
+[2026-08-24T14:25:52.910+0000] [INFO ] GFX_TRACE send bytes=1856224 last=0 frame_id=0 id_server=60 id_client=60 fif=2 us=3692885610
+[2026-08-24T14:25:52.920+0000] [INFO ] GFX_TRACE send bytes=1492893 last=0 frame_id=0 id_server=60 id_client=60 fif=2 us=3692896025
+[2026-08-24T14:25:52.920+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=60 id_client=60 fif=2 us=3692896040
+[2026-08-24T14:25:52.943+0000] [INFO ] GFX_TRACE ack frame_id=61 queue_depth=0 decoded=62 id_server=61 ack_off=0 us=3692919153
+[2026-08-24T14:25:52.967+0000] [INFO ] GFX_TRACE batch cycle=62 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3692942814
+[2026-08-24T14:25:52.971+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3692947028
+[2026-08-24T14:25:52.971+0000] [INFO ] GFX_TRACE enc submitted_seq=61 returned_seq=61 ready=1 inflight=-1 center_y=-1 us=3692947030
+[2026-08-24T14:25:52.972+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=61 id_client=61 fif=2 us=3692948116
+[2026-08-24T14:25:52.985+0000] [INFO ] GFX_TRACE send bytes=1766830 last=0 frame_id=0 id_server=61 id_client=61 fif=2 us=3692960491
+[2026-08-24T14:25:52.997+0000] [INFO ] GFX_TRACE send bytes=1405934 last=0 frame_id=0 id_server=61 id_client=61 fif=2 us=3692972846
+[2026-08-24T14:25:52.997+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=61 id_client=61 fif=2 us=3692972860
+[2026-08-24T14:25:53.033+0000] [INFO ] GFX_TRACE ack frame_id=62 queue_depth=0 decoded=63 id_server=62 ack_off=0 us=3693009105
+[2026-08-24T14:25:53.066+0000] [INFO ] GFX_TRACE batch cycle=63 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693042023
+[2026-08-24T14:25:53.070+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693045938
+[2026-08-24T14:25:53.070+0000] [INFO ] GFX_TRACE enc submitted_seq=62 returned_seq=62 ready=1 inflight=-1 center_y=-1 us=3693045940
+[2026-08-24T14:25:53.070+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=62 id_client=62 fif=2 us=3693046131
+[2026-08-24T14:25:53.086+0000] [INFO ] GFX_TRACE send bytes=1673771 last=0 frame_id=0 id_server=62 id_client=62 fif=2 us=3693061993
+[2026-08-24T14:25:53.099+0000] [INFO ] GFX_TRACE send bytes=1306176 last=0 frame_id=0 id_server=62 id_client=62 fif=2 us=3693075319
+[2026-08-24T14:25:53.099+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=62 id_client=62 fif=2 us=3693075345
+[2026-08-24T14:25:53.117+0000] [INFO ] GFX_TRACE ack frame_id=63 queue_depth=0 decoded=64 id_server=63 ack_off=0 us=3693093100
+[2026-08-24T14:25:53.153+0000] [INFO ] GFX_TRACE batch cycle=64 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693128817
+[2026-08-24T14:25:53.157+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693132687
+[2026-08-24T14:25:53.157+0000] [INFO ] GFX_TRACE enc submitted_seq=63 returned_seq=63 ready=1 inflight=-1 center_y=-1 us=3693132688
+[2026-08-24T14:25:53.157+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=63 id_client=63 fif=2 us=3693133112
+[2026-08-24T14:25:53.171+0000] [INFO ] GFX_TRACE send bytes=1667286 last=0 frame_id=0 id_server=63 id_client=63 fif=2 us=3693146913
+[2026-08-24T14:25:53.180+0000] [INFO ] GFX_TRACE send bytes=1288053 last=0 frame_id=0 id_server=63 id_client=63 fif=2 us=3693155823
+[2026-08-24T14:25:53.180+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=63 id_client=63 fif=2 us=3693155836
+[2026-08-24T14:25:53.202+0000] [INFO ] GFX_TRACE ack frame_id=64 queue_depth=0 decoded=65 id_server=64 ack_off=0 us=3693178129
+[2026-08-24T14:25:53.243+0000] [INFO ] GFX_TRACE batch cycle=65 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693218804
+[2026-08-24T14:25:53.247+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693222936
+[2026-08-24T14:25:53.247+0000] [INFO ] GFX_TRACE enc submitted_seq=64 returned_seq=64 ready=1 inflight=-1 center_y=-1 us=3693222938
+[2026-08-24T14:25:53.247+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=64 id_client=64 fif=2 us=3693223127
+[2026-08-24T14:25:53.261+0000] [INFO ] GFX_TRACE send bytes=1786961 last=0 frame_id=0 id_server=64 id_client=64 fif=2 us=3693236821
+[2026-08-24T14:25:53.270+0000] [INFO ] GFX_TRACE send bytes=1386364 last=0 frame_id=0 id_server=64 id_client=64 fif=2 us=3693246172
+[2026-08-24T14:25:53.270+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=64 id_client=64 fif=2 us=3693246186
+[2026-08-24T14:25:53.298+0000] [INFO ] GFX_TRACE ack frame_id=65 queue_depth=0 decoded=66 id_server=65 ack_off=0 us=3693273773
+[2026-08-24T14:25:53.315+0000] [INFO ] GFX_TRACE batch cycle=66 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693291356
+[2026-08-24T14:25:53.319+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693295343
+[2026-08-24T14:25:53.319+0000] [INFO ] GFX_TRACE enc submitted_seq=65 returned_seq=65 ready=1 inflight=-1 center_y=-1 us=3693295345
+[2026-08-24T14:25:53.320+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=65 id_client=65 fif=2 us=3693295449
+[2026-08-24T14:25:53.350+0000] [INFO ] GFX_TRACE send bytes=1795949 last=0 frame_id=0 id_server=65 id_client=65 fif=2 us=3693325477
+[2026-08-24T14:25:53.360+0000] [INFO ] GFX_TRACE send bytes=1406766 last=0 frame_id=0 id_server=65 id_client=65 fif=2 us=3693335975
+[2026-08-24T14:25:53.360+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=65 id_client=65 fif=2 us=3693335987
+[2026-08-24T14:25:53.381+0000] [INFO ] GFX_TRACE ack frame_id=66 queue_depth=0 decoded=67 id_server=66 ack_off=0 us=3693356442
+[2026-08-24T14:25:53.388+0000] [INFO ] GFX_TRACE batch cycle=67 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693364055
+[2026-08-24T14:25:53.392+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693368031
+[2026-08-24T14:25:53.392+0000] [INFO ] GFX_TRACE enc submitted_seq=66 returned_seq=66 ready=1 inflight=-1 center_y=-1 us=3693368032
+[2026-08-24T14:25:53.393+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=66 id_client=66 fif=2 us=3693369109
+[2026-08-24T14:25:53.414+0000] [INFO ] GFX_TRACE send bytes=1777412 last=0 frame_id=0 id_server=66 id_client=66 fif=2 us=3693390030
+[2026-08-24T14:25:53.426+0000] [INFO ] GFX_TRACE send bytes=1407894 last=0 frame_id=0 id_server=66 id_client=66 fif=2 us=3693401431
+[2026-08-24T14:25:53.426+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=66 id_client=66 fif=2 us=3693401441
+[2026-08-24T14:25:53.447+0000] [INFO ] GFX_TRACE ack frame_id=67 queue_depth=0 decoded=68 id_server=67 ack_off=0 us=3693423261
+[2026-08-24T14:25:53.469+0000] [INFO ] GFX_TRACE batch cycle=68 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693445154
+[2026-08-24T14:25:53.473+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693449220
+[2026-08-24T14:25:53.473+0000] [INFO ] GFX_TRACE enc submitted_seq=67 returned_seq=67 ready=1 inflight=-1 center_y=-1 us=3693449222
+[2026-08-24T14:25:53.473+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=67 id_client=67 fif=2 us=3693449318
+[2026-08-24T14:25:53.495+0000] [INFO ] GFX_TRACE send bytes=1819618 last=0 frame_id=0 id_server=67 id_client=67 fif=2 us=3693471073
+[2026-08-24T14:25:53.505+0000] [INFO ] GFX_TRACE send bytes=1486754 last=0 frame_id=0 id_server=67 id_client=67 fif=2 us=3693480875
+[2026-08-24T14:25:53.505+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=67 id_client=67 fif=2 us=3693480887
+[2026-08-24T14:25:53.528+0000] [INFO ] GFX_TRACE ack frame_id=68 queue_depth=0 decoded=69 id_server=68 ack_off=0 us=3693503954
+[2026-08-24T14:25:53.549+0000] [INFO ] GFX_TRACE batch cycle=69 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693525327
+[2026-08-24T14:25:53.553+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693529132
+[2026-08-24T14:25:53.553+0000] [INFO ] GFX_TRACE enc submitted_seq=68 returned_seq=68 ready=1 inflight=-1 center_y=-1 us=3693529134
+[2026-08-24T14:25:53.554+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=68 id_client=68 fif=2 us=3693529429
+[2026-08-24T14:25:53.579+0000] [INFO ] GFX_TRACE send bytes=1978120 last=0 frame_id=0 id_server=68 id_client=68 fif=2 us=3693555296
+[2026-08-24T14:25:53.593+0000] [INFO ] GFX_TRACE send bytes=1596224 last=0 frame_id=0 id_server=68 id_client=68 fif=2 us=3693568939
+[2026-08-24T14:25:53.593+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=68 id_client=68 fif=2 us=3693568949
+[2026-08-24T14:25:53.615+0000] [INFO ] GFX_TRACE ack frame_id=69 queue_depth=0 decoded=70 id_server=69 ack_off=0 us=3693590980
+[2026-08-24T14:25:53.630+0000] [INFO ] GFX_TRACE batch cycle=70 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693606390
+[2026-08-24T14:25:53.638+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693614168
+[2026-08-24T14:25:53.638+0000] [INFO ] GFX_TRACE enc submitted_seq=69 returned_seq=69 ready=1 inflight=-1 center_y=-1 us=3693614170
+[2026-08-24T14:25:53.639+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=69 id_client=69 fif=2 us=3693615100
+[2026-08-24T14:25:53.662+0000] [INFO ] GFX_TRACE send bytes=2083859 last=0 frame_id=0 id_server=69 id_client=69 fif=2 us=3693638092
+[2026-08-24T14:25:53.673+0000] [INFO ] GFX_TRACE send bytes=1710774 last=0 frame_id=0 id_server=69 id_client=69 fif=2 us=3693648549
+[2026-08-24T14:25:53.673+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=69 id_client=69 fif=2 us=3693648575
+[2026-08-24T14:25:53.711+0000] [INFO ] GFX_TRACE batch cycle=71 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693686407
+[2026-08-24T14:25:53.715+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693691127
+[2026-08-24T14:25:53.715+0000] [INFO ] GFX_TRACE enc submitted_seq=70 returned_seq=70 ready=1 inflight=-1 center_y=-1 us=3693691128
+[2026-08-24T14:25:53.716+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=70 id_client=69 fif=2 us=3693692088
+[2026-08-24T14:25:53.737+0000] [INFO ] GFX_TRACE send bytes=2066116 last=0 frame_id=0 id_server=70 id_client=69 fif=2 us=3693713349
+[2026-08-24T14:25:53.750+0000] [INFO ] GFX_TRACE send bytes=1694531 last=0 frame_id=0 id_server=70 id_client=69 fif=2 us=3693725948
+[2026-08-24T14:25:53.750+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=70 id_client=69 fif=2 us=3693725967
+[2026-08-24T14:25:53.769+0000] [INFO ] GFX_TRACE ack frame_id=70 queue_depth=0 decoded=71 id_server=71 ack_off=0 us=3693745377
+[2026-08-24T14:25:53.797+0000] [INFO ] GFX_TRACE batch cycle=72 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693773145
+[2026-08-24T14:25:53.803+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693778481
+[2026-08-24T14:25:53.803+0000] [INFO ] GFX_TRACE enc submitted_seq=71 returned_seq=71 ready=1 inflight=-1 center_y=-1 us=3693778483
+[2026-08-24T14:25:53.803+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=71 id_client=70 fif=2 us=3693778595
+[2026-08-24T14:25:53.824+0000] [INFO ] GFX_TRACE send bytes=2001222 last=0 frame_id=0 id_server=71 id_client=70 fif=2 us=3693799589
+[2026-08-24T14:25:53.835+0000] [INFO ] GFX_TRACE send bytes=1654519 last=0 frame_id=0 id_server=71 id_client=70 fif=2 us=3693810868
+[2026-08-24T14:25:53.835+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=71 id_client=70 fif=2 us=3693810886
+[2026-08-24T14:25:53.836+0000] [INFO ] GFX_TRACE ack frame_id=71 queue_depth=0 decoded=72 id_server=72 ack_off=0 us=3693812048
+[2026-08-24T14:25:53.866+0000] [INFO ] GFX_TRACE ack frame_id=72 queue_depth=0 decoded=73 id_server=72 ack_off=0 us=3693842346
+[2026-08-24T14:25:53.887+0000] [INFO ] GFX_TRACE batch cycle=73 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693862416
+[2026-08-24T14:25:53.892+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693867830
+[2026-08-24T14:25:53.892+0000] [INFO ] GFX_TRACE enc submitted_seq=72 returned_seq=72 ready=1 inflight=-1 center_y=-1 us=3693867832
+[2026-08-24T14:25:53.892+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=72 id_client=72 fif=2 us=3693868095
+[2026-08-24T14:25:53.916+0000] [INFO ] GFX_TRACE send bytes=2095974 last=0 frame_id=0 id_server=72 id_client=72 fif=2 us=3693891822
+[2026-08-24T14:25:53.925+0000] [INFO ] GFX_TRACE send bytes=1669858 last=0 frame_id=0 id_server=72 id_client=72 fif=2 us=3693901161
+[2026-08-24T14:25:53.925+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=72 id_client=72 fif=2 us=3693901191
+[2026-08-24T14:25:53.967+0000] [INFO ] GFX_TRACE batch cycle=74 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3693942681
+[2026-08-24T14:25:53.972+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3693947848
+[2026-08-24T14:25:53.972+0000] [INFO ] GFX_TRACE enc submitted_seq=73 returned_seq=73 ready=1 inflight=-1 center_y=-1 us=3693947850
+[2026-08-24T14:25:53.972+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=73 id_client=72 fif=2 us=3693948072
+[2026-08-24T14:25:53.988+0000] [INFO ] GFX_TRACE send bytes=2118690 last=0 frame_id=0 id_server=73 id_client=72 fif=2 us=3693964076
+[2026-08-24T14:25:54.000+0000] [INFO ] GFX_TRACE send bytes=1710674 last=0 frame_id=0 id_server=73 id_client=72 fif=2 us=3693975652
+[2026-08-24T14:25:54.000+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=73 id_client=72 fif=2 us=3693975667
+[2026-08-24T14:25:54.006+0000] [INFO ] GFX_TRACE ack frame_id=73 queue_depth=0 decoded=74 id_server=74 ack_off=0 us=3693982021
+[2026-08-24T14:25:54.040+0000] [INFO ] GFX_TRACE ack frame_id=74 queue_depth=0 decoded=75 id_server=74 ack_off=0 us=3694015862
+[2026-08-24T14:25:54.150+0000] [INFO ] GFX_TRACE batch cycle=75 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694126256
+[2026-08-24T14:25:54.155+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694131162
+[2026-08-24T14:25:54.155+0000] [INFO ] GFX_TRACE enc submitted_seq=74 returned_seq=74 ready=1 inflight=-1 center_y=-1 us=3694131164
+[2026-08-24T14:25:54.156+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=74 id_client=74 fif=2 us=3694132129
+[2026-08-24T14:25:54.177+0000] [INFO ] GFX_TRACE send bytes=2133547 last=0 frame_id=0 id_server=74 id_client=74 fif=2 us=3694153035
+[2026-08-24T14:25:54.189+0000] [INFO ] GFX_TRACE send bytes=1744985 last=0 frame_id=0 id_server=74 id_client=74 fif=2 us=3694164769
+[2026-08-24T14:25:54.189+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=74 id_client=74 fif=2 us=3694164782
+[2026-08-24T14:25:54.214+0000] [INFO ] GFX_TRACE ack frame_id=75 queue_depth=0 decoded=76 id_server=75 ack_off=0 us=3694189644
+[2026-08-24T14:25:54.225+0000] [INFO ] GFX_TRACE batch cycle=76 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694200988
+[2026-08-24T14:25:54.229+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694204876
+[2026-08-24T14:25:54.229+0000] [INFO ] GFX_TRACE enc submitted_seq=75 returned_seq=75 ready=1 inflight=-1 center_y=-1 us=3694204877
+[2026-08-24T14:25:54.230+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=75 id_client=75 fif=2 us=3694206142
+[2026-08-24T14:25:54.253+0000] [INFO ] GFX_TRACE send bytes=2032356 last=0 frame_id=0 id_server=75 id_client=75 fif=2 us=3694228856
+[2026-08-24T14:25:54.263+0000] [INFO ] GFX_TRACE send bytes=1620981 last=0 frame_id=0 id_server=75 id_client=75 fif=2 us=3694238635
+[2026-08-24T14:25:54.263+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=75 id_client=75 fif=2 us=3694238647
+[2026-08-24T14:25:54.285+0000] [INFO ] GFX_TRACE ack frame_id=76 queue_depth=0 decoded=77 id_server=76 ack_off=0 us=3694261213
+[2026-08-24T14:25:54.300+0000] [INFO ] GFX_TRACE batch cycle=77 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694276134
+[2026-08-24T14:25:54.305+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694280770
+[2026-08-24T14:25:54.305+0000] [INFO ] GFX_TRACE enc submitted_seq=76 returned_seq=76 ready=1 inflight=-1 center_y=-1 us=3694280771
+[2026-08-24T14:25:54.307+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=76 id_client=76 fif=2 us=3694282427
+[2026-08-24T14:25:54.332+0000] [INFO ] GFX_TRACE send bytes=2068617 last=0 frame_id=0 id_server=76 id_client=76 fif=2 us=3694307615
+[2026-08-24T14:25:54.343+0000] [INFO ] GFX_TRACE send bytes=1685955 last=0 frame_id=0 id_server=76 id_client=76 fif=2 us=3694318710
+[2026-08-24T14:25:54.343+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=76 id_client=76 fif=2 us=3694318721
+[2026-08-24T14:25:54.368+0000] [INFO ] GFX_TRACE ack frame_id=77 queue_depth=0 decoded=78 id_server=77 ack_off=0 us=3694343496
+[2026-08-24T14:25:54.387+0000] [INFO ] GFX_TRACE batch cycle=78 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694362459
+[2026-08-24T14:25:54.391+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694367346
+[2026-08-24T14:25:54.391+0000] [INFO ] GFX_TRACE enc submitted_seq=77 returned_seq=77 ready=1 inflight=-1 center_y=-1 us=3694367348
+[2026-08-24T14:25:54.392+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=77 id_client=77 fif=2 us=3694367452
+[2026-08-24T14:25:54.418+0000] [INFO ] GFX_TRACE send bytes=2208010 last=0 frame_id=0 id_server=77 id_client=77 fif=2 us=3694394219
+[2026-08-24T14:25:54.437+0000] [INFO ] GFX_TRACE send bytes=1796504 last=0 frame_id=0 id_server=77 id_client=77 fif=2 us=3694412820
+[2026-08-24T14:25:54.437+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=77 id_client=77 fif=2 us=3694412834
+[2026-08-24T14:25:54.458+0000] [INFO ] GFX_TRACE ack frame_id=78 queue_depth=0 decoded=79 id_server=78 ack_off=0 us=3694434382
+[2026-08-24T14:25:54.476+0000] [INFO ] GFX_TRACE batch cycle=79 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694451528
+[2026-08-24T14:25:54.482+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694458226
+[2026-08-24T14:25:54.482+0000] [INFO ] GFX_TRACE enc submitted_seq=78 returned_seq=78 ready=1 inflight=-1 center_y=-1 us=3694458228
+[2026-08-24T14:25:54.483+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=78 id_client=78 fif=2 us=3694459127
+[2026-08-24T14:25:54.509+0000] [INFO ] GFX_TRACE send bytes=2297956 last=0 frame_id=0 id_server=78 id_client=78 fif=2 us=3694484639
+[2026-08-24T14:25:54.522+0000] [INFO ] GFX_TRACE send bytes=1850534 last=0 frame_id=0 id_server=78 id_client=78 fif=2 us=3694498251
+[2026-08-24T14:25:54.522+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=78 id_client=78 fif=2 us=3694498266
+[2026-08-24T14:25:54.548+0000] [INFO ] GFX_TRACE ack frame_id=79 queue_depth=0 decoded=80 id_server=79 ack_off=0 us=3694523809
+[2026-08-24T14:25:54.571+0000] [INFO ] GFX_TRACE batch cycle=80 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694546757
+[2026-08-24T14:25:54.576+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694551834
+[2026-08-24T14:25:54.576+0000] [INFO ] GFX_TRACE enc submitted_seq=79 returned_seq=79 ready=1 inflight=-1 center_y=-1 us=3694551836
+[2026-08-24T14:25:54.576+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=79 id_client=79 fif=2 us=3694551975
+[2026-08-24T14:25:54.609+0000] [INFO ] GFX_TRACE send bytes=2093658 last=0 frame_id=0 id_server=79 id_client=79 fif=2 us=3694585355
+[2026-08-24T14:25:54.623+0000] [INFO ] GFX_TRACE send bytes=1801389 last=0 frame_id=0 id_server=79 id_client=79 fif=2 us=3694598442
+[2026-08-24T14:25:54.623+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=79 id_client=79 fif=2 us=3694598455
+[2026-08-24T14:25:54.650+0000] [INFO ] GFX_TRACE ack frame_id=80 queue_depth=0 decoded=81 id_server=80 ack_off=0 us=3694626150
+[2026-08-24T14:25:54.662+0000] [INFO ] GFX_TRACE batch cycle=81 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694637922
+[2026-08-24T14:25:54.667+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694642969
+[2026-08-24T14:25:54.667+0000] [INFO ] GFX_TRACE enc submitted_seq=80 returned_seq=80 ready=1 inflight=-1 center_y=-1 us=3694642971
+[2026-08-24T14:25:54.667+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=80 id_client=80 fif=2 us=3694643067
+[2026-08-24T14:25:54.690+0000] [INFO ] GFX_TRACE send bytes=2230506 last=0 frame_id=0 id_server=80 id_client=80 fif=2 us=3694665533
+[2026-08-24T14:25:54.709+0000] [INFO ] GFX_TRACE send bytes=1872873 last=0 frame_id=0 id_server=80 id_client=80 fif=2 us=3694684547
+[2026-08-24T14:25:54.709+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=80 id_client=80 fif=2 us=3694684562
+[2026-08-24T14:25:54.730+0000] [INFO ] GFX_TRACE ack frame_id=81 queue_depth=0 decoded=82 id_server=81 ack_off=0 us=3694705483
+[2026-08-24T14:25:54.745+0000] [INFO ] GFX_TRACE batch cycle=82 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694721231
+[2026-08-24T14:25:54.751+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694726777
+[2026-08-24T14:25:54.751+0000] [INFO ] GFX_TRACE enc submitted_seq=81 returned_seq=81 ready=1 inflight=-1 center_y=-1 us=3694726779
+[2026-08-24T14:25:54.751+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=81 id_client=81 fif=2 us=3694726941
+[2026-08-24T14:25:54.778+0000] [INFO ] GFX_TRACE send bytes=2066631 last=0 frame_id=0 id_server=81 id_client=81 fif=2 us=3694753730
+[2026-08-24T14:25:54.791+0000] [INFO ] GFX_TRACE send bytes=1723610 last=0 frame_id=0 id_server=81 id_client=81 fif=2 us=3694766910
+[2026-08-24T14:25:54.791+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=81 id_client=81 fif=2 us=3694766924
+[2026-08-24T14:25:54.811+0000] [INFO ] GFX_TRACE ack frame_id=82 queue_depth=0 decoded=83 id_server=82 ack_off=0 us=3694787195
+[2026-08-24T14:25:54.837+0000] [INFO ] GFX_TRACE batch cycle=83 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694812996
+[2026-08-24T14:25:54.845+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694821181
+[2026-08-24T14:25:54.845+0000] [INFO ] GFX_TRACE enc submitted_seq=82 returned_seq=82 ready=1 inflight=-1 center_y=-1 us=3694821183
+[2026-08-24T14:25:54.845+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=82 id_client=82 fif=2 us=3694821363
+[2026-08-24T14:25:54.865+0000] [INFO ] GFX_TRACE send bytes=1961293 last=0 frame_id=0 id_server=82 id_client=82 fif=2 us=3694840483
+[2026-08-24T14:25:54.871+0000] [INFO ] GFX_TRACE send bytes=1636459 last=0 frame_id=0 id_server=82 id_client=82 fif=2 us=3694846814
+[2026-08-24T14:25:54.871+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=82 id_client=82 fif=2 us=3694846824
+[2026-08-24T14:25:54.929+0000] [INFO ] GFX_TRACE batch cycle=84 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694904482
+[2026-08-24T14:25:54.933+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694908864
+[2026-08-24T14:25:54.933+0000] [INFO ] GFX_TRACE enc submitted_seq=83 returned_seq=83 ready=1 inflight=-1 center_y=-1 us=3694908866
+[2026-08-24T14:25:54.927+0000] [INFO ] GFX_TRACE ack frame_id=83 queue_depth=0 decoded=84 id_server=83 ack_off=0 us=3694903101
+[2026-08-24T14:25:54.933+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=83 id_client=83 fif=2 us=3694908994
+[2026-08-24T14:25:54.949+0000] [INFO ] GFX_TRACE send bytes=1981206 last=0 frame_id=0 id_server=83 id_client=83 fif=2 us=3694925180
+[2026-08-24T14:25:54.960+0000] [INFO ] GFX_TRACE send bytes=1593882 last=0 frame_id=0 id_server=83 id_client=83 fif=2 us=3694935738
+[2026-08-24T14:25:54.960+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=83 id_client=83 fif=2 us=3694935752
+[2026-08-24T14:25:54.982+0000] [INFO ] GFX_TRACE ack frame_id=84 queue_depth=0 decoded=85 id_server=84 ack_off=0 us=3694957796
+[2026-08-24T14:25:55.018+0000] [INFO ] GFX_TRACE batch cycle=85 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3694993943
+[2026-08-24T14:25:55.022+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3694998313
+[2026-08-24T14:25:55.022+0000] [INFO ] GFX_TRACE enc submitted_seq=84 returned_seq=84 ready=1 inflight=-1 center_y=-1 us=3694998314
+[2026-08-24T14:25:55.023+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=84 id_client=84 fif=2 us=3694998443
+[2026-08-24T14:25:55.039+0000] [INFO ] GFX_TRACE send bytes=1905825 last=0 frame_id=0 id_server=84 id_client=84 fif=2 us=3695014486
+[2026-08-24T14:25:55.050+0000] [INFO ] GFX_TRACE send bytes=1614926 last=0 frame_id=0 id_server=84 id_client=84 fif=2 us=3695025498
+[2026-08-24T14:25:55.050+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=84 id_client=84 fif=2 us=3695025509
+[2026-08-24T14:25:55.072+0000] [INFO ] GFX_TRACE ack frame_id=85 queue_depth=0 decoded=86 id_server=85 ack_off=0 us=3695047898
+[2026-08-24T14:25:55.104+0000] [INFO ] GFX_TRACE batch cycle=86 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695080284
+[2026-08-24T14:25:55.109+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695084573
+[2026-08-24T14:25:55.109+0000] [INFO ] GFX_TRACE enc submitted_seq=85 returned_seq=85 ready=1 inflight=-1 center_y=-1 us=3695084575
+[2026-08-24T14:25:55.109+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=85 id_client=85 fif=2 us=3695084678
+[2026-08-24T14:25:55.124+0000] [INFO ] GFX_TRACE send bytes=1889939 last=0 frame_id=0 id_server=85 id_client=85 fif=2 us=3695099953
+[2026-08-24T14:25:55.136+0000] [INFO ] GFX_TRACE send bytes=1571784 last=0 frame_id=0 id_server=85 id_client=85 fif=2 us=3695112014
+[2026-08-24T14:25:55.136+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=85 id_client=85 fif=2 us=3695112028
+[2026-08-24T14:25:55.157+0000] [INFO ] GFX_TRACE ack frame_id=86 queue_depth=0 decoded=87 id_server=86 ack_off=0 us=3695133082
+[2026-08-24T14:25:55.193+0000] [INFO ] GFX_TRACE batch cycle=87 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695169144
+[2026-08-24T14:25:55.198+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695173618
+[2026-08-24T14:25:55.198+0000] [INFO ] GFX_TRACE enc submitted_seq=86 returned_seq=86 ready=1 inflight=-1 center_y=-1 us=3695173620
+[2026-08-24T14:25:55.198+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=86 id_client=86 fif=2 us=3695174091
+[2026-08-24T14:25:55.226+0000] [INFO ] GFX_TRACE send bytes=1852149 last=0 frame_id=0 id_server=86 id_client=86 fif=2 us=3695201500
+[2026-08-24T14:25:55.237+0000] [INFO ] GFX_TRACE send bytes=1536139 last=0 frame_id=0 id_server=86 id_client=86 fif=2 us=3695212806
+[2026-08-24T14:25:55.237+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=86 id_client=86 fif=2 us=3695212819
+[2026-08-24T14:25:55.257+0000] [INFO ] GFX_TRACE ack frame_id=87 queue_depth=0 decoded=88 id_server=87 ack_off=0 us=3695232814
+[2026-08-24T14:25:55.277+0000] [INFO ] GFX_TRACE batch cycle=88 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695253313
+[2026-08-24T14:25:55.282+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695258076
+[2026-08-24T14:25:55.282+0000] [INFO ] GFX_TRACE enc submitted_seq=87 returned_seq=87 ready=1 inflight=-1 center_y=-1 us=3695258078
+[2026-08-24T14:25:55.283+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=87 id_client=87 fif=2 us=3695259078
+[2026-08-24T14:25:55.310+0000] [INFO ] GFX_TRACE send bytes=1962740 last=0 frame_id=0 id_server=87 id_client=87 fif=2 us=3695285929
+[2026-08-24T14:25:55.317+0000] [INFO ] GFX_TRACE send bytes=1632829 last=0 frame_id=0 id_server=87 id_client=87 fif=2 us=3695293290
+[2026-08-24T14:25:55.317+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=87 id_client=87 fif=2 us=3695293301
+[2026-08-24T14:25:55.363+0000] [INFO ] GFX_TRACE batch cycle=89 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695339277
+[2026-08-24T14:25:55.368+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695343960
+[2026-08-24T14:25:55.368+0000] [INFO ] GFX_TRACE enc submitted_seq=88 returned_seq=88 ready=1 inflight=-1 center_y=-1 us=3695343962
+[2026-08-24T14:25:55.368+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=88 id_client=87 fif=2 us=3695344133
+[2026-08-24T14:25:55.390+0000] [INFO ] GFX_TRACE send bytes=1934297 last=0 frame_id=0 id_server=88 id_client=87 fif=2 us=3695365416
+[2026-08-24T14:25:55.399+0000] [INFO ] GFX_TRACE send bytes=1613457 last=0 frame_id=0 id_server=88 id_client=87 fif=2 us=3695374601
+[2026-08-24T14:25:55.399+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=88 id_client=87 fif=2 us=3695374608
+[2026-08-24T14:25:55.400+0000] [INFO ] GFX_TRACE ack frame_id=88 queue_depth=0 decoded=89 id_server=89 ack_off=0 us=3695375687
+[2026-08-24T14:25:55.440+0000] [INFO ] GFX_TRACE ack frame_id=89 queue_depth=0 decoded=90 id_server=89 ack_off=0 us=3695416089
+[2026-08-24T14:25:55.450+0000] [INFO ] GFX_TRACE batch cycle=90 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695425562
+[2026-08-24T14:25:55.458+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695433837
+[2026-08-24T14:25:55.458+0000] [INFO ] GFX_TRACE enc submitted_seq=89 returned_seq=89 ready=1 inflight=-1 center_y=-1 us=3695433839
+[2026-08-24T14:25:55.458+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=89 id_client=89 fif=2 us=3695434225
+[2026-08-24T14:25:55.473+0000] [INFO ] GFX_TRACE send bytes=2056803 last=0 frame_id=0 id_server=89 id_client=89 fif=2 us=3695448969
+[2026-08-24T14:25:55.484+0000] [INFO ] GFX_TRACE send bytes=1710226 last=0 frame_id=0 id_server=89 id_client=89 fif=2 us=3695460345
+[2026-08-24T14:25:55.484+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=89 id_client=89 fif=2 us=3695460358
+[2026-08-24T14:25:55.510+0000] [INFO ] GFX_TRACE ack frame_id=90 queue_depth=0 decoded=91 id_server=90 ack_off=0 us=3695486213
+[2026-08-24T14:25:55.561+0000] [INFO ] GFX_TRACE batch cycle=91 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695536947
+[2026-08-24T14:25:55.566+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695541650
+[2026-08-24T14:25:55.566+0000] [INFO ] GFX_TRACE enc submitted_seq=90 returned_seq=90 ready=1 inflight=-1 center_y=-1 us=3695541652
+[2026-08-24T14:25:55.566+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=90 id_client=90 fif=2 us=3695541638
+[2026-08-24T14:25:55.579+0000] [INFO ] GFX_TRACE send bytes=1902176 last=0 frame_id=0 id_server=90 id_client=90 fif=2 us=3695555353
+[2026-08-24T14:25:55.590+0000] [INFO ] GFX_TRACE send bytes=1569781 last=0 frame_id=0 id_server=90 id_client=90 fif=2 us=3695565428
+[2026-08-24T14:25:55.590+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=90 id_client=90 fif=2 us=3695565439
+[2026-08-24T14:25:55.614+0000] [INFO ] GFX_TRACE ack frame_id=91 queue_depth=0 decoded=92 id_server=91 ack_off=0 us=3695590109
+[2026-08-24T14:25:55.683+0000] [INFO ] GFX_TRACE batch cycle=92 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695659170
+[2026-08-24T14:25:55.688+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695663529
+[2026-08-24T14:25:55.688+0000] [INFO ] GFX_TRACE enc submitted_seq=91 returned_seq=91 ready=1 inflight=-1 center_y=-1 us=3695663531
+[2026-08-24T14:25:55.688+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=91 id_client=91 fif=2 us=3695664106
+[2026-08-24T14:25:55.707+0000] [INFO ] GFX_TRACE send bytes=1943638 last=0 frame_id=0 id_server=91 id_client=91 fif=2 us=3695682534
+[2026-08-24T14:25:55.717+0000] [INFO ] GFX_TRACE send bytes=1601741 last=0 frame_id=0 id_server=91 id_client=91 fif=2 us=3695693270
+[2026-08-24T14:25:55.717+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=91 id_client=91 fif=2 us=3695693282
+[2026-08-24T14:25:55.740+0000] [INFO ] GFX_TRACE ack frame_id=92 queue_depth=0 decoded=93 id_server=92 ack_off=0 us=3695716120
+[2026-08-24T14:25:55.769+0000] [INFO ] GFX_TRACE batch cycle=93 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695744734
+[2026-08-24T14:25:55.773+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695749178
+[2026-08-24T14:25:55.773+0000] [INFO ] GFX_TRACE enc submitted_seq=92 returned_seq=92 ready=1 inflight=-1 center_y=-1 us=3695749180
+[2026-08-24T14:25:55.774+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=92 id_client=92 fif=2 us=3695750081
+[2026-08-24T14:25:55.788+0000] [INFO ] GFX_TRACE send bytes=1980176 last=0 frame_id=0 id_server=92 id_client=92 fif=2 us=3695764136
+[2026-08-24T14:25:55.798+0000] [INFO ] GFX_TRACE send bytes=1636885 last=0 frame_id=0 id_server=92 id_client=92 fif=2 us=3695774325
+[2026-08-24T14:25:55.798+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=92 id_client=92 fif=2 us=3695774338
+[2026-08-24T14:25:55.823+0000] [INFO ] GFX_TRACE ack frame_id=93 queue_depth=0 decoded=94 id_server=93 ack_off=0 us=3695799105
+[2026-08-24T14:25:55.853+0000] [INFO ] GFX_TRACE batch cycle=94 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695828533
+[2026-08-24T14:25:55.857+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695833168
+[2026-08-24T14:25:55.857+0000] [INFO ] GFX_TRACE enc submitted_seq=93 returned_seq=93 ready=1 inflight=-1 center_y=-1 us=3695833170
+[2026-08-24T14:25:55.858+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=93 id_client=93 fif=2 us=3695834159
+[2026-08-24T14:25:55.871+0000] [INFO ] GFX_TRACE send bytes=1896483 last=0 frame_id=0 id_server=93 id_client=93 fif=2 us=3695846502
+[2026-08-24T14:25:55.881+0000] [INFO ] GFX_TRACE send bytes=1567589 last=0 frame_id=0 id_server=93 id_client=93 fif=2 us=3695856695
+[2026-08-24T14:25:55.881+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=93 id_client=93 fif=2 us=3695856708
+[2026-08-24T14:25:55.906+0000] [INFO ] GFX_TRACE ack frame_id=94 queue_depth=0 decoded=95 id_server=94 ack_off=0 us=3695882103
+[2026-08-24T14:25:55.934+0000] [INFO ] GFX_TRACE batch cycle=95 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3695910156
+[2026-08-24T14:25:55.939+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3695914626
+[2026-08-24T14:25:55.939+0000] [INFO ] GFX_TRACE enc submitted_seq=94 returned_seq=94 ready=1 inflight=-1 center_y=-1 us=3695914627
+[2026-08-24T14:25:55.939+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=94 id_client=94 fif=2 us=3695915154
+[2026-08-24T14:25:55.953+0000] [INFO ] GFX_TRACE send bytes=1868600 last=0 frame_id=0 id_server=94 id_client=94 fif=2 us=3695929273
+[2026-08-24T14:25:55.964+0000] [INFO ] GFX_TRACE send bytes=1540095 last=0 frame_id=0 id_server=94 id_client=94 fif=2 us=3695939622
+[2026-08-24T14:25:55.964+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=94 id_client=94 fif=2 us=3695939641
+[2026-08-24T14:25:55.986+0000] [INFO ] GFX_TRACE ack frame_id=95 queue_depth=0 decoded=96 id_server=95 ack_off=0 us=3695962105
+[2026-08-24T14:25:56.035+0000] [INFO ] GFX_TRACE batch cycle=96 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696011247
+[2026-08-24T14:25:56.039+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696014573
+[2026-08-24T14:25:56.039+0000] [INFO ] GFX_TRACE enc submitted_seq=95 returned_seq=95 ready=1 inflight=-1 center_y=-1 us=3696014574
+[2026-08-24T14:25:56.040+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=95 id_client=95 fif=2 us=3696015679
+[2026-08-24T14:25:56.072+0000] [INFO ] GFX_TRACE send bytes=1737238 last=0 frame_id=0 id_server=95 id_client=95 fif=2 us=3696047454
+[2026-08-24T14:25:56.089+0000] [INFO ] GFX_TRACE send bytes=1416836 last=0 frame_id=0 id_server=95 id_client=95 fif=2 us=3696064850
+[2026-08-24T14:25:56.089+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=95 id_client=95 fif=2 us=3696064867
+[2026-08-24T14:25:56.105+0000] [INFO ] GFX_TRACE ack frame_id=96 queue_depth=0 decoded=97 id_server=96 ack_off=0 us=3696081132
+[2026-08-24T14:25:56.109+0000] [INFO ] GFX_TRACE batch cycle=97 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696084811
+[2026-08-24T14:25:56.113+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696089185
+[2026-08-24T14:25:56.113+0000] [INFO ] GFX_TRACE enc submitted_seq=96 returned_seq=96 ready=1 inflight=-1 center_y=-1 us=3696089187
+[2026-08-24T14:25:56.114+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=96 id_client=96 fif=2 us=3696090131
+[2026-08-24T14:25:56.138+0000] [INFO ] GFX_TRACE send bytes=1970023 last=0 frame_id=0 id_server=96 id_client=96 fif=2 us=3696114207
+[2026-08-24T14:25:56.148+0000] [INFO ] GFX_TRACE send bytes=1554733 last=0 frame_id=0 id_server=96 id_client=96 fif=2 us=3696124095
+[2026-08-24T14:25:56.148+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=96 id_client=96 fif=2 us=3696124107
+[2026-08-24T14:25:56.169+0000] [INFO ] GFX_TRACE ack frame_id=97 queue_depth=0 decoded=98 id_server=97 ack_off=0 us=3696144952
+[2026-08-24T14:25:56.188+0000] [INFO ] GFX_TRACE batch cycle=98 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696164082
+[2026-08-24T14:25:56.193+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696168775
+[2026-08-24T14:25:56.193+0000] [INFO ] GFX_TRACE enc submitted_seq=97 returned_seq=97 ready=1 inflight=-1 center_y=-1 us=3696168776
+[2026-08-24T14:25:56.193+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=97 id_client=97 fif=2 us=3696168987
+[2026-08-24T14:25:56.223+0000] [INFO ] GFX_TRACE send bytes=2074654 last=0 frame_id=0 id_server=97 id_client=97 fif=2 us=3696198944
+[2026-08-24T14:25:56.240+0000] [INFO ] GFX_TRACE send bytes=1732460 last=0 frame_id=0 id_server=97 id_client=97 fif=2 us=3696215519
+[2026-08-24T14:25:56.240+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=97 id_client=97 fif=2 us=3696215534
+[2026-08-24T14:25:56.257+0000] [INFO ] GFX_TRACE ack frame_id=98 queue_depth=0 decoded=99 id_server=98 ack_off=0 us=3696232483
+[2026-08-24T14:25:56.271+0000] [INFO ] GFX_TRACE batch cycle=99 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696246605
+[2026-08-24T14:25:56.276+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696251895
+[2026-08-24T14:25:56.276+0000] [INFO ] GFX_TRACE enc submitted_seq=98 returned_seq=98 ready=1 inflight=-1 center_y=-1 us=3696251896
+[2026-08-24T14:25:56.276+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=98 id_client=98 fif=2 us=3696252090
+[2026-08-24T14:25:56.302+0000] [INFO ] GFX_TRACE send bytes=2300999 last=0 frame_id=0 id_server=98 id_client=98 fif=2 us=3696277881
+[2026-08-24T14:25:56.316+0000] [INFO ] GFX_TRACE send bytes=1926120 last=0 frame_id=0 id_server=98 id_client=98 fif=2 us=3696291538
+[2026-08-24T14:25:56.316+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=98 id_client=98 fif=2 us=3696291552
+[2026-08-24T14:25:56.339+0000] [INFO ] GFX_TRACE ack frame_id=99 queue_depth=0 decoded=100 id_server=99 ack_off=0 us=3696314471
+[2026-08-24T14:25:56.359+0000] [INFO ] GFX_TRACE batch cycle=100 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696334442
+[2026-08-24T14:25:56.365+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696341301
+[2026-08-24T14:25:56.365+0000] [INFO ] GFX_TRACE enc submitted_seq=99 returned_seq=99 ready=1 inflight=-1 center_y=-1 us=3696341303
+[2026-08-24T14:25:56.366+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=99 id_client=99 fif=2 us=3696341454
+[2026-08-24T14:25:56.384+0000] [INFO ] GFX_TRACE send bytes=2342928 last=0 frame_id=0 id_server=99 id_client=99 fif=2 us=3696359988
+[2026-08-24T14:25:56.397+0000] [INFO ] GFX_TRACE send bytes=1935050 last=0 frame_id=0 id_server=99 id_client=99 fif=2 us=3696373309
+[2026-08-24T14:25:56.397+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=99 id_client=99 fif=2 us=3696373323
+[2026-08-24T14:25:56.423+0000] [INFO ] GFX_TRACE ack frame_id=100 queue_depth=0 decoded=101 id_server=100 ack_off=0 us=3696399165
+[2026-08-24T14:25:56.448+0000] [INFO ] GFX_TRACE batch cycle=101 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696423402
+[2026-08-24T14:25:56.453+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696428707
+[2026-08-24T14:25:56.453+0000] [INFO ] GFX_TRACE enc submitted_seq=100 returned_seq=100 ready=1 inflight=-1 center_y=-1 us=3696428709
+[2026-08-24T14:25:56.453+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=100 id_client=100 fif=2 us=3696428869
+[2026-08-24T14:25:56.488+0000] [INFO ] GFX_TRACE send bytes=2375506 last=0 frame_id=0 id_server=100 id_client=100 fif=2 us=3696463900
+[2026-08-24T14:25:56.504+0000] [INFO ] GFX_TRACE send bytes=1960765 last=0 frame_id=0 id_server=100 id_client=100 fif=2 us=3696479661
+[2026-08-24T14:25:56.504+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=100 id_client=100 fif=2 us=3696479675
+[2026-08-24T14:25:56.530+0000] [INFO ] GFX_TRACE batch cycle=102 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696505938
+[2026-08-24T14:25:56.537+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696512895
+[2026-08-24T14:25:56.537+0000] [INFO ] GFX_TRACE enc submitted_seq=101 returned_seq=101 ready=1 inflight=-1 center_y=-1 us=3696512897
+[2026-08-24T14:25:56.529+0000] [INFO ] GFX_TRACE ack frame_id=101 queue_depth=0 decoded=102 id_server=101 ack_off=0 us=3696504762
+[2026-08-24T14:25:56.537+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=101 id_client=101 fif=2 us=3696513111
+[2026-08-24T14:25:56.567+0000] [INFO ] GFX_TRACE send bytes=2425521 last=0 frame_id=0 id_server=101 id_client=101 fif=2 us=3696542750
+[2026-08-24T14:25:56.578+0000] [INFO ] GFX_TRACE send bytes=2013183 last=0 frame_id=0 id_server=101 id_client=101 fif=2 us=3696553576
+[2026-08-24T14:25:56.578+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=101 id_client=101 fif=2 us=3696553585
+[2026-08-24T14:25:56.607+0000] [INFO ] GFX_TRACE ack frame_id=102 queue_depth=0 decoded=103 id_server=102 ack_off=0 us=3696583241
+[2026-08-24T14:25:56.610+0000] [INFO ] GFX_TRACE batch cycle=103 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696586315
+[2026-08-24T14:25:56.615+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696591367
+[2026-08-24T14:25:56.615+0000] [INFO ] GFX_TRACE enc submitted_seq=102 returned_seq=102 ready=1 inflight=-1 center_y=-1 us=3696591369
+[2026-08-24T14:25:56.616+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=102 id_client=102 fif=2 us=3696591472
+[2026-08-24T14:25:56.637+0000] [INFO ] GFX_TRACE send bytes=2278273 last=0 frame_id=0 id_server=102 id_client=102 fif=2 us=3696612575
+[2026-08-24T14:25:56.649+0000] [INFO ] GFX_TRACE send bytes=1820228 last=0 frame_id=0 id_server=102 id_client=102 fif=2 us=3696625063
+[2026-08-24T14:25:56.649+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=102 id_client=102 fif=2 us=3696625077
+[2026-08-24T14:25:56.674+0000] [INFO ] GFX_TRACE ack frame_id=103 queue_depth=0 decoded=104 id_server=103 ack_off=0 us=3696650127
+[2026-08-24T14:25:56.692+0000] [INFO ] GFX_TRACE batch cycle=104 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696667787
+[2026-08-24T14:25:56.696+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696672144
+[2026-08-24T14:25:56.696+0000] [INFO ] GFX_TRACE enc submitted_seq=103 returned_seq=103 ready=1 inflight=-1 center_y=-1 us=3696672146
+[2026-08-24T14:25:56.697+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=103 id_client=103 fif=2 us=3696673103
+[2026-08-24T14:25:56.719+0000] [INFO ] GFX_TRACE send bytes=1963181 last=0 frame_id=0 id_server=103 id_client=103 fif=2 us=3696695357
+[2026-08-24T14:25:56.730+0000] [INFO ] GFX_TRACE send bytes=1546211 last=0 frame_id=0 id_server=103 id_client=103 fif=2 us=3696705856
+[2026-08-24T14:25:56.730+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=103 id_client=103 fif=2 us=3696705869
+[2026-08-24T14:25:56.759+0000] [INFO ] GFX_TRACE ack frame_id=104 queue_depth=0 decoded=105 id_server=104 ack_off=0 us=3696735390
+[2026-08-24T14:25:56.779+0000] [INFO ] GFX_TRACE batch cycle=105 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696755329
+[2026-08-24T14:25:56.784+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696759789
+[2026-08-24T14:25:56.784+0000] [INFO ] GFX_TRACE enc submitted_seq=104 returned_seq=104 ready=1 inflight=-1 center_y=-1 us=3696759791
+[2026-08-24T14:25:56.784+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=104 id_client=104 fif=2 us=3696760015
+[2026-08-24T14:25:56.801+0000] [INFO ] GFX_TRACE send bytes=2027006 last=0 frame_id=0 id_server=104 id_client=104 fif=2 us=3696776757
+[2026-08-24T14:25:56.813+0000] [INFO ] GFX_TRACE send bytes=1573974 last=0 frame_id=0 id_server=104 id_client=104 fif=2 us=3696788555
+[2026-08-24T14:25:56.813+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=104 id_client=104 fif=2 us=3696788573
+[2026-08-24T14:25:56.864+0000] [INFO ] GFX_TRACE ack frame_id=105 queue_depth=0 decoded=106 id_server=105 ack_off=0 us=3696840130
+[2026-08-24T14:25:56.877+0000] [INFO ] GFX_TRACE batch cycle=106 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696852694
+[2026-08-24T14:25:56.881+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696856993
+[2026-08-24T14:25:56.881+0000] [INFO ] GFX_TRACE enc submitted_seq=105 returned_seq=105 ready=1 inflight=-1 center_y=-1 us=3696856995
+[2026-08-24T14:25:56.881+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=105 id_client=105 fif=2 us=3696857120
+[2026-08-24T14:25:56.898+0000] [INFO ] GFX_TRACE send bytes=1949959 last=0 frame_id=0 id_server=105 id_client=105 fif=2 us=3696873692
+[2026-08-24T14:25:56.908+0000] [INFO ] GFX_TRACE send bytes=1506099 last=0 frame_id=0 id_server=105 id_client=105 fif=2 us=3696883885
+[2026-08-24T14:25:56.908+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=105 id_client=105 fif=2 us=3696883897
+[2026-08-24T14:25:56.938+0000] [INFO ] GFX_TRACE ack frame_id=106 queue_depth=0 decoded=107 id_server=106 ack_off=0 us=3696913451
+[2026-08-24T14:25:56.962+0000] [INFO ] GFX_TRACE batch cycle=107 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3696937971
+[2026-08-24T14:25:56.967+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3696942494
+[2026-08-24T14:25:56.967+0000] [INFO ] GFX_TRACE enc submitted_seq=106 returned_seq=106 ready=1 inflight=-1 center_y=-1 us=3696942495
+[2026-08-24T14:25:56.967+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=106 id_client=106 fif=2 us=3696942595
+[2026-08-24T14:25:56.994+0000] [INFO ] GFX_TRACE send bytes=2000750 last=0 frame_id=0 id_server=106 id_client=106 fif=2 us=3696969961
+[2026-08-24T14:25:57.010+0000] [INFO ] GFX_TRACE send bytes=1547972 last=0 frame_id=0 id_server=106 id_client=106 fif=2 us=3696985914
+[2026-08-24T14:25:57.010+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=106 id_client=106 fif=2 us=3696985944
+[2026-08-24T14:25:57.036+0000] [INFO ] GFX_TRACE ack frame_id=107 queue_depth=0 decoded=108 id_server=107 ack_off=0 us=3697012305
+[2026-08-24T14:25:57.045+0000] [INFO ] GFX_TRACE batch cycle=108 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697021274
+[2026-08-24T14:25:57.049+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697025030
+[2026-08-24T14:25:57.049+0000] [INFO ] GFX_TRACE enc submitted_seq=107 returned_seq=107 ready=1 inflight=-1 center_y=-1 us=3697025031
+[2026-08-24T14:25:57.049+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=107 id_client=107 fif=2 us=3697025188
+[2026-08-24T14:25:57.071+0000] [INFO ] GFX_TRACE send bytes=1968939 last=0 frame_id=0 id_server=107 id_client=107 fif=2 us=3697046882
+[2026-08-24T14:25:57.085+0000] [INFO ] GFX_TRACE send bytes=1614487 last=0 frame_id=0 id_server=107 id_client=107 fif=2 us=3697061230
+[2026-08-24T14:25:57.085+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=107 id_client=107 fif=2 us=3697061243
+[2026-08-24T14:25:57.107+0000] [INFO ] GFX_TRACE ack frame_id=108 queue_depth=0 decoded=109 id_server=108 ack_off=0 us=3697082569
+[2026-08-24T14:25:57.119+0000] [INFO ] GFX_TRACE batch cycle=109 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697095246
+[2026-08-24T14:25:57.123+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697099077
+[2026-08-24T14:25:57.123+0000] [INFO ] GFX_TRACE enc submitted_seq=108 returned_seq=108 ready=1 inflight=-1 center_y=-1 us=3697099079
+[2026-08-24T14:25:57.123+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=108 id_client=108 fif=2 us=3697099194
+[2026-08-24T14:25:57.143+0000] [INFO ] GFX_TRACE send bytes=2025258 last=0 frame_id=0 id_server=108 id_client=108 fif=2 us=3697118726
+[2026-08-24T14:25:57.151+0000] [INFO ] GFX_TRACE send bytes=1625730 last=0 frame_id=0 id_server=108 id_client=108 fif=2 us=3697126925
+[2026-08-24T14:25:57.151+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=108 id_client=108 fif=2 us=3697126934
+[2026-08-24T14:25:57.189+0000] [INFO ] GFX_TRACE batch cycle=110 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697164607
+[2026-08-24T14:25:57.179+0000] [INFO ] GFX_TRACE ack frame_id=109 queue_depth=0 decoded=110 id_server=109 ack_off=0 us=3697154744
+[2026-08-24T14:25:57.193+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697169074
+[2026-08-24T14:25:57.193+0000] [INFO ] GFX_TRACE enc submitted_seq=109 returned_seq=109 ready=1 inflight=-1 center_y=-1 us=3697169076
+[2026-08-24T14:25:57.193+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=109 id_client=109 fif=2 us=3697169158
+[2026-08-24T14:25:57.208+0000] [INFO ] GFX_TRACE send bytes=2003074 last=0 frame_id=0 id_server=109 id_client=109 fif=2 us=3697184366
+[2026-08-24T14:25:57.217+0000] [INFO ] GFX_TRACE send bytes=1612184 last=0 frame_id=0 id_server=109 id_client=109 fif=2 us=3697193017
+[2026-08-24T14:25:57.217+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=109 id_client=109 fif=2 us=3697193034
+[2026-08-24T14:25:57.244+0000] [INFO ] GFX_TRACE ack frame_id=110 queue_depth=0 decoded=111 id_server=110 ack_off=0 us=3697220187
+[2026-08-24T14:25:57.268+0000] [INFO ] GFX_TRACE batch cycle=111 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697244192
+[2026-08-24T14:25:57.272+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697248208
+[2026-08-24T14:25:57.272+0000] [INFO ] GFX_TRACE enc submitted_seq=110 returned_seq=110 ready=1 inflight=-1 center_y=-1 us=3697248209
+[2026-08-24T14:25:57.272+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=110 id_client=110 fif=2 us=3697248326
+[2026-08-24T14:25:57.295+0000] [INFO ] GFX_TRACE send bytes=2062526 last=0 frame_id=0 id_server=110 id_client=110 fif=2 us=3697270519
+[2026-08-24T14:25:57.304+0000] [INFO ] GFX_TRACE send bytes=1696151 last=0 frame_id=0 id_server=110 id_client=110 fif=2 us=3697279482
+[2026-08-24T14:25:57.304+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=110 id_client=110 fif=2 us=3697279492
+[2026-08-24T14:25:57.329+0000] [INFO ] GFX_TRACE ack frame_id=111 queue_depth=0 decoded=112 id_server=111 ack_off=0 us=3697305277
+[2026-08-24T14:25:57.350+0000] [INFO ] GFX_TRACE batch cycle=112 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697325608
+[2026-08-24T14:25:57.354+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697329401
+[2026-08-24T14:25:57.354+0000] [INFO ] GFX_TRACE enc submitted_seq=111 returned_seq=111 ready=1 inflight=-1 center_y=-1 us=3697329402
+[2026-08-24T14:25:57.354+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=111 id_client=111 fif=2 us=3697329523
+[2026-08-24T14:25:57.369+0000] [INFO ] GFX_TRACE send bytes=1980347 last=0 frame_id=0 id_server=111 id_client=111 fif=2 us=3697345281
+[2026-08-24T14:25:57.379+0000] [INFO ] GFX_TRACE send bytes=1643508 last=0 frame_id=0 id_server=111 id_client=111 fif=2 us=3697355325
+[2026-08-24T14:25:57.379+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=111 id_client=111 fif=2 us=3697355341
+[2026-08-24T14:25:57.402+0000] [INFO ] GFX_TRACE ack frame_id=112 queue_depth=0 decoded=113 id_server=112 ack_off=0 us=3697377641
+[2026-08-24T14:25:57.423+0000] [INFO ] GFX_TRACE batch cycle=113 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697398779
+[2026-08-24T14:25:57.427+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697402690
+[2026-08-24T14:25:57.427+0000] [INFO ] GFX_TRACE enc submitted_seq=112 returned_seq=112 ready=1 inflight=-1 center_y=-1 us=3697402691
+[2026-08-24T14:25:57.427+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=112 id_client=112 fif=2 us=3697402832
+[2026-08-24T14:25:57.447+0000] [INFO ] GFX_TRACE send bytes=2044130 last=0 frame_id=0 id_server=112 id_client=112 fif=2 us=3697423159
+[2026-08-24T14:25:57.457+0000] [INFO ] GFX_TRACE send bytes=1663273 last=0 frame_id=0 id_server=112 id_client=112 fif=2 us=3697433074
+[2026-08-24T14:25:57.457+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=112 id_client=112 fif=2 us=3697433086
+[2026-08-24T14:25:57.479+0000] [INFO ] GFX_TRACE ack frame_id=113 queue_depth=0 decoded=114 id_server=113 ack_off=0 us=3697454894
+[2026-08-24T14:25:57.494+0000] [INFO ] GFX_TRACE batch cycle=114 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697469923
+[2026-08-24T14:25:57.498+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697474171
+[2026-08-24T14:25:57.498+0000] [INFO ] GFX_TRACE enc submitted_seq=113 returned_seq=113 ready=1 inflight=-1 center_y=-1 us=3697474173
+[2026-08-24T14:25:57.498+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=113 id_client=113 fif=2 us=3697474280
+[2026-08-24T14:25:57.515+0000] [INFO ] GFX_TRACE send bytes=1912460 last=0 frame_id=0 id_server=113 id_client=113 fif=2 us=3697490930
+[2026-08-24T14:25:57.524+0000] [INFO ] GFX_TRACE send bytes=1544395 last=0 frame_id=0 id_server=113 id_client=113 fif=2 us=3697499632
+[2026-08-24T14:25:57.524+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=113 id_client=113 fif=2 us=3697499645
+[2026-08-24T14:25:57.547+0000] [INFO ] GFX_TRACE ack frame_id=114 queue_depth=0 decoded=115 id_server=114 ack_off=0 us=3697522642
+[2026-08-24T14:25:57.568+0000] [INFO ] GFX_TRACE batch cycle=115 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697544242
+[2026-08-24T14:25:57.572+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697548397
+[2026-08-24T14:25:57.572+0000] [INFO ] GFX_TRACE enc submitted_seq=114 returned_seq=114 ready=1 inflight=-1 center_y=-1 us=3697548398
+[2026-08-24T14:25:57.573+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=114 id_client=114 fif=2 us=3697548508
+[2026-08-24T14:25:57.601+0000] [INFO ] GFX_TRACE send bytes=2109721 last=0 frame_id=0 id_server=114 id_client=114 fif=2 us=3697576948
+[2026-08-24T14:25:57.619+0000] [INFO ] GFX_TRACE send bytes=1809040 last=0 frame_id=0 id_server=114 id_client=114 fif=2 us=3697594603
+[2026-08-24T14:25:57.619+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=114 id_client=114 fif=2 us=3697594618
+[2026-08-24T14:25:57.644+0000] [INFO ] GFX_TRACE batch cycle=116 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697620276
+[2026-08-24T14:25:57.635+0000] [INFO ] GFX_TRACE ack frame_id=115 queue_depth=0 decoded=116 id_server=115 ack_off=0 us=3697611213
+[2026-08-24T14:25:57.649+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697624487
+[2026-08-24T14:25:57.649+0000] [INFO ] GFX_TRACE enc submitted_seq=115 returned_seq=115 ready=1 inflight=-1 center_y=-1 us=3697624488
+[2026-08-24T14:25:57.649+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=115 id_client=115 fif=2 us=3697624609
+[2026-08-24T14:25:57.672+0000] [INFO ] GFX_TRACE send bytes=2175865 last=0 frame_id=0 id_server=115 id_client=115 fif=2 us=3697648014
+[2026-08-24T14:25:57.683+0000] [INFO ] GFX_TRACE send bytes=1795903 last=0 frame_id=0 id_server=115 id_client=115 fif=2 us=3697658674
+[2026-08-24T14:25:57.683+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=115 id_client=115 fif=2 us=3697658684
+[2026-08-24T14:25:57.707+0000] [INFO ] GFX_TRACE ack frame_id=116 queue_depth=0 decoded=117 id_server=116 ack_off=0 us=3697682724
+[2026-08-24T14:25:57.719+0000] [INFO ] GFX_TRACE batch cycle=117 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697694769
+[2026-08-24T14:25:57.725+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697700596
+[2026-08-24T14:25:57.725+0000] [INFO ] GFX_TRACE enc submitted_seq=116 returned_seq=116 ready=1 inflight=-1 center_y=-1 us=3697700598
+[2026-08-24T14:25:57.725+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=116 id_client=116 fif=2 us=3697700692
+[2026-08-24T14:25:57.744+0000] [INFO ] GFX_TRACE send bytes=2150510 last=0 frame_id=0 id_server=116 id_client=116 fif=2 us=3697719485
+[2026-08-24T14:25:57.754+0000] [INFO ] GFX_TRACE send bytes=1746037 last=0 frame_id=0 id_server=116 id_client=116 fif=2 us=3697730255
+[2026-08-24T14:25:57.754+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=116 id_client=116 fif=2 us=3697730264
+[2026-08-24T14:25:57.777+0000] [INFO ] GFX_TRACE ack frame_id=117 queue_depth=0 decoded=118 id_server=117 ack_off=0 us=3697753315
+[2026-08-24T14:25:57.797+0000] [INFO ] GFX_TRACE batch cycle=118 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697772564
+[2026-08-24T14:25:57.802+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697777428
+[2026-08-24T14:25:57.802+0000] [INFO ] GFX_TRACE enc submitted_seq=117 returned_seq=117 ready=1 inflight=-1 center_y=-1 us=3697777429
+[2026-08-24T14:25:57.802+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=117 id_client=117 fif=2 us=3697777540
+[2026-08-24T14:25:57.817+0000] [INFO ] GFX_TRACE send bytes=2191400 last=0 frame_id=0 id_server=117 id_client=117 fif=2 us=3697793232
+[2026-08-24T14:25:57.827+0000] [INFO ] GFX_TRACE send bytes=1732431 last=0 frame_id=0 id_server=117 id_client=117 fif=2 us=3697802628
+[2026-08-24T14:25:57.827+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=117 id_client=117 fif=2 us=3697802638
+[2026-08-24T14:25:57.856+0000] [INFO ] GFX_TRACE ack frame_id=118 queue_depth=0 decoded=119 id_server=118 ack_off=0 us=3697831641
+[2026-08-24T14:25:57.879+0000] [INFO ] GFX_TRACE batch cycle=119 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697855363
+[2026-08-24T14:25:57.884+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697860119
+[2026-08-24T14:25:57.884+0000] [INFO ] GFX_TRACE enc submitted_seq=118 returned_seq=118 ready=1 inflight=-1 center_y=-1 us=3697860120
+[2026-08-24T14:25:57.884+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=118 id_client=118 fif=2 us=3697860227
+[2026-08-24T14:25:57.902+0000] [INFO ] GFX_TRACE send bytes=2188351 last=0 frame_id=0 id_server=118 id_client=118 fif=2 us=3697878310
+[2026-08-24T14:25:57.914+0000] [INFO ] GFX_TRACE send bytes=1635173 last=0 frame_id=0 id_server=118 id_client=118 fif=2 us=3697890047
+[2026-08-24T14:25:57.914+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=118 id_client=118 fif=2 us=3697890061
+[2026-08-24T14:25:57.937+0000] [INFO ] GFX_TRACE ack frame_id=119 queue_depth=0 decoded=120 id_server=119 ack_off=0 us=3697912472
+[2026-08-24T14:25:57.954+0000] [INFO ] GFX_TRACE batch cycle=120 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3697929428
+[2026-08-24T14:25:57.957+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3697933392
+[2026-08-24T14:25:57.957+0000] [INFO ] GFX_TRACE enc submitted_seq=119 returned_seq=119 ready=1 inflight=-1 center_y=-1 us=3697933393
+[2026-08-24T14:25:57.958+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=119 id_client=119 fif=2 us=3697933470
+[2026-08-24T14:25:57.971+0000] [INFO ] GFX_TRACE send bytes=1815303 last=0 frame_id=0 id_server=119 id_client=119 fif=2 us=3697946989
+[2026-08-24T14:25:57.979+0000] [INFO ] GFX_TRACE send bytes=1397556 last=0 frame_id=0 id_server=119 id_client=119 fif=2 us=3697954524
+[2026-08-24T14:25:57.979+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=119 id_client=119 fif=2 us=3697954533
+[2026-08-24T14:25:58.007+0000] [INFO ] GFX_TRACE ack frame_id=120 queue_depth=0 decoded=121 id_server=120 ack_off=0 us=3697982828
+[2026-08-24T14:25:58.033+0000] [INFO ] GFX_TRACE batch cycle=121 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698009105
+[2026-08-24T14:25:58.038+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698013723
+[2026-08-24T14:25:58.038+0000] [INFO ] GFX_TRACE enc submitted_seq=120 returned_seq=120 ready=1 inflight=-1 center_y=-1 us=3698013724
+[2026-08-24T14:25:58.038+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=120 id_client=120 fif=2 us=3698013830
+[2026-08-24T14:25:58.053+0000] [INFO ] GFX_TRACE send bytes=2081310 last=0 frame_id=0 id_server=120 id_client=120 fif=2 us=3698029256
+[2026-08-24T14:25:58.062+0000] [INFO ] GFX_TRACE send bytes=1635611 last=0 frame_id=0 id_server=120 id_client=120 fif=2 us=3698037585
+[2026-08-24T14:25:58.062+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=120 id_client=120 fif=2 us=3698037595
+[2026-08-24T14:25:58.089+0000] [INFO ] GFX_TRACE ack frame_id=121 queue_depth=0 decoded=122 id_server=121 ack_off=0 us=3698064990
+[2026-08-24T14:25:58.110+0000] [INFO ] GFX_TRACE batch cycle=122 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698085464
+[2026-08-24T14:25:58.114+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698089635
+[2026-08-24T14:25:58.114+0000] [INFO ] GFX_TRACE enc submitted_seq=121 returned_seq=121 ready=1 inflight=-1 center_y=-1 us=3698089636
+[2026-08-24T14:25:58.114+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=121 id_client=121 fif=2 us=3698089719
+[2026-08-24T14:25:58.131+0000] [INFO ] GFX_TRACE send bytes=1861329 last=0 frame_id=0 id_server=121 id_client=121 fif=2 us=3698106685
+[2026-08-24T14:25:58.140+0000] [INFO ] GFX_TRACE send bytes=1502183 last=0 frame_id=0 id_server=121 id_client=121 fif=2 us=3698115838
+[2026-08-24T14:25:58.140+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=121 id_client=121 fif=2 us=3698115848
+[2026-08-24T14:25:58.164+0000] [INFO ] GFX_TRACE ack frame_id=122 queue_depth=0 decoded=123 id_server=122 ack_off=0 us=3698140113
+[2026-08-24T14:25:58.186+0000] [INFO ] GFX_TRACE batch cycle=123 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698161682
+[2026-08-24T14:25:58.191+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698166824
+[2026-08-24T14:25:58.191+0000] [INFO ] GFX_TRACE enc submitted_seq=122 returned_seq=122 ready=1 inflight=-1 center_y=-1 us=3698166825
+[2026-08-24T14:25:58.191+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=122 id_client=122 fif=2 us=3698166928
+[2026-08-24T14:25:58.207+0000] [INFO ] GFX_TRACE send bytes=2145100 last=0 frame_id=0 id_server=122 id_client=122 fif=2 us=3698182604
+[2026-08-24T14:25:58.216+0000] [INFO ] GFX_TRACE send bytes=1822009 last=0 frame_id=0 id_server=122 id_client=122 fif=2 us=3698192350
+[2026-08-24T14:25:58.216+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=122 id_client=122 fif=2 us=3698192360
+[2026-08-24T14:25:58.245+0000] [INFO ] GFX_TRACE ack frame_id=123 queue_depth=0 decoded=124 id_server=123 ack_off=0 us=3698220960
+[2026-08-24T14:25:58.259+0000] [INFO ] GFX_TRACE batch cycle=124 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698235210
+[2026-08-24T14:25:58.263+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698239180
+[2026-08-24T14:25:58.263+0000] [INFO ] GFX_TRACE enc submitted_seq=123 returned_seq=123 ready=1 inflight=-1 center_y=-1 us=3698239181
+[2026-08-24T14:25:58.263+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=123 id_client=123 fif=2 us=3698239281
+[2026-08-24T14:25:58.283+0000] [INFO ] GFX_TRACE send bytes=2075168 last=0 frame_id=0 id_server=123 id_client=123 fif=2 us=3698258914
+[2026-08-24T14:25:58.293+0000] [INFO ] GFX_TRACE send bytes=1699169 last=0 frame_id=0 id_server=123 id_client=123 fif=2 us=3698268752
+[2026-08-24T14:25:58.293+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=123 id_client=123 fif=2 us=3698268762
+[2026-08-24T14:25:58.317+0000] [INFO ] GFX_TRACE ack frame_id=124 queue_depth=0 decoded=125 id_server=124 ack_off=0 us=3698292712
+[2026-08-24T14:25:58.331+0000] [INFO ] GFX_TRACE batch cycle=125 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698306853
+[2026-08-24T14:25:58.339+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698315083
+[2026-08-24T14:25:58.339+0000] [INFO ] GFX_TRACE enc submitted_seq=124 returned_seq=124 ready=1 inflight=-1 center_y=-1 us=3698315084
+[2026-08-24T14:25:58.339+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=124 id_client=124 fif=2 us=3698315245
+[2026-08-24T14:25:58.359+0000] [INFO ] GFX_TRACE send bytes=2003150 last=0 frame_id=0 id_server=124 id_client=124 fif=2 us=3698335191
+[2026-08-24T14:25:58.371+0000] [INFO ] GFX_TRACE send bytes=1668425 last=0 frame_id=0 id_server=124 id_client=124 fif=2 us=3698346462
+[2026-08-24T14:25:58.371+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=124 id_client=124 fif=2 us=3698346475
+[2026-08-24T14:25:58.393+0000] [INFO ] GFX_TRACE ack frame_id=125 queue_depth=0 decoded=126 id_server=125 ack_off=0 us=3698369199
+[2026-08-24T14:25:58.404+0000] [INFO ] GFX_TRACE batch cycle=126 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698379788
+[2026-08-24T14:25:58.408+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698383628
+[2026-08-24T14:25:58.408+0000] [INFO ] GFX_TRACE enc submitted_seq=125 returned_seq=125 ready=1 inflight=-1 center_y=-1 us=3698383629
+[2026-08-24T14:25:58.408+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=125 id_client=125 fif=2 us=3698383790
+[2026-08-24T14:25:58.423+0000] [INFO ] GFX_TRACE send bytes=1960130 last=0 frame_id=0 id_server=125 id_client=125 fif=2 us=3698399283
+[2026-08-24T14:25:58.435+0000] [INFO ] GFX_TRACE send bytes=1646583 last=0 frame_id=0 id_server=125 id_client=125 fif=2 us=3698410570
+[2026-08-24T14:25:58.435+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=125 id_client=125 fif=2 us=3698410583
+[2026-08-24T14:25:58.465+0000] [INFO ] GFX_TRACE ack frame_id=126 queue_depth=0 decoded=127 id_server=126 ack_off=0 us=3698440419
+[2026-08-24T14:25:58.475+0000] [INFO ] GFX_TRACE batch cycle=127 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698450788
+[2026-08-24T14:25:58.479+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698455109
+[2026-08-24T14:25:58.479+0000] [INFO ] GFX_TRACE enc submitted_seq=126 returned_seq=126 ready=1 inflight=-1 center_y=-1 us=3698455110
+[2026-08-24T14:25:58.479+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=126 id_client=126 fif=2 us=3698455187
+[2026-08-24T14:25:58.507+0000] [INFO ] GFX_TRACE send bytes=1966194 last=0 frame_id=0 id_server=126 id_client=126 fif=2 us=3698482580
+[2026-08-24T14:25:58.516+0000] [INFO ] GFX_TRACE send bytes=1610648 last=0 frame_id=0 id_server=126 id_client=126 fif=2 us=3698491752
+[2026-08-24T14:25:58.516+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=126 id_client=126 fif=2 us=3698491762
+[2026-08-24T14:25:58.538+0000] [INFO ] GFX_TRACE ack frame_id=127 queue_depth=0 decoded=128 id_server=127 ack_off=0 us=3698514200
+[2026-08-24T14:25:58.554+0000] [INFO ] GFX_TRACE batch cycle=128 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698529564
+[2026-08-24T14:25:58.558+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698533787
+[2026-08-24T14:25:58.558+0000] [INFO ] GFX_TRACE enc submitted_seq=127 returned_seq=127 ready=1 inflight=-1 center_y=-1 us=3698533789
+[2026-08-24T14:25:58.558+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=127 id_client=127 fif=2 us=3698533930
+[2026-08-24T14:25:58.577+0000] [INFO ] GFX_TRACE send bytes=2166914 last=0 frame_id=0 id_server=127 id_client=127 fif=2 us=3698552789
+[2026-08-24T14:25:58.587+0000] [INFO ] GFX_TRACE send bytes=1797074 last=0 frame_id=0 id_server=127 id_client=127 fif=2 us=3698563124
+[2026-08-24T14:25:58.587+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=127 id_client=127 fif=2 us=3698563133
+[2026-08-24T14:25:58.614+0000] [INFO ] GFX_TRACE ack frame_id=128 queue_depth=0 decoded=129 id_server=128 ack_off=0 us=3698589448
+[2026-08-24T14:25:58.635+0000] [INFO ] GFX_TRACE batch cycle=129 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698610749
+[2026-08-24T14:25:58.639+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698615151
+[2026-08-24T14:25:58.639+0000] [INFO ] GFX_TRACE enc submitted_seq=128 returned_seq=128 ready=1 inflight=-1 center_y=-1 us=3698615153
+[2026-08-24T14:25:58.639+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=128 id_client=128 fif=2 us=3698615299
+[2026-08-24T14:25:58.661+0000] [INFO ] GFX_TRACE send bytes=2241330 last=0 frame_id=0 id_server=128 id_client=128 fif=2 us=3698636825
+[2026-08-24T14:25:58.678+0000] [INFO ] GFX_TRACE send bytes=1847518 last=0 frame_id=0 id_server=128 id_client=128 fif=2 us=3698654289
+[2026-08-24T14:25:58.678+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=128 id_client=128 fif=2 us=3698654305
+[2026-08-24T14:25:58.697+0000] [INFO ] GFX_TRACE ack frame_id=129 queue_depth=0 decoded=130 id_server=129 ack_off=0 us=3698673045
+[2026-08-24T14:25:58.719+0000] [INFO ] GFX_TRACE batch cycle=130 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698695358
+[2026-08-24T14:25:58.725+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698700513
+[2026-08-24T14:25:58.725+0000] [INFO ] GFX_TRACE enc submitted_seq=129 returned_seq=129 ready=1 inflight=-1 center_y=-1 us=3698700514
+[2026-08-24T14:25:58.725+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=129 id_client=129 fif=2 us=3698700596
+[2026-08-24T14:25:58.754+0000] [INFO ] GFX_TRACE send bytes=2322414 last=0 frame_id=0 id_server=129 id_client=129 fif=2 us=3698729723
+[2026-08-24T14:25:58.765+0000] [INFO ] GFX_TRACE send bytes=1910222 last=0 frame_id=0 id_server=129 id_client=129 fif=2 us=3698740517
+[2026-08-24T14:25:58.765+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=129 id_client=129 fif=2 us=3698740530
+[2026-08-24T14:25:58.787+0000] [INFO ] GFX_TRACE ack frame_id=130 queue_depth=0 decoded=131 id_server=130 ack_off=0 us=3698762655
+[2026-08-24T14:25:58.794+0000] [INFO ] GFX_TRACE batch cycle=131 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698770357
+[2026-08-24T14:25:58.800+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698775419
+[2026-08-24T14:25:58.800+0000] [INFO ] GFX_TRACE enc submitted_seq=130 returned_seq=130 ready=1 inflight=-1 center_y=-1 us=3698775421
+[2026-08-24T14:25:58.800+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=130 id_client=130 fif=2 us=3698775506
+[2026-08-24T14:25:58.823+0000] [INFO ] GFX_TRACE send bytes=2240294 last=0 frame_id=0 id_server=130 id_client=130 fif=2 us=3698798580
+[2026-08-24T14:25:58.832+0000] [INFO ] GFX_TRACE send bytes=1861210 last=0 frame_id=0 id_server=130 id_client=130 fif=2 us=3698807871
+[2026-08-24T14:25:58.832+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=130 id_client=130 fif=2 us=3698807880
+[2026-08-24T14:25:58.860+0000] [INFO ] GFX_TRACE ack frame_id=131 queue_depth=0 decoded=132 id_server=131 ack_off=0 us=3698836302
+[2026-08-24T14:25:58.878+0000] [INFO ] GFX_TRACE batch cycle=132 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698854375
+[2026-08-24T14:25:58.883+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698859300
+[2026-08-24T14:25:58.883+0000] [INFO ] GFX_TRACE enc submitted_seq=131 returned_seq=131 ready=1 inflight=-1 center_y=-1 us=3698859302
+[2026-08-24T14:25:58.883+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=131 id_client=131 fif=2 us=3698859382
+[2026-08-24T14:25:58.911+0000] [INFO ] GFX_TRACE send bytes=2201703 last=0 frame_id=0 id_server=131 id_client=131 fif=2 us=3698886634
+[2026-08-24T14:25:58.921+0000] [INFO ] GFX_TRACE send bytes=1830502 last=0 frame_id=0 id_server=131 id_client=131 fif=2 us=3698896603
+[2026-08-24T14:25:58.921+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=131 id_client=131 fif=2 us=3698896612
+[2026-08-24T14:25:58.944+0000] [INFO ] GFX_TRACE ack frame_id=132 queue_depth=0 decoded=133 id_server=132 ack_off=0 us=3698920193
+[2026-08-24T14:25:58.949+0000] [INFO ] GFX_TRACE batch cycle=133 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698924772
+[2026-08-24T14:25:58.953+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698928808
+[2026-08-24T14:25:58.953+0000] [INFO ] GFX_TRACE enc submitted_seq=132 returned_seq=132 ready=1 inflight=-1 center_y=-1 us=3698928810
+[2026-08-24T14:25:58.953+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=132 id_client=132 fif=2 us=3698928893
+[2026-08-24T14:25:58.975+0000] [INFO ] GFX_TRACE send bytes=1948944 last=0 frame_id=0 id_server=132 id_client=132 fif=2 us=3698950454
+[2026-08-24T14:25:58.985+0000] [INFO ] GFX_TRACE send bytes=1642104 last=0 frame_id=0 id_server=132 id_client=132 fif=2 us=3698961193
+[2026-08-24T14:25:58.985+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=132 id_client=132 fif=2 us=3698961206
+[2026-08-24T14:25:59.007+0000] [INFO ] GFX_TRACE ack frame_id=133 queue_depth=0 decoded=134 id_server=133 ack_off=0 us=3698982434
+[2026-08-24T14:25:59.019+0000] [INFO ] GFX_TRACE batch cycle=134 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3698994524
+[2026-08-24T14:25:59.023+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3698999324
+[2026-08-24T14:25:59.023+0000] [INFO ] GFX_TRACE enc submitted_seq=133 returned_seq=133 ready=1 inflight=-1 center_y=-1 us=3698999326
+[2026-08-24T14:25:59.024+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=133 id_client=133 fif=2 us=3698999415
+[2026-08-24T14:25:59.041+0000] [INFO ] GFX_TRACE send bytes=2101942 last=0 frame_id=0 id_server=133 id_client=133 fif=2 us=3699016869
+[2026-08-24T14:25:59.051+0000] [INFO ] GFX_TRACE send bytes=1742744 last=0 frame_id=0 id_server=133 id_client=133 fif=2 us=3699026500
+[2026-08-24T14:25:59.051+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=133 id_client=133 fif=2 us=3699026512
+[2026-08-24T14:25:59.076+0000] [INFO ] GFX_TRACE ack frame_id=134 queue_depth=0 decoded=135 id_server=134 ack_off=0 us=3699051947
+[2026-08-24T14:25:59.093+0000] [INFO ] GFX_TRACE batch cycle=135 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699068724
+[2026-08-24T14:25:59.099+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699074821
+[2026-08-24T14:25:59.099+0000] [INFO ] GFX_TRACE enc submitted_seq=134 returned_seq=134 ready=1 inflight=-1 center_y=-1 us=3699074823
+[2026-08-24T14:25:59.099+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=134 id_client=134 fif=2 us=3699074911
+[2026-08-24T14:25:59.121+0000] [INFO ] GFX_TRACE send bytes=2096729 last=0 frame_id=0 id_server=134 id_client=134 fif=2 us=3699096673
+[2026-08-24T14:25:59.130+0000] [INFO ] GFX_TRACE send bytes=1789229 last=0 frame_id=0 id_server=134 id_client=134 fif=2 us=3699105727
+[2026-08-24T14:25:59.130+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=134 id_client=134 fif=2 us=3699105773
+[2026-08-24T14:25:59.155+0000] [INFO ] GFX_TRACE ack frame_id=135 queue_depth=0 decoded=136 id_server=135 ack_off=0 us=3699131077
+[2026-08-24T14:25:59.165+0000] [INFO ] GFX_TRACE batch cycle=136 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699141075
+[2026-08-24T14:25:59.169+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699145089
+[2026-08-24T14:25:59.169+0000] [INFO ] GFX_TRACE enc submitted_seq=135 returned_seq=135 ready=1 inflight=-1 center_y=-1 us=3699145091
+[2026-08-24T14:25:59.169+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=135 id_client=135 fif=2 us=3699145227
+[2026-08-24T14:25:59.190+0000] [INFO ] GFX_TRACE send bytes=2056789 last=0 frame_id=0 id_server=135 id_client=135 fif=2 us=3699165424
+[2026-08-24T14:25:59.201+0000] [INFO ] GFX_TRACE send bytes=1732045 last=0 frame_id=0 id_server=135 id_client=135 fif=2 us=3699176453
+[2026-08-24T14:25:59.201+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=135 id_client=135 fif=2 us=3699176463
+[2026-08-24T14:25:59.223+0000] [INFO ] GFX_TRACE ack frame_id=136 queue_depth=0 decoded=137 id_server=136 ack_off=0 us=3699198939
+[2026-08-24T14:25:59.241+0000] [INFO ] GFX_TRACE batch cycle=137 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699216419
+[2026-08-24T14:25:59.245+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699220475
+[2026-08-24T14:25:59.245+0000] [INFO ] GFX_TRACE enc submitted_seq=136 returned_seq=136 ready=1 inflight=-1 center_y=-1 us=3699220477
+[2026-08-24T14:25:59.245+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=136 id_client=136 fif=2 us=3699220609
+[2026-08-24T14:25:59.260+0000] [INFO ] GFX_TRACE send bytes=2122109 last=0 frame_id=0 id_server=136 id_client=136 fif=2 us=3699236049
+[2026-08-24T14:25:59.271+0000] [INFO ] GFX_TRACE send bytes=1702572 last=0 frame_id=0 id_server=136 id_client=136 fif=2 us=3699247174
+[2026-08-24T14:25:59.271+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=136 id_client=136 fif=2 us=3699247188
+[2026-08-24T14:25:59.298+0000] [INFO ] GFX_TRACE ack frame_id=137 queue_depth=0 decoded=138 id_server=137 ack_off=0 us=3699273404
+[2026-08-24T14:25:59.313+0000] [INFO ] GFX_TRACE batch cycle=138 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699289157
+[2026-08-24T14:25:59.317+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699292961
+[2026-08-24T14:25:59.317+0000] [INFO ] GFX_TRACE enc submitted_seq=137 returned_seq=137 ready=1 inflight=-1 center_y=-1 us=3699292962
+[2026-08-24T14:25:59.317+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=137 id_client=137 fif=2 us=3699293117
+[2026-08-24T14:25:59.337+0000] [INFO ] GFX_TRACE send bytes=2027224 last=0 frame_id=0 id_server=137 id_client=137 fif=2 us=3699312557
+[2026-08-24T14:25:59.346+0000] [INFO ] GFX_TRACE send bytes=1553566 last=0 frame_id=0 id_server=137 id_client=137 fif=2 us=3699321876
+[2026-08-24T14:25:59.346+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=137 id_client=137 fif=2 us=3699321886
+[2026-08-24T14:25:59.370+0000] [INFO ] GFX_TRACE ack frame_id=138 queue_depth=0 decoded=139 id_server=138 ack_off=0 us=3699345632
+[2026-08-24T14:25:59.381+0000] [INFO ] GFX_TRACE batch cycle=139 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699356827
+[2026-08-24T14:25:59.385+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699360609
+[2026-08-24T14:25:59.385+0000] [INFO ] GFX_TRACE enc submitted_seq=138 returned_seq=138 ready=1 inflight=-1 center_y=-1 us=3699360611
+[2026-08-24T14:25:59.385+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=138 id_client=138 fif=2 us=3699360718
+[2026-08-24T14:25:59.404+0000] [INFO ] GFX_TRACE send bytes=2022129 last=0 frame_id=0 id_server=138 id_client=138 fif=2 us=3699380101
+[2026-08-24T14:25:59.414+0000] [INFO ] GFX_TRACE send bytes=1535956 last=0 frame_id=0 id_server=138 id_client=138 fif=2 us=3699389853
+[2026-08-24T14:25:59.414+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=138 id_client=138 fif=2 us=3699389887
+[2026-08-24T14:25:59.437+0000] [INFO ] GFX_TRACE ack frame_id=139 queue_depth=0 decoded=140 id_server=139 ack_off=0 us=3699412959
+[2026-08-24T14:25:59.454+0000] [INFO ] GFX_TRACE batch cycle=140 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699430307
+[2026-08-24T14:25:59.459+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699434851
+[2026-08-24T14:25:59.459+0000] [INFO ] GFX_TRACE enc submitted_seq=139 returned_seq=139 ready=1 inflight=-1 center_y=-1 us=3699434853
+[2026-08-24T14:25:59.459+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=139 id_client=139 fif=2 us=3699434935
+[2026-08-24T14:25:59.475+0000] [INFO ] GFX_TRACE send bytes=2043108 last=0 frame_id=0 id_server=139 id_client=139 fif=2 us=3699450505
+[2026-08-24T14:25:59.484+0000] [INFO ] GFX_TRACE send bytes=1588776 last=0 frame_id=0 id_server=139 id_client=139 fif=2 us=3699460398
+[2026-08-24T14:25:59.485+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=139 id_client=139 fif=2 us=3699460407
+[2026-08-24T14:25:59.514+0000] [INFO ] GFX_TRACE ack frame_id=140 queue_depth=0 decoded=141 id_server=140 ack_off=0 us=3699489461
+[2026-08-24T14:25:59.528+0000] [INFO ] GFX_TRACE batch cycle=141 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699503700
+[2026-08-24T14:25:59.532+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699508177
+[2026-08-24T14:25:59.532+0000] [INFO ] GFX_TRACE enc submitted_seq=140 returned_seq=140 ready=1 inflight=-1 center_y=-1 us=3699508179
+[2026-08-24T14:25:59.532+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=140 id_client=140 fif=2 us=3699508275
+[2026-08-24T14:25:59.549+0000] [INFO ] GFX_TRACE send bytes=2030423 last=0 frame_id=0 id_server=140 id_client=140 fif=2 us=3699524908
+[2026-08-24T14:25:59.556+0000] [INFO ] GFX_TRACE send bytes=1599837 last=0 frame_id=0 id_server=140 id_client=140 fif=2 us=3699532247
+[2026-08-24T14:25:59.556+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=140 id_client=140 fif=2 us=3699532256
+[2026-08-24T14:25:59.586+0000] [INFO ] GFX_TRACE ack frame_id=141 queue_depth=0 decoded=142 id_server=141 ack_off=0 us=3699561451
+[2026-08-24T14:25:59.598+0000] [INFO ] GFX_TRACE batch cycle=142 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699573535
+[2026-08-24T14:25:59.602+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699577554
+[2026-08-24T14:25:59.602+0000] [INFO ] GFX_TRACE enc submitted_seq=141 returned_seq=141 ready=1 inflight=-1 center_y=-1 us=3699577555
+[2026-08-24T14:25:59.602+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=141 id_client=141 fif=2 us=3699577685
+[2026-08-24T14:25:59.619+0000] [INFO ] GFX_TRACE send bytes=2059892 last=0 frame_id=0 id_server=141 id_client=141 fif=2 us=3699594521
+[2026-08-24T14:25:59.630+0000] [INFO ] GFX_TRACE send bytes=1641028 last=0 frame_id=0 id_server=141 id_client=141 fif=2 us=3699606238
+[2026-08-24T14:25:59.630+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=141 id_client=141 fif=2 us=3699606248
+[2026-08-24T14:25:59.654+0000] [INFO ] GFX_TRACE ack frame_id=142 queue_depth=0 decoded=143 id_server=142 ack_off=0 us=3699629457
+[2026-08-24T14:25:59.671+0000] [INFO ] GFX_TRACE batch cycle=143 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699646985
+[2026-08-24T14:25:59.676+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699651601
+[2026-08-24T14:25:59.676+0000] [INFO ] GFX_TRACE enc submitted_seq=142 returned_seq=142 ready=1 inflight=-1 center_y=-1 us=3699651603
+[2026-08-24T14:25:59.676+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=142 id_client=142 fif=2 us=3699651683
+[2026-08-24T14:25:59.693+0000] [INFO ] GFX_TRACE send bytes=2095776 last=0 frame_id=0 id_server=142 id_client=142 fif=2 us=3699668876
+[2026-08-24T14:25:59.709+0000] [INFO ] GFX_TRACE send bytes=1697083 last=0 frame_id=0 id_server=142 id_client=142 fif=2 us=3699684457
+[2026-08-24T14:25:59.709+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=142 id_client=142 fif=2 us=3699684479
+[2026-08-24T14:25:59.731+0000] [INFO ] GFX_TRACE ack frame_id=143 queue_depth=0 decoded=144 id_server=143 ack_off=0 us=3699707386
+[2026-08-24T14:25:59.740+0000] [INFO ] GFX_TRACE batch cycle=144 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699715919
+[2026-08-24T14:25:59.745+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699720527
+[2026-08-24T14:25:59.745+0000] [INFO ] GFX_TRACE enc submitted_seq=143 returned_seq=143 ready=1 inflight=-1 center_y=-1 us=3699720528
+[2026-08-24T14:25:59.745+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=143 id_client=143 fif=2 us=3699720630
+[2026-08-24T14:25:59.762+0000] [INFO ] GFX_TRACE send bytes=2067689 last=0 frame_id=0 id_server=143 id_client=143 fif=2 us=3699737981
+[2026-08-24T14:25:59.774+0000] [INFO ] GFX_TRACE send bytes=1655745 last=0 frame_id=0 id_server=143 id_client=143 fif=2 us=3699749518
+[2026-08-24T14:25:59.774+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=143 id_client=143 fif=2 us=3699749533
+[2026-08-24T14:25:59.797+0000] [INFO ] GFX_TRACE ack frame_id=144 queue_depth=0 decoded=145 id_server=144 ack_off=0 us=3699772601
+[2026-08-24T14:25:59.813+0000] [INFO ] GFX_TRACE batch cycle=145 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699788512
+[2026-08-24T14:25:59.817+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699793129
+[2026-08-24T14:25:59.817+0000] [INFO ] GFX_TRACE enc submitted_seq=144 returned_seq=144 ready=1 inflight=-1 center_y=-1 us=3699793131
+[2026-08-24T14:25:59.818+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=144 id_client=144 fif=2 us=3699794033
+[2026-08-24T14:25:59.843+0000] [INFO ] GFX_TRACE send bytes=2031309 last=0 frame_id=0 id_server=144 id_client=144 fif=2 us=3699818773
+[2026-08-24T14:25:59.859+0000] [INFO ] GFX_TRACE send bytes=1639453 last=0 frame_id=0 id_server=144 id_client=144 fif=2 us=3699835247
+[2026-08-24T14:25:59.859+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=144 id_client=144 fif=2 us=3699835265
+[2026-08-24T14:25:59.875+0000] [INFO ] GFX_TRACE ack frame_id=145 queue_depth=0 decoded=146 id_server=145 ack_off=0 us=3699850860
+[2026-08-24T14:25:59.898+0000] [INFO ] GFX_TRACE batch cycle=146 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699874051
+[2026-08-24T14:25:59.902+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699878233
+[2026-08-24T14:25:59.902+0000] [INFO ] GFX_TRACE enc submitted_seq=145 returned_seq=145 ready=1 inflight=-1 center_y=-1 us=3699878234
+[2026-08-24T14:25:59.902+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=145 id_client=145 fif=2 us=3699878338
+[2026-08-24T14:25:59.923+0000] [INFO ] GFX_TRACE send bytes=2218175 last=0 frame_id=0 id_server=145 id_client=145 fif=2 us=3699898700
+[2026-08-24T14:25:59.933+0000] [INFO ] GFX_TRACE send bytes=1763283 last=0 frame_id=0 id_server=145 id_client=145 fif=2 us=3699908525
+[2026-08-24T14:25:59.933+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=145 id_client=145 fif=2 us=3699908535
+[2026-08-24T14:25:59.959+0000] [INFO ] GFX_TRACE ack frame_id=146 queue_depth=0 decoded=147 id_server=146 ack_off=0 us=3699934847
+[2026-08-24T14:25:59.970+0000] [INFO ] GFX_TRACE batch cycle=147 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3699946160
+[2026-08-24T14:25:59.975+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3699950604
+[2026-08-24T14:25:59.975+0000] [INFO ] GFX_TRACE enc submitted_seq=146 returned_seq=146 ready=1 inflight=-1 center_y=-1 us=3699950606
+[2026-08-24T14:25:59.975+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=146 id_client=146 fif=2 us=3699950682
+[2026-08-24T14:25:59.990+0000] [INFO ] GFX_TRACE send bytes=1982466 last=0 frame_id=0 id_server=146 id_client=146 fif=2 us=3699966276
+[2026-08-24T14:26:00.001+0000] [INFO ] GFX_TRACE send bytes=1604191 last=0 frame_id=0 id_server=146 id_client=146 fif=2 us=3699977399
+[2026-08-24T14:26:00.002+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=146 id_client=146 fif=2 us=3699977412
+[2026-08-24T14:26:00.025+0000] [INFO ] GFX_TRACE ack frame_id=147 queue_depth=0 decoded=148 id_server=147 ack_off=0 us=3700001158
+[2026-08-24T14:26:00.040+0000] [INFO ] GFX_TRACE batch cycle=148 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700015876
+[2026-08-24T14:26:00.045+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700020551
+[2026-08-24T14:26:00.045+0000] [INFO ] GFX_TRACE enc submitted_seq=147 returned_seq=147 ready=1 inflight=-1 center_y=-1 us=3700020553
+[2026-08-24T14:26:00.045+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=147 id_client=147 fif=2 us=3700020633
+[2026-08-24T14:26:00.064+0000] [INFO ] GFX_TRACE send bytes=2063485 last=0 frame_id=0 id_server=147 id_client=147 fif=2 us=3700040356
+[2026-08-24T14:26:00.073+0000] [INFO ] GFX_TRACE send bytes=1712466 last=0 frame_id=0 id_server=147 id_client=147 fif=2 us=3700048446
+[2026-08-24T14:26:00.073+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=147 id_client=147 fif=2 us=3700048456
+[2026-08-24T14:26:00.102+0000] [INFO ] GFX_TRACE ack frame_id=148 queue_depth=0 decoded=149 id_server=148 ack_off=0 us=3700077651
+[2026-08-24T14:26:00.118+0000] [INFO ] GFX_TRACE batch cycle=149 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700093585
+[2026-08-24T14:26:00.122+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700097726
+[2026-08-24T14:26:00.122+0000] [INFO ] GFX_TRACE enc submitted_seq=148 returned_seq=148 ready=1 inflight=-1 center_y=-1 us=3700097728
+[2026-08-24T14:26:00.122+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=148 id_client=148 fif=2 us=3700097880
+[2026-08-24T14:26:00.139+0000] [INFO ] GFX_TRACE send bytes=2154247 last=0 frame_id=0 id_server=148 id_client=148 fif=2 us=3700114493
+[2026-08-24T14:26:00.152+0000] [INFO ] GFX_TRACE send bytes=1730898 last=0 frame_id=0 id_server=148 id_client=148 fif=2 us=3700128269
+[2026-08-24T14:26:00.152+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=148 id_client=148 fif=2 us=3700128282
+[2026-08-24T14:26:00.177+0000] [INFO ] GFX_TRACE ack frame_id=149 queue_depth=0 decoded=150 id_server=149 ack_off=0 us=3700152898
+[2026-08-24T14:26:00.191+0000] [INFO ] GFX_TRACE batch cycle=150 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700166772
+[2026-08-24T14:26:00.195+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700170866
+[2026-08-24T14:26:00.195+0000] [INFO ] GFX_TRACE enc submitted_seq=149 returned_seq=149 ready=1 inflight=-1 center_y=-1 us=3700170868
+[2026-08-24T14:26:00.195+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=149 id_client=149 fif=2 us=3700170989
+[2026-08-24T14:26:00.213+0000] [INFO ] GFX_TRACE send bytes=2120651 last=0 frame_id=0 id_server=149 id_client=149 fif=2 us=3700188598
+[2026-08-24T14:26:00.223+0000] [INFO ] GFX_TRACE send bytes=1773444 last=0 frame_id=0 id_server=149 id_client=149 fif=2 us=3700198837
+[2026-08-24T14:26:00.223+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=149 id_client=149 fif=2 us=3700198846
+[2026-08-24T14:26:00.246+0000] [INFO ] GFX_TRACE ack frame_id=150 queue_depth=0 decoded=151 id_server=150 ack_off=0 us=3700221906
+[2026-08-24T14:26:00.264+0000] [INFO ] GFX_TRACE batch cycle=151 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700239935
+[2026-08-24T14:26:00.268+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700244178
+[2026-08-24T14:26:00.268+0000] [INFO ] GFX_TRACE enc submitted_seq=150 returned_seq=150 ready=1 inflight=-1 center_y=-1 us=3700244179
+[2026-08-24T14:26:00.268+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=150 id_client=150 fif=2 us=3700244291
+[2026-08-24T14:26:00.298+0000] [INFO ] GFX_TRACE send bytes=2165902 last=0 frame_id=0 id_server=150 id_client=150 fif=2 us=3700273546
+[2026-08-24T14:26:00.309+0000] [INFO ] GFX_TRACE send bytes=1822581 last=0 frame_id=0 id_server=150 id_client=150 fif=2 us=3700285311
+[2026-08-24T14:26:00.309+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=150 id_client=150 fif=2 us=3700285332
+[2026-08-24T14:26:00.328+0000] [INFO ] GFX_TRACE batch cycle=152 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700303439
+[2026-08-24T14:26:00.331+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700307201
+[2026-08-24T14:26:00.331+0000] [INFO ] GFX_TRACE enc submitted_seq=151 returned_seq=151 ready=1 inflight=-1 center_y=-1 us=3700307202
+[2026-08-24T14:26:00.331+0000] [INFO ] GFX_TRACE ack frame_id=151 queue_depth=0 decoded=152 id_server=151 ack_off=0 us=3700306827
+[2026-08-24T14:26:00.331+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=151 id_client=151 fif=2 us=3700307305
+[2026-08-24T14:26:00.350+0000] [INFO ] GFX_TRACE send bytes=1957275 last=0 frame_id=0 id_server=151 id_client=151 fif=2 us=3700326127
+[2026-08-24T14:26:00.361+0000] [INFO ] GFX_TRACE send bytes=1585454 last=0 frame_id=0 id_server=151 id_client=151 fif=2 us=3700336616
+[2026-08-24T14:26:00.361+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=151 id_client=151 fif=2 us=3700336630
+[2026-08-24T14:26:00.385+0000] [INFO ] GFX_TRACE ack frame_id=152 queue_depth=0 decoded=153 id_server=152 ack_off=0 us=3700360570
+[2026-08-24T14:26:00.392+0000] [INFO ] GFX_TRACE batch cycle=153 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700367436
+[2026-08-24T14:26:00.397+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700372960
+[2026-08-24T14:26:00.397+0000] [INFO ] GFX_TRACE enc submitted_seq=152 returned_seq=152 ready=1 inflight=-1 center_y=-1 us=3700372962
+[2026-08-24T14:26:00.397+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=152 id_client=152 fif=2 us=3700373051
+[2026-08-24T14:26:00.412+0000] [INFO ] GFX_TRACE send bytes=1851977 last=0 frame_id=0 id_server=152 id_client=152 fif=2 us=3700387719
+[2026-08-24T14:26:00.422+0000] [INFO ] GFX_TRACE send bytes=1491805 last=0 frame_id=0 id_server=152 id_client=152 fif=2 us=3700397881
+[2026-08-24T14:26:00.422+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=152 id_client=152 fif=2 us=3700397890
+[2026-08-24T14:26:00.448+0000] [INFO ] GFX_TRACE ack frame_id=153 queue_depth=0 decoded=154 id_server=153 ack_off=0 us=3700423531
+[2026-08-24T14:26:00.456+0000] [INFO ] GFX_TRACE batch cycle=154 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700432393
+[2026-08-24T14:26:00.460+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700436392
+[2026-08-24T14:26:00.460+0000] [INFO ] GFX_TRACE enc submitted_seq=153 returned_seq=153 ready=1 inflight=-1 center_y=-1 us=3700436393
+[2026-08-24T14:26:00.461+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=153 id_client=153 fif=2 us=3700436483
+[2026-08-24T14:26:00.474+0000] [INFO ] GFX_TRACE send bytes=1784231 last=0 frame_id=0 id_server=153 id_client=153 fif=2 us=3700450084
+[2026-08-24T14:26:00.483+0000] [INFO ] GFX_TRACE send bytes=1433013 last=0 frame_id=0 id_server=153 id_client=153 fif=2 us=3700458958
+[2026-08-24T14:26:00.483+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=153 id_client=153 fif=2 us=3700458968
+[2026-08-24T14:26:00.508+0000] [INFO ] GFX_TRACE ack frame_id=154 queue_depth=0 decoded=155 id_server=154 ack_off=0 us=3700483912
+[2026-08-24T14:26:00.519+0000] [INFO ] GFX_TRACE batch cycle=155 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700494453
+[2026-08-24T14:26:00.522+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700497708
+[2026-08-24T14:26:00.522+0000] [INFO ] GFX_TRACE enc submitted_seq=154 returned_seq=154 ready=1 inflight=-1 center_y=-1 us=3700497709
+[2026-08-24T14:26:00.522+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=154 id_client=154 fif=2 us=3700497823
+[2026-08-24T14:26:00.539+0000] [INFO ] GFX_TRACE send bytes=1751373 last=0 frame_id=0 id_server=154 id_client=154 fif=2 us=3700514537
+[2026-08-24T14:26:00.545+0000] [INFO ] GFX_TRACE send bytes=1360765 last=0 frame_id=0 id_server=154 id_client=154 fif=2 us=3700520886
+[2026-08-24T14:26:00.545+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=154 id_client=154 fif=2 us=3700520895
+[2026-08-24T14:26:00.568+0000] [INFO ] GFX_TRACE ack frame_id=155 queue_depth=0 decoded=156 id_server=155 ack_off=0 us=3700544298
+[2026-08-24T14:26:00.579+0000] [INFO ] GFX_TRACE batch cycle=156 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700555120
+[2026-08-24T14:26:00.583+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700558452
+[2026-08-24T14:26:00.583+0000] [INFO ] GFX_TRACE enc submitted_seq=155 returned_seq=155 ready=1 inflight=-1 center_y=-1 us=3700558454
+[2026-08-24T14:26:00.583+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=155 id_client=155 fif=2 us=3700558603
+[2026-08-24T14:26:00.602+0000] [INFO ] GFX_TRACE send bytes=1774074 last=0 frame_id=0 id_server=155 id_client=155 fif=2 us=3700577597
+[2026-08-24T14:26:00.611+0000] [INFO ] GFX_TRACE send bytes=1369765 last=0 frame_id=0 id_server=155 id_client=155 fif=2 us=3700587224
+[2026-08-24T14:26:00.611+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=155 id_client=155 fif=2 us=3700587237
+[2026-08-24T14:26:00.629+0000] [INFO ] GFX_TRACE ack frame_id=156 queue_depth=0 decoded=157 id_server=156 ack_off=0 us=3700605357
+[2026-08-24T14:26:00.650+0000] [INFO ] GFX_TRACE batch cycle=157 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700625694
+[2026-08-24T14:26:00.653+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700629303
+[2026-08-24T14:26:00.653+0000] [INFO ] GFX_TRACE enc submitted_seq=156 returned_seq=156 ready=1 inflight=-1 center_y=-1 us=3700629304
+[2026-08-24T14:26:00.654+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=156 id_client=156 fif=2 us=3700629404
+[2026-08-24T14:26:00.670+0000] [INFO ] GFX_TRACE send bytes=1906206 last=0 frame_id=0 id_server=156 id_client=156 fif=2 us=3700646097
+[2026-08-24T14:26:00.678+0000] [INFO ] GFX_TRACE send bytes=1510259 last=0 frame_id=0 id_server=156 id_client=156 fif=2 us=3700654252
+[2026-08-24T14:26:00.678+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=156 id_client=156 fif=2 us=3700654261
+[2026-08-24T14:26:00.704+0000] [INFO ] GFX_TRACE ack frame_id=157 queue_depth=0 decoded=158 id_server=157 ack_off=0 us=3700679445
+[2026-08-24T14:26:00.718+0000] [INFO ] GFX_TRACE batch cycle=158 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700693825
+[2026-08-24T14:26:00.721+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700697350
+[2026-08-24T14:26:00.721+0000] [INFO ] GFX_TRACE enc submitted_seq=157 returned_seq=157 ready=1 inflight=-1 center_y=-1 us=3700697351
+[2026-08-24T14:26:00.722+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=157 id_client=157 fif=2 us=3700697496
+[2026-08-24T14:26:00.741+0000] [INFO ] GFX_TRACE send bytes=1812807 last=0 frame_id=0 id_server=157 id_client=157 fif=2 us=3700716838
+[2026-08-24T14:26:00.748+0000] [INFO ] GFX_TRACE send bytes=1470310 last=0 frame_id=0 id_server=157 id_client=157 fif=2 us=3700724340
+[2026-08-24T14:26:00.748+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=157 id_client=157 fif=2 us=3700724349
+[2026-08-24T14:26:00.773+0000] [INFO ] GFX_TRACE ack frame_id=158 queue_depth=0 decoded=159 id_server=158 ack_off=0 us=3700748510
+[2026-08-24T14:26:00.797+0000] [INFO ] GFX_TRACE batch cycle=159 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700772471
+[2026-08-24T14:26:00.800+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700776145
+[2026-08-24T14:26:00.800+0000] [INFO ] GFX_TRACE enc submitted_seq=158 returned_seq=158 ready=1 inflight=-1 center_y=-1 us=3700776146
+[2026-08-24T14:26:00.800+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=158 id_client=158 fif=2 us=3700776249
+[2026-08-24T14:26:00.822+0000] [INFO ] GFX_TRACE send bytes=1936403 last=0 frame_id=0 id_server=158 id_client=158 fif=2 us=3700797811
+[2026-08-24T14:26:00.832+0000] [INFO ] GFX_TRACE send bytes=1568885 last=0 frame_id=0 id_server=158 id_client=158 fif=2 us=3700808193
+[2026-08-24T14:26:00.832+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=158 id_client=158 fif=2 us=3700808211
+[2026-08-24T14:26:00.853+0000] [INFO ] GFX_TRACE ack frame_id=159 queue_depth=0 decoded=160 id_server=159 ack_off=0 us=3700828761
+[2026-08-24T14:26:00.867+0000] [INFO ] GFX_TRACE batch cycle=160 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700843211
+[2026-08-24T14:26:00.872+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700847807
+[2026-08-24T14:26:00.872+0000] [INFO ] GFX_TRACE enc submitted_seq=159 returned_seq=159 ready=1 inflight=-1 center_y=-1 us=3700847809
+[2026-08-24T14:26:00.872+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=159 id_client=159 fif=2 us=3700847882
+[2026-08-24T14:26:00.896+0000] [INFO ] GFX_TRACE send bytes=2049387 last=0 frame_id=0 id_server=159 id_client=159 fif=2 us=3700871698
+[2026-08-24T14:26:00.905+0000] [INFO ] GFX_TRACE send bytes=1680777 last=0 frame_id=0 id_server=159 id_client=159 fif=2 us=3700880524
+[2026-08-24T14:26:00.905+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=159 id_client=159 fif=2 us=3700880534
+[2026-08-24T14:26:00.927+0000] [INFO ] GFX_TRACE ack frame_id=160 queue_depth=0 decoded=161 id_server=160 ack_off=0 us=3700902761
+[2026-08-24T14:26:00.932+0000] [INFO ] GFX_TRACE batch cycle=161 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700908097
+[2026-08-24T14:26:00.937+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700912523
+[2026-08-24T14:26:00.937+0000] [INFO ] GFX_TRACE enc submitted_seq=160 returned_seq=160 ready=1 inflight=-1 center_y=-1 us=3700912525
+[2026-08-24T14:26:00.937+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=160 id_client=160 fif=2 us=3700912599
+[2026-08-24T14:26:00.954+0000] [INFO ] GFX_TRACE send bytes=1981559 last=0 frame_id=0 id_server=160 id_client=160 fif=2 us=3700930335
+[2026-08-24T14:26:00.963+0000] [INFO ] GFX_TRACE send bytes=1627307 last=0 frame_id=0 id_server=160 id_client=160 fif=2 us=3700939349
+[2026-08-24T14:26:00.963+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=160 id_client=160 fif=2 us=3700939358
+[2026-08-24T14:26:00.989+0000] [INFO ] GFX_TRACE ack frame_id=161 queue_depth=0 decoded=162 id_server=161 ack_off=0 us=3700964582
+[2026-08-24T14:26:01.012+0000] [INFO ] GFX_TRACE batch cycle=162 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3700987806
+[2026-08-24T14:26:01.016+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3700991670
+[2026-08-24T14:26:01.016+0000] [INFO ] GFX_TRACE enc submitted_seq=161 returned_seq=161 ready=1 inflight=-1 center_y=-1 us=3700991671
+[2026-08-24T14:26:01.016+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=161 id_client=161 fif=2 us=3700991781
+[2026-08-24T14:26:01.039+0000] [INFO ] GFX_TRACE send bytes=2004598 last=0 frame_id=0 id_server=161 id_client=161 fif=2 us=3701014904
+[2026-08-24T14:26:01.050+0000] [INFO ] GFX_TRACE send bytes=1644439 last=0 frame_id=0 id_server=161 id_client=161 fif=2 us=3701026358
+[2026-08-24T14:26:01.050+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=161 id_client=161 fif=2 us=3701026371
+[2026-08-24T14:26:01.072+0000] [INFO ] GFX_TRACE ack frame_id=162 queue_depth=0 decoded=163 id_server=162 ack_off=0 us=3701048246
+[2026-08-24T14:26:01.090+0000] [INFO ] GFX_TRACE batch cycle=163 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701065698
+[2026-08-24T14:26:01.094+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701069697
+[2026-08-24T14:26:01.094+0000] [INFO ] GFX_TRACE enc submitted_seq=162 returned_seq=162 ready=1 inflight=-1 center_y=-1 us=3701069698
+[2026-08-24T14:26:01.094+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=162 id_client=162 fif=2 us=3701069804
+[2026-08-24T14:26:01.114+0000] [INFO ] GFX_TRACE send bytes=2084081 last=0 frame_id=0 id_server=162 id_client=162 fif=2 us=3701089766
+[2026-08-24T14:26:01.127+0000] [INFO ] GFX_TRACE send bytes=1679200 last=0 frame_id=0 id_server=162 id_client=162 fif=2 us=3701102883
+[2026-08-24T14:26:01.127+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=162 id_client=162 fif=2 us=3701102893
+[2026-08-24T14:26:01.149+0000] [INFO ] GFX_TRACE ack frame_id=163 queue_depth=0 decoded=164 id_server=163 ack_off=0 us=3701124918
+[2026-08-24T14:26:01.162+0000] [INFO ] GFX_TRACE batch cycle=164 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701137426
+[2026-08-24T14:26:01.166+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701142269
+[2026-08-24T14:26:01.166+0000] [INFO ] GFX_TRACE enc submitted_seq=163 returned_seq=163 ready=1 inflight=-1 center_y=-1 us=3701142270
+[2026-08-24T14:26:01.166+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=163 id_client=163 fif=2 us=3701142356
+[2026-08-24T14:26:01.182+0000] [INFO ] GFX_TRACE send bytes=2169878 last=0 frame_id=0 id_server=163 id_client=163 fif=2 us=3701157836
+[2026-08-24T14:26:01.196+0000] [INFO ] GFX_TRACE send bytes=1748144 last=0 frame_id=0 id_server=163 id_client=163 fif=2 us=3701171512
+[2026-08-24T14:26:01.196+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=163 id_client=163 fif=2 us=3701171547
+[2026-08-24T14:26:01.218+0000] [INFO ] GFX_TRACE ack frame_id=164 queue_depth=0 decoded=165 id_server=164 ack_off=0 us=3701194053
+[2026-08-24T14:26:01.237+0000] [INFO ] GFX_TRACE batch cycle=165 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701213296
+[2026-08-24T14:26:01.241+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701217054
+[2026-08-24T14:26:01.241+0000] [INFO ] GFX_TRACE enc submitted_seq=164 returned_seq=164 ready=1 inflight=-1 center_y=-1 us=3701217055
+[2026-08-24T14:26:01.241+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=164 id_client=164 fif=2 us=3701217155
+[2026-08-24T14:26:01.258+0000] [INFO ] GFX_TRACE send bytes=1957283 last=0 frame_id=0 id_server=164 id_client=164 fif=2 us=3701233735
+[2026-08-24T14:26:01.269+0000] [INFO ] GFX_TRACE send bytes=1591119 last=0 frame_id=0 id_server=164 id_client=164 fif=2 us=3701244600
+[2026-08-24T14:26:01.269+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=164 id_client=164 fif=2 us=3701244613
+[2026-08-24T14:26:01.296+0000] [INFO ] GFX_TRACE ack frame_id=165 queue_depth=0 decoded=166 id_server=165 ack_off=0 us=3701272076
+[2026-08-24T14:26:01.322+0000] [INFO ] GFX_TRACE batch cycle=166 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701297777
+[2026-08-24T14:26:01.327+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701302571
+[2026-08-24T14:26:01.327+0000] [INFO ] GFX_TRACE enc submitted_seq=165 returned_seq=165 ready=1 inflight=-1 center_y=-1 us=3701302573
+[2026-08-24T14:26:01.327+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=165 id_client=165 fif=2 us=3701302724
+[2026-08-24T14:26:01.357+0000] [INFO ] GFX_TRACE send bytes=2464471 last=0 frame_id=0 id_server=165 id_client=165 fif=2 us=3701333073
+[2026-08-24T14:26:01.372+0000] [INFO ] GFX_TRACE send bytes=2082535 last=0 frame_id=0 id_server=165 id_client=165 fif=2 us=3701347541
+[2026-08-24T14:26:01.372+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=165 id_client=165 fif=2 us=3701347554
+[2026-08-24T14:26:01.395+0000] [INFO ] GFX_TRACE batch cycle=167 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701371223
+[2026-08-24T14:26:01.400+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701375415
+[2026-08-24T14:26:01.400+0000] [INFO ] GFX_TRACE enc submitted_seq=166 returned_seq=166 ready=1 inflight=-1 center_y=-1 us=3701375416
+[2026-08-24T14:26:01.395+0000] [INFO ] GFX_TRACE ack frame_id=166 queue_depth=0 decoded=167 id_server=166 ack_off=0 us=3701371050
+[2026-08-24T14:26:01.400+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=166 id_client=166 fif=2 us=3701375565
+[2026-08-24T14:26:01.423+0000] [INFO ] GFX_TRACE send bytes=2150553 last=0 frame_id=0 id_server=166 id_client=166 fif=2 us=3701399104
+[2026-08-24T14:26:01.432+0000] [INFO ] GFX_TRACE send bytes=1790626 last=0 frame_id=0 id_server=166 id_client=166 fif=2 us=3701408116
+[2026-08-24T14:26:01.432+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=166 id_client=166 fif=2 us=3701408126
+[2026-08-24T14:26:01.460+0000] [INFO ] GFX_TRACE ack frame_id=167 queue_depth=0 decoded=168 id_server=167 ack_off=0 us=3701436283
+[2026-08-24T14:26:01.472+0000] [INFO ] GFX_TRACE batch cycle=168 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701447963
+[2026-08-24T14:26:01.477+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701452679
+[2026-08-24T14:26:01.477+0000] [INFO ] GFX_TRACE enc submitted_seq=167 returned_seq=167 ready=1 inflight=-1 center_y=-1 us=3701452681
+[2026-08-24T14:26:01.477+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=167 id_client=167 fif=2 us=3701452814
+[2026-08-24T14:26:01.502+0000] [INFO ] GFX_TRACE send bytes=2326631 last=0 frame_id=0 id_server=167 id_client=167 fif=2 us=3701478369
+[2026-08-24T14:26:01.513+0000] [INFO ] GFX_TRACE send bytes=2042267 last=0 frame_id=0 id_server=167 id_client=167 fif=2 us=3701489194
+[2026-08-24T14:26:01.513+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=167 id_client=167 fif=2 us=3701489203
+[2026-08-24T14:26:01.537+0000] [INFO ] GFX_TRACE ack frame_id=168 queue_depth=0 decoded=169 id_server=168 ack_off=0 us=3701513113
+[2026-08-24T14:26:01.546+0000] [INFO ] GFX_TRACE batch cycle=169 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701521445
+[2026-08-24T14:26:01.551+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701526520
+[2026-08-24T14:26:01.551+0000] [INFO ] GFX_TRACE enc submitted_seq=168 returned_seq=168 ready=1 inflight=-1 center_y=-1 us=3701526521
+[2026-08-24T14:26:01.551+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=168 id_client=168 fif=2 us=3701526598
+[2026-08-24T14:26:01.572+0000] [INFO ] GFX_TRACE send bytes=2194301 last=0 frame_id=0 id_server=168 id_client=168 fif=2 us=3701548262
+[2026-08-24T14:26:01.582+0000] [INFO ] GFX_TRACE send bytes=1860881 last=0 frame_id=0 id_server=168 id_client=168 fif=2 us=3701557421
+[2026-08-24T14:26:01.582+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=168 id_client=168 fif=2 us=3701557439
+[2026-08-24T14:26:01.608+0000] [INFO ] GFX_TRACE ack frame_id=169 queue_depth=0 decoded=170 id_server=169 ack_off=0 us=3701584138
+[2026-08-24T14:26:01.616+0000] [INFO ] GFX_TRACE batch cycle=170 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701592090
+[2026-08-24T14:26:01.620+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701596105
+[2026-08-24T14:26:01.620+0000] [INFO ] GFX_TRACE enc submitted_seq=169 returned_seq=169 ready=1 inflight=-1 center_y=-1 us=3701596106
+[2026-08-24T14:26:01.620+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=169 id_client=169 fif=2 us=3701596227
+[2026-08-24T14:26:01.641+0000] [INFO ] GFX_TRACE send bytes=2080370 last=0 frame_id=0 id_server=169 id_client=169 fif=2 us=3701616940
+[2026-08-24T14:26:01.650+0000] [INFO ] GFX_TRACE send bytes=1720472 last=0 frame_id=0 id_server=169 id_client=169 fif=2 us=3701625953
+[2026-08-24T14:26:01.650+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=169 id_client=169 fif=2 us=3701625966
+[2026-08-24T14:26:01.675+0000] [INFO ] GFX_TRACE ack frame_id=170 queue_depth=0 decoded=171 id_server=170 ack_off=0 us=3701650831
+[2026-08-24T14:26:01.684+0000] [INFO ] GFX_TRACE batch cycle=171 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701659465
+[2026-08-24T14:26:01.687+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701663323
+[2026-08-24T14:26:01.687+0000] [INFO ] GFX_TRACE enc submitted_seq=170 returned_seq=170 ready=1 inflight=-1 center_y=-1 us=3701663324
+[2026-08-24T14:26:01.688+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=170 id_client=170 fif=2 us=3701663446
+[2026-08-24T14:26:01.711+0000] [INFO ] GFX_TRACE send bytes=1950136 last=0 frame_id=0 id_server=170 id_client=170 fif=2 us=3701687205
+[2026-08-24T14:26:01.726+0000] [INFO ] GFX_TRACE send bytes=1631834 last=0 frame_id=0 id_server=170 id_client=170 fif=2 us=3701702057
+[2026-08-24T14:26:01.726+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=170 id_client=170 fif=2 us=3701702072
+[2026-08-24T14:26:01.742+0000] [INFO ] GFX_TRACE ack frame_id=171 queue_depth=0 decoded=172 id_server=171 ack_off=0 us=3701718153
+[2026-08-24T14:26:01.754+0000] [INFO ] GFX_TRACE batch cycle=172 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701729468
+[2026-08-24T14:26:01.757+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701733260
+[2026-08-24T14:26:01.757+0000] [INFO ] GFX_TRACE enc submitted_seq=171 returned_seq=171 ready=1 inflight=-1 center_y=-1 us=3701733261
+[2026-08-24T14:26:01.757+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=171 id_client=171 fif=2 us=3701733342
+[2026-08-24T14:26:01.775+0000] [INFO ] GFX_TRACE send bytes=1976690 last=0 frame_id=0 id_server=171 id_client=171 fif=2 us=3701750840
+[2026-08-24T14:26:01.783+0000] [INFO ] GFX_TRACE send bytes=1590272 last=0 frame_id=0 id_server=171 id_client=171 fif=2 us=3701759021
+[2026-08-24T14:26:01.783+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=171 id_client=171 fif=2 us=3701759033
+[2026-08-24T14:26:01.810+0000] [INFO ] GFX_TRACE ack frame_id=172 queue_depth=0 decoded=173 id_server=172 ack_off=0 us=3701785644
+[2026-08-24T14:26:01.823+0000] [INFO ] GFX_TRACE batch cycle=173 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701799115
+[2026-08-24T14:26:01.828+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701803537
+[2026-08-24T14:26:01.828+0000] [INFO ] GFX_TRACE enc submitted_seq=172 returned_seq=172 ready=1 inflight=-1 center_y=-1 us=3701803539
+[2026-08-24T14:26:01.828+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=172 id_client=172 fif=2 us=3701803686
+[2026-08-24T14:26:01.850+0000] [INFO ] GFX_TRACE send bytes=1966429 last=0 frame_id=0 id_server=172 id_client=172 fif=2 us=3701825478
+[2026-08-24T14:26:01.859+0000] [INFO ] GFX_TRACE send bytes=1622785 last=0 frame_id=0 id_server=172 id_client=172 fif=2 us=3701834938
+[2026-08-24T14:26:01.859+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=172 id_client=172 fif=2 us=3701834951
+[2026-08-24T14:26:01.883+0000] [INFO ] GFX_TRACE ack frame_id=173 queue_depth=0 decoded=174 id_server=173 ack_off=0 us=3701859052
+[2026-08-24T14:26:01.899+0000] [INFO ] GFX_TRACE batch cycle=174 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701875268
+[2026-08-24T14:26:01.903+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701878874
+[2026-08-24T14:26:01.903+0000] [INFO ] GFX_TRACE enc submitted_seq=173 returned_seq=173 ready=1 inflight=-1 center_y=-1 us=3701878875
+[2026-08-24T14:26:01.903+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=173 id_client=173 fif=2 us=3701879036
+[2026-08-24T14:26:01.922+0000] [INFO ] GFX_TRACE send bytes=1887730 last=0 frame_id=0 id_server=173 id_client=173 fif=2 us=3701897666
+[2026-08-24T14:26:01.932+0000] [INFO ] GFX_TRACE send bytes=1590490 last=0 frame_id=0 id_server=173 id_client=173 fif=2 us=3701907637
+[2026-08-24T14:26:01.932+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=173 id_client=173 fif=2 us=3701907650
+[2026-08-24T14:26:01.955+0000] [INFO ] GFX_TRACE ack frame_id=174 queue_depth=0 decoded=175 id_server=174 ack_off=0 us=3701930601
+[2026-08-24T14:26:01.973+0000] [INFO ] GFX_TRACE batch cycle=175 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3701948991
+[2026-08-24T14:26:01.977+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3701953167
+[2026-08-24T14:26:01.977+0000] [INFO ] GFX_TRACE enc submitted_seq=174 returned_seq=174 ready=1 inflight=-1 center_y=-1 us=3701953169
+[2026-08-24T14:26:01.977+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=174 id_client=174 fif=2 us=3701953257
+[2026-08-24T14:26:01.990+0000] [INFO ] GFX_TRACE send bytes=1842991 last=0 frame_id=0 id_server=174 id_client=174 fif=2 us=3701966293
+[2026-08-24T14:26:02.004+0000] [INFO ] GFX_TRACE send bytes=1524140 last=0 frame_id=0 id_server=174 id_client=174 fif=2 us=3701979665
+[2026-08-24T14:26:02.004+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=174 id_client=174 fif=2 us=3701979678
+[2026-08-24T14:26:02.026+0000] [INFO ] GFX_TRACE ack frame_id=175 queue_depth=0 decoded=176 id_server=175 ack_off=0 us=3702001401
+[2026-08-24T14:26:02.050+0000] [INFO ] GFX_TRACE batch cycle=176 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702025621
+[2026-08-24T14:26:02.053+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702029363
+[2026-08-24T14:26:02.053+0000] [INFO ] GFX_TRACE enc submitted_seq=175 returned_seq=175 ready=1 inflight=-1 center_y=-1 us=3702029364
+[2026-08-24T14:26:02.054+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=175 id_client=175 fif=2 us=3702029477
+[2026-08-24T14:26:02.075+0000] [INFO ] GFX_TRACE send bytes=1950831 last=0 frame_id=0 id_server=175 id_client=175 fif=2 us=3702051158
+[2026-08-24T14:26:02.092+0000] [INFO ] GFX_TRACE send bytes=1627861 last=0 frame_id=0 id_server=175 id_client=175 fif=2 us=3702068193
+[2026-08-24T14:26:02.092+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=175 id_client=175 fif=2 us=3702068217
+[2026-08-24T14:26:02.108+0000] [INFO ] GFX_TRACE ack frame_id=176 queue_depth=0 decoded=177 id_server=176 ack_off=0 us=3702083764
+[2026-08-24T14:26:02.119+0000] [INFO ] GFX_TRACE batch cycle=177 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702094976
+[2026-08-24T14:26:02.124+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702099560
+[2026-08-24T14:26:02.124+0000] [INFO ] GFX_TRACE enc submitted_seq=176 returned_seq=176 ready=1 inflight=-1 center_y=-1 us=3702099561
+[2026-08-24T14:26:02.124+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=176 id_client=176 fif=2 us=3702099647
+[2026-08-24T14:26:02.141+0000] [INFO ] GFX_TRACE send bytes=2027304 last=0 frame_id=0 id_server=176 id_client=176 fif=2 us=3702117068
+[2026-08-24T14:26:02.152+0000] [INFO ] GFX_TRACE send bytes=1671489 last=0 frame_id=0 id_server=176 id_client=176 fif=2 us=3702127619
+[2026-08-24T14:26:02.152+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=176 id_client=176 fif=2 us=3702127629
+[2026-08-24T14:26:02.176+0000] [INFO ] GFX_TRACE ack frame_id=177 queue_depth=0 decoded=178 id_server=177 ack_off=0 us=3702151930
+[2026-08-24T14:26:02.196+0000] [INFO ] GFX_TRACE batch cycle=178 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702171412
+[2026-08-24T14:26:02.200+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702175689
+[2026-08-24T14:26:02.200+0000] [INFO ] GFX_TRACE enc submitted_seq=177 returned_seq=177 ready=1 inflight=-1 center_y=-1 us=3702175691
+[2026-08-24T14:26:02.200+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=177 id_client=177 fif=2 us=3702175778
+[2026-08-24T14:26:02.214+0000] [INFO ] GFX_TRACE send bytes=1908010 last=0 frame_id=0 id_server=177 id_client=177 fif=2 us=3702189615
+[2026-08-24T14:26:02.222+0000] [INFO ] GFX_TRACE send bytes=1581937 last=0 frame_id=0 id_server=177 id_client=177 fif=2 us=3702197582
+[2026-08-24T14:26:02.222+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=177 id_client=177 fif=2 us=3702197591
+[2026-08-24T14:26:02.249+0000] [INFO ] GFX_TRACE ack frame_id=178 queue_depth=0 decoded=179 id_server=178 ack_off=0 us=3702225398
+[2026-08-24T14:26:02.266+0000] [INFO ] GFX_TRACE batch cycle=179 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702242336
+[2026-08-24T14:26:02.272+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702247747
+[2026-08-24T14:26:02.272+0000] [INFO ] GFX_TRACE enc submitted_seq=178 returned_seq=178 ready=1 inflight=-1 center_y=-1 us=3702247748
+[2026-08-24T14:26:02.272+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=178 id_client=178 fif=2 us=3702247902
+[2026-08-24T14:26:02.295+0000] [INFO ] GFX_TRACE send bytes=1978790 last=0 frame_id=0 id_server=178 id_client=178 fif=2 us=3702271164
+[2026-08-24T14:26:02.304+0000] [INFO ] GFX_TRACE send bytes=1631907 last=0 frame_id=0 id_server=178 id_client=178 fif=2 us=3702280028
+[2026-08-24T14:26:02.304+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=178 id_client=178 fif=2 us=3702280040
+[2026-08-24T14:26:02.328+0000] [INFO ] GFX_TRACE ack frame_id=179 queue_depth=0 decoded=180 id_server=179 ack_off=0 us=3702304307
+[2026-08-24T14:26:02.337+0000] [INFO ] GFX_TRACE batch cycle=180 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702313032
+[2026-08-24T14:26:02.341+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702317282
+[2026-08-24T14:26:02.341+0000] [INFO ] GFX_TRACE enc submitted_seq=179 returned_seq=179 ready=1 inflight=-1 center_y=-1 us=3702317284
+[2026-08-24T14:26:02.341+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=179 id_client=179 fif=2 us=3702317357
+[2026-08-24T14:26:02.368+0000] [INFO ] GFX_TRACE send bytes=1893302 last=0 frame_id=0 id_server=179 id_client=179 fif=2 us=3702343482
+[2026-08-24T14:26:02.377+0000] [INFO ] GFX_TRACE send bytes=1575920 last=0 frame_id=0 id_server=179 id_client=179 fif=2 us=3702352428
+[2026-08-24T14:26:02.377+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=179 id_client=179 fif=2 us=3702352440
+[2026-08-24T14:26:02.403+0000] [INFO ] GFX_TRACE batch cycle=181 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702378562
+[2026-08-24T14:26:02.398+0000] [INFO ] GFX_TRACE ack frame_id=180 queue_depth=0 decoded=181 id_server=180 ack_off=0 us=3702373768
+[2026-08-24T14:26:02.406+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702381731
+[2026-08-24T14:26:02.406+0000] [INFO ] GFX_TRACE enc submitted_seq=180 returned_seq=180 ready=1 inflight=-1 center_y=-1 us=3702381732
+[2026-08-24T14:26:02.406+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=180 id_client=180 fif=2 us=3702381871
+[2026-08-24T14:26:02.422+0000] [INFO ] GFX_TRACE send bytes=1647155 last=0 frame_id=0 id_server=180 id_client=180 fif=2 us=3702397814
+[2026-08-24T14:26:02.430+0000] [INFO ] GFX_TRACE send bytes=1357686 last=0 frame_id=0 id_server=180 id_client=180 fif=2 us=3702406363
+[2026-08-24T14:26:02.430+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=180 id_client=180 fif=2 us=3702406376
+[2026-08-24T14:26:02.455+0000] [INFO ] GFX_TRACE ack frame_id=181 queue_depth=0 decoded=182 id_server=181 ack_off=0 us=3702431045
+[2026-08-24T14:26:02.479+0000] [INFO ] GFX_TRACE batch cycle=182 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702454584
+[2026-08-24T14:26:02.483+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702458834
+[2026-08-24T14:26:02.483+0000] [INFO ] GFX_TRACE enc submitted_seq=181 returned_seq=181 ready=1 inflight=-1 center_y=-1 us=3702458836
+[2026-08-24T14:26:02.483+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=181 id_client=181 fif=2 us=3702458924
+[2026-08-24T14:26:02.503+0000] [INFO ] GFX_TRACE send bytes=1939260 last=0 frame_id=0 id_server=181 id_client=181 fif=2 us=3702478910
+[2026-08-24T14:26:02.518+0000] [INFO ] GFX_TRACE send bytes=1530226 last=0 frame_id=0 id_server=181 id_client=181 fif=2 us=3702494162
+[2026-08-24T14:26:02.518+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=181 id_client=181 fif=2 us=3702494173
+[2026-08-24T14:26:02.537+0000] [INFO ] GFX_TRACE ack frame_id=182 queue_depth=0 decoded=183 id_server=182 ack_off=0 us=3702512807
+[2026-08-24T14:26:02.559+0000] [INFO ] GFX_TRACE batch cycle=183 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702534584
+[2026-08-24T14:26:02.563+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702539009
+[2026-08-24T14:26:02.563+0000] [INFO ] GFX_TRACE enc submitted_seq=182 returned_seq=182 ready=1 inflight=-1 center_y=-1 us=3702539011
+[2026-08-24T14:26:02.563+0000] [INFO ] GFX_TRACE send bytes=18 last=0 frame_id=0 id_server=182 id_client=182 fif=2 us=3702539146
+[2026-08-24T14:26:02.582+0000] [INFO ] GFX_TRACE send bytes=2273155 last=0 frame_id=0 id_server=182 id_client=182 fif=2 us=3702557726
+[2026-08-24T14:26:02.592+0000] [INFO ] GFX_TRACE send bytes=1885063 last=0 frame_id=0 id_server=182 id_client=182 fif=2 us=3702568317
+[2026-08-24T14:26:02.592+0000] [INFO ] GFX_TRACE send bytes=14 last=0 frame_id=0 id_server=182 id_client=182 fif=2 us=3702568327
+[2026-08-24T14:26:02.644+0000] [INFO ] GFX_TRACE batch cycle=184 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0 us=3702619530
+[2026-08-24T14:26:02.650+0000] [INFO ] GFX_TRACE dmg surface=0 num_rects=1 x1=0 y1=0 x2=3840 y2=2400 us=3702625552
+[2026-08-24T14:26:02.650+0000] [INFO ] GFX_TRACE enc submitted_seq=183 returned_seq=183 ready=1 inflight=-1 center_y=-1 us=3702625554

@@ -1,0 +1,3 @@
+host install (no image): ubuntu@3.235.10.89
+Linux 7.0.0-1009-aws x86_64
+Tesla T4

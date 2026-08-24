@@ -7,9 +7,10 @@
 # ssh -L forward. The test account is `ubuntu` (the owner-equivalent
 # session; no special test users, no session-policy edits); its RDP
 # credential is fetched from root-owned /root/.ubuntu_cred ON the T4 at
-# use time and never printed or stored locally. Session-side actions
-# (colour-key terminal, window placement) are single ssh commands; the
-# colour-key app is a persistent checksum-gated install on the T4.
+# use time and never printed or stored locally. The colour-key app and its
+# wrapper are persistent checksum-gated installs. A root-owned marker arms
+# their XDG autostart before login; SSH never launches or supervises a GUI
+# process inside a live remote session.
 #
 # Flow: fresh RDP login -> full-screen colorkey.sh in the session ->
 # press r/g/b/w twice each through the client -> after every keypress,
@@ -19,8 +20,8 @@
 #
 # TARGET (added 2026-07-29). SMOKE_TARGET=t4 (default) is the flow above.
 # SMOKE_TARGET=pod runs the SAME gate against a bisect-fleet pod instead,
-# reached on its host loopback port with no tunnel, session-side commands
-# issued through kubectl exec, and the log read with kubectl logs. That
+# reached on its host loopback port with no tunnel, and the log read with
+# kubectl logs. The same XDG autostart owns the session payload. That
 # exists because the gate must run against whatever pair is actually
 # deployed (BACKLOG #45 E1) and the T4 is not always up; it is the same
 # assertions against a package-installed xrdp + gfx.toml, which is what
@@ -83,18 +84,80 @@ else
     fi
 fi
 
-# persistent session-side colour-key app (checksum-gated install)
-LSUM=$(md5sum "$D/colorkey.sh" | cut -d' ' -f1)
-RSUM=$(t4 "md5sum /usr/local/bin/colorkey.sh 2>/dev/null | cut -d' ' -f1")
+# Persistent session-side colour-key app and login-time wrapper.
+LSUM=$(sha256sum "$D/colorkey.sh" "$D/colorkey-autostart.sh" \
+       "$D/xrdp-smoke-colorkey.desktop" | cut -d' ' -f1 | sha256sum | \
+       cut -d' ' -f1)
+RSUM=$(t4 "sha256sum /usr/local/bin/colorkey.sh \
+    /usr/local/bin/xrdp-smoke-colorkey \
+    /etc/xdg/autostart/xrdp-smoke-colorkey.desktop 2>/dev/null | \
+    cut -d' ' -f1 | sha256sum | cut -d' ' -f1")
 if [ "$LSUM" != "$RSUM" ]; then
     if [ "$TARGET" = pod ]; then
         kubectl -n "$NS" cp "$D/colorkey.sh" "$POD:/usr/local/bin/colorkey.sh"
-        t4 "chmod 755 /usr/local/bin/colorkey.sh"
+        kubectl -n "$NS" cp "$D/colorkey-autostart.sh" \
+            "$POD:/usr/local/bin/xrdp-smoke-colorkey"
+        kubectl -n "$NS" cp "$D/xrdp-smoke-colorkey.desktop" \
+            "$POD:/etc/xdg/autostart/xrdp-smoke-colorkey.desktop"
+        t4 "chmod 755 /usr/local/bin/colorkey.sh \
+            /usr/local/bin/xrdp-smoke-colorkey"
     else
-        scp -q -i "$T4_KEY" "$D/colorkey.sh" "$T4:/tmp/colorkey.sh"
-        t4 "sudo install -m 755 /tmp/colorkey.sh /usr/local/bin/colorkey.sh"
+        scp -q -i "$T4_KEY" "$D/colorkey.sh" \
+            "$D/colorkey-autostart.sh" "$D/xrdp-smoke-colorkey.desktop" \
+            "$T4:/tmp/"
+        t4 "sudo install -m 755 /tmp/colorkey.sh \
+                /usr/local/bin/colorkey.sh && \
+            sudo install -m 755 /tmp/colorkey-autostart.sh \
+                /usr/local/bin/xrdp-smoke-colorkey && \
+            sudo install -m 644 /tmp/xrdp-smoke-colorkey.desktop \
+                /etc/xdg/autostart/xrdp-smoke-colorkey.desktop"
     fi
 fi
+
+end_session()
+{
+    if [ "$TARGET" = pod ]; then
+        t4 "xpid=\$(pgrep -u '$SU' -x Xorg | head -1); \
+             [ -n \"\$xpid\" ] || exit 0; \
+             args=\$(tr '\0' ' ' < /proc/\$xpid/cmdline); \
+             display=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE ' :[0-9]+ ' | head -1 | tr -d ' '); \
+             auth=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE -- '-auth [^ ]+' | head -1 | cut -d' ' -f2); \
+             su -s /bin/sh '$SU' -c \"DISPLAY=\$display \
+                 XAUTHORITY=\$auth xfce4-session-logout --logout\"" \
+            >/dev/null 2>&1 || return 1
+    else
+        t4 "for session in \$(loginctl list-sessions --no-legend | \
+             awk '{print \$1}'); do \
+             [ \"\$(loginctl show-session \"\$session\" -p Name \
+                    --value)\" = '$SU' ] || continue; \
+             [ \"\$(loginctl show-session \"\$session\" -p Type \
+                    --value)\" = x11 ] || continue; \
+             sudo loginctl terminate-session \"\$session\"; done" \
+            >/dev/null 2>&1 || return 1
+    fi
+    t4 "for i in \$(seq 1 25); do pgrep -u '$SU' -x Xorg >/dev/null || \
+        break; sleep 1; done" >/dev/null 2>&1
+}
+
+disarm_payload()
+{
+    if [ "$TARGET" = pod ]; then
+        t4 "rm -f /etc/xrdp-smoke-colorkey" >/dev/null 2>&1 || true
+    else
+        t4 "sudo rm -f /etc/xrdp-smoke-colorkey" >/dev/null 2>&1 || true
+    fi
+}
+
+cleanup()
+{
+    disarm_payload
+    end_session >/dev/null 2>&1 || true
+    pkill -9 -x xfreerdp3 2>/dev/null || true
+}
+
+trap cleanup EXIT INT TERM
 
 # client-side X server for xfreerdp (local); geometry VERIFIED after
 # start — a silent bind failure on a busy display must abort, not fall
@@ -109,17 +172,15 @@ if ! DISPLAY=$CLI xdotool getdisplaygeometry 2>/dev/null | grep -q "^${CLIENT_SI
         || { echo "FAIL: client X $CLI not at $CLIENT_SIZE (display busy?)"; exit 1; }
 fi
 
-# end any existing session + client so this is a cold login
+# End any existing whole session so this is a cold login, then arm the
+# versioned login-time payload for this resolution.
 pkill -9 -x xfreerdp3 2>/dev/null
+end_session || { echo "ABORT: could not log off the existing session"; exit 1; }
 if [ "$TARGET" = pod ]; then
-    # a disposable fleet session, never the owner's: end it so this is a
-    # cold login, then wait for its Xorg to go
-    t4 "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" 2>/dev/null
-    t4 "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null || break; \
-        sleep 1; done" 2>/dev/null
+    t4 "printf '%s\\n' '$SIZE' > /etc/xrdp-smoke-colorkey"
 else
-    t4 "pkill -TERM -u $SU xfce4-session" 2>/dev/null; sleep 2
-    t4 'for i in $(seq 1 25); do pgrep -u $(id -u) -x Xorg >/dev/null || break; sleep 1; done'
+    printf '%s\n' "$SIZE" | t4 "sudo tee /etc/xrdp-smoke-colorkey" \
+        >/dev/null
 fi
 sleep 2
 
@@ -151,64 +212,7 @@ sleep 6
 fw=$(DISPLAY=$CLI xdotool search --name FreeRDP 2>/dev/null | head -1)
 [ -z "$fw" ] && { echo "FAIL: no FreeRDP window (login failed)"; exit 1; }
 
-if [ "$TARGET" = pod ]; then
-    SD=$(t4 "ls /tmp/.X11-unix/ | head -1 | sed 's/^X/:/'")
-else
-    SD=$(t4 'pgrep -a -u $(id -u) -x Xorg' | grep -oE ' :[0-9]+ ' \
-         | head -1 | tr -d ' ')
-fi
-[ -z "$SD" ] && { echo "FAIL: no fresh Xorg session"; exit 1; }
-echo "session display=$SD client=$CLI target=$TGT_NAME via :$LPORT"
-if [ "$TARGET" = pod ]; then
-    # The session's X authority file is wherever sesman told the X server
-    # to put it, so ASK THE RUNNING SERVER rather than guessing a path.
-    # Both previous guesses were wrong here and failed the same way, with
-    # "Authorization required, but no authorization protocol specified"
-    # and then "FAIL: no terminal" three minutes later:
-    #   /home/$SU/.Xauthority        -- does not exist; sesman puts it
-    #                                   under /var/run/xrdp/<uid>/
-    #   /var/run/xrdp/$(id -u)/...   -- $(id -u) inside kubectl exec is
-    #                                   ROOT, not the session's owner
-    # Reading it off the Xorg command line is correct whatever the user,
-    # the uid or the layout.
-    SXAUTH=$(t4 "pgrep -a -x Xorg | grep -oE '\-auth [^ ]+' \
-| head -1 | cut -d' ' -f2")
-    [ -z "$SXAUTH" ] && { echo "FAIL: no -auth on the session Xorg"; \
-                          exit 1; }
-    echo "session xauthority=$SXAUTH"
-    # three levels of quoting (kubectl exec -> bash -lc -> su -c), so the
-    # inner payload is wrapped in DOUBLE quotes: callers pass single
-    # quotes of their own (pkill -f 'xterm.*colorkey') and redirections.
-    sess() { t4 "su -s /bin/bash $SU -c \"DISPLAY=$SD \
-XAUTHORITY=$SXAUTH $*\""; }
-else
-    sess() { t4 "DISPLAY=$SD XAUTHORITY=/var/run/xrdp/\$(id -u)/Xauthority $*"; }
-fi
-
-# fullscreen terminal running the colour-key app. xterm, launched
-# OVERSIZED at +0+0 instead of resized afterwards: xfwm's compositor on
-# headless xrdp sessions repaints window moves but can freeze the
-# on-screen image across window RESIZES (server-side framebuffer proven
-# stale vs xdotool geometry, 2026-07-26).
-sess "pkill -f 'xterm.*colorkey'" 2>/dev/null; sleep 1
-COLS=$((SW / 6 + 10))
-ROWS=$((SH / 13 + 10))
-sess "setsid xterm -geometry ${COLS}x${ROWS}+0+0 -e bash /usr/local/bin/colorkey.sh </dev/null >/dev/null 2>&1 & sleep 0.1"
-qw=""
-for i in $(seq 1 15); do
-    sleep 1
-    qw=$(sess "xdotool search --class 'XTerm|xterm'" 2>/dev/null | tail -1)
-    [ -n "$qw" ] && break
-done
-[ -z "$qw" ] && { echo "FAIL: no terminal"; exit 1; }
-# dismiss any polkit prompt (e.g. colord on fresh login) — it floats over
-# the screen centre and would be read instead of the terminal colour
-for i in 1 2; do
-    pw=$(sess "xdotool search --name '^Authenticate$'" 2>/dev/null | head -1)
-    [ -z "$pw" ] && break
-    sess "xdotool key --window $pw Escape" >/dev/null 2>&1
-    sleep 1
-done
+echo "session client=$CLI target=$TGT_NAME via :$LPORT payload=XDG-autostart"
 
 shot(){ ffmpeg -hide_banner -loglevel error -f x11grab -video_size "$CLIENT_SIZE" \
         -i "$CLI.0" -frames:v 1 -y "$1" 2>/dev/null; }
@@ -228,17 +232,11 @@ EOF
 }
 
 # Synchronize on the DISPLAYED state, not a blind sleep: wait until the
-# client actually shows colorkey's initial black screen. Window geometry
-# is retried inside the loop (applying it right after launch races the
-# WM's initial mapping; move only — never resize, see above), and the
-# cold-login paint flood can back up the client for a few seconds; the
-# press loop must measure steady-state responsivity, not login catch-up.
+# client actually shows colorkey's initial black screen. The cold-login paint
+# flood can back up the client for a few seconds; the press loop must measure
+# steady-state responsivity, not login catch-up.
 settled=0
 for i in $(seq 1 20); do
-    for w in $(sess "xdotool search --class 'XTerm|xterm'" 2>/dev/null); do
-        sess "xdotool windowactivate --sync $w; xdotool windowmove --sync $w 0 0" \
-            >/dev/null 2>&1
-    done
     sleep 1
     shot "$OUT/keytest_settle.png"
     got_pre=$(classify "$OUT/keytest_settle.png")

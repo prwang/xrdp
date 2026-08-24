@@ -1,0 +1,6 @@
+Final post-deployment smoke after enabling NVIDIA persistence mode and
+removing the matrix-only runtime trace service override:
+
+smoke[1920x1080]: target=t4 ok=8 lag=0 edge=1.000 encoder_errors=0
+smoke[1024x768]: target=t4 ok=8 lag=0 edge=1.000 encoder_errors=0
+SMOKE PASS -- safe to hand over

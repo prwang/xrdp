@@ -1,0 +1,3 @@
+condition A2
+profile dense-w1
+seconds 20

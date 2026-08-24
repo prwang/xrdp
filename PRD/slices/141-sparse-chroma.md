@@ -46,7 +46,11 @@ encoder suites. Register `Avc444ChromaDue` in
   `since_previous_ms` and `refresh_ms`. A disabled build shall not perform
   these diagnostic reads. A trailing request shall emit
   `chroma_restore_request` with `monitor_mask`; it is a settle-rate event,
-  never a per-frame `LOG()`.
+  never a per-frame `LOG()`. It shall also emit `video_cmd` at successful
+  luma or chroma command construction with the echoed `frame_id`, numeric
+  `view` (1 for luma, 2 for chroma) and exact command `bytes`. This is the
+  identity source for main-only versus paired byte accounting; transport
+  fragments shall not be paired by time or by the previous server frontier.
 * S141-R9: trailing restoration shall neither retain borrowed capture pages
   past collect nor copy a full capture per moving frame. Module transport I/O
   shall remain on the xrdp main thread. Failure to queue or send a restoration

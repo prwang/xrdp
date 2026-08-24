@@ -1,0 +1,1176 @@
+[2026-08-24T14:25:42.664+0000] [INFO ] Socket 14: connection accepted from 127.0.0.1:58936
+[2026-08-24T14:25:42.671+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-08-24T14:25:42.674+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-08-24T14:25:42.680+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-08-24T14:25:42.683+0000] [INFO ] Selected TLS security
+[2026-08-24T14:25:42.721+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-08-24T14:25:42.724+0000] [INFO ] client supports gfx protocol
+[2026-08-24T14:25:42.727+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-08-24T14:25:42.730+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-08-24T14:25:42.748+0000] [INFO ] TLS connection established from 127.0.0.1:58936 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-08-24T14:25:42.780+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-08-24T14:25:42.783+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-08-24T14:25:42.786+0000] [INFO ] Client does not support Unicode input
+[2026-08-24T14:25:42.789+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-08-24T14:25:42.797+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-08-24T14:25:42.800+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-08-24T14:25:42.803+0000] [INFO ] Login screen monitor height is 2400 pixels over 1000 mm (60 DPI)
+[2026-08-24T14:25:42.816+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-08-24T14:25:42.873+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-08-24T14:25:42.876+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-08-24T14:25:42.879+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-08-24T14:25:42.882+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-08-24T14:25:42.885+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-08-24T14:25:42.888+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-08-24T14:25:42.890+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-08-24T14:25:42.893+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-08-24T14:25:42.896+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-08-24T14:25:42.898+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-08-24T14:25:42.901+0000] [INFO ] unknown version 0x000a0601
+[2026-08-24T14:25:42.904+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-08-24T14:25:42.907+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 3840x2400 (gfx.toml dump_extra=1)
+[2026-08-24T14:25:43.723+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=1) at 3840x2400 in 769 ms
+[2026-08-24T14:25:43.726+0000] [INFO ] gfx.toml eager_slot_ack is ON: the capture slot is released when the encoder children have absorbed the frame and the previous frame has left for the transport
+[2026-08-24T14:25:43.729+0000] [INFO ] gfx.toml aux_ltr_chain is ON: the main and auxiliary views use independent long-term reference slots; scheduled intra refresh every 240 main pictures and every 240 aux pictures, re-key at frame_num 65024
+[2026-08-24T14:25:43.731+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=1)
+[2026-08-24T14:25:43.734+0000] [INFO ] Codec search order is H264, RFX
+[2026-08-24T14:25:43.737+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 9 (0x000a0701)
+[2026-08-24T14:25:43.740+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-08-24T14:25:43.743+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-08-24T14:25:43.745+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-08-24T14:25:43.748+0000] [INFO ] xrdp_egfx_reset_graphics: width 3840 height 2400 monitorcount 1
+[2026-08-24T14:25:43.751+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-08-24T14:25:43.754+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 3840 height 2400
+[2026-08-24T14:25:43.756+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-08-24T14:25:43.759+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-08-24T14:25:43.762+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-08-24T14:25:43.765+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-08-24T14:25:43.768+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-08-24T14:25:43.771+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-08-24T14:25:43.773+0000] [INFO ] xrdp_wm_log_msg: Performing login request for ubuntu
+[2026-08-24T14:25:43.918+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-08-24T14:25:46.457+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user ubuntu
+[2026-08-24T14:25:46.460+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-08-24T14:25:46.467+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-08-24T14:25:46.469+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-08-24T14:25:46.473+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-08-24T14:25:46.476+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-08-24T14:25:46.479+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-08-24T14:25:46.483+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-08-24T14:25:46.486+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-08-24T14:25:46.489+0000] [INFO ] lib_mod_log_peer: xrdp_pid=70350 connected to Xorg_pid=70374 Xorg_uid=1000 Xorg_gid=1000 client=127.0.0.1:58936
+[2026-08-24T14:25:46.499+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-08-24T14:25:46.505+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-08-24T14:25:46.528+0000] [INFO ] Received memory_allocation_complete command. width: 3840, height: 2400
+[2026-08-24T14:25:46.556+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 70681 coded 3840x2400 generation 1
+[2026-08-24T14:25:46.562+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 70682 coded 3840x2400 generation 1
+[2026-08-24T14:25:46.568+0000] [INFO ] xrdp_ffmpeg: aux_ltr_chain (EXPERIMENTAL) active (aux child pid 70682)
+[2026-08-24T14:26:02.615+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-08-24T14:26:02.618+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-08-24T14:26:03.264+0000] [ERROR] xrdp_iso_send: trans_write_copy_s failed
+[2026-08-24T14:26:03.267+0000] [ERROR] xrdp_mcs_send: xrdp_iso_send failed
+[2026-08-24T14:26:03.270+0000] [ERROR] xrdp_sec_send: xrdp_mcs_send failed
+[2026-08-24T14:26:03.273+0000] [ERROR] xrdp_channel_send: xrdp_sec_send failed
+[2026-08-24T14:26:03.276+0000] [ERROR] xrdp_channel_drdynvc_data: xrdp_channel_send failed
+[2026-08-24T14:25:46.554+0000] [INFO ] ACK_TRACE msgin id=1 bytes=55296000 us=3686529988
+[2026-08-24T14:25:46.570+0000] [INFO ] ACK_TRACE submit id=1 monitor=0 us=3686545958
+[2026-08-24T14:25:46.625+0000] [INFO ] ACK_TRACE msgin id=2 bytes=55296000 us=3686601242
+[2026-08-24T14:25:47.368+0000] [INFO ] ACK_TRACE absorb id=1 monitor=0 us=3687343558
+[2026-08-24T14:25:47.368+0000] [INFO ] ACK_TRACE ack id=1 kind=slot egress=0 absorbed=1 client=0 window=2 us=3687343601
+[2026-08-24T14:25:47.379+0000] [INFO ] ACK_TRACE submit id=2 monitor=0 us=3687354599
+[2026-08-24T14:25:47.427+0000] [INFO ] ACK_TRACE egress id=1 shown=1 pending_kib=1246 client=0 us=3687402694
+[2026-08-24T14:25:47.427+0000] [INFO ] ACK_TRACE ack id=1 kind=region egress=1 absorbed=1 client=0 window=2 us=3687402695
+[2026-08-24T14:25:47.428+0000] [INFO ] ACK_TRACE msgin id=3 bytes=55296000 us=3687403840
+[2026-08-24T14:25:47.479+0000] [INFO ] ACK_TRACE absorb id=2 monitor=0 us=3687455067
+[2026-08-24T14:25:47.479+0000] [INFO ] ACK_TRACE ack id=2 kind=slot egress=1 absorbed=2 client=0 window=2 us=3687455101
+[2026-08-24T14:25:47.487+0000] [INFO ] ACK_TRACE submit id=3 monitor=0 us=3687462661
+[2026-08-24T14:25:47.529+0000] [INFO ] ACK_TRACE egress id=2 shown=1 pending_kib=1497 client=0 us=3687505270
+[2026-08-24T14:25:47.529+0000] [INFO ] ACK_TRACE ack id=2 kind=region egress=2 absorbed=2 client=0 window=2 us=3687505271
+[2026-08-24T14:25:47.531+0000] [INFO ] ACK_TRACE msgin id=4 bytes=55296000 us=3687506541
+[2026-08-24T14:25:47.590+0000] [INFO ] ACK_TRACE absorb id=3 monitor=0 us=3687566319
+[2026-08-24T14:25:47.593+0000] [INFO ] ACK_TRACE submit id=4 monitor=0 us=3687568496
+[2026-08-24T14:25:47.590+0000] [INFO ] ACK_TRACE ack id=3 kind=slot egress=2 absorbed=3 client=1 window=2 us=3687566357
+[2026-08-24T14:25:47.625+0000] [INFO ] ACK_TRACE egress id=3 shown=1 pending_kib=0 client=1 us=3687600533
+[2026-08-24T14:25:47.625+0000] [INFO ] ACK_TRACE ack id=3 kind=region egress=3 absorbed=3 client=1 window=2 us=3687600535
+[2026-08-24T14:25:47.674+0000] [INFO ] ACK_TRACE absorb id=4 monitor=0 us=3687650257
+[2026-08-24T14:25:47.675+0000] [INFO ] ACK_TRACE ack id=4 kind=slot egress=3 absorbed=4 client=3 window=2 us=3687651055
+[2026-08-24T14:25:47.694+0000] [INFO ] ACK_TRACE egress id=4 shown=1 pending_kib=0 client=3 us=3687670268
+[2026-08-24T14:25:47.694+0000] [INFO ] ACK_TRACE ack id=4 kind=region egress=4 absorbed=4 client=3 window=2 us=3687670269
+[2026-08-24T14:25:47.713+0000] [INFO ] ACK_TRACE submit id=5 monitor=0 us=3687689031
+[2026-08-24T14:25:47.713+0000] [INFO ] ACK_TRACE msgin id=5 bytes=55296000 us=3687688966
+[2026-08-24T14:25:47.795+0000] [INFO ] ACK_TRACE absorb id=5 monitor=0 us=3687770628
+[2026-08-24T14:25:47.795+0000] [INFO ] ACK_TRACE ack id=5 kind=slot egress=4 absorbed=5 client=4 window=2 us=3687771044
+[2026-08-24T14:25:47.823+0000] [INFO ] ACK_TRACE egress id=5 shown=1 pending_kib=0 client=4 us=3687799307
+[2026-08-24T14:25:47.823+0000] [INFO ] ACK_TRACE ack id=5 kind=region egress=5 absorbed=5 client=4 window=2 us=3687799309
+[2026-08-24T14:25:47.868+0000] [INFO ] ACK_TRACE submit id=6 monitor=0 us=3687844114
+[2026-08-24T14:25:47.868+0000] [INFO ] ACK_TRACE msgin id=6 bytes=55296000 us=3687844084
+[2026-08-24T14:25:47.941+0000] [INFO ] ACK_TRACE absorb id=6 monitor=0 us=3687917034
+[2026-08-24T14:25:47.942+0000] [INFO ] ACK_TRACE ack id=6 kind=slot egress=5 absorbed=6 client=5 window=2 us=3687918045
+[2026-08-24T14:25:47.972+0000] [INFO ] ACK_TRACE egress id=6 shown=1 pending_kib=0 client=5 us=3687947934
+[2026-08-24T14:25:47.972+0000] [INFO ] ACK_TRACE ack id=6 kind=region egress=6 absorbed=6 client=5 window=2 us=3687947935
+[2026-08-24T14:25:48.002+0000] [INFO ] ACK_TRACE submit id=7 monitor=0 us=3687977780
+[2026-08-24T14:25:48.002+0000] [INFO ] ACK_TRACE msgin id=7 bytes=55296000 us=3687977712
+[2026-08-24T14:25:48.069+0000] [INFO ] ACK_TRACE absorb id=7 monitor=0 us=3688044425
+[2026-08-24T14:25:48.069+0000] [INFO ] ACK_TRACE ack id=7 kind=slot egress=6 absorbed=7 client=6 window=2 us=3688044468
+[2026-08-24T14:25:48.093+0000] [INFO ] ACK_TRACE egress id=7 shown=1 pending_kib=0 client=6 us=3688068957
+[2026-08-24T14:25:48.093+0000] [INFO ] ACK_TRACE ack id=7 kind=region egress=7 absorbed=7 client=6 window=2 us=3688068958
+[2026-08-24T14:25:48.114+0000] [INFO ] ACK_TRACE submit id=8 monitor=0 us=3688089795
+[2026-08-24T14:25:48.114+0000] [INFO ] ACK_TRACE msgin id=8 bytes=55296000 us=3688089766
+[2026-08-24T14:25:48.167+0000] [INFO ] ACK_TRACE msgin id=9 bytes=55296000 us=3688143154
+[2026-08-24T14:25:48.175+0000] [INFO ] ACK_TRACE absorb id=8 monitor=0 us=3688151299
+[2026-08-24T14:25:48.180+0000] [INFO ] ACK_TRACE submit id=9 monitor=0 us=3688155510
+[2026-08-24T14:25:48.176+0000] [INFO ] ACK_TRACE ack id=8 kind=slot egress=7 absorbed=8 client=7 window=2 us=3688152043
+[2026-08-24T14:25:48.208+0000] [INFO ] ACK_TRACE egress id=8 shown=1 pending_kib=0 client=7 us=3688183818
+[2026-08-24T14:25:48.208+0000] [INFO ] ACK_TRACE ack id=8 kind=region egress=8 absorbed=8 client=7 window=2 us=3688183820
+[2026-08-24T14:25:48.219+0000] [INFO ] ACK_TRACE msgin id=10 bytes=55296000 us=3688194655
+[2026-08-24T14:25:48.238+0000] [INFO ] ACK_TRACE absorb id=9 monitor=0 us=3688214227
+[2026-08-24T14:25:48.240+0000] [INFO ] ACK_TRACE submit id=10 monitor=0 us=3688215670
+[2026-08-24T14:25:48.238+0000] [INFO ] ACK_TRACE ack id=9 kind=slot egress=8 absorbed=9 client=7 window=2 us=3688214279
+[2026-08-24T14:25:48.301+0000] [INFO ] ACK_TRACE absorb id=10 monitor=0 us=3688276801
+[2026-08-24T14:25:48.302+0000] [INFO ] ACK_TRACE submit id=11 monitor=0 us=3688278114
+[2026-08-24T14:25:48.297+0000] [INFO ] ACK_TRACE egress id=9 shown=1 pending_kib=0 client=7 us=3688273379
+[2026-08-24T14:25:48.297+0000] [INFO ] ACK_TRACE ack id=9 kind=region egress=9 absorbed=9 client=7 window=2 us=3688273380
+[2026-08-24T14:25:48.299+0000] [INFO ] ACK_TRACE msgin id=11 bytes=55296000 us=3688274547
+[2026-08-24T14:25:48.301+0000] [INFO ] ACK_TRACE ack id=10 kind=slot egress=9 absorbed=10 client=8 window=2 us=3688276845
+[2026-08-24T14:25:48.338+0000] [INFO ] ACK_TRACE egress id=10 shown=1 pending_kib=0 client=8 us=3688314142
+[2026-08-24T14:25:48.338+0000] [INFO ] ACK_TRACE ack id=10 kind=region egress=10 absorbed=10 client=8 window=2 us=3688314143
+[2026-08-24T14:25:48.353+0000] [INFO ] ACK_TRACE msgin id=12 bytes=55296000 us=3688329174
+[2026-08-24T14:25:48.364+0000] [INFO ] ACK_TRACE absorb id=11 monitor=0 us=3688340023
+[2026-08-24T14:25:48.365+0000] [INFO ] ACK_TRACE submit id=12 monitor=0 us=3688341373
+[2026-08-24T14:25:48.364+0000] [INFO ] ACK_TRACE ack id=11 kind=slot egress=10 absorbed=11 client=10 window=2 us=3688340065
+[2026-08-24T14:25:48.391+0000] [INFO ] ACK_TRACE egress id=11 shown=1 pending_kib=0 client=10 us=3688366955
+[2026-08-24T14:25:48.391+0000] [INFO ] ACK_TRACE ack id=11 kind=region egress=11 absorbed=11 client=10 window=2 us=3688366956
+[2026-08-24T14:25:48.412+0000] [INFO ] ACK_TRACE msgin id=13 bytes=55296000 us=3688388341
+[2026-08-24T14:25:48.428+0000] [INFO ] ACK_TRACE absorb id=12 monitor=0 us=3688404106
+[2026-08-24T14:25:48.430+0000] [INFO ] ACK_TRACE submit id=13 monitor=0 us=3688405457
+[2026-08-24T14:25:48.428+0000] [INFO ] ACK_TRACE ack id=12 kind=slot egress=11 absorbed=12 client=11 window=2 us=3688404153
+[2026-08-24T14:25:48.453+0000] [INFO ] ACK_TRACE egress id=12 shown=1 pending_kib=0 client=11 us=3688428433
+[2026-08-24T14:25:48.453+0000] [INFO ] ACK_TRACE ack id=12 kind=region egress=12 absorbed=12 client=11 window=2 us=3688428435
+[2026-08-24T14:25:48.482+0000] [INFO ] ACK_TRACE msgin id=14 bytes=55296000 us=3688458054
+[2026-08-24T14:25:48.501+0000] [INFO ] ACK_TRACE absorb id=13 monitor=0 us=3688476432
+[2026-08-24T14:25:48.502+0000] [INFO ] ACK_TRACE submit id=14 monitor=0 us=3688477743
+[2026-08-24T14:25:48.501+0000] [INFO ] ACK_TRACE ack id=13 kind=slot egress=12 absorbed=13 client=12 window=2 us=3688476489
+[2026-08-24T14:25:48.533+0000] [INFO ] ACK_TRACE egress id=13 shown=1 pending_kib=0 client=12 us=3688509073
+[2026-08-24T14:25:48.533+0000] [INFO ] ACK_TRACE ack id=13 kind=region egress=13 absorbed=13 client=12 window=2 us=3688509074
+[2026-08-24T14:25:48.539+0000] [INFO ] ACK_TRACE msgin id=15 bytes=55296000 us=3688515262
+[2026-08-24T14:25:48.568+0000] [INFO ] ACK_TRACE absorb id=14 monitor=0 us=3688544340
+[2026-08-24T14:25:48.570+0000] [INFO ] ACK_TRACE submit id=15 monitor=0 us=3688545567
+[2026-08-24T14:25:48.569+0000] [INFO ] ACK_TRACE ack id=14 kind=slot egress=13 absorbed=14 client=13 window=2 us=3688544403
+[2026-08-24T14:25:48.594+0000] [INFO ] ACK_TRACE egress id=14 shown=1 pending_kib=0 client=13 us=3688570369
+[2026-08-24T14:25:48.594+0000] [INFO ] ACK_TRACE ack id=14 kind=region egress=14 absorbed=14 client=13 window=2 us=3688570371
+[2026-08-24T14:25:48.638+0000] [INFO ] ACK_TRACE absorb id=15 monitor=0 us=3688613736
+[2026-08-24T14:25:48.638+0000] [INFO ] ACK_TRACE ack id=15 kind=slot egress=14 absorbed=15 client=14 window=2 us=3688613789
+[2026-08-24T14:25:48.664+0000] [INFO ] ACK_TRACE submit id=16 monitor=0 us=3688640130
+[2026-08-24T14:25:48.661+0000] [INFO ] ACK_TRACE egress id=15 shown=1 pending_kib=0 client=14 us=3688636813
+[2026-08-24T14:25:48.661+0000] [INFO ] ACK_TRACE ack id=15 kind=region egress=15 absorbed=15 client=14 window=2 us=3688636814
+[2026-08-24T14:25:48.664+0000] [INFO ] ACK_TRACE msgin id=16 bytes=55296000 us=3688640089
+[2026-08-24T14:25:48.733+0000] [INFO ] ACK_TRACE absorb id=16 monitor=0 us=3688709173
+[2026-08-24T14:25:48.733+0000] [INFO ] ACK_TRACE ack id=16 kind=slot egress=15 absorbed=16 client=15 window=2 us=3688709308
+[2026-08-24T14:25:48.760+0000] [INFO ] ACK_TRACE egress id=16 shown=1 pending_kib=0 client=15 us=3688735950
+[2026-08-24T14:25:48.760+0000] [INFO ] ACK_TRACE ack id=16 kind=region egress=16 absorbed=16 client=15 window=2 us=3688735952
+[2026-08-24T14:25:48.785+0000] [INFO ] ACK_TRACE submit id=17 monitor=0 us=3688761036
+[2026-08-24T14:25:48.784+0000] [INFO ] ACK_TRACE msgin id=17 bytes=55296000 us=3688760016
+[2026-08-24T14:25:48.857+0000] [INFO ] ACK_TRACE absorb id=17 monitor=0 us=3688833391
+[2026-08-24T14:25:48.858+0000] [INFO ] ACK_TRACE ack id=17 kind=slot egress=16 absorbed=17 client=16 window=2 us=3688834044
+[2026-08-24T14:25:48.886+0000] [INFO ] ACK_TRACE submit id=18 monitor=0 us=3688861797
+[2026-08-24T14:25:48.885+0000] [INFO ] ACK_TRACE egress id=17 shown=1 pending_kib=0 client=16 us=3688860657
+[2026-08-24T14:25:48.885+0000] [INFO ] ACK_TRACE ack id=17 kind=region egress=17 absorbed=17 client=16 window=2 us=3688860658
+[2026-08-24T14:25:48.886+0000] [INFO ] ACK_TRACE msgin id=18 bytes=55296000 us=3688861743
+[2026-08-24T14:25:48.954+0000] [INFO ] ACK_TRACE absorb id=18 monitor=0 us=3688929836
+[2026-08-24T14:25:48.954+0000] [INFO ] ACK_TRACE ack id=18 kind=slot egress=17 absorbed=18 client=17 window=2 us=3688929887
+[2026-08-24T14:25:48.982+0000] [INFO ] ACK_TRACE submit id=19 monitor=0 us=3688957886
+[2026-08-24T14:25:48.981+0000] [INFO ] ACK_TRACE egress id=18 shown=1 pending_kib=0 client=17 us=3688956711
+[2026-08-24T14:25:48.981+0000] [INFO ] ACK_TRACE ack id=18 kind=region egress=18 absorbed=18 client=17 window=2 us=3688956712
+[2026-08-24T14:25:48.982+0000] [INFO ] ACK_TRACE msgin id=19 bytes=55296000 us=3688957858
+[2026-08-24T14:25:49.051+0000] [INFO ] ACK_TRACE absorb id=19 monitor=0 us=3689026658
+[2026-08-24T14:25:49.051+0000] [INFO ] ACK_TRACE ack id=19 kind=slot egress=18 absorbed=19 client=18 window=2 us=3689026704
+[2026-08-24T14:25:49.079+0000] [INFO ] ACK_TRACE submit id=20 monitor=0 us=3689055128
+[2026-08-24T14:25:49.078+0000] [INFO ] ACK_TRACE egress id=19 shown=1 pending_kib=0 client=18 us=3689053990
+[2026-08-24T14:25:49.078+0000] [INFO ] ACK_TRACE ack id=19 kind=region egress=19 absorbed=19 client=18 window=2 us=3689053991
+[2026-08-24T14:25:49.079+0000] [INFO ] ACK_TRACE msgin id=20 bytes=55296000 us=3689055101
+[2026-08-24T14:25:49.159+0000] [INFO ] ACK_TRACE absorb id=20 monitor=0 us=3689135263
+[2026-08-24T14:25:49.160+0000] [INFO ] ACK_TRACE ack id=20 kind=slot egress=19 absorbed=20 client=19 window=2 us=3689136044
+[2026-08-24T14:25:49.190+0000] [INFO ] ACK_TRACE submit id=21 monitor=0 us=3689166036
+[2026-08-24T14:25:49.188+0000] [INFO ] ACK_TRACE egress id=20 shown=1 pending_kib=0 client=19 us=3689164353
+[2026-08-24T14:25:49.188+0000] [INFO ] ACK_TRACE ack id=20 kind=region egress=20 absorbed=20 client=19 window=2 us=3689164355
+[2026-08-24T14:25:49.190+0000] [INFO ] ACK_TRACE msgin id=21 bytes=55296000 us=3689165546
+[2026-08-24T14:25:49.267+0000] [INFO ] ACK_TRACE msgin id=22 bytes=55296000 us=3689243089
+[2026-08-24T14:25:49.288+0000] [INFO ] ACK_TRACE absorb id=21 monitor=0 us=3689264195
+[2026-08-24T14:25:49.292+0000] [INFO ] ACK_TRACE submit id=22 monitor=0 us=3689267500
+[2026-08-24T14:25:49.288+0000] [INFO ] ACK_TRACE ack id=21 kind=slot egress=20 absorbed=21 client=20 window=2 us=3689264239
+[2026-08-24T14:25:49.323+0000] [INFO ] ACK_TRACE egress id=21 shown=1 pending_kib=0 client=20 us=3689299028
+[2026-08-24T14:25:49.323+0000] [INFO ] ACK_TRACE ack id=21 kind=region egress=21 absorbed=21 client=20 window=2 us=3689299029
+[2026-08-24T14:25:49.368+0000] [INFO ] ACK_TRACE absorb id=22 monitor=0 us=3689344325
+[2026-08-24T14:25:49.368+0000] [INFO ] ACK_TRACE ack id=22 kind=slot egress=21 absorbed=22 client=21 window=2 us=3689344365
+[2026-08-24T14:25:49.399+0000] [INFO ] ACK_TRACE submit id=23 monitor=0 us=3689374859
+[2026-08-24T14:25:49.398+0000] [INFO ] ACK_TRACE egress id=22 shown=1 pending_kib=0 client=21 us=3689373681
+[2026-08-24T14:25:49.398+0000] [INFO ] ACK_TRACE ack id=22 kind=region egress=22 absorbed=22 client=21 window=2 us=3689373682
+[2026-08-24T14:25:49.399+0000] [INFO ] ACK_TRACE msgin id=23 bytes=55296000 us=3689374821
+[2026-08-24T14:25:49.440+0000] [INFO ] ACK_TRACE msgin id=24 bytes=55296000 us=3689415481
+[2026-08-24T14:25:49.469+0000] [INFO ] ACK_TRACE absorb id=23 monitor=0 us=3689445120
+[2026-08-24T14:25:49.471+0000] [INFO ] ACK_TRACE submit id=24 monitor=0 us=3689446714
+[2026-08-24T14:25:49.469+0000] [INFO ] ACK_TRACE ack id=23 kind=slot egress=22 absorbed=23 client=22 window=2 us=3689445195
+[2026-08-24T14:25:49.507+0000] [INFO ] ACK_TRACE egress id=23 shown=1 pending_kib=0 client=22 us=3689483215
+[2026-08-24T14:25:49.507+0000] [INFO ] ACK_TRACE ack id=23 kind=region egress=23 absorbed=23 client=22 window=2 us=3689483216
+[2026-08-24T14:25:49.508+0000] [INFO ] ACK_TRACE msgin id=25 bytes=55296000 us=3689484370
+[2026-08-24T14:25:49.541+0000] [INFO ] ACK_TRACE absorb id=24 monitor=0 us=3689517227
+[2026-08-24T14:25:49.543+0000] [INFO ] ACK_TRACE submit id=25 monitor=0 us=3689518641
+[2026-08-24T14:25:49.541+0000] [INFO ] ACK_TRACE ack id=24 kind=slot egress=23 absorbed=24 client=23 window=2 us=3689517299
+[2026-08-24T14:25:49.584+0000] [INFO ] ACK_TRACE egress id=24 shown=1 pending_kib=0 client=23 us=3689560062
+[2026-08-24T14:25:49.584+0000] [INFO ] ACK_TRACE ack id=24 kind=region egress=24 absorbed=24 client=23 window=2 us=3689560063
+[2026-08-24T14:25:49.585+0000] [INFO ] ACK_TRACE msgin id=26 bytes=55296000 us=3689561321
+[2026-08-24T14:25:49.611+0000] [INFO ] ACK_TRACE absorb id=25 monitor=0 us=3689586511
+[2026-08-24T14:25:49.612+0000] [INFO ] ACK_TRACE submit id=26 monitor=0 us=3689587918
+[2026-08-24T14:25:49.611+0000] [INFO ] ACK_TRACE ack id=25 kind=slot egress=24 absorbed=25 client=24 window=2 us=3689586570
+[2026-08-24T14:25:49.644+0000] [INFO ] ACK_TRACE egress id=25 shown=1 pending_kib=0 client=24 us=3689619921
+[2026-08-24T14:25:49.644+0000] [INFO ] ACK_TRACE ack id=25 kind=region egress=25 absorbed=25 client=24 window=2 us=3689619922
+[2026-08-24T14:25:49.645+0000] [INFO ] ACK_TRACE msgin id=27 bytes=55296000 us=3689620986
+[2026-08-24T14:25:49.692+0000] [INFO ] ACK_TRACE absorb id=26 monitor=0 us=3689667464
+[2026-08-24T14:25:49.694+0000] [INFO ] ACK_TRACE submit id=27 monitor=0 us=3689669597
+[2026-08-24T14:25:49.692+0000] [INFO ] ACK_TRACE ack id=26 kind=slot egress=25 absorbed=26 client=25 window=2 us=3689667504
+[2026-08-24T14:25:49.727+0000] [INFO ] ACK_TRACE egress id=26 shown=1 pending_kib=795 client=25 us=3689702681
+[2026-08-24T14:25:49.727+0000] [INFO ] ACK_TRACE ack id=26 kind=region egress=26 absorbed=26 client=25 window=2 us=3689702683
+[2026-08-24T14:25:49.728+0000] [INFO ] ACK_TRACE msgin id=28 bytes=55296000 us=3689703795
+[2026-08-24T14:25:49.772+0000] [INFO ] ACK_TRACE absorb id=27 monitor=0 us=3689748070
+[2026-08-24T14:25:49.774+0000] [INFO ] ACK_TRACE submit id=28 monitor=0 us=3689749559
+[2026-08-24T14:25:49.773+0000] [INFO ] ACK_TRACE ack id=27 kind=slot egress=26 absorbed=27 client=25 window=2 us=3689749024
+[2026-08-24T14:25:49.813+0000] [INFO ] ACK_TRACE egress id=27 shown=1 pending_kib=0 client=25 us=3689788673
+[2026-08-24T14:25:49.813+0000] [INFO ] ACK_TRACE ack id=27 kind=region egress=27 absorbed=27 client=25 window=2 us=3689788674
+[2026-08-24T14:25:49.833+0000] [INFO ] ACK_TRACE msgin id=29 bytes=55296000 us=3689809328
+[2026-08-24T14:25:49.877+0000] [INFO ] ACK_TRACE absorb id=28 monitor=0 us=3689852470
+[2026-08-24T14:25:49.878+0000] [INFO ] ACK_TRACE submit id=29 monitor=0 us=3689854222
+[2026-08-24T14:25:49.877+0000] [INFO ] ACK_TRACE ack id=28 kind=slot egress=27 absorbed=28 client=27 window=2 us=3689853059
+[2026-08-24T14:25:49.962+0000] [INFO ] ACK_TRACE egress id=28 shown=1 pending_kib=0 client=27 us=3689937958
+[2026-08-24T14:25:49.962+0000] [INFO ] ACK_TRACE ack id=28 kind=region egress=28 absorbed=28 client=27 window=2 us=3689937959
+[2026-08-24T14:25:49.963+0000] [INFO ] ACK_TRACE msgin id=30 bytes=55296000 us=3689939300
+[2026-08-24T14:25:49.980+0000] [INFO ] ACK_TRACE absorb id=29 monitor=0 us=3689955756
+[2026-08-24T14:25:49.981+0000] [INFO ] ACK_TRACE submit id=30 monitor=0 us=3689957162
+[2026-08-24T14:25:49.980+0000] [INFO ] ACK_TRACE ack id=29 kind=slot egress=28 absorbed=29 client=27 window=2 us=3689956045
+[2026-08-24T14:25:50.011+0000] [INFO ] ACK_TRACE egress id=29 shown=1 pending_kib=0 client=27 us=3689987050
+[2026-08-24T14:25:50.011+0000] [INFO ] ACK_TRACE ack id=29 kind=region egress=29 absorbed=29 client=27 window=2 us=3689987051
+[2026-08-24T14:25:50.036+0000] [INFO ] ACK_TRACE msgin id=31 bytes=55296000 us=3690011642
+[2026-08-24T14:25:50.068+0000] [INFO ] ACK_TRACE absorb id=30 monitor=0 us=3690043580
+[2026-08-24T14:25:50.068+0000] [INFO ] ACK_TRACE ack id=30 kind=slot egress=29 absorbed=30 client=29 window=2 us=3690044046
+[2026-08-24T14:25:50.069+0000] [INFO ] ACK_TRACE submit id=31 monitor=0 us=3690044992
+[2026-08-24T14:25:50.099+0000] [INFO ] ACK_TRACE egress id=30 shown=1 pending_kib=0 client=29 us=3690074687
+[2026-08-24T14:25:50.099+0000] [INFO ] ACK_TRACE ack id=30 kind=region egress=30 absorbed=30 client=29 window=2 us=3690074688
+[2026-08-24T14:25:50.147+0000] [INFO ] ACK_TRACE absorb id=31 monitor=0 us=3690122921
+[2026-08-24T14:25:50.147+0000] [INFO ] ACK_TRACE ack id=31 kind=slot egress=30 absorbed=31 client=30 window=2 us=3690123048
+[2026-08-24T14:25:50.180+0000] [INFO ] ACK_TRACE egress id=31 shown=1 pending_kib=0 client=30 us=3690155456
+[2026-08-24T14:25:50.180+0000] [INFO ] ACK_TRACE ack id=31 kind=region egress=31 absorbed=31 client=30 window=2 us=3690155457
+[2026-08-24T14:25:50.198+0000] [INFO ] ACK_TRACE submit id=32 monitor=0 us=3690173777
+[2026-08-24T14:25:50.198+0000] [INFO ] ACK_TRACE msgin id=32 bytes=55296000 us=3690173627
+[2026-08-24T14:25:50.278+0000] [INFO ] ACK_TRACE msgin id=33 bytes=55296000 us=3690253723
+[2026-08-24T14:25:50.286+0000] [INFO ] ACK_TRACE absorb id=32 monitor=0 us=3690262361
+[2026-08-24T14:25:50.288+0000] [INFO ] ACK_TRACE submit id=33 monitor=0 us=3690263670
+[2026-08-24T14:25:50.287+0000] [INFO ] ACK_TRACE ack id=32 kind=slot egress=31 absorbed=32 client=31 window=2 us=3690263045
+[2026-08-24T14:25:50.317+0000] [INFO ] ACK_TRACE egress id=32 shown=1 pending_kib=0 client=31 us=3690292753
+[2026-08-24T14:25:50.317+0000] [INFO ] ACK_TRACE ack id=32 kind=region egress=32 absorbed=32 client=31 window=2 us=3690292754
+[2026-08-24T14:25:50.350+0000] [INFO ] ACK_TRACE msgin id=34 bytes=55296000 us=3690325414
+[2026-08-24T14:25:50.365+0000] [INFO ] ACK_TRACE absorb id=33 monitor=0 us=3690340778
+[2026-08-24T14:25:50.366+0000] [INFO ] ACK_TRACE submit id=34 monitor=0 us=3690341946
+[2026-08-24T14:25:50.365+0000] [INFO ] ACK_TRACE ack id=33 kind=slot egress=32 absorbed=33 client=32 window=2 us=3690340832
+[2026-08-24T14:25:50.393+0000] [INFO ] ACK_TRACE egress id=33 shown=1 pending_kib=0 client=32 us=3690368456
+[2026-08-24T14:25:50.393+0000] [INFO ] ACK_TRACE ack id=33 kind=region egress=33 absorbed=33 client=32 window=2 us=3690368457
+[2026-08-24T14:25:50.410+0000] [INFO ] ACK_TRACE msgin id=35 bytes=55296000 us=3690386215
+[2026-08-24T14:25:50.454+0000] [INFO ] ACK_TRACE absorb id=34 monitor=0 us=3690430229
+[2026-08-24T14:25:50.456+0000] [INFO ] ACK_TRACE submit id=35 monitor=0 us=3690431403
+[2026-08-24T14:25:50.454+0000] [INFO ] ACK_TRACE ack id=34 kind=slot egress=33 absorbed=34 client=33 window=2 us=3690430291
+[2026-08-24T14:25:50.501+0000] [INFO ] ACK_TRACE egress id=34 shown=1 pending_kib=0 client=33 us=3690476720
+[2026-08-24T14:25:50.501+0000] [INFO ] ACK_TRACE ack id=34 kind=region egress=34 absorbed=34 client=33 window=2 us=3690476721
+[2026-08-24T14:25:50.502+0000] [INFO ] ACK_TRACE msgin id=36 bytes=55296000 us=3690477925
+[2026-08-24T14:25:50.530+0000] [INFO ] ACK_TRACE absorb id=35 monitor=0 us=3690505864
+[2026-08-24T14:25:50.531+0000] [INFO ] ACK_TRACE submit id=36 monitor=0 us=3690507108
+[2026-08-24T14:25:50.530+0000] [INFO ] ACK_TRACE ack id=35 kind=slot egress=34 absorbed=35 client=33 window=2 us=3690505929
+[2026-08-24T14:25:50.561+0000] [INFO ] ACK_TRACE egress id=35 shown=1 pending_kib=0 client=33 us=3690536470
+[2026-08-24T14:25:50.561+0000] [INFO ] ACK_TRACE ack id=35 kind=region egress=35 absorbed=35 client=33 window=2 us=3690536472
+[2026-08-24T14:25:50.562+0000] [INFO ] ACK_TRACE msgin id=37 bytes=55296000 us=3690537584
+[2026-08-24T14:25:50.615+0000] [INFO ] ACK_TRACE absorb id=36 monitor=0 us=3690590930
+[2026-08-24T14:25:50.615+0000] [INFO ] ACK_TRACE ack id=36 kind=slot egress=35 absorbed=36 client=35 window=2 us=3690590982
+[2026-08-24T14:25:50.616+0000] [INFO ] ACK_TRACE submit id=37 monitor=0 us=3690592183
+[2026-08-24T14:25:50.651+0000] [INFO ] ACK_TRACE egress id=36 shown=1 pending_kib=0 client=35 us=3690627087
+[2026-08-24T14:25:50.651+0000] [INFO ] ACK_TRACE ack id=36 kind=region egress=36 absorbed=36 client=35 window=2 us=3690627088
+[2026-08-24T14:25:50.653+0000] [INFO ] ACK_TRACE msgin id=38 bytes=55296000 us=3690628784
+[2026-08-24T14:25:50.701+0000] [INFO ] ACK_TRACE absorb id=37 monitor=0 us=3690676936
+[2026-08-24T14:25:50.702+0000] [INFO ] ACK_TRACE submit id=38 monitor=0 us=3690678260
+[2026-08-24T14:25:50.701+0000] [INFO ] ACK_TRACE ack id=37 kind=slot egress=36 absorbed=37 client=36 window=2 us=3690677042
+[2026-08-24T14:25:50.773+0000] [INFO ] ACK_TRACE egress id=37 shown=1 pending_kib=0 client=36 us=3690748735
+[2026-08-24T14:25:50.773+0000] [INFO ] ACK_TRACE ack id=37 kind=region egress=37 absorbed=37 client=36 window=2 us=3690748737
+[2026-08-24T14:25:50.775+0000] [INFO ] ACK_TRACE msgin id=39 bytes=55296000 us=3690751180
+[2026-08-24T14:25:50.823+0000] [INFO ] ACK_TRACE absorb id=38 monitor=0 us=3690799383
+[2026-08-24T14:25:50.825+0000] [INFO ] ACK_TRACE submit id=39 monitor=0 us=3690800655
+[2026-08-24T14:25:50.824+0000] [INFO ] ACK_TRACE ack id=38 kind=slot egress=37 absorbed=38 client=37 window=2 us=3690800041
+[2026-08-24T14:25:50.857+0000] [INFO ] ACK_TRACE egress id=38 shown=1 pending_kib=1192 client=37 us=3690832434
+[2026-08-24T14:25:50.857+0000] [INFO ] ACK_TRACE ack id=38 kind=region egress=38 absorbed=38 client=37 window=2 us=3690832436
+[2026-08-24T14:25:50.908+0000] [INFO ] ACK_TRACE msgin id=40 bytes=55296000 us=3690884121
+[2026-08-24T14:25:50.932+0000] [INFO ] ACK_TRACE absorb id=39 monitor=0 us=3690907504
+[2026-08-24T14:25:50.933+0000] [INFO ] ACK_TRACE submit id=40 monitor=0 us=3690908807
+[2026-08-24T14:25:50.932+0000] [INFO ] ACK_TRACE ack id=39 kind=slot egress=38 absorbed=39 client=38 window=2 us=3690907539
+[2026-08-24T14:25:50.981+0000] [INFO ] ACK_TRACE egress id=39 shown=1 pending_kib=0 client=38 us=3690956816
+[2026-08-24T14:25:50.981+0000] [INFO ] ACK_TRACE ack id=39 kind=region egress=39 absorbed=39 client=38 window=2 us=3690956818
+[2026-08-24T14:25:50.982+0000] [INFO ] ACK_TRACE msgin id=41 bytes=55296000 us=3690957862
+[2026-08-24T14:25:51.006+0000] [INFO ] ACK_TRACE absorb id=40 monitor=0 us=3690981622
+[2026-08-24T14:25:51.007+0000] [INFO ] ACK_TRACE submit id=41 monitor=0 us=3690983069
+[2026-08-24T14:25:51.006+0000] [INFO ] ACK_TRACE ack id=40 kind=slot egress=39 absorbed=40 client=38 window=2 us=3690981659
+[2026-08-24T14:25:51.036+0000] [INFO ] ACK_TRACE egress id=40 shown=1 pending_kib=0 client=38 us=3691011624
+[2026-08-24T14:25:51.036+0000] [INFO ] ACK_TRACE ack id=40 kind=region egress=40 absorbed=40 client=38 window=2 us=3691011624
+[2026-08-24T14:25:51.037+0000] [INFO ] ACK_TRACE msgin id=42 bytes=55296000 us=3691012429
+[2026-08-24T14:25:51.089+0000] [INFO ] ACK_TRACE absorb id=41 monitor=0 us=3691065362
+[2026-08-24T14:25:51.090+0000] [INFO ] ACK_TRACE ack id=41 kind=slot egress=40 absorbed=41 client=39 window=2 us=3691066045
+[2026-08-24T14:25:51.094+0000] [INFO ] ACK_TRACE submit id=42 monitor=0 us=3691069444
+[2026-08-24T14:25:51.126+0000] [INFO ] ACK_TRACE egress id=41 shown=1 pending_kib=0 client=39 us=3691102289
+[2026-08-24T14:25:51.126+0000] [INFO ] ACK_TRACE ack id=41 kind=region egress=41 absorbed=41 client=39 window=2 us=3691102290
+[2026-08-24T14:25:51.128+0000] [INFO ] ACK_TRACE msgin id=43 bytes=55296000 us=3691103404
+[2026-08-24T14:25:51.168+0000] [INFO ] ACK_TRACE absorb id=42 monitor=0 us=3691144366
+[2026-08-24T14:25:51.170+0000] [INFO ] ACK_TRACE submit id=43 monitor=0 us=3691145549
+[2026-08-24T14:25:51.169+0000] [INFO ] ACK_TRACE ack id=42 kind=slot egress=41 absorbed=42 client=41 window=2 us=3691144433
+[2026-08-24T14:25:51.197+0000] [INFO ] ACK_TRACE egress id=42 shown=1 pending_kib=0 client=41 us=3691172916
+[2026-08-24T14:25:51.197+0000] [INFO ] ACK_TRACE ack id=42 kind=region egress=42 absorbed=42 client=41 window=2 us=3691172917
+[2026-08-24T14:25:51.218+0000] [INFO ] ACK_TRACE msgin id=44 bytes=55296000 us=3691194016
+[2026-08-24T14:25:51.249+0000] [INFO ] ACK_TRACE absorb id=43 monitor=0 us=3691225374
+[2026-08-24T14:25:51.253+0000] [INFO ] ACK_TRACE submit id=44 monitor=0 us=3691228465
+[2026-08-24T14:25:51.250+0000] [INFO ] ACK_TRACE ack id=43 kind=slot egress=42 absorbed=43 client=42 window=2 us=3691225413
+[2026-08-24T14:25:51.287+0000] [INFO ] ACK_TRACE egress id=43 shown=1 pending_kib=0 client=42 us=3691262933
+[2026-08-24T14:25:51.287+0000] [INFO ] ACK_TRACE ack id=43 kind=region egress=43 absorbed=43 client=42 window=2 us=3691262934
+[2026-08-24T14:25:51.334+0000] [INFO ] ACK_TRACE absorb id=44 monitor=0 us=3691309459
+[2026-08-24T14:25:51.334+0000] [INFO ] ACK_TRACE ack id=44 kind=slot egress=43 absorbed=44 client=43 window=2 us=3691309500
+[2026-08-24T14:25:51.363+0000] [INFO ] ACK_TRACE submit id=45 monitor=0 us=3691338734
+[2026-08-24T14:25:51.362+0000] [INFO ] ACK_TRACE egress id=44 shown=1 pending_kib=0 client=43 us=3691337510
+[2026-08-24T14:25:51.362+0000] [INFO ] ACK_TRACE ack id=44 kind=region egress=44 absorbed=44 client=43 window=2 us=3691337512
+[2026-08-24T14:25:51.363+0000] [INFO ] ACK_TRACE msgin id=45 bytes=55296000 us=3691338709
+[2026-08-24T14:25:51.431+0000] [INFO ] ACK_TRACE msgin id=46 bytes=55296000 us=3691406665
+[2026-08-24T14:25:51.460+0000] [INFO ] ACK_TRACE absorb id=45 monitor=0 us=3691436064
+[2026-08-24T14:25:51.462+0000] [INFO ] ACK_TRACE submit id=46 monitor=0 us=3691438347
+[2026-08-24T14:25:51.460+0000] [INFO ] ACK_TRACE ack id=45 kind=slot egress=44 absorbed=45 client=44 window=2 us=3691436105
+[2026-08-24T14:25:51.497+0000] [INFO ] ACK_TRACE egress id=45 shown=1 pending_kib=0 client=44 us=3691472692
+[2026-08-24T14:25:51.497+0000] [INFO ] ACK_TRACE ack id=45 kind=region egress=45 absorbed=45 client=44 window=2 us=3691472693
+[2026-08-24T14:25:51.547+0000] [INFO ] ACK_TRACE absorb id=46 monitor=0 us=3691523393
+[2026-08-24T14:25:51.548+0000] [INFO ] ACK_TRACE ack id=46 kind=slot egress=45 absorbed=46 client=45 window=2 us=3691523433
+[2026-08-24T14:25:51.576+0000] [INFO ] ACK_TRACE submit id=47 monitor=0 us=3691552159
+[2026-08-24T14:25:51.575+0000] [INFO ] ACK_TRACE egress id=46 shown=1 pending_kib=0 client=45 us=3691550876
+[2026-08-24T14:25:51.575+0000] [INFO ] ACK_TRACE ack id=46 kind=region egress=46 absorbed=46 client=45 window=2 us=3691550878
+[2026-08-24T14:25:51.576+0000] [INFO ] ACK_TRACE msgin id=47 bytes=55296000 us=3691552129
+[2026-08-24T14:25:51.650+0000] [INFO ] ACK_TRACE absorb id=47 monitor=0 us=3691626328
+[2026-08-24T14:25:51.651+0000] [INFO ] ACK_TRACE ack id=47 kind=slot egress=46 absorbed=47 client=46 window=2 us=3691626865
+[2026-08-24T14:25:51.651+0000] [INFO ] ACK_TRACE msgin id=48 bytes=55296000 us=3691627027
+[2026-08-24T14:25:51.652+0000] [INFO ] ACK_TRACE submit id=48 monitor=0 us=3691627766
+[2026-08-24T14:25:51.692+0000] [INFO ] ACK_TRACE egress id=47 shown=1 pending_kib=0 client=46 us=3691667869
+[2026-08-24T14:25:51.692+0000] [INFO ] ACK_TRACE ack id=47 kind=region egress=47 absorbed=47 client=46 window=2 us=3691667870
+[2026-08-24T14:25:51.720+0000] [INFO ] ACK_TRACE msgin id=49 bytes=55296000 us=3691695702
+[2026-08-24T14:25:51.728+0000] [INFO ] ACK_TRACE absorb id=48 monitor=0 us=3691703540
+[2026-08-24T14:25:51.732+0000] [INFO ] ACK_TRACE submit id=49 monitor=0 us=3691707458
+[2026-08-24T14:25:51.728+0000] [INFO ] ACK_TRACE ack id=48 kind=slot egress=47 absorbed=48 client=47 window=2 us=3691704043
+[2026-08-24T14:25:51.777+0000] [INFO ] ACK_TRACE egress id=48 shown=1 pending_kib=0 client=47 us=3691752849
+[2026-08-24T14:25:51.777+0000] [INFO ] ACK_TRACE ack id=48 kind=region egress=48 absorbed=48 client=47 window=2 us=3691752863
+[2026-08-24T14:25:51.783+0000] [INFO ] ACK_TRACE msgin id=50 bytes=55296000 us=3691758829
+[2026-08-24T14:25:51.807+0000] [INFO ] ACK_TRACE absorb id=49 monitor=0 us=3691782487
+[2026-08-24T14:25:51.808+0000] [INFO ] ACK_TRACE submit id=50 monitor=0 us=3691783759
+[2026-08-24T14:25:51.807+0000] [INFO ] ACK_TRACE ack id=49 kind=slot egress=48 absorbed=49 client=48 window=2 us=3691782514
+[2026-08-24T14:25:51.838+0000] [INFO ] ACK_TRACE egress id=49 shown=1 pending_kib=0 client=48 us=3691813505
+[2026-08-24T14:25:51.838+0000] [INFO ] ACK_TRACE ack id=49 kind=region egress=49 absorbed=49 client=48 window=2 us=3691813506
+[2026-08-24T14:25:51.885+0000] [INFO ] ACK_TRACE msgin id=51 bytes=55296000 us=3691860485
+[2026-08-24T14:25:51.892+0000] [INFO ] ACK_TRACE absorb id=50 monitor=0 us=3691868023
+[2026-08-24T14:25:51.897+0000] [INFO ] ACK_TRACE submit id=51 monitor=0 us=3691873298
+[2026-08-24T14:25:51.892+0000] [INFO ] ACK_TRACE ack id=50 kind=slot egress=49 absorbed=50 client=49 window=2 us=3691868058
+[2026-08-24T14:25:51.932+0000] [INFO ] ACK_TRACE egress id=50 shown=1 pending_kib=0 client=49 us=3691908325
+[2026-08-24T14:25:51.932+0000] [INFO ] ACK_TRACE ack id=50 kind=region egress=50 absorbed=50 client=49 window=2 us=3691908327
+[2026-08-24T14:25:51.979+0000] [INFO ] ACK_TRACE msgin id=52 bytes=55296000 us=3691955087
+[2026-08-24T14:25:51.980+0000] [INFO ] ACK_TRACE absorb id=51 monitor=0 us=3691956223
+[2026-08-24T14:25:51.983+0000] [INFO ] ACK_TRACE submit id=52 monitor=0 us=3691958507
+[2026-08-24T14:25:51.980+0000] [INFO ] ACK_TRACE ack id=51 kind=slot egress=50 absorbed=51 client=50 window=2 us=3691956257
+[2026-08-24T14:25:52.013+0000] [INFO ] ACK_TRACE egress id=51 shown=1 pending_kib=810 client=50 us=3691988810
+[2026-08-24T14:25:52.013+0000] [INFO ] ACK_TRACE ack id=51 kind=region egress=51 absorbed=51 client=50 window=2 us=3691988812
+[2026-08-24T14:25:52.061+0000] [INFO ] ACK_TRACE absorb id=52 monitor=0 us=3692036861
+[2026-08-24T14:25:52.054+0000] [INFO ] ACK_TRACE msgin id=53 bytes=55296000 us=3692030028
+[2026-08-24T14:25:52.061+0000] [INFO ] ACK_TRACE ack id=52 kind=slot egress=51 absorbed=52 client=51 window=2 us=3692036896
+[2026-08-24T14:25:52.062+0000] [INFO ] ACK_TRACE submit id=53 monitor=0 us=3692038150
+[2026-08-24T14:25:52.095+0000] [INFO ] ACK_TRACE egress id=52 shown=1 pending_kib=0 client=51 us=3692070651
+[2026-08-24T14:25:52.095+0000] [INFO ] ACK_TRACE ack id=52 kind=region egress=52 absorbed=52 client=51 window=2 us=3692070652
+[2026-08-24T14:25:52.111+0000] [INFO ] ACK_TRACE msgin id=54 bytes=55296000 us=3692087266
+[2026-08-24T14:25:52.137+0000] [INFO ] ACK_TRACE absorb id=53 monitor=0 us=3692113284
+[2026-08-24T14:25:52.139+0000] [INFO ] ACK_TRACE submit id=54 monitor=0 us=3692114471
+[2026-08-24T14:25:52.137+0000] [INFO ] ACK_TRACE ack id=53 kind=slot egress=52 absorbed=53 client=52 window=2 us=3692113332
+[2026-08-24T14:25:52.170+0000] [INFO ] ACK_TRACE egress id=53 shown=1 pending_kib=0 client=52 us=3692145765
+[2026-08-24T14:25:52.170+0000] [INFO ] ACK_TRACE ack id=53 kind=region egress=53 absorbed=53 client=52 window=2 us=3692145766
+[2026-08-24T14:25:52.184+0000] [INFO ] ACK_TRACE msgin id=55 bytes=55296000 us=3692160270
+[2026-08-24T14:25:52.223+0000] [INFO ] ACK_TRACE absorb id=54 monitor=0 us=3692198702
+[2026-08-24T14:25:52.224+0000] [INFO ] ACK_TRACE submit id=55 monitor=0 us=3692199961
+[2026-08-24T14:25:52.223+0000] [INFO ] ACK_TRACE ack id=54 kind=slot egress=53 absorbed=54 client=53 window=2 us=3692198743
+[2026-08-24T14:25:52.255+0000] [INFO ] ACK_TRACE egress id=54 shown=1 pending_kib=1090 client=53 us=3692231305
+[2026-08-24T14:25:52.255+0000] [INFO ] ACK_TRACE ack id=54 kind=region egress=54 absorbed=54 client=53 window=2 us=3692231306
+[2026-08-24T14:25:52.257+0000] [INFO ] ACK_TRACE msgin id=56 bytes=55296000 us=3692232707
+[2026-08-24T14:25:52.307+0000] [INFO ] ACK_TRACE absorb id=55 monitor=0 us=3692282601
+[2026-08-24T14:25:52.308+0000] [INFO ] ACK_TRACE submit id=56 monitor=0 us=3692283871
+[2026-08-24T14:25:52.307+0000] [INFO ] ACK_TRACE ack id=55 kind=slot egress=54 absorbed=55 client=54 window=2 us=3692282645
+[2026-08-24T14:25:52.342+0000] [INFO ] ACK_TRACE egress id=55 shown=1 pending_kib=0 client=54 us=3692318387
+[2026-08-24T14:25:52.342+0000] [INFO ] ACK_TRACE ack id=55 kind=region egress=55 absorbed=55 client=54 window=2 us=3692318389
+[2026-08-24T14:25:52.344+0000] [INFO ] ACK_TRACE msgin id=57 bytes=55296000 us=3692319547
+[2026-08-24T14:25:52.381+0000] [INFO ] ACK_TRACE absorb id=56 monitor=0 us=3692356848
+[2026-08-24T14:25:52.382+0000] [INFO ] ACK_TRACE submit id=57 monitor=0 us=3692358102
+[2026-08-24T14:25:52.381+0000] [INFO ] ACK_TRACE ack id=56 kind=slot egress=55 absorbed=56 client=55 window=2 us=3692356907
+[2026-08-24T14:25:52.415+0000] [INFO ] ACK_TRACE egress id=56 shown=1 pending_kib=0 client=55 us=3692391231
+[2026-08-24T14:25:52.415+0000] [INFO ] ACK_TRACE ack id=56 kind=region egress=56 absorbed=56 client=55 window=2 us=3692391233
+[2026-08-24T14:25:52.455+0000] [INFO ] ACK_TRACE absorb id=57 monitor=0 us=3692430894
+[2026-08-24T14:25:52.455+0000] [INFO ] ACK_TRACE ack id=57 kind=slot egress=56 absorbed=57 client=56 window=2 us=3692430956
+[2026-08-24T14:25:52.489+0000] [INFO ] ACK_TRACE submit id=58 monitor=0 us=3692465036
+[2026-08-24T14:25:52.488+0000] [INFO ] ACK_TRACE egress id=57 shown=1 pending_kib=0 client=56 us=3692463732
+[2026-08-24T14:25:52.488+0000] [INFO ] ACK_TRACE ack id=57 kind=region egress=57 absorbed=57 client=56 window=2 us=3692463733
+[2026-08-24T14:25:52.489+0000] [INFO ] ACK_TRACE msgin id=58 bytes=55296000 us=3692464877
+[2026-08-24T14:25:52.538+0000] [INFO ] ACK_TRACE msgin id=59 bytes=55296000 us=3692513683
+[2026-08-24T14:25:52.565+0000] [INFO ] ACK_TRACE absorb id=58 monitor=0 us=3692540824
+[2026-08-24T14:25:52.566+0000] [INFO ] ACK_TRACE submit id=59 monitor=0 us=3692542056
+[2026-08-24T14:25:52.565+0000] [INFO ] ACK_TRACE ack id=58 kind=slot egress=57 absorbed=58 client=57 window=2 us=3692540881
+[2026-08-24T14:25:52.593+0000] [INFO ] ACK_TRACE egress id=58 shown=1 pending_kib=1247 client=57 us=3692568635
+[2026-08-24T14:25:52.593+0000] [INFO ] ACK_TRACE ack id=58 kind=region egress=58 absorbed=58 client=57 window=2 us=3692568637
+[2026-08-24T14:25:52.646+0000] [INFO ] ACK_TRACE absorb id=59 monitor=0 us=3692622326
+[2026-08-24T14:25:52.647+0000] [INFO ] ACK_TRACE ack id=59 kind=slot egress=58 absorbed=59 client=58 window=2 us=3692623044
+[2026-08-24T14:25:52.675+0000] [INFO ] ACK_TRACE egress id=59 shown=1 pending_kib=0 client=58 us=3692651197
+[2026-08-24T14:25:52.675+0000] [INFO ] ACK_TRACE ack id=59 kind=region egress=59 absorbed=59 client=58 window=2 us=3692651198
+[2026-08-24T14:25:52.677+0000] [INFO ] ACK_TRACE submit id=60 monitor=0 us=3692653041
+[2026-08-24T14:25:52.676+0000] [INFO ] ACK_TRACE msgin id=60 bytes=55296000 us=3692652227
+[2026-08-24T14:25:52.777+0000] [INFO ] ACK_TRACE absorb id=60 monitor=0 us=3692752884
+[2026-08-24T14:25:52.777+0000] [INFO ] ACK_TRACE ack id=60 kind=slot egress=59 absorbed=60 client=59 window=2 us=3692753060
+[2026-08-24T14:25:52.812+0000] [INFO ] ACK_TRACE submit id=61 monitor=0 us=3692787417
+[2026-08-24T14:25:52.808+0000] [INFO ] ACK_TRACE egress id=60 shown=1 pending_kib=0 client=59 us=3692783856
+[2026-08-24T14:25:52.808+0000] [INFO ] ACK_TRACE ack id=60 kind=region egress=60 absorbed=60 client=59 window=2 us=3692783857
+[2026-08-24T14:25:52.811+0000] [INFO ] ACK_TRACE msgin id=61 bytes=55296000 us=3692787121
+[2026-08-24T14:25:52.894+0000] [INFO ] ACK_TRACE absorb id=61 monitor=0 us=3692870226
+[2026-08-24T14:25:52.895+0000] [INFO ] ACK_TRACE submit id=62 monitor=0 us=3692871336
+[2026-08-24T14:25:52.893+0000] [INFO ] ACK_TRACE msgin id=62 bytes=55296000 us=3692869053
+[2026-08-24T14:25:52.895+0000] [INFO ] ACK_TRACE ack id=61 kind=slot egress=60 absorbed=61 client=60 window=2 us=3692871035
+[2026-08-24T14:25:52.920+0000] [INFO ] ACK_TRACE egress id=61 shown=1 pending_kib=0 client=60 us=3692896042
+[2026-08-24T14:25:52.920+0000] [INFO ] ACK_TRACE ack id=61 kind=region egress=61 absorbed=61 client=60 window=2 us=3692896043
+[2026-08-24T14:25:52.971+0000] [INFO ] ACK_TRACE absorb id=62 monitor=0 us=3692946992
+[2026-08-24T14:25:52.972+0000] [INFO ] ACK_TRACE ack id=62 kind=slot egress=61 absorbed=62 client=61 window=2 us=3692948043
+[2026-08-24T14:25:52.997+0000] [INFO ] ACK_TRACE egress id=62 shown=1 pending_kib=0 client=61 us=3692972862
+[2026-08-24T14:25:52.997+0000] [INFO ] ACK_TRACE ack id=62 kind=region egress=62 absorbed=62 client=61 window=2 us=3692972864
+[2026-08-24T14:25:53.001+0000] [INFO ] ACK_TRACE submit id=63 monitor=0 us=3692977034
+[2026-08-24T14:25:53.000+0000] [INFO ] ACK_TRACE msgin id=63 bytes=55296000 us=3692976094
+[2026-08-24T14:25:53.047+0000] [INFO ] ACK_TRACE msgin id=64 bytes=55296000 us=3693022970
+[2026-08-24T14:25:53.070+0000] [INFO ] ACK_TRACE absorb id=63 monitor=0 us=3693045915
+[2026-08-24T14:25:53.071+0000] [INFO ] ACK_TRACE submit id=64 monitor=0 us=3693047030
+[2026-08-24T14:25:53.070+0000] [INFO ] ACK_TRACE ack id=63 kind=slot egress=62 absorbed=63 client=62 window=2 us=3693046043
+[2026-08-24T14:25:53.099+0000] [INFO ] ACK_TRACE egress id=63 shown=1 pending_kib=0 client=62 us=3693075348
+[2026-08-24T14:25:53.099+0000] [INFO ] ACK_TRACE ack id=63 kind=region egress=63 absorbed=63 client=62 window=2 us=3693075350
+[2026-08-24T14:25:53.118+0000] [INFO ] ACK_TRACE msgin id=65 bytes=55296000 us=3693094072
+[2026-08-24T14:25:53.157+0000] [INFO ] ACK_TRACE absorb id=64 monitor=0 us=3693132665
+[2026-08-24T14:25:53.158+0000] [INFO ] ACK_TRACE submit id=65 monitor=0 us=3693133665
+[2026-08-24T14:25:53.157+0000] [INFO ] ACK_TRACE ack id=64 kind=slot egress=63 absorbed=64 client=63 window=2 us=3693133042
+[2026-08-24T14:25:53.180+0000] [INFO ] ACK_TRACE egress id=64 shown=1 pending_kib=0 client=63 us=3693155838
+[2026-08-24T14:25:53.180+0000] [INFO ] ACK_TRACE ack id=64 kind=region egress=64 absorbed=64 client=63 window=2 us=3693155840
+[2026-08-24T14:25:53.228+0000] [INFO ] ACK_TRACE msgin id=66 bytes=55296000 us=3693204067
+[2026-08-24T14:25:53.247+0000] [INFO ] ACK_TRACE absorb id=65 monitor=0 us=3693222916
+[2026-08-24T14:25:53.248+0000] [INFO ] ACK_TRACE submit id=66 monitor=0 us=3693223988
+[2026-08-24T14:25:53.247+0000] [INFO ] ACK_TRACE ack id=65 kind=slot egress=64 absorbed=65 client=64 window=2 us=3693223043
+[2026-08-24T14:25:53.270+0000] [INFO ] ACK_TRACE egress id=65 shown=1 pending_kib=0 client=64 us=3693246188
+[2026-08-24T14:25:53.270+0000] [INFO ] ACK_TRACE ack id=65 kind=region egress=65 absorbed=65 client=64 window=2 us=3693246190
+[2026-08-24T14:25:53.306+0000] [INFO ] ACK_TRACE msgin id=67 bytes=55296000 us=3693281502
+[2026-08-24T14:25:53.319+0000] [INFO ] ACK_TRACE absorb id=66 monitor=0 us=3693295325
+[2026-08-24T14:25:53.320+0000] [INFO ] ACK_TRACE submit id=67 monitor=0 us=3693296338
+[2026-08-24T14:25:53.319+0000] [INFO ] ACK_TRACE ack id=66 kind=slot egress=65 absorbed=66 client=65 window=2 us=3693295379
+[2026-08-24T14:25:53.360+0000] [INFO ] ACK_TRACE egress id=66 shown=1 pending_kib=0 client=65 us=3693335990
+[2026-08-24T14:25:53.360+0000] [INFO ] ACK_TRACE ack id=66 kind=region egress=66 absorbed=66 client=65 window=2 us=3693335991
+[2026-08-24T14:25:53.361+0000] [INFO ] ACK_TRACE msgin id=68 bytes=55296000 us=3693337151
+[2026-08-24T14:25:53.392+0000] [INFO ] ACK_TRACE absorb id=67 monitor=0 us=3693368012
+[2026-08-24T14:25:53.393+0000] [INFO ] ACK_TRACE ack id=67 kind=slot egress=66 absorbed=67 client=66 window=2 us=3693369039
+[2026-08-24T14:25:53.396+0000] [INFO ] ACK_TRACE submit id=68 monitor=0 us=3693372040
+[2026-08-24T14:25:53.426+0000] [INFO ] ACK_TRACE egress id=67 shown=1 pending_kib=0 client=66 us=3693401442
+[2026-08-24T14:25:53.426+0000] [INFO ] ACK_TRACE ack id=67 kind=region egress=67 absorbed=67 client=66 window=2 us=3693401443
+[2026-08-24T14:25:53.426+0000] [INFO ] ACK_TRACE msgin id=69 bytes=55296000 us=3693402197
+[2026-08-24T14:25:53.473+0000] [INFO ] ACK_TRACE absorb id=68 monitor=0 us=3693449201
+[2026-08-24T14:25:53.474+0000] [INFO ] ACK_TRACE submit id=69 monitor=0 us=3693450290
+[2026-08-24T14:25:53.473+0000] [INFO ] ACK_TRACE ack id=68 kind=slot egress=67 absorbed=68 client=67 window=2 us=3693449251
+[2026-08-24T14:25:53.505+0000] [INFO ] ACK_TRACE egress id=68 shown=1 pending_kib=0 client=67 us=3693480890
+[2026-08-24T14:25:53.505+0000] [INFO ] ACK_TRACE ack id=68 kind=region egress=68 absorbed=68 client=67 window=2 us=3693480891
+[2026-08-24T14:25:53.506+0000] [INFO ] ACK_TRACE msgin id=70 bytes=55296000 us=3693482038
+[2026-08-24T14:25:53.553+0000] [INFO ] ACK_TRACE absorb id=69 monitor=0 us=3693529113
+[2026-08-24T14:25:53.557+0000] [INFO ] ACK_TRACE submit id=70 monitor=0 us=3693533372
+[2026-08-24T14:25:53.553+0000] [INFO ] ACK_TRACE ack id=69 kind=slot egress=68 absorbed=69 client=68 window=2 us=3693529176
+[2026-08-24T14:25:53.593+0000] [INFO ] ACK_TRACE egress id=69 shown=1 pending_kib=0 client=68 us=3693568951
+[2026-08-24T14:25:53.593+0000] [INFO ] ACK_TRACE ack id=69 kind=region egress=69 absorbed=69 client=68 window=2 us=3693568952
+[2026-08-24T14:25:53.594+0000] [INFO ] ACK_TRACE msgin id=71 bytes=55296000 us=3693569936
+[2026-08-24T14:25:53.638+0000] [INFO ] ACK_TRACE absorb id=70 monitor=0 us=3693614095
+[2026-08-24T14:25:53.641+0000] [INFO ] ACK_TRACE submit id=71 monitor=0 us=3693616425
+[2026-08-24T14:25:53.638+0000] [INFO ] ACK_TRACE ack id=70 kind=slot egress=69 absorbed=70 client=69 window=2 us=3693614133
+[2026-08-24T14:25:53.673+0000] [INFO ] ACK_TRACE egress id=70 shown=1 pending_kib=1113 client=69 us=3693648578
+[2026-08-24T14:25:53.673+0000] [INFO ] ACK_TRACE ack id=70 kind=region egress=70 absorbed=70 client=69 window=2 us=3693648579
+[2026-08-24T14:25:53.674+0000] [INFO ] ACK_TRACE msgin id=72 bytes=55296000 us=3693649832
+[2026-08-24T14:25:53.715+0000] [INFO ] ACK_TRACE absorb id=71 monitor=0 us=3693691051
+[2026-08-24T14:25:53.717+0000] [INFO ] ACK_TRACE submit id=72 monitor=0 us=3693693319
+[2026-08-24T14:25:53.715+0000] [INFO ] ACK_TRACE ack id=71 kind=slot egress=70 absorbed=71 client=69 window=2 us=3693691089
+[2026-08-24T14:25:53.750+0000] [INFO ] ACK_TRACE egress id=71 shown=1 pending_kib=1167 client=69 us=3693725969
+[2026-08-24T14:25:53.750+0000] [INFO ] ACK_TRACE ack id=71 kind=region egress=71 absorbed=71 client=69 window=2 us=3693725970
+[2026-08-24T14:25:53.751+0000] [INFO ] ACK_TRACE msgin id=73 bytes=55296000 us=3693727068
+[2026-08-24T14:25:53.803+0000] [INFO ] ACK_TRACE absorb id=72 monitor=0 us=3693778459
+[2026-08-24T14:25:53.804+0000] [INFO ] ACK_TRACE submit id=73 monitor=0 us=3693779851
+[2026-08-24T14:25:53.803+0000] [INFO ] ACK_TRACE ack id=72 kind=slot egress=71 absorbed=72 client=70 window=2 us=3693778507
+[2026-08-24T14:25:53.835+0000] [INFO ] ACK_TRACE egress id=72 shown=1 pending_kib=0 client=70 us=3693810888
+[2026-08-24T14:25:53.835+0000] [INFO ] ACK_TRACE ack id=72 kind=region egress=72 absorbed=72 client=70 window=2 us=3693810890
+[2026-08-24T14:25:53.868+0000] [INFO ] ACK_TRACE msgin id=74 bytes=55296000 us=3693843927
+[2026-08-24T14:25:53.892+0000] [INFO ] ACK_TRACE absorb id=73 monitor=0 us=3693867749
+[2026-08-24T14:25:53.894+0000] [INFO ] ACK_TRACE submit id=74 monitor=0 us=3693869569
+[2026-08-24T14:25:53.892+0000] [INFO ] ACK_TRACE ack id=73 kind=slot egress=72 absorbed=73 client=72 window=2 us=3693867798
+[2026-08-24T14:25:53.925+0000] [INFO ] ACK_TRACE egress id=73 shown=1 pending_kib=2030 client=72 us=3693901194
+[2026-08-24T14:25:53.925+0000] [INFO ] ACK_TRACE ack id=73 kind=region egress=73 absorbed=73 client=72 window=2 us=3693901195
+[2026-08-24T14:25:53.972+0000] [INFO ] ACK_TRACE absorb id=74 monitor=0 us=3693947775
+[2026-08-24T14:25:53.972+0000] [INFO ] ACK_TRACE ack id=74 kind=slot egress=73 absorbed=74 client=72 window=2 us=3693947810
+[2026-08-24T14:25:54.000+0000] [INFO ] ACK_TRACE egress id=74 shown=1 pending_kib=0 client=72 us=3693975669
+[2026-08-24T14:25:54.000+0000] [INFO ] ACK_TRACE ack id=74 kind=region egress=74 absorbed=74 client=72 window=2 us=3693975670
+[2026-08-24T14:25:54.078+0000] [INFO ] ACK_TRACE submit id=75 monitor=0 us=3694054143
+[2026-08-24T14:25:54.078+0000] [INFO ] ACK_TRACE msgin id=75 bytes=55296000 us=3694054097
+[2026-08-24T14:25:54.155+0000] [INFO ] ACK_TRACE absorb id=75 monitor=0 us=3694131144
+[2026-08-24T14:25:54.157+0000] [INFO ] ACK_TRACE submit id=76 monitor=0 us=3694132482
+[2026-08-24T14:25:54.148+0000] [INFO ] ACK_TRACE msgin id=76 bytes=55296000 us=3694123701
+[2026-08-24T14:25:54.156+0000] [INFO ] ACK_TRACE ack id=75 kind=slot egress=74 absorbed=75 client=74 window=2 us=3694132041
+[2026-08-24T14:25:54.189+0000] [INFO ] ACK_TRACE egress id=75 shown=1 pending_kib=0 client=74 us=3694164784
+[2026-08-24T14:25:54.189+0000] [INFO ] ACK_TRACE ack id=75 kind=region egress=75 absorbed=75 client=74 window=2 us=3694164786
+[2026-08-24T14:25:54.207+0000] [INFO ] ACK_TRACE msgin id=77 bytes=55296000 us=3694182808
+[2026-08-24T14:25:54.229+0000] [INFO ] ACK_TRACE absorb id=76 monitor=0 us=3694204860
+[2026-08-24T14:25:54.230+0000] [INFO ] ACK_TRACE submit id=77 monitor=0 us=3694205980
+[2026-08-24T14:25:54.230+0000] [INFO ] ACK_TRACE ack id=76 kind=slot egress=75 absorbed=76 client=75 window=2 us=3694206080
+[2026-08-24T14:25:54.263+0000] [INFO ] ACK_TRACE egress id=76 shown=1 pending_kib=0 client=75 us=3694238649
+[2026-08-24T14:25:54.263+0000] [INFO ] ACK_TRACE ack id=76 kind=region egress=76 absorbed=76 client=75 window=2 us=3694238650
+[2026-08-24T14:25:54.278+0000] [INFO ] ACK_TRACE msgin id=78 bytes=55296000 us=3694253460
+[2026-08-24T14:25:54.305+0000] [INFO ] ACK_TRACE absorb id=77 monitor=0 us=3694280676
+[2026-08-24T14:25:54.306+0000] [INFO ] ACK_TRACE submit id=78 monitor=0 us=3694281884
+[2026-08-24T14:25:54.305+0000] [INFO ] ACK_TRACE ack id=77 kind=slot egress=76 absorbed=77 client=76 window=2 us=3694280709
+[2026-08-24T14:25:54.343+0000] [INFO ] ACK_TRACE egress id=77 shown=1 pending_kib=0 client=76 us=3694318723
+[2026-08-24T14:25:54.343+0000] [INFO ] ACK_TRACE ack id=77 kind=region egress=77 absorbed=77 client=76 window=2 us=3694318724
+[2026-08-24T14:25:54.344+0000] [INFO ] ACK_TRACE msgin id=79 bytes=55296000 us=3694319722
+[2026-08-24T14:25:54.391+0000] [INFO ] ACK_TRACE absorb id=78 monitor=0 us=3694367328
+[2026-08-24T14:25:54.393+0000] [INFO ] ACK_TRACE submit id=79 monitor=0 us=3694368522
+[2026-08-24T14:25:54.391+0000] [INFO ] ACK_TRACE ack id=78 kind=slot egress=77 absorbed=78 client=77 window=2 us=3694367383
+[2026-08-24T14:25:54.437+0000] [INFO ] ACK_TRACE egress id=78 shown=1 pending_kib=0 client=77 us=3694412837
+[2026-08-24T14:25:54.437+0000] [INFO ] ACK_TRACE ack id=78 kind=region egress=78 absorbed=78 client=77 window=2 us=3694412838
+[2026-08-24T14:25:54.438+0000] [INFO ] ACK_TRACE msgin id=80 bytes=55296000 us=3694414050
+[2026-08-24T14:25:54.482+0000] [INFO ] ACK_TRACE absorb id=79 monitor=0 us=3694458206
+[2026-08-24T14:25:54.487+0000] [INFO ] ACK_TRACE submit id=80 monitor=0 us=3694462463
+[2026-08-24T14:25:54.483+0000] [INFO ] ACK_TRACE ack id=79 kind=slot egress=78 absorbed=79 client=78 window=2 us=3694459043
+[2026-08-24T14:25:54.522+0000] [INFO ] ACK_TRACE egress id=79 shown=1 pending_kib=0 client=78 us=3694498268
+[2026-08-24T14:25:54.522+0000] [INFO ] ACK_TRACE ack id=79 kind=region egress=79 absorbed=79 client=78 window=2 us=3694498270
+[2026-08-24T14:25:54.524+0000] [INFO ] ACK_TRACE msgin id=81 bytes=55296000 us=3694499410
+[2026-08-24T14:25:54.576+0000] [INFO ] ACK_TRACE absorb id=80 monitor=0 us=3694551814
+[2026-08-24T14:25:54.577+0000] [INFO ] ACK_TRACE submit id=81 monitor=0 us=3694553173
+[2026-08-24T14:25:54.576+0000] [INFO ] ACK_TRACE ack id=80 kind=slot egress=79 absorbed=80 client=79 window=2 us=3694551888
+[2026-08-24T14:25:54.623+0000] [INFO ] ACK_TRACE egress id=80 shown=1 pending_kib=0 client=79 us=3694598457
+[2026-08-24T14:25:54.623+0000] [INFO ] ACK_TRACE ack id=80 kind=region egress=80 absorbed=80 client=79 window=2 us=3694598459
+[2026-08-24T14:25:54.625+0000] [INFO ] ACK_TRACE msgin id=82 bytes=55296000 us=3694600430
+[2026-08-24T14:25:54.667+0000] [INFO ] ACK_TRACE absorb id=81 monitor=0 us=3694642950
+[2026-08-24T14:25:54.668+0000] [INFO ] ACK_TRACE submit id=82 monitor=0 us=3694644239
+[2026-08-24T14:25:54.667+0000] [INFO ] ACK_TRACE ack id=81 kind=slot egress=80 absorbed=81 client=80 window=2 us=3694642991
+[2026-08-24T14:25:54.709+0000] [INFO ] ACK_TRACE egress id=81 shown=1 pending_kib=0 client=80 us=3694684564
+[2026-08-24T14:25:54.709+0000] [INFO ] ACK_TRACE ack id=81 kind=region egress=81 absorbed=81 client=80 window=2 us=3694684565
+[2026-08-24T14:25:54.710+0000] [INFO ] ACK_TRACE msgin id=83 bytes=55296000 us=3694685676
+[2026-08-24T14:25:54.751+0000] [INFO ] ACK_TRACE absorb id=82 monitor=0 us=3694726754
+[2026-08-24T14:25:54.752+0000] [INFO ] ACK_TRACE submit id=83 monitor=0 us=3694728209
+[2026-08-24T14:25:54.751+0000] [INFO ] ACK_TRACE ack id=82 kind=slot egress=81 absorbed=82 client=81 window=2 us=3694726809
+[2026-08-24T14:25:54.791+0000] [INFO ] ACK_TRACE egress id=82 shown=1 pending_kib=0 client=81 us=3694766926
+[2026-08-24T14:25:54.791+0000] [INFO ] ACK_TRACE ack id=82 kind=region egress=82 absorbed=82 client=81 window=2 us=3694766927
+[2026-08-24T14:25:54.792+0000] [INFO ] ACK_TRACE msgin id=84 bytes=55296000 us=3694768038
+[2026-08-24T14:25:54.845+0000] [INFO ] ACK_TRACE absorb id=83 monitor=0 us=3694821150
+[2026-08-24T14:25:54.847+0000] [INFO ] ACK_TRACE submit id=84 monitor=0 us=3694822574
+[2026-08-24T14:25:54.845+0000] [INFO ] ACK_TRACE ack id=83 kind=slot egress=82 absorbed=83 client=82 window=2 us=3694821213
+[2026-08-24T14:25:54.871+0000] [INFO ] ACK_TRACE egress id=83 shown=1 pending_kib=1039 client=82 us=3694846826
+[2026-08-24T14:25:54.871+0000] [INFO ] ACK_TRACE ack id=83 kind=region egress=83 absorbed=83 client=82 window=2 us=3694846827
+[2026-08-24T14:25:54.872+0000] [INFO ] ACK_TRACE msgin id=85 bytes=55296000 us=3694847854
+[2026-08-24T14:25:54.933+0000] [INFO ] ACK_TRACE absorb id=84 monitor=0 us=3694908844
+[2026-08-24T14:25:54.934+0000] [INFO ] ACK_TRACE submit id=85 monitor=0 us=3694910051
+[2026-08-24T14:25:54.933+0000] [INFO ] ACK_TRACE ack id=84 kind=slot egress=83 absorbed=84 client=83 window=2 us=3694908912
+[2026-08-24T14:25:54.960+0000] [INFO ] ACK_TRACE egress id=84 shown=1 pending_kib=0 client=83 us=3694935754
+[2026-08-24T14:25:54.960+0000] [INFO ] ACK_TRACE ack id=84 kind=region egress=84 absorbed=84 client=83 window=2 us=3694935755
+[2026-08-24T14:25:54.970+0000] [INFO ] ACK_TRACE msgin id=86 bytes=55296000 us=3694945831
+[2026-08-24T14:25:55.022+0000] [INFO ] ACK_TRACE absorb id=85 monitor=0 us=3694998292
+[2026-08-24T14:25:55.024+0000] [INFO ] ACK_TRACE submit id=86 monitor=0 us=3694999517
+[2026-08-24T14:25:55.022+0000] [INFO ] ACK_TRACE ack id=85 kind=slot egress=84 absorbed=85 client=84 window=2 us=3694998360
+[2026-08-24T14:25:55.050+0000] [INFO ] ACK_TRACE egress id=85 shown=1 pending_kib=0 client=84 us=3695025511
+[2026-08-24T14:25:55.050+0000] [INFO ] ACK_TRACE ack id=85 kind=region egress=85 absorbed=85 client=84 window=2 us=3695025512
+[2026-08-24T14:25:55.067+0000] [INFO ] ACK_TRACE msgin id=87 bytes=55296000 us=3695042987
+[2026-08-24T14:25:55.109+0000] [INFO ] ACK_TRACE absorb id=86 monitor=0 us=3695084553
+[2026-08-24T14:25:55.110+0000] [INFO ] ACK_TRACE submit id=87 monitor=0 us=3695085766
+[2026-08-24T14:25:55.109+0000] [INFO ] ACK_TRACE ack id=86 kind=slot egress=85 absorbed=86 client=85 window=2 us=3695084602
+[2026-08-24T14:25:55.136+0000] [INFO ] ACK_TRACE egress id=86 shown=1 pending_kib=0 client=85 us=3695112030
+[2026-08-24T14:25:55.136+0000] [INFO ] ACK_TRACE ack id=86 kind=region egress=86 absorbed=86 client=85 window=2 us=3695112031
+[2026-08-24T14:25:55.145+0000] [INFO ] ACK_TRACE msgin id=88 bytes=55296000 us=3695121041
+[2026-08-24T14:25:55.198+0000] [INFO ] ACK_TRACE absorb id=87 monitor=0 us=3695173535
+[2026-08-24T14:25:55.201+0000] [INFO ] ACK_TRACE submit id=88 monitor=0 us=3695176474
+[2026-08-24T14:25:55.198+0000] [INFO ] ACK_TRACE ack id=87 kind=slot egress=86 absorbed=87 client=86 window=2 us=3695173579
+[2026-08-24T14:25:55.237+0000] [INFO ] ACK_TRACE egress id=87 shown=1 pending_kib=0 client=86 us=3695212821
+[2026-08-24T14:25:55.237+0000] [INFO ] ACK_TRACE ack id=87 kind=region egress=87 absorbed=87 client=86 window=2 us=3695212823
+[2026-08-24T14:25:55.238+0000] [INFO ] ACK_TRACE msgin id=89 bytes=55296000 us=3695214033
+[2026-08-24T14:25:55.282+0000] [INFO ] ACK_TRACE absorb id=88 monitor=0 us=3695257995
+[2026-08-24T14:25:55.284+0000] [INFO ] ACK_TRACE submit id=89 monitor=0 us=3695260244
+[2026-08-24T14:25:55.282+0000] [INFO ] ACK_TRACE ack id=88 kind=slot egress=87 absorbed=88 client=87 window=2 us=3695258049
+[2026-08-24T14:25:55.317+0000] [INFO ] ACK_TRACE egress id=88 shown=1 pending_kib=869 client=87 us=3695293304
+[2026-08-24T14:25:55.317+0000] [INFO ] ACK_TRACE ack id=88 kind=region egress=88 absorbed=88 client=87 window=2 us=3695293305
+[2026-08-24T14:25:55.347+0000] [INFO ] ACK_TRACE msgin id=90 bytes=55296000 us=3695322465
+[2026-08-24T14:25:55.368+0000] [INFO ] ACK_TRACE absorb id=89 monitor=0 us=3695343939
+[2026-08-24T14:25:55.368+0000] [INFO ] ACK_TRACE ack id=89 kind=slot egress=88 absorbed=89 client=87 window=2 us=3695344039
+[2026-08-24T14:25:55.369+0000] [INFO ] ACK_TRACE submit id=90 monitor=0 us=3695345157
+[2026-08-24T14:25:55.399+0000] [INFO ] ACK_TRACE egress id=89 shown=1 pending_kib=292 client=87 us=3695374610
+[2026-08-24T14:25:55.399+0000] [INFO ] ACK_TRACE ack id=89 kind=region egress=89 absorbed=89 client=87 window=2 us=3695374612
+[2026-08-24T14:25:55.458+0000] [INFO ] ACK_TRACE absorb id=90 monitor=0 us=3695433810
+[2026-08-24T14:25:55.458+0000] [INFO ] ACK_TRACE ack id=90 kind=slot egress=89 absorbed=90 client=89 window=2 us=3695434061
+[2026-08-24T14:25:55.486+0000] [INFO ] ACK_TRACE submit id=91 monitor=0 us=3695461570
+[2026-08-24T14:25:55.484+0000] [INFO ] ACK_TRACE egress id=90 shown=1 pending_kib=0 client=89 us=3695460360
+[2026-08-24T14:25:55.484+0000] [INFO ] ACK_TRACE ack id=90 kind=region egress=90 absorbed=90 client=89 window=2 us=3695460361
+[2026-08-24T14:25:55.486+0000] [INFO ] ACK_TRACE msgin id=91 bytes=55296000 us=3695461542
+[2026-08-24T14:25:55.566+0000] [INFO ] ACK_TRACE absorb id=91 monitor=0 us=3695541471
+[2026-08-24T14:25:55.566+0000] [INFO ] ACK_TRACE ack id=91 kind=slot egress=90 absorbed=91 client=90 window=2 us=3695541514
+[2026-08-24T14:25:55.590+0000] [INFO ] ACK_TRACE egress id=91 shown=1 pending_kib=0 client=90 us=3695565441
+[2026-08-24T14:25:55.590+0000] [INFO ] ACK_TRACE ack id=91 kind=region egress=91 absorbed=91 client=90 window=2 us=3695565443
+[2026-08-24T14:25:55.607+0000] [INFO ] ACK_TRACE submit id=92 monitor=0 us=3695583110
+[2026-08-24T14:25:55.607+0000] [INFO ] ACK_TRACE msgin id=92 bytes=55296000 us=3695583066
+[2026-08-24T14:25:55.678+0000] [INFO ] ACK_TRACE msgin id=93 bytes=55296000 us=3695654090
+[2026-08-24T14:25:55.688+0000] [INFO ] ACK_TRACE absorb id=92 monitor=0 us=3695663455
+[2026-08-24T14:25:55.690+0000] [INFO ] ACK_TRACE submit id=93 monitor=0 us=3695665446
+[2026-08-24T14:25:55.688+0000] [INFO ] ACK_TRACE ack id=92 kind=slot egress=91 absorbed=92 client=91 window=2 us=3695663495
+[2026-08-24T14:25:55.717+0000] [INFO ] ACK_TRACE egress id=92 shown=1 pending_kib=0 client=91 us=3695693284
+[2026-08-24T14:25:55.717+0000] [INFO ] ACK_TRACE ack id=92 kind=region egress=92 absorbed=92 client=91 window=2 us=3695693285
+[2026-08-24T14:25:55.745+0000] [INFO ] ACK_TRACE msgin id=94 bytes=55296000 us=3695720875
+[2026-08-24T14:25:55.773+0000] [INFO ] ACK_TRACE absorb id=93 monitor=0 us=3695749117
+[2026-08-24T14:25:55.775+0000] [INFO ] ACK_TRACE submit id=94 monitor=0 us=3695751322
+[2026-08-24T14:25:55.773+0000] [INFO ] ACK_TRACE ack id=93 kind=slot egress=92 absorbed=93 client=92 window=2 us=3695749154
+[2026-08-24T14:25:55.798+0000] [INFO ] ACK_TRACE egress id=93 shown=1 pending_kib=0 client=92 us=3695774340
+[2026-08-24T14:25:55.798+0000] [INFO ] ACK_TRACE ack id=93 kind=region egress=93 absorbed=93 client=92 window=2 us=3695774341
+[2026-08-24T14:25:55.843+0000] [INFO ] ACK_TRACE msgin id=95 bytes=55296000 us=3695819064
+[2026-08-24T14:25:55.857+0000] [INFO ] ACK_TRACE absorb id=94 monitor=0 us=3695833146
+[2026-08-24T14:25:55.858+0000] [INFO ] ACK_TRACE submit id=95 monitor=0 us=3695834354
+[2026-08-24T14:25:55.858+0000] [INFO ] ACK_TRACE ack id=94 kind=slot egress=93 absorbed=94 client=93 window=2 us=3695834039
+[2026-08-24T14:25:55.881+0000] [INFO ] ACK_TRACE egress id=94 shown=1 pending_kib=0 client=93 us=3695856711
+[2026-08-24T14:25:55.881+0000] [INFO ] ACK_TRACE ack id=94 kind=region egress=94 absorbed=94 client=93 window=2 us=3695856712
+[2026-08-24T14:25:55.939+0000] [INFO ] ACK_TRACE absorb id=95 monitor=0 us=3695914603
+[2026-08-24T14:25:55.939+0000] [INFO ] ACK_TRACE ack id=95 kind=slot egress=94 absorbed=95 client=94 window=2 us=3695915042
+[2026-08-24T14:25:55.965+0000] [INFO ] ACK_TRACE submit id=96 monitor=0 us=3695940818
+[2026-08-24T14:25:55.964+0000] [INFO ] ACK_TRACE egress id=95 shown=1 pending_kib=0 client=94 us=3695939644
+[2026-08-24T14:25:55.964+0000] [INFO ] ACK_TRACE ack id=95 kind=region egress=95 absorbed=95 client=94 window=2 us=3695939645
+[2026-08-24T14:25:55.965+0000] [INFO ] ACK_TRACE msgin id=96 bytes=55296000 us=3695940791
+[2026-08-24T14:25:56.023+0000] [INFO ] ACK_TRACE msgin id=97 bytes=55296000 us=3695998685
+[2026-08-24T14:25:56.039+0000] [INFO ] ACK_TRACE absorb id=96 monitor=0 us=3696014559
+[2026-08-24T14:25:56.040+0000] [INFO ] ACK_TRACE submit id=97 monitor=0 us=3696015514
+[2026-08-24T14:25:56.040+0000] [INFO ] ACK_TRACE ack id=96 kind=slot egress=95 absorbed=96 client=95 window=2 us=3696015602
+[2026-08-24T14:25:56.089+0000] [INFO ] ACK_TRACE egress id=96 shown=1 pending_kib=0 client=95 us=3696064870
+[2026-08-24T14:25:56.089+0000] [INFO ] ACK_TRACE ack id=96 kind=region egress=96 absorbed=96 client=95 window=2 us=3696064871
+[2026-08-24T14:25:56.090+0000] [INFO ] ACK_TRACE msgin id=98 bytes=55296000 us=3696065728
+[2026-08-24T14:25:56.113+0000] [INFO ] ACK_TRACE absorb id=97 monitor=0 us=3696089118
+[2026-08-24T14:25:56.114+0000] [INFO ] ACK_TRACE submit id=98 monitor=0 us=3696090301
+[2026-08-24T14:25:56.113+0000] [INFO ] ACK_TRACE ack id=97 kind=slot egress=96 absorbed=97 client=96 window=2 us=3696089152
+[2026-08-24T14:25:56.148+0000] [INFO ] ACK_TRACE egress id=97 shown=1 pending_kib=0 client=96 us=3696124109
+[2026-08-24T14:25:56.148+0000] [INFO ] ACK_TRACE ack id=97 kind=region egress=97 absorbed=97 client=96 window=2 us=3696124110
+[2026-08-24T14:25:56.158+0000] [INFO ] ACK_TRACE msgin id=99 bytes=55296000 us=3696133644
+[2026-08-24T14:25:56.193+0000] [INFO ] ACK_TRACE absorb id=98 monitor=0 us=3696168755
+[2026-08-24T14:25:56.194+0000] [INFO ] ACK_TRACE submit id=99 monitor=0 us=3696170020
+[2026-08-24T14:25:56.193+0000] [INFO ] ACK_TRACE ack id=98 kind=slot egress=97 absorbed=98 client=97 window=2 us=3696168801
+[2026-08-24T14:25:56.240+0000] [INFO ] ACK_TRACE egress id=98 shown=1 pending_kib=0 client=97 us=3696215536
+[2026-08-24T14:25:56.240+0000] [INFO ] ACK_TRACE ack id=98 kind=region egress=98 absorbed=98 client=97 window=2 us=3696215538
+[2026-08-24T14:25:56.241+0000] [INFO ] ACK_TRACE msgin id=100 bytes=55296000 us=3696217136
+[2026-08-24T14:25:56.276+0000] [INFO ] ACK_TRACE absorb id=99 monitor=0 us=3696251875
+[2026-08-24T14:25:56.277+0000] [INFO ] ACK_TRACE submit id=100 monitor=0 us=3696253352
+[2026-08-24T14:25:56.276+0000] [INFO ] ACK_TRACE ack id=99 kind=slot egress=98 absorbed=99 client=98 window=2 us=3696251927
+[2026-08-24T14:25:56.316+0000] [INFO ] ACK_TRACE egress id=99 shown=1 pending_kib=0 client=98 us=3696291554
+[2026-08-24T14:25:56.316+0000] [INFO ] ACK_TRACE ack id=99 kind=region egress=99 absorbed=99 client=98 window=2 us=3696291556
+[2026-08-24T14:25:56.317+0000] [INFO ] ACK_TRACE msgin id=101 bytes=55296000 us=3696292428
+[2026-08-24T14:25:56.365+0000] [INFO ] ACK_TRACE absorb id=100 monitor=0 us=3696341283
+[2026-08-24T14:25:56.367+0000] [INFO ] ACK_TRACE submit id=101 monitor=0 us=3696342746
+[2026-08-24T14:25:56.365+0000] [INFO ] ACK_TRACE ack id=100 kind=slot egress=99 absorbed=100 client=99 window=2 us=3696341342
+[2026-08-24T14:25:56.397+0000] [INFO ] ACK_TRACE egress id=100 shown=1 pending_kib=0 client=99 us=3696373325
+[2026-08-24T14:25:56.397+0000] [INFO ] ACK_TRACE ack id=100 kind=region egress=100 absorbed=100 client=99 window=2 us=3696373327
+[2026-08-24T14:25:56.399+0000] [INFO ] ACK_TRACE msgin id=102 bytes=55296000 us=3696374446
+[2026-08-24T14:25:56.453+0000] [INFO ] ACK_TRACE absorb id=101 monitor=0 us=3696428689
+[2026-08-24T14:25:56.454+0000] [INFO ] ACK_TRACE submit id=102 monitor=0 us=3696430233
+[2026-08-24T14:25:56.453+0000] [INFO ] ACK_TRACE ack id=101 kind=slot egress=100 absorbed=101 client=100 window=2 us=3696428744
+[2026-08-24T14:25:56.504+0000] [INFO ] ACK_TRACE egress id=101 shown=1 pending_kib=0 client=100 us=3696479677
+[2026-08-24T14:25:56.504+0000] [INFO ] ACK_TRACE ack id=101 kind=region egress=101 absorbed=101 client=100 window=2 us=3696479679
+[2026-08-24T14:25:56.505+0000] [INFO ] ACK_TRACE msgin id=103 bytes=55296000 us=3696480701
+[2026-08-24T14:25:56.537+0000] [INFO ] ACK_TRACE absorb id=102 monitor=0 us=3696512875
+[2026-08-24T14:25:56.537+0000] [INFO ] ACK_TRACE ack id=102 kind=slot egress=101 absorbed=102 client=101 window=2 us=3696512938
+[2026-08-24T14:25:56.539+0000] [INFO ] ACK_TRACE submit id=103 monitor=0 us=3696514496
+[2026-08-24T14:25:56.578+0000] [INFO ] ACK_TRACE egress id=102 shown=1 pending_kib=0 client=101 us=3696553587
+[2026-08-24T14:25:56.578+0000] [INFO ] ACK_TRACE ack id=102 kind=region egress=102 absorbed=102 client=101 window=2 us=3696553588
+[2026-08-24T14:25:56.579+0000] [INFO ] ACK_TRACE msgin id=104 bytes=55296000 us=3696554665
+[2026-08-24T14:25:56.615+0000] [INFO ] ACK_TRACE absorb id=103 monitor=0 us=3696591348
+[2026-08-24T14:25:56.617+0000] [INFO ] ACK_TRACE submit id=104 monitor=0 us=3696592599
+[2026-08-24T14:25:56.616+0000] [INFO ] ACK_TRACE ack id=103 kind=slot egress=102 absorbed=103 client=102 window=2 us=3696591410
+[2026-08-24T14:25:56.649+0000] [INFO ] ACK_TRACE egress id=103 shown=1 pending_kib=0 client=102 us=3696625079
+[2026-08-24T14:25:56.649+0000] [INFO ] ACK_TRACE ack id=103 kind=region egress=103 absorbed=103 client=102 window=2 us=3696625080
+[2026-08-24T14:25:56.674+0000] [INFO ] ACK_TRACE msgin id=105 bytes=55296000 us=3696650056
+[2026-08-24T14:25:56.696+0000] [INFO ] ACK_TRACE absorb id=104 monitor=0 us=3696672083
+[2026-08-24T14:25:56.698+0000] [INFO ] ACK_TRACE submit id=105 monitor=0 us=3696674265
+[2026-08-24T14:25:56.696+0000] [INFO ] ACK_TRACE ack id=104 kind=slot egress=103 absorbed=104 client=103 window=2 us=3696672120
+[2026-08-24T14:25:56.730+0000] [INFO ] ACK_TRACE egress id=104 shown=1 pending_kib=0 client=103 us=3696705871
+[2026-08-24T14:25:56.730+0000] [INFO ] ACK_TRACE ack id=104 kind=region egress=104 absorbed=104 client=103 window=2 us=3696705872
+[2026-08-24T14:25:56.757+0000] [INFO ] ACK_TRACE msgin id=106 bytes=55296000 us=3696733049
+[2026-08-24T14:25:56.784+0000] [INFO ] ACK_TRACE absorb id=105 monitor=0 us=3696759769
+[2026-08-24T14:25:56.785+0000] [INFO ] ACK_TRACE submit id=106 monitor=0 us=3696760877
+[2026-08-24T14:25:56.784+0000] [INFO ] ACK_TRACE ack id=105 kind=slot egress=104 absorbed=105 client=104 window=2 us=3696759890
+[2026-08-24T14:25:56.813+0000] [INFO ] ACK_TRACE egress id=105 shown=1 pending_kib=1025 client=104 us=3696788575
+[2026-08-24T14:25:56.813+0000] [INFO ] ACK_TRACE ack id=105 kind=region egress=105 absorbed=105 client=104 window=2 us=3696788577
+[2026-08-24T14:25:56.814+0000] [INFO ] ACK_TRACE msgin id=107 bytes=55296000 us=3696789621
+[2026-08-24T14:25:56.881+0000] [INFO ] ACK_TRACE absorb id=106 monitor=0 us=3696856973
+[2026-08-24T14:25:56.882+0000] [INFO ] ACK_TRACE submit id=107 monitor=0 us=3696858062
+[2026-08-24T14:25:56.881+0000] [INFO ] ACK_TRACE ack id=106 kind=slot egress=105 absorbed=106 client=105 window=2 us=3696857040
+[2026-08-24T14:25:56.908+0000] [INFO ] ACK_TRACE egress id=106 shown=1 pending_kib=0 client=105 us=3696883899
+[2026-08-24T14:25:56.908+0000] [INFO ] ACK_TRACE ack id=106 kind=region egress=106 absorbed=106 client=105 window=2 us=3696883900
+[2026-08-24T14:25:56.931+0000] [INFO ] ACK_TRACE msgin id=108 bytes=55296000 us=3696907073
+[2026-08-24T14:25:56.967+0000] [INFO ] ACK_TRACE absorb id=107 monitor=0 us=3696942474
+[2026-08-24T14:25:56.968+0000] [INFO ] ACK_TRACE submit id=108 monitor=0 us=3696943694
+[2026-08-24T14:25:56.967+0000] [INFO ] ACK_TRACE ack id=107 kind=slot egress=106 absorbed=107 client=106 window=2 us=3696942526
+[2026-08-24T14:25:57.010+0000] [INFO ] ACK_TRACE egress id=107 shown=1 pending_kib=0 client=106 us=3696985947
+[2026-08-24T14:25:57.010+0000] [INFO ] ACK_TRACE ack id=107 kind=region egress=107 absorbed=107 client=106 window=2 us=3696985948
+[2026-08-24T14:25:57.013+0000] [INFO ] ACK_TRACE msgin id=109 bytes=55296000 us=3696988741
+[2026-08-24T14:25:57.049+0000] [INFO ] ACK_TRACE absorb id=108 monitor=0 us=3697025011
+[2026-08-24T14:25:57.051+0000] [INFO ] ACK_TRACE submit id=109 monitor=0 us=3697026486
+[2026-08-24T14:25:57.049+0000] [INFO ] ACK_TRACE ack id=108 kind=slot egress=107 absorbed=108 client=107 window=2 us=3697025114
+[2026-08-24T14:25:57.085+0000] [INFO ] ACK_TRACE egress id=108 shown=1 pending_kib=0 client=107 us=3697061245
+[2026-08-24T14:25:57.085+0000] [INFO ] ACK_TRACE ack id=108 kind=region egress=108 absorbed=108 client=107 window=2 us=3697061246
+[2026-08-24T14:25:57.086+0000] [INFO ] ACK_TRACE msgin id=110 bytes=55296000 us=3697062285
+[2026-08-24T14:25:57.123+0000] [INFO ] ACK_TRACE absorb id=109 monitor=0 us=3697099060
+[2026-08-24T14:25:57.124+0000] [INFO ] ACK_TRACE submit id=110 monitor=0 us=3697100261
+[2026-08-24T14:25:57.123+0000] [INFO ] ACK_TRACE ack id=109 kind=slot egress=108 absorbed=109 client=108 window=2 us=3697099116
+[2026-08-24T14:25:57.151+0000] [INFO ] ACK_TRACE egress id=109 shown=1 pending_kib=0 client=108 us=3697126936
+[2026-08-24T14:25:57.151+0000] [INFO ] ACK_TRACE ack id=109 kind=region egress=109 absorbed=109 client=108 window=2 us=3697126936
+[2026-08-24T14:25:57.174+0000] [INFO ] ACK_TRACE msgin id=111 bytes=55296000 us=3697150311
+[2026-08-24T14:25:57.193+0000] [INFO ] ACK_TRACE absorb id=110 monitor=0 us=3697169057
+[2026-08-24T14:25:57.194+0000] [INFO ] ACK_TRACE submit id=111 monitor=0 us=3697170235
+[2026-08-24T14:25:57.193+0000] [INFO ] ACK_TRACE ack id=110 kind=slot egress=109 absorbed=110 client=109 window=2 us=3697169097
+[2026-08-24T14:25:57.217+0000] [INFO ] ACK_TRACE egress id=110 shown=1 pending_kib=0 client=109 us=3697193037
+[2026-08-24T14:25:57.217+0000] [INFO ] ACK_TRACE ack id=110 kind=region egress=110 absorbed=110 client=109 window=2 us=3697193038
+[2026-08-24T14:25:57.236+0000] [INFO ] ACK_TRACE msgin id=112 bytes=55296000 us=3697211855
+[2026-08-24T14:25:57.272+0000] [INFO ] ACK_TRACE absorb id=111 monitor=0 us=3697248191
+[2026-08-24T14:25:57.273+0000] [INFO ] ACK_TRACE submit id=112 monitor=0 us=3697249380
+[2026-08-24T14:25:57.272+0000] [INFO ] ACK_TRACE ack id=111 kind=slot egress=110 absorbed=111 client=110 window=2 us=3697248245
+[2026-08-24T14:25:57.304+0000] [INFO ] ACK_TRACE egress id=111 shown=1 pending_kib=0 client=110 us=3697279494
+[2026-08-24T14:25:57.304+0000] [INFO ] ACK_TRACE ack id=111 kind=region egress=111 absorbed=111 client=110 window=2 us=3697279494
+[2026-08-24T14:25:57.304+0000] [INFO ] ACK_TRACE msgin id=113 bytes=55296000 us=3697280237
+[2026-08-24T14:25:57.353+0000] [INFO ] ACK_TRACE absorb id=112 monitor=0 us=3697329383
+[2026-08-24T14:25:57.355+0000] [INFO ] ACK_TRACE submit id=113 monitor=0 us=3697330586
+[2026-08-24T14:25:57.354+0000] [INFO ] ACK_TRACE ack id=112 kind=slot egress=111 absorbed=112 client=111 window=2 us=3697329443
+[2026-08-24T14:25:57.379+0000] [INFO ] ACK_TRACE egress id=112 shown=1 pending_kib=0 client=111 us=3697355343
+[2026-08-24T14:25:57.379+0000] [INFO ] ACK_TRACE ack id=112 kind=region egress=112 absorbed=112 client=111 window=2 us=3697355345
+[2026-08-24T14:25:57.383+0000] [INFO ] ACK_TRACE msgin id=114 bytes=55296000 us=3697358837
+[2026-08-24T14:25:57.427+0000] [INFO ] ACK_TRACE absorb id=113 monitor=0 us=3697402672
+[2026-08-24T14:25:57.428+0000] [INFO ] ACK_TRACE submit id=114 monitor=0 us=3697403886
+[2026-08-24T14:25:57.427+0000] [INFO ] ACK_TRACE ack id=113 kind=slot egress=112 absorbed=113 client=112 window=2 us=3697402733
+[2026-08-24T14:25:57.457+0000] [INFO ] ACK_TRACE egress id=113 shown=1 pending_kib=0 client=112 us=3697433088
+[2026-08-24T14:25:57.457+0000] [INFO ] ACK_TRACE ack id=113 kind=region egress=113 absorbed=113 client=112 window=2 us=3697433089
+[2026-08-24T14:25:57.458+0000] [INFO ] ACK_TRACE msgin id=115 bytes=55296000 us=3697433905
+[2026-08-24T14:25:57.498+0000] [INFO ] ACK_TRACE absorb id=114 monitor=0 us=3697474154
+[2026-08-24T14:25:57.499+0000] [INFO ] ACK_TRACE submit id=115 monitor=0 us=3697475288
+[2026-08-24T14:25:57.498+0000] [INFO ] ACK_TRACE ack id=114 kind=slot egress=113 absorbed=114 client=113 window=2 us=3697474192
+[2026-08-24T14:25:57.524+0000] [INFO ] ACK_TRACE egress id=114 shown=1 pending_kib=0 client=113 us=3697499647
+[2026-08-24T14:25:57.524+0000] [INFO ] ACK_TRACE ack id=114 kind=region egress=114 absorbed=114 client=113 window=2 us=3697499649
+[2026-08-24T14:25:57.528+0000] [INFO ] ACK_TRACE msgin id=116 bytes=55296000 us=3697503454
+[2026-08-24T14:25:57.572+0000] [INFO ] ACK_TRACE absorb id=115 monitor=0 us=3697548381
+[2026-08-24T14:25:57.574+0000] [INFO ] ACK_TRACE submit id=116 monitor=0 us=3697549616
+[2026-08-24T14:25:57.573+0000] [INFO ] ACK_TRACE ack id=115 kind=slot egress=114 absorbed=115 client=114 window=2 us=3697548430
+[2026-08-24T14:25:57.619+0000] [INFO ] ACK_TRACE egress id=115 shown=1 pending_kib=0 client=114 us=3697594620
+[2026-08-24T14:25:57.619+0000] [INFO ] ACK_TRACE ack id=115 kind=region egress=115 absorbed=115 client=114 window=2 us=3697594622
+[2026-08-24T14:25:57.620+0000] [INFO ] ACK_TRACE msgin id=117 bytes=55296000 us=3697595717
+[2026-08-24T14:25:57.649+0000] [INFO ] ACK_TRACE absorb id=116 monitor=0 us=3697624470
+[2026-08-24T14:25:57.650+0000] [INFO ] ACK_TRACE submit id=117 monitor=0 us=3697625763
+[2026-08-24T14:25:57.649+0000] [INFO ] ACK_TRACE ack id=116 kind=slot egress=115 absorbed=116 client=115 window=2 us=3697624525
+[2026-08-24T14:25:57.683+0000] [INFO ] ACK_TRACE egress id=116 shown=1 pending_kib=0 client=115 us=3697658686
+[2026-08-24T14:25:57.683+0000] [INFO ] ACK_TRACE ack id=116 kind=region egress=116 absorbed=116 client=115 window=2 us=3697658687
+[2026-08-24T14:25:57.684+0000] [INFO ] ACK_TRACE msgin id=118 bytes=55296000 us=3697659599
+[2026-08-24T14:25:57.725+0000] [INFO ] ACK_TRACE absorb id=117 monitor=0 us=3697700576
+[2026-08-24T14:25:57.726+0000] [INFO ] ACK_TRACE submit id=118 monitor=0 us=3697701970
+[2026-08-24T14:25:57.725+0000] [INFO ] ACK_TRACE ack id=117 kind=slot egress=116 absorbed=117 client=116 window=2 us=3697700616
+[2026-08-24T14:25:57.754+0000] [INFO ] ACK_TRACE egress id=117 shown=1 pending_kib=0 client=116 us=3697730266
+[2026-08-24T14:25:57.754+0000] [INFO ] ACK_TRACE ack id=117 kind=region egress=117 absorbed=117 client=116 window=2 us=3697730266
+[2026-08-24T14:25:57.755+0000] [INFO ] ACK_TRACE msgin id=119 bytes=55296000 us=3697730981
+[2026-08-24T14:25:57.802+0000] [INFO ] ACK_TRACE absorb id=118 monitor=0 us=3697777410
+[2026-08-24T14:25:57.802+0000] [INFO ] ACK_TRACE ack id=118 kind=slot egress=117 absorbed=118 client=117 window=2 us=3697777448
+[2026-08-24T14:25:57.803+0000] [INFO ] ACK_TRACE submit id=119 monitor=0 us=3697778862
+[2026-08-24T14:25:57.827+0000] [INFO ] ACK_TRACE egress id=118 shown=1 pending_kib=0 client=117 us=3697802639
+[2026-08-24T14:25:57.827+0000] [INFO ] ACK_TRACE ack id=118 kind=region egress=118 absorbed=118 client=117 window=2 us=3697802640
+[2026-08-24T14:25:57.828+0000] [INFO ] ACK_TRACE msgin id=120 bytes=55296000 us=3697803620
+[2026-08-24T14:25:57.884+0000] [INFO ] ACK_TRACE absorb id=119 monitor=0 us=3697860100
+[2026-08-24T14:25:57.885+0000] [INFO ] ACK_TRACE submit id=120 monitor=0 us=3697861357
+[2026-08-24T14:25:57.884+0000] [INFO ] ACK_TRACE ack id=119 kind=slot egress=118 absorbed=119 client=118 window=2 us=3697860139
+[2026-08-24T14:25:57.914+0000] [INFO ] ACK_TRACE egress id=119 shown=1 pending_kib=0 client=118 us=3697890063
+[2026-08-24T14:25:57.914+0000] [INFO ] ACK_TRACE ack id=119 kind=region egress=119 absorbed=119 client=118 window=2 us=3697890064
+[2026-08-24T14:25:57.915+0000] [INFO ] ACK_TRACE msgin id=121 bytes=55296000 us=3697891149
+[2026-08-24T14:25:57.957+0000] [INFO ] ACK_TRACE absorb id=120 monitor=0 us=3697933372
+[2026-08-24T14:25:57.959+0000] [INFO ] ACK_TRACE submit id=121 monitor=0 us=3697934421
+[2026-08-24T14:25:57.958+0000] [INFO ] ACK_TRACE ack id=120 kind=slot egress=119 absorbed=120 client=119 window=2 us=3697933412
+[2026-08-24T14:25:57.979+0000] [INFO ] ACK_TRACE egress id=120 shown=1 pending_kib=0 client=119 us=3697954535
+[2026-08-24T14:25:57.979+0000] [INFO ] ACK_TRACE ack id=120 kind=region egress=120 absorbed=120 client=119 window=2 us=3697954535
+[2026-08-24T14:25:57.980+0000] [INFO ] ACK_TRACE msgin id=122 bytes=55296000 us=3697955483
+[2026-08-24T14:25:58.038+0000] [INFO ] ACK_TRACE absorb id=121 monitor=0 us=3698013703
+[2026-08-24T14:25:58.039+0000] [INFO ] ACK_TRACE submit id=122 monitor=0 us=3698014924
+[2026-08-24T14:25:58.038+0000] [INFO ] ACK_TRACE ack id=121 kind=slot egress=120 absorbed=121 client=120 window=2 us=3698013742
+[2026-08-24T14:25:58.062+0000] [INFO ] ACK_TRACE egress id=121 shown=1 pending_kib=0 client=120 us=3698037597
+[2026-08-24T14:25:58.062+0000] [INFO ] ACK_TRACE ack id=121 kind=region egress=121 absorbed=121 client=120 window=2 us=3698037597
+[2026-08-24T14:25:58.063+0000] [INFO ] ACK_TRACE msgin id=123 bytes=55296000 us=3698038513
+[2026-08-24T14:25:58.114+0000] [INFO ] ACK_TRACE absorb id=122 monitor=0 us=3698089616
+[2026-08-24T14:25:58.115+0000] [INFO ] ACK_TRACE submit id=123 monitor=0 us=3698090722
+[2026-08-24T14:25:58.114+0000] [INFO ] ACK_TRACE ack id=122 kind=slot egress=121 absorbed=122 client=121 window=2 us=3698089658
+[2026-08-24T14:25:58.140+0000] [INFO ] ACK_TRACE egress id=122 shown=1 pending_kib=0 client=121 us=3698115850
+[2026-08-24T14:25:58.140+0000] [INFO ] ACK_TRACE ack id=122 kind=region egress=122 absorbed=122 client=121 window=2 us=3698115851
+[2026-08-24T14:25:58.141+0000] [INFO ] ACK_TRACE msgin id=124 bytes=55296000 us=3698116651
+[2026-08-24T14:25:58.191+0000] [INFO ] ACK_TRACE absorb id=123 monitor=0 us=3698166805
+[2026-08-24T14:25:58.192+0000] [INFO ] ACK_TRACE submit id=124 monitor=0 us=3698168099
+[2026-08-24T14:25:58.191+0000] [INFO ] ACK_TRACE ack id=123 kind=slot egress=122 absorbed=123 client=122 window=2 us=3698166846
+[2026-08-24T14:25:58.216+0000] [INFO ] ACK_TRACE egress id=123 shown=1 pending_kib=0 client=122 us=3698192361
+[2026-08-24T14:25:58.216+0000] [INFO ] ACK_TRACE ack id=123 kind=region egress=123 absorbed=123 client=122 window=2 us=3698192362
+[2026-08-24T14:25:58.217+0000] [INFO ] ACK_TRACE msgin id=125 bytes=55296000 us=3698193146
+[2026-08-24T14:25:58.263+0000] [INFO ] ACK_TRACE absorb id=124 monitor=0 us=3698239164
+[2026-08-24T14:25:58.265+0000] [INFO ] ACK_TRACE submit id=125 monitor=0 us=3698240468
+[2026-08-24T14:25:58.263+0000] [INFO ] ACK_TRACE ack id=124 kind=slot egress=123 absorbed=124 client=123 window=2 us=3698239214
+[2026-08-24T14:25:58.293+0000] [INFO ] ACK_TRACE egress id=124 shown=1 pending_kib=0 client=123 us=3698268763
+[2026-08-24T14:25:58.293+0000] [INFO ] ACK_TRACE ack id=124 kind=region egress=124 absorbed=124 client=123 window=2 us=3698268764
+[2026-08-24T14:25:58.294+0000] [INFO ] ACK_TRACE msgin id=126 bytes=55296000 us=3698269777
+[2026-08-24T14:25:58.339+0000] [INFO ] ACK_TRACE absorb id=125 monitor=0 us=3698315068
+[2026-08-24T14:25:58.340+0000] [INFO ] ACK_TRACE submit id=126 monitor=0 us=3698316360
+[2026-08-24T14:25:58.339+0000] [INFO ] ACK_TRACE ack id=125 kind=slot egress=124 absorbed=125 client=124 window=2 us=3698315143
+[2026-08-24T14:25:58.371+0000] [INFO ] ACK_TRACE egress id=125 shown=1 pending_kib=0 client=124 us=3698346477
+[2026-08-24T14:25:58.371+0000] [INFO ] ACK_TRACE ack id=125 kind=region egress=125 absorbed=125 client=124 window=2 us=3698346478
+[2026-08-24T14:25:58.372+0000] [INFO ] ACK_TRACE msgin id=127 bytes=55296000 us=3698347495
+[2026-08-24T14:25:58.408+0000] [INFO ] ACK_TRACE absorb id=126 monitor=0 us=3698383613
+[2026-08-24T14:25:58.409+0000] [INFO ] ACK_TRACE submit id=127 monitor=0 us=3698384813
+[2026-08-24T14:25:58.408+0000] [INFO ] ACK_TRACE ack id=126 kind=slot egress=125 absorbed=126 client=125 window=2 us=3698383660
+[2026-08-24T14:25:58.435+0000] [INFO ] ACK_TRACE egress id=126 shown=1 pending_kib=0 client=125 us=3698410585
+[2026-08-24T14:25:58.435+0000] [INFO ] ACK_TRACE ack id=126 kind=region egress=126 absorbed=126 client=125 window=2 us=3698410587
+[2026-08-24T14:25:58.436+0000] [INFO ] ACK_TRACE msgin id=128 bytes=55296000 us=3698411664
+[2026-08-24T14:25:58.479+0000] [INFO ] ACK_TRACE absorb id=127 monitor=0 us=3698455092
+[2026-08-24T14:25:58.480+0000] [INFO ] ACK_TRACE submit id=128 monitor=0 us=3698456261
+[2026-08-24T14:25:58.479+0000] [INFO ] ACK_TRACE ack id=127 kind=slot egress=126 absorbed=127 client=126 window=2 us=3698455127
+[2026-08-24T14:25:58.516+0000] [INFO ] ACK_TRACE egress id=127 shown=1 pending_kib=0 client=126 us=3698491763
+[2026-08-24T14:25:58.516+0000] [INFO ] ACK_TRACE ack id=127 kind=region egress=127 absorbed=127 client=126 window=2 us=3698491764
+[2026-08-24T14:25:58.517+0000] [INFO ] ACK_TRACE msgin id=129 bytes=55296000 us=3698492535
+[2026-08-24T14:25:58.558+0000] [INFO ] ACK_TRACE absorb id=128 monitor=0 us=3698533769
+[2026-08-24T14:25:58.559+0000] [INFO ] ACK_TRACE submit id=129 monitor=0 us=3698535204
+[2026-08-24T14:25:58.558+0000] [INFO ] ACK_TRACE ack id=128 kind=slot egress=127 absorbed=128 client=127 window=2 us=3698533832
+[2026-08-24T14:25:58.587+0000] [INFO ] ACK_TRACE egress id=128 shown=1 pending_kib=0 client=127 us=3698563145
+[2026-08-24T14:25:58.587+0000] [INFO ] ACK_TRACE ack id=128 kind=region egress=128 absorbed=128 client=127 window=2 us=3698563146
+[2026-08-24T14:25:58.588+0000] [INFO ] ACK_TRACE msgin id=130 bytes=55296000 us=3698564050
+[2026-08-24T14:25:58.639+0000] [INFO ] ACK_TRACE absorb id=129 monitor=0 us=3698615132
+[2026-08-24T14:25:58.641+0000] [INFO ] ACK_TRACE submit id=130 monitor=0 us=3698616608
+[2026-08-24T14:25:58.639+0000] [INFO ] ACK_TRACE ack id=129 kind=slot egress=128 absorbed=129 client=128 window=2 us=3698615197
+[2026-08-24T14:25:58.678+0000] [INFO ] ACK_TRACE egress id=129 shown=1 pending_kib=0 client=128 us=3698654308
+[2026-08-24T14:25:58.678+0000] [INFO ] ACK_TRACE ack id=129 kind=region egress=129 absorbed=129 client=128 window=2 us=3698654309
+[2026-08-24T14:25:58.679+0000] [INFO ] ACK_TRACE msgin id=131 bytes=55296000 us=3698655106
+[2026-08-24T14:25:58.725+0000] [INFO ] ACK_TRACE absorb id=130 monitor=0 us=3698700493
+[2026-08-24T14:25:58.726+0000] [INFO ] ACK_TRACE submit id=131 monitor=0 us=3698701853
+[2026-08-24T14:25:58.725+0000] [INFO ] ACK_TRACE ack id=130 kind=slot egress=129 absorbed=130 client=129 window=2 us=3698700532
+[2026-08-24T14:25:58.765+0000] [INFO ] ACK_TRACE egress id=130 shown=1 pending_kib=0 client=129 us=3698740532
+[2026-08-24T14:25:58.765+0000] [INFO ] ACK_TRACE ack id=130 kind=region egress=130 absorbed=130 client=129 window=2 us=3698740533
+[2026-08-24T14:25:58.765+0000] [INFO ] ACK_TRACE msgin id=132 bytes=55296000 us=3698741366
+[2026-08-24T14:25:58.799+0000] [INFO ] ACK_TRACE absorb id=131 monitor=0 us=3698775391
+[2026-08-24T14:25:58.801+0000] [INFO ] ACK_TRACE submit id=132 monitor=0 us=3698776941
+[2026-08-24T14:25:58.800+0000] [INFO ] ACK_TRACE ack id=131 kind=slot egress=130 absorbed=131 client=130 window=2 us=3698775441
+[2026-08-24T14:25:58.832+0000] [INFO ] ACK_TRACE egress id=131 shown=1 pending_kib=0 client=130 us=3698807882
+[2026-08-24T14:25:58.832+0000] [INFO ] ACK_TRACE ack id=131 kind=region egress=131 absorbed=131 client=130 window=2 us=3698807883
+[2026-08-24T14:25:58.833+0000] [INFO ] ACK_TRACE msgin id=133 bytes=55296000 us=3698808707
+[2026-08-24T14:25:58.883+0000] [INFO ] ACK_TRACE absorb id=132 monitor=0 us=3698859281
+[2026-08-24T14:25:58.883+0000] [INFO ] ACK_TRACE ack id=132 kind=slot egress=131 absorbed=132 client=131 window=2 us=3698859323
+[2026-08-24T14:25:58.885+0000] [INFO ] ACK_TRACE submit id=133 monitor=0 us=3698860550
+[2026-08-24T14:25:58.921+0000] [INFO ] ACK_TRACE egress id=132 shown=1 pending_kib=0 client=131 us=3698896614
+[2026-08-24T14:25:58.921+0000] [INFO ] ACK_TRACE ack id=132 kind=region egress=132 absorbed=132 client=131 window=2 us=3698896615
+[2026-08-24T14:25:58.922+0000] [INFO ] ACK_TRACE msgin id=134 bytes=55296000 us=3698897417
+[2026-08-24T14:25:58.953+0000] [INFO ] ACK_TRACE absorb id=133 monitor=0 us=3698928775
+[2026-08-24T14:25:58.954+0000] [INFO ] ACK_TRACE submit id=134 monitor=0 us=3698930165
+[2026-08-24T14:25:58.953+0000] [INFO ] ACK_TRACE ack id=133 kind=slot egress=132 absorbed=133 client=132 window=2 us=3698928831
+[2026-08-24T14:25:58.985+0000] [INFO ] ACK_TRACE egress id=133 shown=1 pending_kib=0 client=132 us=3698961208
+[2026-08-24T14:25:58.985+0000] [INFO ] ACK_TRACE ack id=133 kind=region egress=133 absorbed=133 client=132 window=2 us=3698961210
+[2026-08-24T14:25:58.986+0000] [INFO ] ACK_TRACE msgin id=135 bytes=55296000 us=3698962245
+[2026-08-24T14:25:59.023+0000] [INFO ] ACK_TRACE absorb id=134 monitor=0 us=3698999305
+[2026-08-24T14:25:59.025+0000] [INFO ] ACK_TRACE submit id=135 monitor=0 us=3699000571
+[2026-08-24T14:25:59.023+0000] [INFO ] ACK_TRACE ack id=134 kind=slot egress=133 absorbed=134 client=133 window=2 us=3698999348
+[2026-08-24T14:25:59.051+0000] [INFO ] ACK_TRACE egress id=134 shown=1 pending_kib=0 client=133 us=3699026514
+[2026-08-24T14:25:59.051+0000] [INFO ] ACK_TRACE ack id=134 kind=region egress=134 absorbed=134 client=133 window=2 us=3699026515
+[2026-08-24T14:25:59.052+0000] [INFO ] ACK_TRACE msgin id=136 bytes=55296000 us=3699027498
+[2026-08-24T14:25:59.099+0000] [INFO ] ACK_TRACE absorb id=135 monitor=0 us=3699074801
+[2026-08-24T14:25:59.100+0000] [INFO ] ACK_TRACE submit id=136 monitor=0 us=3699076059
+[2026-08-24T14:25:59.099+0000] [INFO ] ACK_TRACE ack id=135 kind=slot egress=134 absorbed=135 client=134 window=2 us=3699074841
+[2026-08-24T14:25:59.130+0000] [INFO ] ACK_TRACE egress id=135 shown=1 pending_kib=0 client=134 us=3699105775
+[2026-08-24T14:25:59.130+0000] [INFO ] ACK_TRACE ack id=135 kind=region egress=135 absorbed=135 client=134 window=2 us=3699105775
+[2026-08-24T14:25:59.131+0000] [INFO ] ACK_TRACE msgin id=137 bytes=55296000 us=3699106632
+[2026-08-24T14:25:59.169+0000] [INFO ] ACK_TRACE absorb id=136 monitor=0 us=3699145072
+[2026-08-24T14:25:59.171+0000] [INFO ] ACK_TRACE submit id=137 monitor=0 us=3699146449
+[2026-08-24T14:25:59.169+0000] [INFO ] ACK_TRACE ack id=136 kind=slot egress=135 absorbed=136 client=135 window=2 us=3699145131
+[2026-08-24T14:25:59.201+0000] [INFO ] ACK_TRACE egress id=136 shown=1 pending_kib=0 client=135 us=3699176465
+[2026-08-24T14:25:59.201+0000] [INFO ] ACK_TRACE ack id=136 kind=region egress=136 absorbed=136 client=135 window=2 us=3699176466
+[2026-08-24T14:25:59.202+0000] [INFO ] ACK_TRACE msgin id=138 bytes=55296000 us=3699177546
+[2026-08-24T14:25:59.245+0000] [INFO ] ACK_TRACE absorb id=137 monitor=0 us=3699220456
+[2026-08-24T14:25:59.246+0000] [INFO ] ACK_TRACE submit id=138 monitor=0 us=3699221849
+[2026-08-24T14:25:59.245+0000] [INFO ] ACK_TRACE ack id=137 kind=slot egress=136 absorbed=137 client=136 window=2 us=3699220520
+[2026-08-24T14:25:59.271+0000] [INFO ] ACK_TRACE egress id=137 shown=1 pending_kib=0 client=136 us=3699247191
+[2026-08-24T14:25:59.271+0000] [INFO ] ACK_TRACE ack id=137 kind=region egress=137 absorbed=137 client=136 window=2 us=3699247192
+[2026-08-24T14:25:59.272+0000] [INFO ] ACK_TRACE msgin id=139 bytes=55296000 us=3699248081
+[2026-08-24T14:25:59.317+0000] [INFO ] ACK_TRACE absorb id=138 monitor=0 us=3699292943
+[2026-08-24T14:25:59.318+0000] [INFO ] ACK_TRACE submit id=139 monitor=0 us=3699294298
+[2026-08-24T14:25:59.317+0000] [INFO ] ACK_TRACE ack id=138 kind=slot egress=137 absorbed=138 client=137 window=2 us=3699293022
+[2026-08-24T14:25:59.346+0000] [INFO ] ACK_TRACE egress id=138 shown=1 pending_kib=0 client=137 us=3699321887
+[2026-08-24T14:25:59.346+0000] [INFO ] ACK_TRACE ack id=138 kind=region egress=138 absorbed=138 client=137 window=2 us=3699321888
+[2026-08-24T14:25:59.347+0000] [INFO ] ACK_TRACE msgin id=140 bytes=55296000 us=3699322675
+[2026-08-24T14:25:59.385+0000] [INFO ] ACK_TRACE absorb id=139 monitor=0 us=3699360592
+[2026-08-24T14:25:59.386+0000] [INFO ] ACK_TRACE submit id=140 monitor=0 us=3699361869
+[2026-08-24T14:25:59.385+0000] [INFO ] ACK_TRACE ack id=139 kind=slot egress=138 absorbed=139 client=138 window=2 us=3699360639
+[2026-08-24T14:25:59.414+0000] [INFO ] ACK_TRACE egress id=139 shown=1 pending_kib=0 client=138 us=3699389890
+[2026-08-24T14:25:59.414+0000] [INFO ] ACK_TRACE ack id=139 kind=region egress=139 absorbed=139 client=138 window=2 us=3699389892
+[2026-08-24T14:25:59.415+0000] [INFO ] ACK_TRACE msgin id=141 bytes=55296000 us=3699390767
+[2026-08-24T14:25:59.459+0000] [INFO ] ACK_TRACE absorb id=140 monitor=0 us=3699434831
+[2026-08-24T14:25:59.460+0000] [INFO ] ACK_TRACE submit id=141 monitor=0 us=3699436152
+[2026-08-24T14:25:59.459+0000] [INFO ] ACK_TRACE ack id=140 kind=slot egress=139 absorbed=140 client=139 window=2 us=3699434872
+[2026-08-24T14:25:59.485+0000] [INFO ] ACK_TRACE egress id=140 shown=1 pending_kib=0 client=139 us=3699460409
+[2026-08-24T14:25:59.485+0000] [INFO ] ACK_TRACE ack id=140 kind=region egress=140 absorbed=140 client=139 window=2 us=3699460410
+[2026-08-24T14:25:59.485+0000] [INFO ] ACK_TRACE msgin id=142 bytes=55296000 us=3699461205
+[2026-08-24T14:25:59.532+0000] [INFO ] ACK_TRACE absorb id=141 monitor=0 us=3699508159
+[2026-08-24T14:25:59.534+0000] [INFO ] ACK_TRACE submit id=142 monitor=0 us=3699509446
+[2026-08-24T14:25:59.532+0000] [INFO ] ACK_TRACE ack id=141 kind=slot egress=140 absorbed=141 client=140 window=2 us=3699508198
+[2026-08-24T14:25:59.556+0000] [INFO ] ACK_TRACE egress id=141 shown=1 pending_kib=0 client=140 us=3699532257
+[2026-08-24T14:25:59.556+0000] [INFO ] ACK_TRACE ack id=141 kind=region egress=141 absorbed=141 client=140 window=2 us=3699532258
+[2026-08-24T14:25:59.557+0000] [INFO ] ACK_TRACE msgin id=143 bytes=55296000 us=3699532992
+[2026-08-24T14:25:59.602+0000] [INFO ] ACK_TRACE absorb id=142 monitor=0 us=3699577539
+[2026-08-24T14:25:59.603+0000] [INFO ] ACK_TRACE submit id=143 monitor=0 us=3699578928
+[2026-08-24T14:25:59.602+0000] [INFO ] ACK_TRACE ack id=142 kind=slot egress=141 absorbed=142 client=141 window=2 us=3699577610
+[2026-08-24T14:25:59.630+0000] [INFO ] ACK_TRACE egress id=142 shown=1 pending_kib=0 client=141 us=3699606249
+[2026-08-24T14:25:59.630+0000] [INFO ] ACK_TRACE ack id=142 kind=region egress=142 absorbed=142 client=141 window=2 us=3699606250
+[2026-08-24T14:25:59.631+0000] [INFO ] ACK_TRACE msgin id=144 bytes=55296000 us=3699607153
+[2026-08-24T14:25:59.676+0000] [INFO ] ACK_TRACE absorb id=143 monitor=0 us=3699651581
+[2026-08-24T14:25:59.677+0000] [INFO ] ACK_TRACE submit id=144 monitor=0 us=3699652830
+[2026-08-24T14:25:59.676+0000] [INFO ] ACK_TRACE ack id=143 kind=slot egress=142 absorbed=143 client=142 window=2 us=3699651620
+[2026-08-24T14:25:59.709+0000] [INFO ] ACK_TRACE egress id=143 shown=1 pending_kib=0 client=142 us=3699684482
+[2026-08-24T14:25:59.709+0000] [INFO ] ACK_TRACE ack id=143 kind=region egress=143 absorbed=143 client=142 window=2 us=3699684483
+[2026-08-24T14:25:59.710+0000] [INFO ] ACK_TRACE msgin id=145 bytes=55296000 us=3699686176
+[2026-08-24T14:25:59.745+0000] [INFO ] ACK_TRACE absorb id=144 monitor=0 us=3699720509
+[2026-08-24T14:25:59.746+0000] [INFO ] ACK_TRACE submit id=145 monitor=0 us=3699721714
+[2026-08-24T14:25:59.745+0000] [INFO ] ACK_TRACE ack id=144 kind=slot egress=143 absorbed=144 client=143 window=2 us=3699720543
+[2026-08-24T14:25:59.774+0000] [INFO ] ACK_TRACE egress id=144 shown=1 pending_kib=0 client=143 us=3699749536
+[2026-08-24T14:25:59.774+0000] [INFO ] ACK_TRACE ack id=144 kind=region egress=144 absorbed=144 client=143 window=2 us=3699749537
+[2026-08-24T14:25:59.775+0000] [INFO ] ACK_TRACE msgin id=146 bytes=55296000 us=3699750729
+[2026-08-24T14:25:59.817+0000] [INFO ] ACK_TRACE absorb id=145 monitor=0 us=3699793111
+[2026-08-24T14:25:59.818+0000] [INFO ] ACK_TRACE submit id=146 monitor=0 us=3699794338
+[2026-08-24T14:25:59.817+0000] [INFO ] ACK_TRACE ack id=145 kind=slot egress=144 absorbed=145 client=144 window=2 us=3699793165
+[2026-08-24T14:25:59.859+0000] [INFO ] ACK_TRACE egress id=145 shown=1 pending_kib=0 client=144 us=3699835267
+[2026-08-24T14:25:59.859+0000] [INFO ] ACK_TRACE ack id=145 kind=region egress=145 absorbed=145 client=144 window=2 us=3699835269
+[2026-08-24T14:25:59.860+0000] [INFO ] ACK_TRACE msgin id=147 bytes=55296000 us=3699836332
+[2026-08-24T14:25:59.902+0000] [INFO ] ACK_TRACE absorb id=146 monitor=0 us=3699878218
+[2026-08-24T14:25:59.904+0000] [INFO ] ACK_TRACE submit id=147 monitor=0 us=3699879433
+[2026-08-24T14:25:59.902+0000] [INFO ] ACK_TRACE ack id=146 kind=slot egress=145 absorbed=146 client=145 window=2 us=3699878269
+[2026-08-24T14:25:59.933+0000] [INFO ] ACK_TRACE egress id=146 shown=1 pending_kib=0 client=145 us=3699908537
+[2026-08-24T14:25:59.933+0000] [INFO ] ACK_TRACE ack id=146 kind=region egress=146 absorbed=146 client=145 window=2 us=3699908538
+[2026-08-24T14:25:59.934+0000] [INFO ] ACK_TRACE msgin id=148 bytes=55296000 us=3699909584
+[2026-08-24T14:25:59.975+0000] [INFO ] ACK_TRACE absorb id=147 monitor=0 us=3699950585
+[2026-08-24T14:25:59.976+0000] [INFO ] ACK_TRACE submit id=148 monitor=0 us=3699951737
+[2026-08-24T14:25:59.975+0000] [INFO ] ACK_TRACE ack id=147 kind=slot egress=146 absorbed=147 client=146 window=2 us=3699950624
+[2026-08-24T14:26:00.002+0000] [INFO ] ACK_TRACE egress id=147 shown=1 pending_kib=0 client=146 us=3699977415
+[2026-08-24T14:26:00.002+0000] [INFO ] ACK_TRACE ack id=147 kind=region egress=147 absorbed=147 client=146 window=2 us=3699977416
+[2026-08-24T14:26:00.003+0000] [INFO ] ACK_TRACE msgin id=149 bytes=55296000 us=3699978420
+[2026-08-24T14:26:00.045+0000] [INFO ] ACK_TRACE absorb id=148 monitor=0 us=3700020532
+[2026-08-24T14:26:00.046+0000] [INFO ] ACK_TRACE submit id=149 monitor=0 us=3700021901
+[2026-08-24T14:26:00.045+0000] [INFO ] ACK_TRACE ack id=148 kind=slot egress=147 absorbed=148 client=147 window=2 us=3700020574
+[2026-08-24T14:26:00.073+0000] [INFO ] ACK_TRACE egress id=148 shown=1 pending_kib=0 client=147 us=3700048458
+[2026-08-24T14:26:00.073+0000] [INFO ] ACK_TRACE ack id=148 kind=region egress=148 absorbed=148 client=147 window=2 us=3700048459
+[2026-08-24T14:26:00.073+0000] [INFO ] ACK_TRACE msgin id=150 bytes=55296000 us=3700049298
+[2026-08-24T14:26:00.122+0000] [INFO ] ACK_TRACE absorb id=149 monitor=0 us=3700097709
+[2026-08-24T14:26:00.123+0000] [INFO ] ACK_TRACE submit id=150 monitor=0 us=3700099159
+[2026-08-24T14:26:00.122+0000] [INFO ] ACK_TRACE ack id=149 kind=slot egress=148 absorbed=149 client=148 window=2 us=3700097772
+[2026-08-24T14:26:00.152+0000] [INFO ] ACK_TRACE egress id=149 shown=1 pending_kib=0 client=148 us=3700128285
+[2026-08-24T14:26:00.152+0000] [INFO ] ACK_TRACE ack id=149 kind=region egress=149 absorbed=149 client=148 window=2 us=3700128286
+[2026-08-24T14:26:00.153+0000] [INFO ] ACK_TRACE msgin id=151 bytes=55296000 us=3700129280
+[2026-08-24T14:26:00.195+0000] [INFO ] ACK_TRACE absorb id=150 monitor=0 us=3700170850
+[2026-08-24T14:26:00.196+0000] [INFO ] ACK_TRACE submit id=151 monitor=0 us=3700172215
+[2026-08-24T14:26:00.195+0000] [INFO ] ACK_TRACE ack id=150 kind=slot egress=149 absorbed=150 client=149 window=2 us=3700170906
+[2026-08-24T14:26:00.223+0000] [INFO ] ACK_TRACE egress id=150 shown=1 pending_kib=0 client=149 us=3700198848
+[2026-08-24T14:26:00.223+0000] [INFO ] ACK_TRACE ack id=150 kind=region egress=150 absorbed=150 client=149 window=2 us=3700198849
+[2026-08-24T14:26:00.224+0000] [INFO ] ACK_TRACE msgin id=152 bytes=55296000 us=3700199630
+[2026-08-24T14:26:00.268+0000] [INFO ] ACK_TRACE absorb id=151 monitor=0 us=3700244162
+[2026-08-24T14:26:00.270+0000] [INFO ] ACK_TRACE submit id=152 monitor=0 us=3700245431
+[2026-08-24T14:26:00.268+0000] [INFO ] ACK_TRACE ack id=151 kind=slot egress=150 absorbed=151 client=150 window=2 us=3700244215
+[2026-08-24T14:26:00.309+0000] [INFO ] ACK_TRACE egress id=151 shown=1 pending_kib=0 client=150 us=3700285336
+[2026-08-24T14:26:00.309+0000] [INFO ] ACK_TRACE ack id=151 kind=region egress=151 absorbed=151 client=150 window=2 us=3700285337
+[2026-08-24T14:26:00.311+0000] [INFO ] ACK_TRACE msgin id=153 bytes=55296000 us=3700286872
+[2026-08-24T14:26:00.331+0000] [INFO ] ACK_TRACE absorb id=152 monitor=0 us=3700307185
+[2026-08-24T14:26:00.332+0000] [INFO ] ACK_TRACE submit id=153 monitor=0 us=3700308350
+[2026-08-24T14:26:00.331+0000] [INFO ] ACK_TRACE ack id=152 kind=slot egress=151 absorbed=152 client=151 window=2 us=3700307231
+[2026-08-24T14:26:00.361+0000] [INFO ] ACK_TRACE egress id=152 shown=1 pending_kib=0 client=151 us=3700336633
+[2026-08-24T14:26:00.361+0000] [INFO ] ACK_TRACE ack id=152 kind=region egress=152 absorbed=152 client=151 window=2 us=3700336635
+[2026-08-24T14:26:00.362+0000] [INFO ] ACK_TRACE msgin id=154 bytes=55296000 us=3700337966
+[2026-08-24T14:26:00.397+0000] [INFO ] ACK_TRACE absorb id=153 monitor=0 us=3700372931
+[2026-08-24T14:26:00.398+0000] [INFO ] ACK_TRACE submit id=154 monitor=0 us=3700374209
+[2026-08-24T14:26:00.397+0000] [INFO ] ACK_TRACE ack id=153 kind=slot egress=152 absorbed=153 client=152 window=2 us=3700372977
+[2026-08-24T14:26:00.422+0000] [INFO ] ACK_TRACE egress id=153 shown=1 pending_kib=0 client=152 us=3700397892
+[2026-08-24T14:26:00.422+0000] [INFO ] ACK_TRACE ack id=153 kind=region egress=153 absorbed=153 client=152 window=2 us=3700397893
+[2026-08-24T14:26:00.423+0000] [INFO ] ACK_TRACE msgin id=155 bytes=55296000 us=3700398653
+[2026-08-24T14:26:00.460+0000] [INFO ] ACK_TRACE absorb id=154 monitor=0 us=3700436374
+[2026-08-24T14:26:00.462+0000] [INFO ] ACK_TRACE submit id=155 monitor=0 us=3700437514
+[2026-08-24T14:26:00.461+0000] [INFO ] ACK_TRACE ack id=154 kind=slot egress=153 absorbed=154 client=153 window=2 us=3700436411
+[2026-08-24T14:26:00.483+0000] [INFO ] ACK_TRACE egress id=154 shown=1 pending_kib=0 client=153 us=3700458969
+[2026-08-24T14:26:00.483+0000] [INFO ] ACK_TRACE ack id=154 kind=region egress=154 absorbed=154 client=153 window=2 us=3700458970
+[2026-08-24T14:26:00.484+0000] [INFO ] ACK_TRACE msgin id=156 bytes=55296000 us=3700459844
+[2026-08-24T14:26:00.522+0000] [INFO ] ACK_TRACE absorb id=155 monitor=0 us=3700497693
+[2026-08-24T14:26:00.523+0000] [INFO ] ACK_TRACE submit id=156 monitor=0 us=3700498773
+[2026-08-24T14:26:00.522+0000] [INFO ] ACK_TRACE ack id=155 kind=slot egress=154 absorbed=155 client=154 window=2 us=3700497740
+[2026-08-24T14:26:00.545+0000] [INFO ] ACK_TRACE egress id=155 shown=1 pending_kib=0 client=154 us=3700520897
+[2026-08-24T14:26:00.545+0000] [INFO ] ACK_TRACE ack id=155 kind=region egress=155 absorbed=155 client=154 window=2 us=3700520898
+[2026-08-24T14:26:00.547+0000] [INFO ] ACK_TRACE msgin id=157 bytes=55296000 us=3700523249
+[2026-08-24T14:26:00.583+0000] [INFO ] ACK_TRACE absorb id=156 monitor=0 us=3700558435
+[2026-08-24T14:26:00.584+0000] [INFO ] ACK_TRACE submit id=157 monitor=0 us=3700559495
+[2026-08-24T14:26:00.583+0000] [INFO ] ACK_TRACE ack id=156 kind=slot egress=155 absorbed=156 client=155 window=2 us=3700558491
+[2026-08-24T14:26:00.611+0000] [INFO ] ACK_TRACE egress id=156 shown=1 pending_kib=0 client=155 us=3700587239
+[2026-08-24T14:26:00.611+0000] [INFO ] ACK_TRACE ack id=156 kind=region egress=156 absorbed=156 client=155 window=2 us=3700587241
+[2026-08-24T14:26:00.612+0000] [INFO ] ACK_TRACE msgin id=158 bytes=55296000 us=3700588308
+[2026-08-24T14:26:00.653+0000] [INFO ] ACK_TRACE absorb id=157 monitor=0 us=3700629288
+[2026-08-24T14:26:00.653+0000] [INFO ] ACK_TRACE ack id=157 kind=slot egress=156 absorbed=157 client=156 window=2 us=3700629344
+[2026-08-24T14:26:00.655+0000] [INFO ] ACK_TRACE submit id=158 monitor=0 us=3700630463
+[2026-08-24T14:26:00.678+0000] [INFO ] ACK_TRACE egress id=157 shown=1 pending_kib=0 client=156 us=3700654262
+[2026-08-24T14:26:00.678+0000] [INFO ] ACK_TRACE ack id=157 kind=region egress=157 absorbed=157 client=156 window=2 us=3700654263
+[2026-08-24T14:26:00.679+0000] [INFO ] ACK_TRACE msgin id=159 bytes=55296000 us=3700655018
+[2026-08-24T14:26:00.721+0000] [INFO ] ACK_TRACE absorb id=158 monitor=0 us=3700697334
+[2026-08-24T14:26:00.723+0000] [INFO ] ACK_TRACE submit id=159 monitor=0 us=3700698525
+[2026-08-24T14:26:00.722+0000] [INFO ] ACK_TRACE ack id=158 kind=slot egress=157 absorbed=158 client=157 window=2 us=3700697407
+[2026-08-24T14:26:00.748+0000] [INFO ] ACK_TRACE egress id=158 shown=1 pending_kib=0 client=157 us=3700724351
+[2026-08-24T14:26:00.748+0000] [INFO ] ACK_TRACE ack id=158 kind=region egress=158 absorbed=158 client=157 window=2 us=3700724351
+[2026-08-24T14:26:00.749+0000] [INFO ] ACK_TRACE msgin id=160 bytes=55296000 us=3700725144
+[2026-08-24T14:26:00.800+0000] [INFO ] ACK_TRACE absorb id=159 monitor=0 us=3700776131
+[2026-08-24T14:26:00.801+0000] [INFO ] ACK_TRACE submit id=160 monitor=0 us=3700777195
+[2026-08-24T14:26:00.800+0000] [INFO ] ACK_TRACE ack id=159 kind=slot egress=158 absorbed=159 client=158 window=2 us=3700776179
+[2026-08-24T14:26:00.832+0000] [INFO ] ACK_TRACE egress id=159 shown=1 pending_kib=0 client=158 us=3700808213
+[2026-08-24T14:26:00.832+0000] [INFO ] ACK_TRACE ack id=159 kind=region egress=159 absorbed=159 client=158 window=2 us=3700808214
+[2026-08-24T14:26:00.833+0000] [INFO ] ACK_TRACE msgin id=161 bytes=55296000 us=3700809076
+[2026-08-24T14:26:00.872+0000] [INFO ] ACK_TRACE absorb id=160 monitor=0 us=3700847788
+[2026-08-24T14:26:00.873+0000] [INFO ] ACK_TRACE submit id=161 monitor=0 us=3700849157
+[2026-08-24T14:26:00.872+0000] [INFO ] ACK_TRACE ack id=160 kind=slot egress=159 absorbed=160 client=159 window=2 us=3700847828
+[2026-08-24T14:26:00.905+0000] [INFO ] ACK_TRACE egress id=160 shown=1 pending_kib=0 client=159 us=3700880536
+[2026-08-24T14:26:00.905+0000] [INFO ] ACK_TRACE ack id=160 kind=region egress=160 absorbed=160 client=159 window=2 us=3700880537
+[2026-08-24T14:26:00.905+0000] [INFO ] ACK_TRACE msgin id=162 bytes=55296000 us=3700881359
+[2026-08-24T14:26:00.937+0000] [INFO ] ACK_TRACE absorb id=161 monitor=0 us=3700912505
+[2026-08-24T14:26:00.938+0000] [INFO ] ACK_TRACE submit id=162 monitor=0 us=3700913691
+[2026-08-24T14:26:00.937+0000] [INFO ] ACK_TRACE ack id=161 kind=slot egress=160 absorbed=161 client=160 window=2 us=3700912546
+[2026-08-24T14:26:00.963+0000] [INFO ] ACK_TRACE egress id=161 shown=1 pending_kib=0 client=160 us=3700939360
+[2026-08-24T14:26:00.963+0000] [INFO ] ACK_TRACE ack id=161 kind=region egress=161 absorbed=161 client=160 window=2 us=3700939361
+[2026-08-24T14:26:00.964+0000] [INFO ] ACK_TRACE msgin id=163 bytes=55296000 us=3700940286
+[2026-08-24T14:26:01.016+0000] [INFO ] ACK_TRACE absorb id=162 monitor=0 us=3700991653
+[2026-08-24T14:26:01.017+0000] [INFO ] ACK_TRACE submit id=163 monitor=0 us=3700992785
+[2026-08-24T14:26:01.016+0000] [INFO ] ACK_TRACE ack id=162 kind=slot egress=161 absorbed=162 client=161 window=2 us=3700991706
+[2026-08-24T14:26:01.050+0000] [INFO ] ACK_TRACE egress id=162 shown=1 pending_kib=0 client=161 us=3701026373
+[2026-08-24T14:26:01.050+0000] [INFO ] ACK_TRACE ack id=162 kind=region egress=162 absorbed=162 client=161 window=2 us=3701026375
+[2026-08-24T14:26:01.052+0000] [INFO ] ACK_TRACE msgin id=164 bytes=55296000 us=3701027476
+[2026-08-24T14:26:01.094+0000] [INFO ] ACK_TRACE absorb id=163 monitor=0 us=3701069682
+[2026-08-24T14:26:01.095+0000] [INFO ] ACK_TRACE submit id=164 monitor=0 us=3701070848
+[2026-08-24T14:26:01.094+0000] [INFO ] ACK_TRACE ack id=163 kind=slot egress=162 absorbed=163 client=162 window=2 us=3701069731
+[2026-08-24T14:26:01.127+0000] [INFO ] ACK_TRACE egress id=163 shown=1 pending_kib=0 client=162 us=3701102895
+[2026-08-24T14:26:01.127+0000] [INFO ] ACK_TRACE ack id=163 kind=region egress=163 absorbed=163 client=162 window=2 us=3701102896
+[2026-08-24T14:26:01.128+0000] [INFO ] ACK_TRACE msgin id=165 bytes=55296000 us=3701103629
+[2026-08-24T14:26:01.166+0000] [INFO ] ACK_TRACE absorb id=164 monitor=0 us=3701142252
+[2026-08-24T14:26:01.168+0000] [INFO ] ACK_TRACE submit id=165 monitor=0 us=3701143990
+[2026-08-24T14:26:01.166+0000] [INFO ] ACK_TRACE ack id=164 kind=slot egress=163 absorbed=164 client=163 window=2 us=3701142288
+[2026-08-24T14:26:01.196+0000] [INFO ] ACK_TRACE egress id=164 shown=1 pending_kib=0 client=163 us=3701171549
+[2026-08-24T14:26:01.196+0000] [INFO ] ACK_TRACE ack id=164 kind=region egress=164 absorbed=164 client=163 window=2 us=3701171551
+[2026-08-24T14:26:01.197+0000] [INFO ] ACK_TRACE msgin id=166 bytes=55296000 us=3701172647
+[2026-08-24T14:26:01.241+0000] [INFO ] ACK_TRACE absorb id=165 monitor=0 us=3701217040
+[2026-08-24T14:26:01.241+0000] [INFO ] ACK_TRACE ack id=165 kind=slot egress=164 absorbed=165 client=164 window=2 us=3701217089
+[2026-08-24T14:26:01.242+0000] [INFO ] ACK_TRACE submit id=166 monitor=0 us=3701218192
+[2026-08-24T14:26:01.269+0000] [INFO ] ACK_TRACE egress id=165 shown=1 pending_kib=0 client=164 us=3701244615
+[2026-08-24T14:26:01.269+0000] [INFO ] ACK_TRACE ack id=165 kind=region egress=165 absorbed=165 client=164 window=2 us=3701244616
+[2026-08-24T14:26:01.270+0000] [INFO ] ACK_TRACE msgin id=167 bytes=55296000 us=3701245609
+[2026-08-24T14:26:01.327+0000] [INFO ] ACK_TRACE absorb id=166 monitor=0 us=3701302553
+[2026-08-24T14:26:01.328+0000] [INFO ] ACK_TRACE submit id=167 monitor=0 us=3701304286
+[2026-08-24T14:26:01.327+0000] [INFO ] ACK_TRACE ack id=166 kind=slot egress=165 absorbed=166 client=165 window=2 us=3701302618
+[2026-08-24T14:26:01.372+0000] [INFO ] ACK_TRACE egress id=166 shown=1 pending_kib=0 client=165 us=3701347556
+[2026-08-24T14:26:01.372+0000] [INFO ] ACK_TRACE ack id=166 kind=region egress=166 absorbed=166 client=165 window=2 us=3701347557
+[2026-08-24T14:26:01.373+0000] [INFO ] ACK_TRACE msgin id=168 bytes=55296000 us=3701348634
+[2026-08-24T14:26:01.399+0000] [INFO ] ACK_TRACE absorb id=167 monitor=0 us=3701375399
+[2026-08-24T14:26:01.401+0000] [INFO ] ACK_TRACE submit id=168 monitor=0 us=3701376594
+[2026-08-24T14:26:01.400+0000] [INFO ] ACK_TRACE ack id=167 kind=slot egress=166 absorbed=167 client=166 window=2 us=3701375447
+[2026-08-24T14:26:01.432+0000] [INFO ] ACK_TRACE egress id=167 shown=1 pending_kib=0 client=166 us=3701408127
+[2026-08-24T14:26:01.432+0000] [INFO ] ACK_TRACE ack id=167 kind=region egress=167 absorbed=167 client=166 window=2 us=3701408128
+[2026-08-24T14:26:01.433+0000] [INFO ] ACK_TRACE msgin id=169 bytes=55296000 us=3701408919
+[2026-08-24T14:26:01.477+0000] [INFO ] ACK_TRACE absorb id=168 monitor=0 us=3701452661
+[2026-08-24T14:26:01.478+0000] [INFO ] ACK_TRACE submit id=169 monitor=0 us=3701454148
+[2026-08-24T14:26:01.477+0000] [INFO ] ACK_TRACE ack id=168 kind=slot egress=167 absorbed=168 client=167 window=2 us=3701452714
+[2026-08-24T14:26:01.513+0000] [INFO ] ACK_TRACE egress id=168 shown=1 pending_kib=0 client=167 us=3701489204
+[2026-08-24T14:26:01.513+0000] [INFO ] ACK_TRACE ack id=168 kind=region egress=168 absorbed=168 client=167 window=2 us=3701489206
+[2026-08-24T14:26:01.514+0000] [INFO ] ACK_TRACE msgin id=170 bytes=55296000 us=3701490145
+[2026-08-24T14:26:01.551+0000] [INFO ] ACK_TRACE absorb id=169 monitor=0 us=3701526501
+[2026-08-24T14:26:01.552+0000] [INFO ] ACK_TRACE submit id=170 monitor=0 us=3701527782
+[2026-08-24T14:26:01.551+0000] [INFO ] ACK_TRACE ack id=169 kind=slot egress=168 absorbed=169 client=168 window=2 us=3701526537
+[2026-08-24T14:26:01.582+0000] [INFO ] ACK_TRACE egress id=169 shown=1 pending_kib=0 client=168 us=3701557440
+[2026-08-24T14:26:01.582+0000] [INFO ] ACK_TRACE ack id=169 kind=region egress=169 absorbed=169 client=168 window=2 us=3701557441
+[2026-08-24T14:26:01.582+0000] [INFO ] ACK_TRACE msgin id=171 bytes=55296000 us=3701558232
+[2026-08-24T14:26:01.620+0000] [INFO ] ACK_TRACE absorb id=170 monitor=0 us=3701596090
+[2026-08-24T14:26:01.621+0000] [INFO ] ACK_TRACE submit id=171 monitor=0 us=3701597354
+[2026-08-24T14:26:01.620+0000] [INFO ] ACK_TRACE ack id=170 kind=slot egress=169 absorbed=170 client=169 window=2 us=3701596145
+[2026-08-24T14:26:01.650+0000] [INFO ] ACK_TRACE egress id=170 shown=1 pending_kib=0 client=169 us=3701625968
+[2026-08-24T14:26:01.650+0000] [INFO ] ACK_TRACE ack id=170 kind=region egress=170 absorbed=170 client=169 window=2 us=3701625968
+[2026-08-24T14:26:01.651+0000] [INFO ] ACK_TRACE msgin id=172 bytes=55296000 us=3701626949
+[2026-08-24T14:26:01.687+0000] [INFO ] ACK_TRACE absorb id=171 monitor=0 us=3701663306
+[2026-08-24T14:26:01.689+0000] [INFO ] ACK_TRACE submit id=172 monitor=0 us=3701664473
+[2026-08-24T14:26:01.687+0000] [INFO ] ACK_TRACE ack id=171 kind=slot egress=170 absorbed=171 client=170 window=2 us=3701663361
+[2026-08-24T14:26:01.726+0000] [INFO ] ACK_TRACE egress id=171 shown=1 pending_kib=0 client=170 us=3701702075
+[2026-08-24T14:26:01.726+0000] [INFO ] ACK_TRACE ack id=171 kind=region egress=171 absorbed=171 client=170 window=2 us=3701702076
+[2026-08-24T14:26:01.727+0000] [INFO ] ACK_TRACE msgin id=173 bytes=55296000 us=3701702885
+[2026-08-24T14:26:01.757+0000] [INFO ] ACK_TRACE absorb id=172 monitor=0 us=3701733245
+[2026-08-24T14:26:01.759+0000] [INFO ] ACK_TRACE submit id=173 monitor=0 us=3701734404
+[2026-08-24T14:26:01.757+0000] [INFO ] ACK_TRACE ack id=172 kind=slot egress=171 absorbed=172 client=171 window=2 us=3701733284
+[2026-08-24T14:26:01.783+0000] [INFO ] ACK_TRACE egress id=172 shown=1 pending_kib=0 client=171 us=3701759036
+[2026-08-24T14:26:01.783+0000] [INFO ] ACK_TRACE ack id=172 kind=region egress=172 absorbed=172 client=171 window=2 us=3701759037
+[2026-08-24T14:26:01.785+0000] [INFO ] ACK_TRACE msgin id=174 bytes=55296000 us=3701760838
+[2026-08-24T14:26:01.828+0000] [INFO ] ACK_TRACE absorb id=173 monitor=0 us=3701803519
+[2026-08-24T14:26:01.829+0000] [INFO ] ACK_TRACE submit id=174 monitor=0 us=3701804701
+[2026-08-24T14:26:01.828+0000] [INFO ] ACK_TRACE ack id=173 kind=slot egress=172 absorbed=173 client=172 window=2 us=3701803576
+[2026-08-24T14:26:01.859+0000] [INFO ] ACK_TRACE egress id=173 shown=1 pending_kib=0 client=172 us=3701834953
+[2026-08-24T14:26:01.859+0000] [INFO ] ACK_TRACE ack id=173 kind=region egress=173 absorbed=173 client=172 window=2 us=3701834954
+[2026-08-24T14:26:01.860+0000] [INFO ] ACK_TRACE msgin id=175 bytes=55296000 us=3701835878
+[2026-08-24T14:26:01.903+0000] [INFO ] ACK_TRACE absorb id=174 monitor=0 us=3701878859
+[2026-08-24T14:26:01.904+0000] [INFO ] ACK_TRACE submit id=175 monitor=0 us=3701879972
+[2026-08-24T14:26:01.903+0000] [INFO ] ACK_TRACE ack id=174 kind=slot egress=173 absorbed=174 client=173 window=2 us=3701878909
+[2026-08-24T14:26:01.932+0000] [INFO ] ACK_TRACE egress id=174 shown=1 pending_kib=0 client=173 us=3701907653
+[2026-08-24T14:26:01.932+0000] [INFO ] ACK_TRACE ack id=174 kind=region egress=174 absorbed=174 client=173 window=2 us=3701907654
+[2026-08-24T14:26:01.933+0000] [INFO ] ACK_TRACE msgin id=176 bytes=55296000 us=3701908732
+[2026-08-24T14:26:01.977+0000] [INFO ] ACK_TRACE absorb id=175 monitor=0 us=3701953149
+[2026-08-24T14:26:01.977+0000] [INFO ] ACK_TRACE ack id=175 kind=slot egress=174 absorbed=175 client=174 window=2 us=3701953193
+[2026-08-24T14:26:01.978+0000] [INFO ] ACK_TRACE submit id=176 monitor=0 us=3701954232
+[2026-08-24T14:26:02.004+0000] [INFO ] ACK_TRACE egress id=175 shown=1 pending_kib=0 client=174 us=3701979680
+[2026-08-24T14:26:02.004+0000] [INFO ] ACK_TRACE ack id=175 kind=region egress=175 absorbed=175 client=174 window=2 us=3701979682
+[2026-08-24T14:26:02.005+0000] [INFO ] ACK_TRACE msgin id=177 bytes=55296000 us=3701980707
+[2026-08-24T14:26:02.053+0000] [INFO ] ACK_TRACE absorb id=176 monitor=0 us=3702029348
+[2026-08-24T14:26:02.055+0000] [INFO ] ACK_TRACE submit id=177 monitor=0 us=3702030454
+[2026-08-24T14:26:02.054+0000] [INFO ] ACK_TRACE ack id=176 kind=slot egress=175 absorbed=176 client=175 window=2 us=3702029401
+[2026-08-24T14:26:02.092+0000] [INFO ] ACK_TRACE egress id=176 shown=1 pending_kib=0 client=175 us=3702068220
+[2026-08-24T14:26:02.092+0000] [INFO ] ACK_TRACE ack id=176 kind=region egress=176 absorbed=176 client=175 window=2 us=3702068221
+[2026-08-24T14:26:02.093+0000] [INFO ] ACK_TRACE msgin id=178 bytes=55296000 us=3702069340
+[2026-08-24T14:26:02.124+0000] [INFO ] ACK_TRACE absorb id=177 monitor=0 us=3702099529
+[2026-08-24T14:26:02.125+0000] [INFO ] ACK_TRACE submit id=178 monitor=0 us=3702101218
+[2026-08-24T14:26:02.124+0000] [INFO ] ACK_TRACE ack id=177 kind=slot egress=176 absorbed=177 client=176 window=2 us=3702099582
+[2026-08-24T14:26:02.152+0000] [INFO ] ACK_TRACE egress id=177 shown=1 pending_kib=0 client=176 us=3702127630
+[2026-08-24T14:26:02.152+0000] [INFO ] ACK_TRACE ack id=177 kind=region egress=177 absorbed=177 client=176 window=2 us=3702127631
+[2026-08-24T14:26:02.152+0000] [INFO ] ACK_TRACE msgin id=179 bytes=55296000 us=3702128364
+[2026-08-24T14:26:02.200+0000] [INFO ] ACK_TRACE absorb id=178 monitor=0 us=3702175671
+[2026-08-24T14:26:02.201+0000] [INFO ] ACK_TRACE submit id=179 monitor=0 us=3702176912
+[2026-08-24T14:26:02.200+0000] [INFO ] ACK_TRACE ack id=178 kind=slot egress=177 absorbed=178 client=177 window=2 us=3702175711
+[2026-08-24T14:26:02.222+0000] [INFO ] ACK_TRACE egress id=178 shown=1 pending_kib=0 client=177 us=3702197593
+[2026-08-24T14:26:02.222+0000] [INFO ] ACK_TRACE ack id=178 kind=region egress=178 absorbed=178 client=177 window=2 us=3702197594
+[2026-08-24T14:26:02.222+0000] [INFO ] ACK_TRACE msgin id=180 bytes=55296000 us=3702198387
+[2026-08-24T14:26:02.272+0000] [INFO ] ACK_TRACE absorb id=179 monitor=0 us=3702247729
+[2026-08-24T14:26:02.272+0000] [INFO ] ACK_TRACE ack id=179 kind=slot egress=178 absorbed=179 client=178 window=2 us=3702247793
+[2026-08-24T14:26:02.273+0000] [INFO ] ACK_TRACE submit id=180 monitor=0 us=3702249114
+[2026-08-24T14:26:02.304+0000] [INFO ] ACK_TRACE egress id=179 shown=1 pending_kib=0 client=178 us=3702280042
+[2026-08-24T14:26:02.304+0000] [INFO ] ACK_TRACE ack id=179 kind=region egress=179 absorbed=179 client=178 window=2 us=3702280043
+[2026-08-24T14:26:02.305+0000] [INFO ] ACK_TRACE msgin id=181 bytes=55296000 us=3702280843
+[2026-08-24T14:26:02.341+0000] [INFO ] ACK_TRACE absorb id=180 monitor=0 us=3702317265
+[2026-08-24T14:26:02.342+0000] [INFO ] ACK_TRACE submit id=181 monitor=0 us=3702318389
+[2026-08-24T14:26:02.341+0000] [INFO ] ACK_TRACE ack id=180 kind=slot egress=179 absorbed=180 client=179 window=2 us=3702317302
+[2026-08-24T14:26:02.377+0000] [INFO ] ACK_TRACE egress id=180 shown=1 pending_kib=0 client=179 us=3702352442
+[2026-08-24T14:26:02.377+0000] [INFO ] ACK_TRACE ack id=180 kind=region egress=180 absorbed=180 client=179 window=2 us=3702352443
+[2026-08-24T14:26:02.377+0000] [INFO ] ACK_TRACE msgin id=182 bytes=55296000 us=3702353304
+[2026-08-24T14:26:02.406+0000] [INFO ] ACK_TRACE absorb id=181 monitor=0 us=3702381714
+[2026-08-24T14:26:02.407+0000] [INFO ] ACK_TRACE submit id=182 monitor=0 us=3702382713
+[2026-08-24T14:26:02.406+0000] [INFO ] ACK_TRACE ack id=181 kind=slot egress=180 absorbed=181 client=180 window=2 us=3702381786
+[2026-08-24T14:26:02.430+0000] [INFO ] ACK_TRACE egress id=181 shown=1 pending_kib=0 client=180 us=3702406378
+[2026-08-24T14:26:02.430+0000] [INFO ] ACK_TRACE ack id=181 kind=region egress=181 absorbed=181 client=180 window=2 us=3702406379
+[2026-08-24T14:26:02.431+0000] [INFO ] ACK_TRACE msgin id=183 bytes=55296000 us=3702407365
+[2026-08-24T14:26:02.483+0000] [INFO ] ACK_TRACE absorb id=182 monitor=0 us=3702458814
+[2026-08-24T14:26:02.484+0000] [INFO ] ACK_TRACE submit id=183 monitor=0 us=3702459947
+[2026-08-24T14:26:02.483+0000] [INFO ] ACK_TRACE ack id=182 kind=slot egress=181 absorbed=182 client=181 window=2 us=3702458858
+[2026-08-24T14:26:02.518+0000] [INFO ] ACK_TRACE egress id=182 shown=1 pending_kib=0 client=181 us=3702494175
+[2026-08-24T14:26:02.518+0000] [INFO ] ACK_TRACE ack id=182 kind=region egress=182 absorbed=182 client=181 window=2 us=3702494175
+[2026-08-24T14:26:02.519+0000] [INFO ] ACK_TRACE msgin id=184 bytes=55296000 us=3702495039
+[2026-08-24T14:26:02.563+0000] [INFO ] ACK_TRACE absorb id=183 monitor=0 us=3702538979
+[2026-08-24T14:26:02.564+0000] [INFO ] ACK_TRACE submit id=184 monitor=0 us=3702540345
+[2026-08-24T14:26:02.563+0000] [INFO ] ACK_TRACE ack id=183 kind=slot egress=182 absorbed=183 client=182 window=2 us=3702539044
+[2026-08-24T14:26:02.592+0000] [INFO ] ACK_TRACE egress id=183 shown=1 pending_kib=0 client=182 us=3702568328
+[2026-08-24T14:26:02.592+0000] [INFO ] ACK_TRACE ack id=183 kind=region egress=183 absorbed=183 client=182 window=2 us=3702568329
+[2026-08-24T14:26:02.593+0000] [INFO ] ACK_TRACE msgin id=185 bytes=55296000 us=3702569339
+[2026-08-24T14:26:02.650+0000] [INFO ] ACK_TRACE absorb id=184 monitor=0 us=3702625530

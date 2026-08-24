@@ -45,8 +45,9 @@ Register `Avc444CreditFrontier` in `tests/xrdp/Makefile.am`,
 * S140-R8: the paired message format shall be versioned and bounds checked;
   unknown acknowledgement flags or monitor identities shall be rejected.
 * S140-R9: trace-enabled builds shall record `submit`/`absorb` by frame and
-  monitor; `msgin` by message identity/bytes; `send` by frame, server/client
-  frontiers, bytes, last-fragment flag and in-flight count; `egress` by
+  monitor; `msgin` by message identity/bytes; `send` by transport fragment
+  with server/client frontiers, bytes, terminal-fragment field and in-flight
+  count; `egress` by
   identity, shown state, queued bytes and client frontier; and frontier `ack`
   by acknowledgement kind and all slot/region/client frontiers. Client
   decode `ack` shall carry frame identity, queue depth, decoded count, server
@@ -55,7 +56,9 @@ Register `Avc444CreditFrontier` in `tests/xrdp/Makefile.am`,
   trace-only transport counters.
   Frontier `ack`, `submit`, `absorb`, `egress` and `msgin` carry static
   `class=ACK_TRACE`; client decode `ack` and `send` carry static
-  `class=GFX_TRACE`.
+  `class=GFX_TRACE`. A `send` record is transport-fragment evidence and shall
+  not be used as the current video-command identity; #141 supplies that
+  identity at command construction.
 
 ## Required tests and gate
 

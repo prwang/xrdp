@@ -110,7 +110,8 @@ client supports them, Windows and macOS clients, one and two monitors, resize,
 still full-chroma detail and motion. For sparse AVC444, the motion run shall
 contain both main-only and main-plus-auxiliary cycles. Its audit shall report
 LC=1 and LC=2 command counts and transmitted bytes, close their sum against
-the audited video-command total, confirm the configured chroma-gap bound, and
+the audited video-command total using #141's explicit `video_cmd` frame
+identity, confirm the configured chroma-gap bound, and
 show that the one-shot trailing capture restores static one-pixel chroma after
 motion stops without later application damage.
 Visible 4:2:0/4:4:4 churn inside an affected update while damage continues is

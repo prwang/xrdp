@@ -1,0 +1,1 @@
+b0585234306461194e5b11a9b8ab9422b9cd3e18ac0fa9f07a168b847fe54a5c  /etc/xrdp/gfx.toml
