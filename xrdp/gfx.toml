@@ -47,7 +47,7 @@ h264_encoder = "x264"
 #   "-tune", "zerolatency",
 #   "-crf", "18",
 #   "-g", "240",
-#   "-x264-params", "repeat-headers=1",
+#   "-x264-params", "repeat-headers=1:aud=1:cabac=1",
 # ]
 #
 # VAAPI example (Intel/AMD render node). Replace encoder_args above with:

@@ -1231,9 +1231,9 @@ put_ue(unsigned char *out, int *pos, int cap_bits, unsigned int v, int *err)
 }
 
 /*****************************************************************************/
-/* every parse-relevant SPS/PPS field must match between the two encoder   */
-/* children, or the leaf slice bits would be reinterpreted under the main  */
-/* parameter sets; anything outside the shapes our encoders emit fails     */
+/* Every parse-relevant SPS/PPS field must match between the two encoder
+ * children, or one child's slice bits would be reinterpreted under the
+ * other's parameter sets. */
 static int
 leaf_caches_compatible(const struct xrdp_h264_param_cache *mc,
                        const struct xrdp_h264_param_cache *ac)
@@ -1252,6 +1252,104 @@ leaf_caches_compatible(const struct xrdp_h264_param_cache *mc,
            mc->second_chroma_qp_offset == ac->second_chroma_qp_offset &&
            mc->transform_8x8 == ac->transform_8x8 &&
            mc->pps_scaling_present == 0 && ac->pps_scaling_present == 0;
+}
+
+/*****************************************************************************/
+static enum xrdp_h264_leaf_reject_reason
+leaf_caches_reject_reason(const struct xrdp_h264_param_cache *mc,
+                          const struct xrdp_h264_param_cache *ac)
+{
+    if (!mc->have_sps || !mc->have_pps || !ac->have_sps || !ac->have_pps)
+    {
+        return XRDP_H264_LEAF_PARAMETER_SETS_MISSING;
+    }
+    if (mc->log2_max_frame_num != ac->log2_max_frame_num)
+    {
+        return XRDP_H264_LEAF_FRAME_NUM_WIDTH_MISMATCH;
+    }
+    if (mc->poc_type != 2 || ac->poc_type != 2)
+    {
+        return XRDP_H264_LEAF_POC_TYPE_UNSUPPORTED;
+    }
+    if (mc->frame_mbs_only != 1 || ac->frame_mbs_only != 1)
+    {
+        return XRDP_H264_LEAF_FRAME_MODE_UNSUPPORTED;
+    }
+    if (mc->scaling_present != 0 || ac->scaling_present != 0 ||
+            mc->pps_scaling_present != 0 || ac->pps_scaling_present != 0)
+    {
+        return XRDP_H264_LEAF_SCALING_UNSUPPORTED;
+    }
+    if (mc->entropy_cabac != 1 || ac->entropy_cabac != 1)
+    {
+        return XRDP_H264_LEAF_ENTROPY_UNSUPPORTED;
+    }
+    if (mc->slice_groups != 0 || ac->slice_groups != 0)
+    {
+        return XRDP_H264_LEAF_SLICE_GROUPS_UNSUPPORTED;
+    }
+    if (mc->deblock_present != ac->deblock_present)
+    {
+        return XRDP_H264_LEAF_DEBLOCK_MISMATCH;
+    }
+    if (mc->redundant_present != 0 || ac->redundant_present != 0)
+    {
+        return XRDP_H264_LEAF_REDUNDANT_PICTURES_UNSUPPORTED;
+    }
+    if (mc->pic_init_qp != ac->pic_init_qp)
+    {
+        return XRDP_H264_LEAF_PIC_INIT_QP_MISMATCH;
+    }
+    if (mc->chroma_qp_offset != ac->chroma_qp_offset)
+    {
+        return XRDP_H264_LEAF_CHROMA_QP_MISMATCH;
+    }
+    if (mc->second_chroma_qp_offset != ac->second_chroma_qp_offset)
+    {
+        return XRDP_H264_LEAF_SECOND_CHROMA_QP_MISMATCH;
+    }
+    if (mc->transform_8x8 != ac->transform_8x8)
+    {
+        return XRDP_H264_LEAF_TRANSFORM_8X8_MISMATCH;
+    }
+    return XRDP_H264_LEAF_OK;
+}
+
+/*****************************************************************************/
+const char *
+xrdp_h264_leaf_reject_reason_str(enum xrdp_h264_leaf_reject_reason reason)
+{
+    static const char *const names[] =
+    {
+        "OK",
+        "INVALID_ARGUMENT",
+        "MAIN_NO_REFERENCE_VCL",
+        "AUX_NO_START_CODE",
+        "OUT_OF_MEMORY",
+        "PARAMETER_SETS_MISSING",
+        "FRAME_NUM_WIDTH_MISMATCH",
+        "POC_TYPE_UNSUPPORTED",
+        "FRAME_MODE_UNSUPPORTED",
+        "SCALING_UNSUPPORTED",
+        "ENTROPY_UNSUPPORTED",
+        "SLICE_GROUPS_UNSUPPORTED",
+        "DEBLOCK_MISMATCH",
+        "REDUNDANT_PICTURES_UNSUPPORTED",
+        "PIC_INIT_QP_MISMATCH",
+        "CHROMA_QP_MISMATCH",
+        "SECOND_CHROMA_QP_MISMATCH",
+        "TRANSFORM_8X8_MISMATCH",
+        "OUTPUT_LIMIT",
+        "SLICE_REWRITE_UNSUPPORTED",
+        "UNEXPECTED_NAL",
+        "NO_IDR_SLICE"
+    };
+
+    if ((unsigned int)reason >= sizeof(names) / sizeof(names[0]))
+    {
+        return "UNKNOWN";
+    }
+    return names[reason];
 }
 
 /*****************************************************************************/
@@ -1494,10 +1592,11 @@ main_ref_frame_num(const unsigned char *data, int len,
 
 /*****************************************************************************/
 int
-xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
-                      const unsigned char *main_data, int main_len,
-                      struct xrdp_h264_param_cache *main_cache,
-                      struct xrdp_h264_param_cache *aux_cache)
+xrdp_h264_aux_to_leaf_ex(unsigned char *aux, int *aux_len,
+                         const unsigned char *main_data, int main_len,
+                         struct xrdp_h264_param_cache *main_cache,
+                         struct xrdp_h264_param_cache *aux_cache,
+                         enum xrdp_h264_leaf_reject_reason *reason)
 {
     unsigned char *out;
     int out_len;
@@ -1510,6 +1609,13 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
     int leaves;
     int rv;
 
+    enum xrdp_h264_leaf_reject_reason reject;
+
+    reject = XRDP_H264_LEAF_INVALID_ARGUMENT;
+    if (reason != NULL)
+    {
+        *reason = reject;
+    }
     if (aux == NULL || aux_len == NULL || main_data == NULL ||
             main_cache == NULL || aux_cache == NULL || *aux_len < 4)
     {
@@ -1519,15 +1625,27 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
     if (main_fn < 0)
     {
         /* no reference VCL NAL in the main packet */
+        if (reason != NULL)
+        {
+            *reason = XRDP_H264_LEAF_MAIN_NO_REFERENCE_VCL;
+        }
         return 1;
     }
     if (!find_start_code(aux, *aux_len, 0, &nal_start, &sc_prefix))
     {
+        if (reason != NULL)
+        {
+            *reason = XRDP_H264_LEAF_AUX_NO_START_CODE;
+        }
         return 1;
     }
     out = (unsigned char *)malloc(*aux_len + 16);
     if (out == NULL)
     {
+        if (reason != NULL)
+        {
+            *reason = XRDP_H264_LEAF_OUT_OF_MEMORY;
+        }
         return 1;
     }
     rv = 0;
@@ -1571,7 +1689,8 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
         }
         else if (ntype == 5)
         {
-            if (!leaf_caches_compatible(main_cache, aux_cache))
+            reject = leaf_caches_reject_reason(main_cache, aux_cache);
+            if (reject != XRDP_H264_LEAF_OK)
             {
                 /* main/aux SPS-PPS parse fields differ or unsupported */
                 rv = 1;
@@ -1581,6 +1700,7 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
                       ((1 << main_cache->log2_max_frame_num) - 1);
             if (out_len + 4 + nal_len + 8 > *aux_len + 16)
             {
+                reject = XRDP_H264_LEAF_OUTPUT_LIMIT;
                 rv = 1;
                 break;
             }
@@ -1593,6 +1713,7 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
                                         aux_cache, main_cache, leaf_fn);
             if (new_len < 0)
             {
+                reject = XRDP_H264_LEAF_SLICE_REWRITE_UNSUPPORTED;
                 rv = 1;
                 break;
             }
@@ -1602,6 +1723,7 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
         else
         {
             /* unexpected NAL type in the all-IDR aux stream */
+            reject = XRDP_H264_LEAF_UNEXPECTED_NAL;
             rv = 1;
             break;
         }
@@ -1613,15 +1735,32 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
     }
     if (rv == 0 && leaves == 0)
     {
+        reject = XRDP_H264_LEAF_NO_IDR_SLICE;
         rv = 1;
     }
     if (rv == 0)
     {
         memcpy(aux, out, out_len);
         *aux_len = out_len;
+        reject = XRDP_H264_LEAF_OK;
     }
     free(out);
+    if (reason != NULL)
+    {
+        *reason = reject;
+    }
     return rv;
+}
+
+/*****************************************************************************/
+int
+xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
+                      const unsigned char *main_data, int main_len,
+                      struct xrdp_h264_param_cache *main_cache,
+                      struct xrdp_h264_param_cache *aux_cache)
+{
+    return xrdp_h264_aux_to_leaf_ex(aux, aux_len, main_data, main_len,
+                                    main_cache, aux_cache, NULL);
 }
 
 /*

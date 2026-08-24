@@ -451,3 +451,79 @@ The T4 did not expose this gap because Scope B set `aux_ltr_chain=true`.
 Both its probe and runtime exercised the LTR rewriters, which take precedence
 over the leaf path. Scope B remains admissible for that configuration, but it
 is not evidence for the default CPU/leaf topology.
+
+## 2026-08-24 Scope C — reproduced, explained and repaired
+
+The local control reproduced the supplied failure on one Ubuntu 24.04.4 arm
+with FFmpeg 6.1.1, Ubuntu libx264 0.164, xrdp `4cf5063e05d3` and xorgxrdp
+`c190343ff28a`. It used the historical 2560x1440 single-monitor modeline and
+FreeRDP 3.15.0 requesting AVC444. The old single-child probe passed in 55 ms,
+AVC444v2 was selected, and the post-login path then logged 63 completed leaf
+rewrite failures in 5.3 seconds while spawning 128 children and publishing no
+pair. The captured presentation is black apart from the cursor. Exact files
+and identities are in
+`PR-demo/mac_bisect_matrix/captures/i125c_local_u2404_frontier_20260824T224100Z/`.
+
+The rejected syntax is now identified. The affected arguments combine
+libx264's `ultrafast` preset with no explicit entropy setting. Both the main
+and auxiliary access units are H.264 Constrained Baseline and their parsed
+PPS fields say `entropy_cabac=0`: they use CAVLC. The leaf transform splices
+slice payload bits under the main parameter sets and supports the CABAC
+shape, so refusing CAVLC was correct. The defect was certifying a different
+one-child topology and then treating a deterministic contract rejection as a
+recoverable child failure. It was not an FFmpeg-6-wide incompatibility.
+
+The repair makes the built-in libx264 arguments explicitly request
+`cabac=1`. More importantly, AVC444 capability probing now instantiates the
+same main plus forced-IDR auxiliary children as the selected session, encodes
+one pair and calls the production leaf transform before confirmation. The
+transform returns a stable field-specific reason. Replaying the exact old
+CAVLC arguments therefore creates two probe children, rejects once as
+`ENTROPY_UNSUPPORTED`, retains the first untouched main and auxiliary access
+units plus a manifest, and removes AVC before selection. RFX is then selected
+by the configured pre-confirmation codec search; this is not a fallback from
+a confirmed AVC session. The banner is visible. The final capture, including
+the encoded units and mode inventory, is
+`PR-demo/mac_bisect_matrix/captures/i125c_local_u2404_final_reject_20260824T231900Z/`.
+
+The positive Ubuntu control is the deterministic post-confirm fixture. With
+the same arguments plus `cabac=1`, its exact two-child production-topology
+probe passes. `-frames:v 5` then makes the two persistent live children exit
+after confirmation. The run contains four process spawns total (two probe,
+two live), one failure manifest, one terminal connection-close line and no
+later spawn. It neither retries nor changes codec. The evidence is in
+`PR-demo/mac_bisect_matrix/captures/i125c_local_u2404_postconfirm_exit_20260824T231015Z/`.
+
+For a rewrite rejection, the bounded mode-0600 bundle includes both encoded
+access units because those bytes exist. A pipe/fork failure or a child which
+has already exited has no rejected access unit; its one mode-0600 manifest
+instead retains the exact executable version, dimensions, typed operation and
+argv. Raw desktop pixels and credentials are never retained. Retention uses
+one persistent server-wide `*-first*` slot for each failure class. This fixed
+bound matters because a client can request AVC before authentication; an
+incompatible operator configuration must not turn repeated connections into a
+disk-fill path. The operator archives and removes a class's slot to re-arm it
+after changing the configuration.
+
+FreeRDP reported the terminal replay as `ERRINFO_LOGOFF_BY_USER
+[0x0001000C]`, although xrdp internally latched
+`ERRINFO_SERVER_DWM_CRASH`. This is not a second failure path. FreeRDP 3.15
+client mode does not advertise error-info PDU support by default, so xrdp
+cannot send the detailed code; FreeRDP synthesizes the generic logoff status
+from the subsequent user-requested disconnect ultimatum. The high bits in the
+printed value are FreeRDP's last-error class.
+
+The comparisons satisfy the consistency gates: all three legs use the same
+distribution, codec packages, client, geometry and affected arguments except
+for the named repair or deterministic exit condition; the new probe visibly
+changes the targeted topology from one child to two and invokes the missing
+rewrite; the captured reason agrees with both parsed entropy fields; process
+counts close against the expected children; and no Scope A/B byte, latency or
+T4/LTR claim is reused for this CPU-leaf result.
+
+Decision: Scope C is green and #125 closes again. Retain the earlier sparse
+bandwidth/quality decision, dense default and one-frame default unchanged.
+Use explicit CABAC in the built-in libx264 arguments, probe every selected
+runtime topology before confirmation, refuse an incompatible custom stream
+there, and make any later backend failure terminal for that connection after
+one bounded forensic record. #126 is now the first open clean-room slice.

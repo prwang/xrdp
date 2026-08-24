@@ -1,0 +1,9 @@
+[22:41:55:529] [1345762:001488e4] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x08 -> no RDP scancode found
+[22:41:55:529] [1345762:001488e4] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x5d -> no RDP scancode found
+[22:41:55:587] [1345762:001488e4] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[22:41:55:587] [1345762:001488e4] [WARN][com.freerdp.core.license] - [license_read_binary_blob_data]: license binary blob::type BB_ERROR_BLOB, length=0, skipping.
+[22:41:55:587] [1345762:001488e4] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[22:41:55:784] [1345762:0014892c] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x7561cce69190
+[22:42:03:753] [1345762:001488e2] [ERROR][com.freerdp.utils.signal] - [term_handler]: Caught signal 'Terminated' [15]
+[22:42:03:753] [1345762:001488e2] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+X connection to :96 broken (explicit kill or server shutdown).

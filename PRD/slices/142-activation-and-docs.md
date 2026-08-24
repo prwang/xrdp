@@ -50,7 +50,9 @@ capability-response seam but shall not introduce a new mechanism there.
   documented transforms required by a hardware profile. The executable path
   defaults to `/usr/bin/ffmpeg`; the built-in argv is `-c:v`, `libx264`,
   `-bf`, `0`, `-preset`, `ultrafast`, `-tune`, `zerolatency`, `-crf`, `18`,
-  `-g`, `240`, `-x264-params`, `repeat-headers=1:aud=1`.
+  `-g`, `240`, `-x264-params`, `repeat-headers=1:aud=1:cabac=1`. CABAC is
+  explicit because the auxiliary-leaf transform requires it and libx264's
+  `ultrafast` preset otherwise selects Constrained Baseline/CAVLC.
 * S142-R5: invalid mode, alignment, window, interval, dependency or argument
   shall produce a clear warning/error and keep the backend unavailable or the
   documented safe default. It shall never be silently clamped into a
@@ -70,10 +72,14 @@ capability-response seam but shall not introduce a new mechanism there.
 * S142-R7: runtime failure shall not switch codec. A child-creation,
   stream-contract or rewrite failure after confirmation is terminal for the
   affected connection/session: preserve damage, retain one bounded mode-0600
-  forensic bundle containing the exact ffmpeg version/argv, typed reason and
-  rejected encoded access units, tear down the children once and hang up the
-  session. Do not dump raw desktop pixels or credentials. Later damage shall
-  not recreate a child for that connection.
+  forensic bundle containing the exact ffmpeg version/argv and typed reason,
+  plus the rejected encoded access units when encoded units exist, tear down
+  the children once and hang up the session. A creation failure or an already
+  exited child has no access unit to retain. Do not dump raw desktop pixels or
+  credentials. Later damage shall not recreate a child for that connection.
+  Retention shall have a server-wide fixed bound: an incompatible
+  pre-confirmation configuration is remotely triggerable and must not allocate
+  another bundle for every connection.
 * S142-R8: the man page and sample config shall state process cardinality,
   required host pipe capacity, security model, resize behavior, multi-monitor
   support, shipped credit values, sparse guarantee, sparse visual limitation

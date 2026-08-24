@@ -43,6 +43,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <poll.h>
@@ -198,6 +199,8 @@ struct xrdp_ffmpeg_avc444
     struct xrdp_ffmpeg_avc444 *leaf;
     struct xrdp_h264_param_cache leaf_main_cache;
     struct xrdp_h264_param_cache leaf_aux_cache;
+    enum xrdp_h264_leaf_reject_reason leaf_reject_reason;
+    int leaf_forensics_written;
 
     /* aux_ltr_chain (EXPERIMENTAL, FR-H264-8): shared-chain rewrite
      * state, including the scheduled-refresh period and per-view
@@ -252,9 +255,13 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
      *                       bootstraps luma-only LC=1 and defers chroma via
      *                       LC=2). See
      *                       PRD/slices/219-avc-wire-serialization.md.
-     * This reproduces the historic hard-coded argv (plus the AUD delimiter);
-     * tuning is the administrator's job via gfx.toml [avc444_ffmpeg]
-     * encoder_args.
+     *   cabac=1             keep the auxiliary-leaf stream in Main/CABAC form;
+     *                       ultrafast otherwise selects Baseline/CAVLC, whose
+     *                       slice payload cannot be byte-spliced by the leaf
+     *                       transform.
+     * This preserves the historic hard-coded argv while making its AUD and
+     * CABAC stream contracts explicit; tuning is the administrator's job via
+     * gfx.toml [avc444_ffmpeg] encoder_args.
      */
     static const char *const def[] =
     {
@@ -264,7 +271,7 @@ xrdp_ffmpeg_avc444_default_encoder_args(struct xrdp_avc444_encoder_args *args)
         "-tune", "zerolatency",
         "-crf", "18",
         "-g", "240",
-        "-x264-params", "repeat-headers=1:aud=1"
+        "-x264-params", "repeat-headers=1:aud=1:cabac=1"
     };
     int i;
     int count = (int)(sizeof(def) / sizeof(def[0]));
@@ -750,6 +757,419 @@ reap_child(int pid, int grace_ms)
         return status;
     }
     return -1;
+}
+
+/*****************************************************************************/
+static int
+write_all(int fd, const unsigned char *data, int len)
+{
+    int off;
+
+    for (off = 0; off < len; )
+    {
+        int rv = g_file_write(fd, (const char *)data + off, len - off);
+
+        if (rv <= 0)
+        {
+            return 1;
+        }
+        off += rv;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+static int
+capture_ffmpeg_version(const char *path, char *out, int out_size)
+{
+    int p[2];
+    int pid;
+    int len;
+    int status;
+    long long deadline;
+
+    if (out == NULL || out_size < 2 || pipe(p) != 0)
+    {
+        return 1;
+    }
+    pid = fork();
+    if (pid < 0)
+    {
+        close(p[0]);
+        close(p[1]);
+        return 1;
+    }
+    if (pid == 0)
+    {
+        char *const argv[] = {(char *)path, (char *)"-version", NULL};
+        char *const envp[] = {(char *)"PATH=/usr/bin:/bin", NULL};
+        int devnull = open("/dev/null", O_RDONLY);
+
+        if (devnull >= 0)
+        {
+            dup2(devnull, 0);
+        }
+        dup2(p[1], 1);
+        dup2(p[1], 2);
+        close_range_from(3);
+        execve(path, argv, envp);
+        _exit(127);
+    }
+    close(p[1]);
+    fcntl(p[0], F_SETFL, O_NONBLOCK);
+    len = 0;
+    status = 0;
+    deadline = now_ms() + 1000;
+    for (;;)
+    {
+        int n = (int)read(p[0], out + len, out_size - 1 - len);
+
+        if (n > 0)
+        {
+            len += n;
+            if (len >= out_size - 1)
+            {
+                break;
+            }
+            continue;
+        }
+        if (waitpid(pid, &status, WNOHANG) == pid)
+        {
+            pid = -1;
+            if (n == 0)
+            {
+                break;
+            }
+        }
+        if (now_ms() >= deadline)
+        {
+            break;
+        }
+        {
+            struct pollfd pfd;
+            pfd.fd = p[0];
+            pfd.events = POLLIN;
+            poll(&pfd, 1, 20);
+        }
+    }
+    close(p[0]);
+    if (pid > 0)
+    {
+        kill(pid, SIGKILL);
+        waitpid(pid, &status, 0);
+    }
+    out[len] = '\0';
+    return len > 0 ? 0 : 1;
+}
+
+/*****************************************************************************/
+static int
+append_text(char *dst, int cap, int *len, const char *fmt, ...)
+{
+    va_list ap;
+    int rv;
+
+    if (*len >= cap)
+    {
+        return 1;
+    }
+    va_start(ap, fmt);
+    rv = vsnprintf(dst + *len, cap - *len, fmt, ap);
+    va_end(ap);
+    if (rv < 0 || rv >= cap - *len)
+    {
+        return 1;
+    }
+    *len += rv;
+    return 0;
+}
+
+/*****************************************************************************/
+static int
+append_hex_arg(char *dst, int cap, int *len, int index, const char *arg)
+{
+    static const char hex[] = "0123456789abcdef";
+    int i;
+
+    if (append_text(dst, cap, len, "argv_%03d_hex=", index) != 0)
+    {
+        return 1;
+    }
+    for (i = 0; arg[i] != '\0'; i++)
+    {
+        unsigned char ch = (unsigned char)arg[i];
+
+        if (*len + 2 >= cap)
+        {
+            return 1;
+        }
+        dst[(*len)++] = hex[ch >> 4];
+        dst[(*len)++] = hex[ch & 15];
+    }
+    dst[(*len)++] = '\n';
+    dst[*len] = '\0';
+    return 0;
+}
+
+/*****************************************************************************/
+/* Reserve one persistent forensic slot of each class for the whole server.
+ * The marker is never removed automatically: an incompatible pre-login
+ * configuration is remotely triggerable, so retaining one bounded bundle is
+ * useful but allocating one bundle per connection would be a disk-fill path.
+ * An administrator may archive and remove the class files to re-arm it. */
+static int
+reserve_forensic_slot(const char *dir, const char *slot)
+{
+    char path[640];
+    int fd;
+
+    if (!g_directory_exist("/var/log/xrdp"))
+    {
+        g_mkdir("/var/log/xrdp");
+    }
+    if (!g_directory_exist(dir))
+    {
+        g_mkdir(dir);
+    }
+    g_chmod_hex(dir, 0x0700);
+    g_snprintf(path, sizeof(path), "%s/%s.lock", dir, slot);
+    fd = open(path, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC | O_NOFOLLOW,
+              S_IRUSR | S_IWUSR);
+    if (fd >= 0)
+    {
+        close(fd);
+        return 1;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+static void
+write_leaf_forensics(struct xrdp_ffmpeg_avc444 *self)
+{
+    const char *dir = "/var/log/xrdp/ffmpeg-forensics";
+    char prefix[512];
+    char path[640];
+    char version[4096];
+    char num_store[192];
+    char *argv[FF_MAX_ARGV];
+    char *meta;
+    int argc;
+    int cap;
+    int len;
+    int fd;
+    int i;
+    int retained;
+
+    if (self->leaf_forensics_written ||
+            self->leaf_reject_reason == XRDP_H264_LEAF_OK)
+    {
+        return;
+    }
+    self->leaf_forensics_written = 1;
+    retained = 0;
+    if (!reserve_forensic_slot(dir, "leaf-first"))
+    {
+        return;
+    }
+    g_snprintf(prefix, sizeof(prefix), "%s/leaf-first", dir);
+
+    g_snprintf(path, sizeof(path), "%s-main.264", prefix);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        retained += write_all(fd, self->main_buf, self->main_len) == 0;
+        g_file_close(fd);
+        g_chmod_hex(path, 0x0600);
+    }
+    g_snprintf(path, sizeof(path), "%s-aux-original.264", prefix);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        retained += write_all(fd, self->aux_buf, self->aux_len) == 0;
+        g_file_close(fd);
+        g_chmod_hex(path, 0x0600);
+    }
+
+    cap = 256 * 1024;
+    meta = (char *)g_malloc(cap, 1);
+    if (meta == NULL)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: could not allocate rejected "
+            "leaf manifest under %s", dir);
+        return;
+    }
+    len = 0;
+    append_text(meta, cap, &len,
+                "reason=%s\nvisible=%dx%d\ncoded=%dx%d\n"
+                "main_bytes=%d\naux_bytes=%d\nmonitor=%d\n"
+                "xrdp_pid=%d\nencoder_pid=%d\ngeneration=%llu\n",
+                xrdp_h264_leaf_reject_reason_str(self->leaf_reject_reason),
+                self->actual_width, self->actual_height,
+                self->coded_width, self->coded_height,
+                self->main_len, self->aux_len, self->cfg.monitor_index,
+                g_getpid(), self->pid, self->generation);
+    append_text(meta, cap, &len,
+                "main_log2_frame_num=%d\naux_log2_frame_num=%d\n"
+                "main_poc_type=%d\naux_poc_type=%d\n"
+                "main_pic_init_qp=%d\naux_pic_init_qp=%d\n"
+                "main_entropy_cabac=%d\naux_entropy_cabac=%d\n"
+                "main_frame_mbs_only=%d\naux_frame_mbs_only=%d\n"
+                "main_scaling_present=%d\naux_scaling_present=%d\n"
+                "main_pps_scaling_present=%d\n"
+                "aux_pps_scaling_present=%d\n"
+                "main_slice_groups=%d\naux_slice_groups=%d\n"
+                "main_deblock_present=%d\naux_deblock_present=%d\n"
+                "main_redundant_present=%d\n"
+                "aux_redundant_present=%d\n"
+                "main_chroma_qp_offset=%d\naux_chroma_qp_offset=%d\n"
+                "main_second_chroma_qp_offset=%d\n"
+                "aux_second_chroma_qp_offset=%d\n"
+                "main_transform_8x8=%d\naux_transform_8x8=%d\n",
+                self->leaf_main_cache.log2_max_frame_num,
+                self->leaf_aux_cache.log2_max_frame_num,
+                self->leaf_main_cache.poc_type,
+                self->leaf_aux_cache.poc_type,
+                self->leaf_main_cache.pic_init_qp,
+                self->leaf_aux_cache.pic_init_qp,
+                self->leaf_main_cache.entropy_cabac,
+                self->leaf_aux_cache.entropy_cabac,
+                self->leaf_main_cache.frame_mbs_only,
+                self->leaf_aux_cache.frame_mbs_only,
+                self->leaf_main_cache.scaling_present,
+                self->leaf_aux_cache.scaling_present,
+                self->leaf_main_cache.pps_scaling_present,
+                self->leaf_aux_cache.pps_scaling_present,
+                self->leaf_main_cache.slice_groups,
+                self->leaf_aux_cache.slice_groups,
+                self->leaf_main_cache.deblock_present,
+                self->leaf_aux_cache.deblock_present,
+                self->leaf_main_cache.redundant_present,
+                self->leaf_aux_cache.redundant_present,
+                self->leaf_main_cache.chroma_qp_offset,
+                self->leaf_aux_cache.chroma_qp_offset,
+                self->leaf_main_cache.second_chroma_qp_offset,
+                self->leaf_aux_cache.second_chroma_qp_offset,
+                self->leaf_main_cache.transform_8x8,
+                self->leaf_aux_cache.transform_8x8);
+    if (capture_ffmpeg_version(self->cfg.path, version,
+                               sizeof(version)) == 0)
+    {
+        append_text(meta, cap, &len, "ffmpeg_version_begin\n%s"
+                    "ffmpeg_version_end\n", version);
+    }
+    argc = build_argv(&self->cfg, self->coded_width, self->coded_height,
+                      argv, num_store, sizeof(num_store));
+    append_text(meta, cap, &len, "argv_encoding=lowercase_hex\nargc=%d\n",
+                argc);
+    for (i = 0; i < argc && i < FF_MAX_ARGV; i++)
+    {
+        if (append_hex_arg(meta, cap, &len, i, argv[i]) != 0)
+        {
+            break;
+        }
+    }
+    g_snprintf(path, sizeof(path), "%s-manifest.txt", prefix);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        retained += write_all(fd, (const unsigned char *)meta, len) == 0;
+        g_file_close(fd);
+        g_chmod_hex(path, 0x0600);
+    }
+    g_free(meta);
+    if (retained == 3)
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: retained rejected leaf pair and "
+            "manifest as %s-* (directory 0700, files 0600)", prefix);
+    }
+    else
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: rejected leaf forensic bundle "
+            "is incomplete under %s (%d of 3 files retained)", dir,
+            retained);
+    }
+}
+
+/*****************************************************************************/
+static void
+write_failure_manifest(const struct xrdp_ffmpeg_avc444_config *cfg,
+                       int width, int height, const char *reason)
+{
+    const char *dir = "/var/log/xrdp/ffmpeg-forensics";
+    char path[640];
+    char version[4096];
+    char num_store[192];
+    char *argv[FF_MAX_ARGV];
+    char *meta;
+    int coded_width;
+    int coded_height;
+    int argc;
+    int cap;
+    int len;
+    int fd;
+    int i;
+
+    if (!reserve_forensic_slot(dir, "failure-first"))
+    {
+        return;
+    }
+    coded_width = cfg->chroma_align == 32 ? (width + 31) & ~31 :
+                  round_up_16(width);
+    coded_height = round_up_16(height);
+    cap = 256 * 1024;
+    meta = (char *)g_malloc(cap, 1);
+    if (meta == NULL)
+    {
+        return;
+    }
+    len = 0;
+    append_text(meta, cap, &len,
+                "reason=%s\nvisible=%dx%d\ncoded=%dx%d\nmonitor=%d\n"
+                "xrdp_pid=%d\ntimestamp_ms=%lld\n",
+                reason, width, height, coded_width, coded_height,
+                cfg->monitor_index, g_getpid(), now_ms());
+    if (capture_ffmpeg_version(cfg->path, version, sizeof(version)) == 0)
+    {
+        append_text(meta, cap, &len, "ffmpeg_version_begin\n%s"
+                    "ffmpeg_version_end\n", version);
+    }
+    argc = build_argv(cfg, coded_width, coded_height, argv, num_store,
+                      sizeof(num_store));
+    append_text(meta, cap, &len, "argv_encoding=lowercase_hex\nargc=%d\n",
+                argc);
+    for (i = 0; i < argc && i < FF_MAX_ARGV; i++)
+    {
+        if (append_hex_arg(meta, cap, &len, i, argv[i]) != 0)
+        {
+            break;
+        }
+    }
+    g_snprintf(path, sizeof(path), "%s/failure-first-manifest.txt", dir);
+    fd = g_file_open_ex(path, 0, 1, 1, 1);
+    if (fd >= 0)
+    {
+        int write_ok = write_all(fd, (const unsigned char *)meta, len) == 0;
+
+        g_file_close(fd);
+        g_chmod_hex(path, 0x0600);
+        if (write_ok)
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: retained backend-failure "
+                "manifest as %s (directory 0700, file 0600)", path);
+        }
+        else
+        {
+            LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: backend-failure manifest "
+                "is incomplete at %s", path);
+        }
+    }
+    else
+    {
+        LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: could not create "
+            "backend-failure manifest under %s", dir);
+    }
+    g_free(meta);
 }
 
 /*****************************************************************************/
@@ -1538,13 +1958,18 @@ xrdp_ffmpeg_avc444_encode_pair(struct xrdp_ffmpeg_avc444 *self,
         }
         memcpy(self->aux_buf, leaf_result.main_data, leaf_result.main_len);
         self->aux_len = leaf_result.main_len;
-        if (xrdp_h264_aux_to_leaf(self->aux_buf, &self->aux_len,
-                                  self->main_buf, self->main_len,
-                                  &self->leaf_main_cache,
-                                  &self->leaf_aux_cache) != 0)
+        self->leaf_reject_reason = XRDP_H264_LEAF_OK;
+        if (xrdp_h264_aux_to_leaf_ex(self->aux_buf, &self->aux_len,
+                                     self->main_buf, self->main_len,
+                                     &self->leaf_main_cache,
+                                     &self->leaf_aux_cache,
+                                     &self->leaf_reject_reason) != 0)
         {
             LOG(LOG_LEVEL_ERROR, "xrdp_ffmpeg: aux_intra_leaf rewrite "
-                "failed; refusing to ship the pair");
+                "failed (%s); refusing to ship the pair",
+                xrdp_h264_leaf_reject_reason_str(
+                    self->leaf_reject_reason));
+            write_leaf_forensics(self);
             return XRDP_FFMPEG_PAIR_ERROR;
         }
         result->aux_data = self->aux_buf;
@@ -2207,6 +2632,8 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
                     &self->in_fd, &self->out_fd, &self->err_fd,
                     &self->pid) != 0)
     {
+        write_failure_manifest(&self->cfg, actual_width, actual_height,
+                               "PRIMARY_CHILD_CREATE_FAILED");
         xrdp_nut_delete(self->nut);
         g_free(self);
         return NULL;
@@ -2218,6 +2645,8 @@ xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
     {
         if (spawn_second_child(self) != 0)
         {
+            write_failure_manifest(&self->cfg, actual_width, actual_height,
+                                   "AUXILIARY_CHILD_CREATE_FAILED");
             xrdp_ffmpeg_avc444_delete(self);
             return NULL;
         }
@@ -2302,6 +2731,30 @@ int
 xrdp_ffmpeg_avc444_rekey_pending(struct xrdp_ffmpeg_avc444 *self)
 {
     return self != NULL ? self->rekey_pending : 0;
+}
+
+/*****************************************************************************/
+enum xrdp_h264_leaf_reject_reason
+xrdp_ffmpeg_avc444_leaf_reject_reason(
+    const struct xrdp_ffmpeg_avc444 *self)
+{
+    return self != NULL ? self->leaf_reject_reason :
+    XRDP_H264_LEAF_INVALID_ARGUMENT;
+}
+
+/*****************************************************************************/
+void
+xrdp_ffmpeg_avc444_retain_failure(struct xrdp_ffmpeg_avc444 *self,
+                                  const char *reason)
+{
+    if (self == NULL || self->leaf_forensics_written)
+    {
+        return;
+    }
+    self->leaf_forensics_written = 1;
+    write_failure_manifest(&self->cfg, self->actual_width,
+                           self->actual_height,
+                           reason != NULL ? reason : "UNKNOWN_FAILURE");
 }
 
 /*****************************************************************************/
@@ -2403,6 +2856,66 @@ make_probe_frame(unsigned char *buf, int nv12_size, int cw, int ch, int idx)
     }
     memset(buf + cw * ch, (unsigned char)(0x80 + idx * 8),
            nv12_size - cw * ch);
+}
+
+/*****************************************************************************/
+static enum xrdp_ffmpeg_probe_result
+probe_production_topology(const struct xrdp_ffmpeg_avc444_config *cfg,
+                          int width, int height)
+{
+    struct xrdp_ffmpeg_avc444 *enc;
+    struct xrdp_avc444_encoded_pair pair;
+    enum xrdp_h264_leaf_reject_reason reason;
+    unsigned char *frames;
+    int nv12_size;
+    int rv;
+
+    if (!cfg->aux_intra_leaf && !cfg->aux_ltr_chain)
+    {
+        return XRDP_FFMPEG_PROBE_OK;
+    }
+    enc = xrdp_ffmpeg_avc444_create(cfg, width, height);
+    if (enc == NULL)
+    {
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: production-topology probe "
+            "could not create the selected two-child encoder");
+        return XRDP_FFMPEG_PROBE_SPAWN_FAIL;
+    }
+    nv12_size = enc->nv12_size;
+    frames = (unsigned char *)malloc((size_t)nv12_size * 2);
+    if (frames == NULL)
+    {
+        xrdp_ffmpeg_avc444_delete(enc);
+        return XRDP_FFMPEG_PROBE_STREAM_ERROR;
+    }
+    make_probe_frame(frames, nv12_size, enc->coded_width,
+                     enc->coded_height, 0);
+    make_probe_frame(frames + nv12_size, nv12_size, enc->coded_width,
+                     enc->coded_height, 1);
+    rv = xrdp_ffmpeg_avc444_encode_pair(enc, frames,
+                                        frames + nv12_size, nv12_size,
+                                        0, &pair);
+    reason = xrdp_ffmpeg_avc444_leaf_reject_reason(enc);
+    free(frames);
+    xrdp_ffmpeg_avc444_delete(enc);
+    if (rv != XRDP_FFMPEG_PAIR_READY)
+    {
+        if (reason != XRDP_H264_LEAF_OK)
+        {
+            LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: production-topology "
+                "probe CONTENT_REJECT: auxiliary-leaf transform rejected "
+                "the selected encoder (%s)",
+                xrdp_h264_leaf_reject_reason_str(reason));
+            return XRDP_FFMPEG_PROBE_CONTENT_REJECT;
+        }
+        LOG(LOG_LEVEL_WARNING, "xrdp_ffmpeg: production-topology probe "
+            "STREAM_ERROR: selected two-child pair did not complete");
+        return XRDP_FFMPEG_PROBE_STREAM_ERROR;
+    }
+    LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: production-topology probe OK (%s)",
+        cfg->aux_ltr_chain ? "main plus auxiliary LTR child" :
+        "main plus forced-IDR auxiliary leaf child");
+    return XRDP_FFMPEG_PROBE_OK;
 }
 
 /*****************************************************************************/
@@ -2799,6 +3312,15 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
     }
     xrdp_nut_delete(nut);
     free(blob);
+    if (!fail && (cfg->aux_intra_leaf || cfg->aux_ltr_chain))
+    {
+        res = probe_production_topology(cfg, coded_width, coded_height);
+        if (res != XRDP_FFMPEG_PROBE_OK)
+        {
+            why = "the selected production two-child topology failed";
+            fail = 1;
+        }
+    }
     if (!fail)
     {
         LOG(LOG_LEVEL_INFO, "xrdp_ffmpeg: probe OK (dump_extra=%d) at "

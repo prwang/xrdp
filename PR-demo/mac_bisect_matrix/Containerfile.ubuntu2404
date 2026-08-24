@@ -1,0 +1,45 @@
+# Container for BACKLOG #125C's distribution-specific CPU/leaf gate.
+#
+# Keep this separate from Containerfile: the ordinary matrix deliberately
+# models the Debian development host, while this arm must exercise Ubuntu
+# 24.04's FFmpeg 6/libx264 bitstream.
+FROM ubuntu:24.04
+
+ARG XRDP_DEB
+ARG XORGXRDP_DEB
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        ffmpeg \
+        xserver-xorg-core xserver-xorg-legacy \
+        x11-xserver-utils xterm xfonts-base fonts-dejavu-core \
+        dbus procps openssl ca-certificates xdotool \
+        libx11-6 libxfixes3 libxrandr2 \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY ${XRDP_DEB} ${XORGXRDP_DEB} /tmp/debs/
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends /tmp/debs/*.deb \
+    && rm -rf /tmp/debs /var/lib/apt/lists/*
+
+# Ubuntu reserves uid 1000 for its image account; account identity is not
+# part of this codec gate, so use stable, unoccupied local ids.
+RUN printf 'allowed_users=anybody\nneeds_root_rights=no\n' \
+        > /etc/X11/Xwrapper.config \
+    && sed -i -e 's|^port=3389|port=tcp://:3389|' \
+              -e 's|^autorun=$|autorun=Xorg|' /etc/xrdp/xrdp.ini \
+    && groupadd -f render \
+    && useradd -m -u 1100 -s /bin/bash tester \
+    && usermod -aG video,render tester \
+    && useradd -m -u 1101 -s /bin/bash probe444 \
+    && usermod -aG video,render probe444
+
+COPY startwm.sh /etc/xrdp/startwm.sh
+COPY banner.sh /usr/local/bin/banner.sh
+COPY entrypoint.sh /usr/local/bin/entrypoint.sh
+RUN chmod 755 /etc/xrdp/startwm.sh /usr/local/bin/banner.sh \
+              /usr/local/bin/entrypoint.sh
+
+EXPOSE 3389
+ENTRYPOINT ["/usr/local/bin/entrypoint.sh"]

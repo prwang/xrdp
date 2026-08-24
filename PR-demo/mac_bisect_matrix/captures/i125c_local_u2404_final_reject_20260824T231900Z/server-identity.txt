@@ -1,0 +1,22 @@
+PRETTY_NAME="Ubuntu 24.04.4 LTS"
+NAME="Ubuntu"
+VERSION_ID="24.04"
+VERSION="24.04.4 LTS (Noble Numbat)"
+VERSION_CODENAME=noble
+ID=ubuntu
+ID_LIKE=debian
+HOME_URL="https://www.ubuntu.com/"
+SUPPORT_URL="https://help.ubuntu.com/"
+BUG_REPORT_URL="https://bugs.launchpad.net/ubuntu/"
+PRIVACY_POLICY_URL="https://www.ubuntu.com/legal/terms-and-policies/privacy-policy"
+UBUNTU_CODENAME=noble
+LOGO=ubuntu-logo
+ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+ffmpeg	7:6.1.1-3ubuntu5
+libx264-164:amd64	2:0.164.3108+git31e19f9-1
+xorgxrdp-dev	1:0.10.80+git20260822114312.c190343ff28a
+xrdp-dev	0.10.80+git20260824223401.f9edaecb19d7+dirty
+959b986e33c0b9c45a9d63fae44bdd6c02b091b2d0a314e2d36cb7d73d029e4f  /usr/sbin/xrdp
+0e2f7e08765fdfdbccab93ca97c363d755550c690f8b88e91a00bc93157d5ab1  /usr/lib/xorg/modules/libxorgxrdp.so
+localhost/xrdp-bisect:i125c-u2404-candidate3
+sha256:e1ca74dabf2c0db06b2422e1265bf85978d1e259252ef137d9d3e721d6470d27

@@ -482,6 +482,7 @@ struct xrdp_encoder
     int avc444_fault_aux_delay; /* DIAGNOSTIC one-frame aux slip        */
     int avc444_fault_strip_mmco; /* DIAGNOSTIC MMCO -> sliding window   */
     int avc444_aux_ltr_chain;   /* EXPERIMENTAL FR-H264-8 LTR aux-chain  */
+    int avc444_ffmpeg_fatal;    /* terminal post-confirm backend failure */
     int avc444_ltr_rekey_frame_num; /* re-key threshold (BACKLOG #48)    */
     int avc444_intra_refresh_frames; /* scheduled refresh (FR-H264-6)    */
     int avc444_intra_refresh_frames_aux; /* the aux view's own (#92)     */
@@ -647,6 +648,13 @@ struct xrdp_encoder
     xrdp_encoder_h264_delete_proc xrdp_encoder_h264_delete;
     xrdp_encoder_h264_encode_proc xrdp_encoder_h264_encode;
 };
+
+/* A backend failure after capability confirmation is terminal. This is
+ * idempotent so repeated damage cannot restart a failed child or replace the
+ * selected codec. */
+void
+xrdp_encoder_ffmpeg_set_fatal(struct xrdp_encoder *self,
+                              const char *operation, int monitor);
 
 /**
  * Publish one cycle's per-monitor arm state to the emit pass.

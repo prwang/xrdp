@@ -1440,6 +1440,22 @@ gfx_send_chroma_invalidate(struct xrdp_encoder *self)
 }
 
 /*****************************************************************************/
+void
+xrdp_encoder_ffmpeg_set_fatal(struct xrdp_encoder *self,
+                              const char *operation, int monitor)
+{
+    if (self->avc444_ffmpeg_fatal)
+    {
+        return;
+    }
+    self->avc444_ffmpeg_fatal = 1;
+    LOG(LOG_LEVEL_ERROR, "ffmpeg H.264 backend failed after capability "
+        "confirmation while %s on monitor %d; closing the connection "
+        "without retry or codec fallback", operation, monitor);
+    xrdp_mm_set_fatal(self->mm, ERRINFO_SERVER_DWM_CRASH);
+}
+
+/*****************************************************************************/
 /* Debug-only capture (env XRDP_AVC444_DUMP=<dir>): write the exact main/aux
  * Annex-B H.264 substreams the client receives, plus the surface dimensions and
  * damage rects, one set of files per emitted frame keyed by desktop sequence.
@@ -1576,6 +1592,10 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
     int need;
     int shmem_offset;
 
+    if (self->avc444_ffmpeg_fatal)
+    {
+        return NULL;
+    }
     if (!s_check_rem(in_s, 11))
     {
         return NULL;
@@ -1680,6 +1700,8 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {
+            xrdp_encoder_ffmpeg_set_fatal(self, "creating the AVC420 child",
+                                          mon_index);
             g_free(d_rects);
             return NULL;
         }
@@ -1712,6 +1734,9 @@ gfx_wiretosurface1_avc420(struct xrdp_encoder *self,
 #endif
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
+        xrdp_ffmpeg_avc444_retain_failure(ff, "AVC420_ENCODE_FAILED");
+        xrdp_encoder_ffmpeg_set_fatal(self, "encoding an AVC420 picture",
+                                      mon_index);
         xrdp_ffmpeg_avc444_delete(ff);
         self->avc444_ffmpeg_handle[mon_index] = NULL;
         g_free(d_rects);
@@ -1882,6 +1907,10 @@ gfx_avc444_handle_for(struct xrdp_encoder *self, int mon_index,
 {
     struct xrdp_ffmpeg_avc444 *ff;
 
+    if (self->avc444_ffmpeg_fatal)
+    {
+        return NULL;
+    }
     ff = (struct xrdp_ffmpeg_avc444 *)self->avc444_ffmpeg_handle[mon_index];
     if (ff != NULL &&
             (self->avc444_actual_w[mon_index] != twidth ||
@@ -1902,6 +1931,9 @@ gfx_avc444_handle_for(struct xrdp_encoder *self, int mon_index,
         ff = xrdp_ffmpeg_avc444_create(&cfg, twidth, theight);
         if (ff == NULL)
         {
+            xrdp_encoder_ffmpeg_set_fatal(self,
+                                          "creating the AVC444 child pair",
+                                          mon_index);
             return NULL;
         }
         self->avc444_ffmpeg_handle[mon_index] = ff;
@@ -2252,6 +2284,9 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
 #endif
     if (enc_rv == XRDP_FFMPEG_PAIR_ERROR)
     {
+        xrdp_ffmpeg_avc444_retain_failure(ff, "AVC444_ENCODE_FAILED");
+        xrdp_encoder_ffmpeg_set_fatal(self, "encoding an AVC444 pair",
+                                      mon_index);
         /* only reachable from the inline encode above, which is the
          * only branch that owns a handle here */
         if (ff != NULL)
@@ -2617,8 +2652,10 @@ gfx_batch_collect_one(struct xrdp_encoder *self,
         return;
     }
     LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: monitor %d pair seq %llu could "
-        "not be collected; recreating its encoder pair", mon,
+        "not be collected; closing the connection", mon,
         (unsigned long long)self->avc444_batch_seq[mon]);
+    xrdp_ffmpeg_avc444_retain_failure(ff, "AVC444_COLLECT_FAILED");
+    xrdp_encoder_ffmpeg_set_fatal(self, "collecting an AVC444 pair", mon);
     xrdp_ffmpeg_avc444_delete(ff);
     self->avc444_ffmpeg_handle[mon] = NULL;
     self->avc444_batch_have[mon] = -1;
@@ -2937,9 +2974,12 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
                 != XRDP_FFMPEG_PAIR_READY)
         {
             LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: submit failed for "
-                "monitor %d seq %llu; recreating its encoder pair and "
-                "shipping nothing for it this frame", mon,
+                "monitor %d seq %llu; closing the connection", mon,
                 (unsigned long long)seq);
+            xrdp_ffmpeg_avc444_retain_failure(ff,
+                                              "AVC444_SUBMIT_FAILED");
+            xrdp_encoder_ffmpeg_set_fatal(self,
+                                          "submitting an AVC444 pair", mon);
             xrdp_ffmpeg_avc444_delete(ff);
             self->avc444_ffmpeg_handle[mon] = NULL;
             sub_state[mon] = -1;
@@ -3036,6 +3076,15 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
     {
         LOG(LOG_LEVEL_ERROR, "gfx_batch_run_set: pump of %d children failed; "
             "the failing child belongs to monitor %d", kids_armed,
+            (bad_handle >= 0 && bad_handle < n_handles)
+            ? handle_mon[bad_handle] : -1);
+        if (bad_handle >= 0 && bad_handle < n_handles)
+        {
+            xrdp_ffmpeg_avc444_retain_failure(
+                handles[bad_handle], "AVC444_CHILD_WAIT_FAILED");
+        }
+        xrdp_encoder_ffmpeg_set_fatal(
+            self, "waiting for an AVC444 child set",
             (bad_handle >= 0 && bad_handle < n_handles)
             ? handle_mon[bad_handle] : -1);
         for (index = 0; index < n_handles; index++)
@@ -3419,10 +3468,10 @@ gfx_wiretosurface2(struct xrdp_encoder *self,
     if (self->codec_handle_prfx_gfx[mon_index] == NULL)
     {
         self->codec_handle_prfx_gfx[mon_index] = rfxcodec_encode_create(
-                width,
-                height,
-                RFX_FORMAT_YUV,
-                RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
+                    width,
+                    height,
+                    RFX_FORMAT_YUV,
+                    RFX_FLAGS_RLGR1 | RFX_FLAGS_PRO1);
         if (self->codec_handle_prfx_gfx[mon_index] == NULL)
         {
             g_free(tiles);

@@ -55,6 +55,6 @@ Where things go:
 | `122-one-active-monitor.md` | #122 | one-active slowdown refuted with valid selected-monitor evidence |
 | `123-t4-nvenc-compatibility.md` | #123 | DONE with documented limitation — v2/420 qualified; forced v1 is red on macOS and retained only as a compatibility tier |
 | `124-credit-frontier-client-qualification.md` | #124/#124B | DONE — dense AVC444v2 and both corrected flood payloads passed on Windows and macOS |
-| `125-sparse-chroma-qualification.md` | #125 | OPEN Scope C — T4/LTR result retained; Ubuntu FFmpeg 6 CPU leaf topology passed a false-green probe then restart-looped black |
+| `125-sparse-chroma-qualification.md` | #125 | CLOSED — sparse/T4 result retained; exact CPU leaf probe rejects unsupported CAVLC and post-confirm failure is terminal |
 | `201-prd-refactor.md` | #201 | paired bases pinned; one normative file per clean-room slice |
 | `avc444-lc-reframe-design.md` | pre-backlog | historical LC=1/LC=2 ground truth and original fix design; superseded normatively by PRD slice #135 |

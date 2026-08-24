@@ -186,10 +186,11 @@ START_TEST(test_tconfig_gfx_avc444_defaults)
         ck_assert_int_lt(ci + 1, a->count);
         ck_assert_str_eq(a->arg[ci + 1], "18");
     }
-    /* the x264-params token carries repeat-headers plus the AUD delimiter
-     * (aud=1) that matches a real Windows AVC444 stream; see
+    /* The x264-params token carries in-band headers, the AUD delimiter and
+     * CABAC required by the auxiliary-leaf transform; see
      * xrdp_ffmpeg_avc444_default_encoder_args */
-    ck_assert_int_ge(find_enc_arg(a, "repeat-headers=1:aud=1"), 0);
+    ck_assert_int_ge(find_enc_arg(
+                         a, "repeat-headers=1:aud=1:cabac=1"), 0);
     /* BACKLOG #80: with no [avc444_ffmpeg] table at all, the shipped ack
      * mechanism is the credit frontier (owner directive 2026-08-07) at a
      * wire window of 1 (owner directive 2026-08-10, superseding the

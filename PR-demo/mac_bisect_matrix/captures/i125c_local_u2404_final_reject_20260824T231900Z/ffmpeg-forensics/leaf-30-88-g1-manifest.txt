@@ -1,0 +1,102 @@
+reason=ENTROPY_UNSUPPORTED
+visible=2560x1440
+coded=2560x1440
+main_bytes=195151
+aux_bytes=217365
+monitor=-1
+main_log2_frame_num=4
+aux_log2_frame_num=4
+main_poc_type=2
+aux_poc_type=2
+main_pic_init_qp=18
+aux_pic_init_qp=18
+main_entropy_cabac=0
+aux_entropy_cabac=0
+main_frame_mbs_only=1
+aux_frame_mbs_only=1
+main_scaling_present=0
+aux_scaling_present=0
+main_pps_scaling_present=0
+aux_pps_scaling_present=0
+main_slice_groups=0
+aux_slice_groups=0
+main_deblock_present=1
+aux_deblock_present=1
+main_redundant_present=0
+aux_redundant_present=0
+main_chroma_qp_offset=0
+aux_chroma_qp_offset=0
+main_second_chroma_qp_offset=0
+aux_second_chroma_qp_offset=0
+main_transform_8x8=0
+aux_transform_8x8=0
+ffmpeg_version_begin
+ffmpeg version 6.1.1-3ubuntu5 Copyright (c) 2000-2023 the FFmpeg developers
+built with gcc 13 (Ubuntu 13.2.0-23ubuntu3)
+configuration: --prefix=/usr --extra-version=3ubuntu5 --toolchain=hardened --libdir=/usr/lib/x86_64-linux-gnu --incdir=/usr/include/x86_64-linux-gnu --arch=amd64 --enable-gpl --disable-stripping --disable-omx --enable-gnutls --enable-libaom --enable-libass --enable-libbs2b --enable-libcaca --enable-libcdio --enable-libcodec2 --enable-libdav1d --enable-libflite --enable-libfontconfig --enable-libfreetype --enable-libfribidi --enable-libglslang --enable-libgme --enable-libgsm --enable-libharfbuzz --enable-libmp3lame --enable-libmysofa --enable-libopenjpeg --enable-libopenmpt --enable-libopus --enable-librubberband --enable-libshine --enable-libsnappy --enable-libsoxr --enable-libspeex --enable-libtheora --enable-libtwolame --enable-libvidstab --enable-libvorbis --enable-libvpx --enable-libwebp --enable-libx265 --enable-libxml2 --enable-libxvid --enable-libzimg --enable-openal --enable-opencl --enable-opengl --disable-sndio --enable-libvpl --disable-libmfx --enable-libdc1394 --enable-libdrm --enable-libiec61883 --enable-chromaprint --enable-frei0r --enable-ladspa --enable-libbluray --enable-libjack --enable-libpulse --enable-librabbitmq --enable-librist --enable-libsrt --enable-libssh --enable-libsvtav1 --enable-libx264 --enable-libzmq --enable-libzvbi --enable-lv2 --enable-sdl2 --enable-libplacebo --enable-librav1e --enable-pocketsphinx --enable-librsvg --enable-libjxl --enable-shared
+libavutil      58. 29.100 / 58. 29.100
+libavcodec     60. 31.102 / 60. 31.102
+libavformat    60. 16.100 / 60. 16.100
+libavdevice    60.  3.100 / 60.  3.100
+libavfilter     9. 12.100 /  9. 12.100
+libswscale      7.  5.100 /  7.  5.100
+libswresample   4. 12.100 /  4. 12.100
+libpostproc    57.  3.100 / 57.  3.100
+ffmpeg_version_end
+argv_encoding=lowercase_hex
+argc=55
+argv_000_hex=2f7573722f62696e2f66666d706567
+argv_001_hex=2d686964655f62616e6e6572
+argv_002_hex=2d6e6f737464696e
+argv_003_hex=2d6c6f676c6576656c
+argv_004_hex=6572726f72
+argv_005_hex=2d66
+argv_006_hex=726177766964656f
+argv_007_hex=2d706978656c5f666f726d6174
+argv_008_hex=6e763132
+argv_009_hex=2d766964656f5f73697a65
+argv_010_hex=323536307831343430
+argv_011_hex=2d6672616d6572617465
+argv_012_hex=313230
+argv_013_hex=2d636f6c6f725f72616e6765
+argv_014_hex=7063
+argv_015_hex=2d636f6c6f727370616365
+argv_016_hex=6274373039
+argv_017_hex=2d636f6c6f725f7072696d6172696573
+argv_018_hex=6274373039
+argv_019_hex=2d636f6c6f725f747263
+argv_020_hex=6274373039
+argv_021_hex=2d70726f626573697a65
+argv_022_hex=35353239363030
+argv_023_hex=2d69
+argv_024_hex=706970653a33
+argv_025_hex=2d6d6170
+argv_026_hex=303a763a30
+argv_027_hex=2d616e
+argv_028_hex=2d736e
+argv_029_hex=2d646e
+argv_030_hex=2d6670735f6d6f6465
+argv_031_hex=706173737468726f756768
+argv_032_hex=2d633a76
+argv_033_hex=6c696278323634
+argv_034_hex=2d6266
+argv_035_hex=30
+argv_036_hex=2d707265736574
+argv_037_hex=756c74726166617374
+argv_038_hex=2d74756e65
+argv_039_hex=7a65726f6c6174656e6379
+argv_040_hex=2d637266
+argv_041_hex=3138
+argv_042_hex=2d67
+argv_043_hex=323430
+argv_044_hex=2d783236342d706172616d73
+argv_045_hex=7265706561742d686561646572733d313a6175643d31
+argv_046_hex=2d6273663a76
+argv_047_hex=683236345f6d7034746f616e6e657862
+argv_048_hex=2d666c7573685f7061636b657473
+argv_049_hex=31
+argv_050_hex=2d77726974655f696e646578
+argv_051_hex=30
+argv_052_hex=2d66
+argv_053_hex=6e7574
+argv_054_hex=706970653a31

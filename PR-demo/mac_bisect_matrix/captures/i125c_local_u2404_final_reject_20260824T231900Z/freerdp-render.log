@@ -1,0 +1,10 @@
+[23:19:00:343] [1394518:00154757] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x08 -> no RDP scancode found
+[23:19:00:343] [1394518:00154757] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x5d -> no RDP scancode found
+[23:19:00:393] [1394518:00154757] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[23:19:00:393] [1394518:00154757] [WARN][com.freerdp.core.license] - [license_read_binary_blob_data]: license binary blob::type BB_ERROR_BLOB, length=0, skipping.
+[23:19:00:393] [1394518:00154757] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[23:19:00:718] [1394518:0015479f] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x71ae97e71190
+[23:19:12:320] [1394518:00154756] [ERROR][com.freerdp.utils.signal] - [term_handler]: Caught signal 'Terminated' [15]
+[23:19:12:320] [1394518:00154756] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+fuse: writing device: Bad file descriptor
+[23:19:12:332] [1394518:0015479f] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x71ae97e71190

@@ -13,6 +13,8 @@
 #include "string_calls.h"
 #include "log.h"
 #include "xrdp_encoder.h"
+#include "xrdp.h"
+#include "ms-rdpbcgr.h"
 #include "test_xrdp.h"
 
 /*
@@ -73,6 +75,74 @@ START_TEST(test_ffmpeg_probe)
         return; /* skipped: no ffmpeg configured */
     }
     ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64), 0);
+}
+END_TEST
+
+/* The capability gate must run the same two-child leaf transform as the
+ * selected AVC444 session. The supported default is accepted; changing only
+ * its entropy mode to CAVLC is rejected before capability confirmation. */
+START_TEST(test_ffmpeg_probe_production_leaf_topology)
+{
+    struct xrdp_ffmpeg_avc444_config cfg;
+    int i;
+
+    if (!have_ffmpeg(&cfg))
+    {
+        return;
+    }
+    cfg.aux_intra_leaf = 1;
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_OK);
+
+    for (i = 0; i < cfg.encoder_args.count; i++)
+    {
+        if (strcmp(cfg.encoder_args.arg[i],
+                   "repeat-headers=1:aud=1:cabac=1") == 0)
+        {
+            snprintf(cfg.encoder_args.arg[i],
+                     sizeof(cfg.encoder_args.arg[i]),
+                     "%s", "repeat-headers=1:aud=1:cabac=0");
+            break;
+        }
+    }
+    ck_assert_int_lt(i, cfg.encoder_args.count);
+    ck_assert_int_eq(xrdp_ffmpeg_avc444_probe(&cfg, 64, 64),
+                     XRDP_FFMPEG_PROBE_CONTENT_REJECT);
+}
+END_TEST
+
+/* A backend error after confirmation requests connection teardown once. A
+ * later damaged frame sees the latched state and cannot start another child. */
+START_TEST(test_ffmpeg_post_confirm_failure_is_terminal_once)
+{
+    struct xrdp_encoder enc;
+    struct xrdp_mm mm;
+    struct xrdp_wm wm;
+    struct xrdp_process pro;
+
+    memset(&enc, 0, sizeof(enc));
+    memset(&mm, 0, sizeof(mm));
+    memset(&wm, 0, sizeof(wm));
+    memset(&pro, 0, sizeof(pro));
+    pro.self_term_event = g_create_wait_obj(
+                              "xrdp-test-ffmpeg-terminal");
+    ck_assert(pro.self_term_event != 0);
+    pro.errinfo = ERRINFO_NONE;
+    wm.pro_layer = &pro;
+    mm.wm = &wm;
+    enc.mm = &mm;
+
+    xrdp_encoder_ffmpeg_set_fatal(&enc, "testing a child failure", 0);
+    ck_assert_int_eq(enc.avc444_ffmpeg_fatal, 1);
+    ck_assert_int_eq(pro.errinfo, ERRINFO_SERVER_DWM_CRASH);
+    ck_assert_int_ne(g_is_wait_obj_set(pro.self_term_event), 0);
+
+    g_reset_wait_obj(pro.self_term_event);
+    pro.errinfo = ERRINFO_NONE;
+    xrdp_encoder_ffmpeg_set_fatal(&enc, "testing repeated damage", 0);
+    ck_assert_int_eq(pro.errinfo, ERRINFO_NONE);
+    ck_assert_int_eq(g_is_wait_obj_set(pro.self_term_event), 0);
+    g_delete_wait_obj(pro.self_term_event);
 }
 END_TEST
 
@@ -1305,6 +1375,8 @@ make_suite_avc444_ffmpeg(void)
     tc = tcase_create("avc444_ffmpeg");
     tcase_set_timeout(tc, 60);
     tcase_add_test(tc, test_ffmpeg_probe);
+    tcase_add_test(tc, test_ffmpeg_probe_production_leaf_topology);
+    tcase_add_test(tc, test_ffmpeg_post_confirm_failure_is_terminal_once);
     tcase_add_test(tc, test_ffmpeg_probe_global_header_encoder);
     tcase_add_test(tc, test_ffmpeg_probe_duplicate_headers_rejected);
     tcase_add_test(tc, test_ffmpeg_probe_timeout_classified);

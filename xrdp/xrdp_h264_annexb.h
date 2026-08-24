@@ -131,6 +131,38 @@ struct xrdp_h264_param_cache
     int pps_raw_len;
 };
 
+/* Stable reason codes for a rejected auxiliary-leaf transform. These are
+ * operator forensics, not parser internals: a production failure must say
+ * which stream contract was violated before the connection is closed. */
+enum xrdp_h264_leaf_reject_reason
+{
+    XRDP_H264_LEAF_OK = 0,
+    XRDP_H264_LEAF_INVALID_ARGUMENT,
+    XRDP_H264_LEAF_MAIN_NO_REFERENCE_VCL,
+    XRDP_H264_LEAF_AUX_NO_START_CODE,
+    XRDP_H264_LEAF_OUT_OF_MEMORY,
+    XRDP_H264_LEAF_PARAMETER_SETS_MISSING,
+    XRDP_H264_LEAF_FRAME_NUM_WIDTH_MISMATCH,
+    XRDP_H264_LEAF_POC_TYPE_UNSUPPORTED,
+    XRDP_H264_LEAF_FRAME_MODE_UNSUPPORTED,
+    XRDP_H264_LEAF_SCALING_UNSUPPORTED,
+    XRDP_H264_LEAF_ENTROPY_UNSUPPORTED,
+    XRDP_H264_LEAF_SLICE_GROUPS_UNSUPPORTED,
+    XRDP_H264_LEAF_DEBLOCK_MISMATCH,
+    XRDP_H264_LEAF_REDUNDANT_PICTURES_UNSUPPORTED,
+    XRDP_H264_LEAF_PIC_INIT_QP_MISMATCH,
+    XRDP_H264_LEAF_CHROMA_QP_MISMATCH,
+    XRDP_H264_LEAF_SECOND_CHROMA_QP_MISMATCH,
+    XRDP_H264_LEAF_TRANSFORM_8X8_MISMATCH,
+    XRDP_H264_LEAF_OUTPUT_LIMIT,
+    XRDP_H264_LEAF_SLICE_REWRITE_UNSUPPORTED,
+    XRDP_H264_LEAF_UNEXPECTED_NAL,
+    XRDP_H264_LEAF_NO_IDR_SLICE
+};
+
+const char *
+xrdp_h264_leaf_reject_reason_str(enum xrdp_h264_leaf_reject_reason reason);
+
 /*
  * DIAGNOSTIC (Mac k=1 bisect): rewrite every non-IDR reference slice so
  * dec_ref_pic_marking uses sliding-window instead of an explicit MMCO
@@ -164,6 +196,13 @@ xrdp_h264_aux_to_leaf(unsigned char *aux, int *aux_len,
                       const unsigned char *main_data, int main_len,
                       struct xrdp_h264_param_cache *main_cache,
                       struct xrdp_h264_param_cache *aux_cache);
+
+int
+xrdp_h264_aux_to_leaf_ex(unsigned char *aux, int *aux_len,
+                         const unsigned char *main_data, int main_len,
+                         struct xrdp_h264_param_cache *main_cache,
+                         struct xrdp_h264_param_cache *aux_cache,
+                         enum xrdp_h264_leaf_reject_reason *reason);
 
 /*
  * FR-H264-8 (EXPERIMENTAL): aux-refs-aux via Windows-style long-term
@@ -338,4 +377,3 @@ xrdp_h264_ltr_rewrite_aux(unsigned char *data, int *len, int cap,
                           struct xrdp_h264_ltr_state *st);
 
 #endif /* _XRDP_H264_ANNEXB_H */
-

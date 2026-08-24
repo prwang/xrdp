@@ -597,15 +597,17 @@ START_TEST(test_h264_aux_to_leaf_golden)
 {
     struct xrdp_h264_param_cache mc;
     struct xrdp_h264_param_cache ac;
+    enum xrdp_h264_leaf_reject_reason reason;
     unsigned char aux[sizeof(leaf_aux_pkt)];
     int len = sizeof(leaf_aux_pkt);
 
     memset(&mc, 0, sizeof(mc));
     memset(&ac, 0, sizeof(ac));
     memcpy(aux, leaf_aux_pkt, sizeof(leaf_aux_pkt));
-    ck_assert_int_eq(xrdp_h264_aux_to_leaf(aux, &len, leaf_main_pkt,
-                                           sizeof(leaf_main_pkt),
-                                           &mc, &ac), 0);
+    ck_assert_int_eq(xrdp_h264_aux_to_leaf_ex(aux, &len, leaf_main_pkt,
+                     sizeof(leaf_main_pkt),
+                     &mc, &ac, &reason), 0);
+    ck_assert_int_eq(reason, XRDP_H264_LEAF_OK);
     ck_assert_int_eq(len, (int)sizeof(leaf_golden));
     ck_assert_int_eq(memcmp(aux, leaf_golden, len), 0);
     /* the leaf must be a non-reference type-1 NAL, and both caches
@@ -624,6 +626,7 @@ START_TEST(test_h264_aux_to_leaf_rejects_non_idr_aux)
 {
     struct xrdp_h264_param_cache mc;
     struct xrdp_h264_param_cache ac;
+    enum xrdp_h264_leaf_reject_reason reason;
     /* the main packet (which ends in a non-IDR P slice) is not a valid
      * all-IDR aux stream: fail loudly, never ship a half-rewrite */
     unsigned char aux[sizeof(leaf_main_pkt)];
@@ -632,9 +635,10 @@ START_TEST(test_h264_aux_to_leaf_rejects_non_idr_aux)
     memset(&mc, 0, sizeof(mc));
     memset(&ac, 0, sizeof(ac));
     memcpy(aux, leaf_main_pkt, sizeof(leaf_main_pkt));
-    ck_assert_int_ne(xrdp_h264_aux_to_leaf(aux, &len, leaf_main_pkt,
-                                           sizeof(leaf_main_pkt),
-                                           &mc, &ac), 0);
+    ck_assert_int_ne(xrdp_h264_aux_to_leaf_ex(aux, &len, leaf_main_pkt,
+                     sizeof(leaf_main_pkt),
+                     &mc, &ac, &reason), 0);
+    ck_assert_int_eq(reason, XRDP_H264_LEAF_UNEXPECTED_NAL);
 }
 END_TEST
 
@@ -643,6 +647,7 @@ START_TEST(test_h264_aux_to_leaf_requires_main_ref_vcl)
 {
     struct xrdp_h264_param_cache mc;
     struct xrdp_h264_param_cache ac;
+    enum xrdp_h264_leaf_reject_reason reason;
     unsigned char aux[sizeof(leaf_aux_pkt)];
     /* main packet truncated to its SPS+PPS only: no reference VCL to
      * take frame_num from */
@@ -653,9 +658,10 @@ START_TEST(test_h264_aux_to_leaf_requires_main_ref_vcl)
     memset(&ac, 0, sizeof(ac));
     memcpy(aux, leaf_aux_pkt, sizeof(leaf_aux_pkt));
     memcpy(short_main, leaf_main_pkt, sizeof(short_main));
-    ck_assert_int_ne(xrdp_h264_aux_to_leaf(aux, &len, short_main,
-                                           sizeof(short_main),
-                                           &mc, &ac), 0);
+    ck_assert_int_ne(xrdp_h264_aux_to_leaf_ex(aux, &len, short_main,
+                     sizeof(short_main),
+                     &mc, &ac, &reason), 0);
+    ck_assert_int_eq(reason, XRDP_H264_LEAF_MAIN_NO_REFERENCE_VCL);
 }
 END_TEST
 

@@ -63,6 +63,10 @@ realistic payload rather than a diagnostic pattern.
   bisect. Also holds the capture archive (`captures/`), the arm
   certificates, `e_gate_run.sh`, `build_and_deploy.sh`, and the per-item
   analysers (`i61e_*`, `i79_*`, `i80_*`, `i91_encode_overlap.py`, …).
+  `Containerfile.ubuntu2404`, `k8s/x039.yaml` and
+  `i125c_ubuntu2404_deploy.sh` define the one Ubuntu 24.04 / FFmpeg 6 CPU
+  compatibility arm on `127.0.0.1:40055`; its deliberately incompatible
+  CAVLC configuration verifies rejection before AVC selection.
 * **`multimon_offline/`** — drives a real two-monitor `xfreerdp /multimon`
   login and asserts the server took the multi-monitor AVC444 path.
   `setup_monitors.sh` verifies each output's **active pixel geometry**, not

@@ -1,0 +1,11 @@
+[23:10:46:867] [1390015:001535c1] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x08 -> no RDP scancode found
+[23:10:46:867] [1390015:001535c1] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x5d -> no RDP scancode found
+[23:10:46:934] [1390015:001535c1] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[23:10:46:934] [1390015:001535c1] [WARN][com.freerdp.core.license] - [license_read_binary_blob_data]: license binary blob::type BB_ERROR_BLOB, length=0, skipping.
+[23:10:46:934] [1390015:001535c1] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[23:10:47:205] [1390015:00153609] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x7c769386c190
+[23:10:54:489] [1390015:001535c1] [ERROR][com.freerdp.core] - [rdp_set_error_info]: ERRINFO_LOGOFF_BY_USER [0x0001000C]
+[23:10:54:489] [1390015:001535c1] [ERROR][com.freerdp.core.rdp] - [rdp_recv_callback_int][0x5ab3a3ef2160]: CONNECTION_STATE_CAPABILITIES_EXCHANGE_DEMAND_ACTIVE status STATE_RUN_QUIT_SESSION [-2]
+[23:10:54:489] [1390015:001535c1] [ERROR][com.freerdp.core.transport] - [transport_check_fds]: transport_check_fds: transport->ReceiveCallback() - STATE_RUN_QUIT_SESSION [-2]
+[23:10:54:489] [1390015:001535c1] [ERROR][com.freerdp.core.transport] - [transport_default_write]: BIO_should_retry returned an error: error:80000020:system library::Broken pipe
+[23:10:54:493] [1390015:00153609] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x7c769386c190

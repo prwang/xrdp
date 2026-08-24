@@ -40,12 +40,12 @@ stub at the end of this file and points to its record.
 
 ## Execution order
 
-The porting list is one chain. Complete #125 before #126; an item does not
-start until its predecessor is closed. #120–#124B are closed below.
-#126–#142 re-author it as the clean-room commit series. #143 is explicitly
-later architecture work and cannot change or qualify that series. #300 is the
-public-PR documentation deliverable after #142; it does not block #143 and is
-not permission to publish or push anything.
+The porting list is one chain. #125 is closed; #126 is the first open item and
+an item does not start until its predecessor is closed. #126–#142 re-author
+the qualified development tree as the clean-room commit series. #143 is
+explicitly later architecture work and cannot change or qualify that series.
+#300 is the public-PR documentation deliverable after #142; it does not block
+#143 and is not permission to publish or push anything.
 
 For every dev qualification, commit the exact procedure, paired source and
 package identities, configuration, workload, instrument and expected checks.
@@ -53,48 +53,6 @@ The clean-room run changes no arm, knob or interpretation: it replays that
 anchor on an immutable candidate tree. A red clean-room slice never becomes a
 commit, and the next slice does not start. The final paired tree is not frozen
 history until all retained replays are green.
-
----
-
-# Active dependency chain
-
-## #125 — IN PROGRESS — client, numerical and runtime qualification
-
-Scopes A/B remain green: retain sparse chroma as an opt-in bandwidth/quality
-tradeoff; dense and a one-frame wire window remain shipped defaults. Scope C
-is now the first open action and blocks #126. The record is
-[`docs/experiments/125-sparse-chroma-qualification.md`](docs/experiments/125-sparse-chroma-qualification.md).
-
-**Scope C — false-green CPU/leaf certification and restart storm.** An owner
-deployment on Ubuntu 24.04.4 LTS with its FFmpeg 6/libx264 path passed
-the pre-confirm behavioral probe at 2560x1440, then every post-login
-`aux_intra_leaf` rewrite failed. No pair was published, the client stayed
-black, and persistent damage caused about ten teardown/recreate cycles per
-second. The probe left `aux_intra_leaf` disabled while live AVC444 forces it
-on, and the real-ffmpeg pair test repeats that single-child mismatch. The
-original log is retained under
-`PR-demo/mac_bisect_matrix/captures/i125c_ubuntu2404_ffmpeg6_cpu_blackscreen_20260824T142954Z/`.
-
-Build exactly one local Ubuntu 24.04.4 arm with the affected FFmpeg 6 CPU
-profile and connect through the repository FreeRDP client at the recorded
-2560x1440 single-monitor geometry. Preserve the first rejected main and
-auxiliary encoded access units, exact argv/version/configuration and a typed
-rewrite reason before teardown; encoded forensics are bounded and mode 0600,
-and raw desktop pixels or credentials are never dumped.
-
-**Acceptance:** the unmodified frontier first reproduces probe-OK followed by
-the leaf rejection and black presentation. The repair probes the exact
-selected topology: an AVC444 leaf candidate spawns the real main and
-forced-IDR auxiliary children, encodes a pair and runs the production leaf
-transform before capability confirmation. An unsupported stream is rejected
-there with a typed reason. Any child-creation, stream-contract or rewrite
-failure which nevertheless occurs after confirmation terminates the affected
-connection/session once, after retaining the bounded forensics; later damage
-cannot spawn another child and no codec fallback masks it. A FreeRDP replay
-then proves either the affected FFmpeg 6 stream is correctly transformed and
-presented or is refused before AVC selection. Real-ffmpeg tests cover the
-actual leaf topology, not the old single-child stand-in, and the corrected
-requirements in PRD slices #137/#142 are green before #125 closes again.
 
 ---
 
@@ -117,7 +75,7 @@ the slice without opening the development branch.
 
 ## #126 — paired latent GFX H.264 shared-memory isolation fix
 
-**Status: TODO; blocked on #125.** Re-author the pre-existing AVC420/H.264
+**Status: TODO; #125 is complete.** Re-author the pre-existing AVC420/H.264
 multi-monitor plane-overwrite fix before any AVC444 feature.
 
 **Development inventory (not source text):** xrdp
@@ -471,4 +429,5 @@ The record, not this table, owns conditions, measurements and retractions.
 | #122 | Valid selected-monitor evidence refuted the one-active slowdown hypothesis. | `docs/experiments/122-one-active-monitor.md` |
 | #123 | T4/client compatibility closed with forced-v1 macOS per-pixel fidelity RED; auto prefers v2 and v1 remains a legacy capability tier. | `docs/experiments/123-t4-nvenc-compatibility.md` |
 | #124/#124B | Windows/macOS AVC444v2 visual qualification and both corrected flood payloads passed. | `docs/experiments/124-credit-frontier-client-qualification.md` |
+| #125 | Sparse/T4 qualification retained; Ubuntu FFmpeg 6 CAVLC is now refused by the exact leaf-topology probe, and post-confirm backend failure is terminal without respawn or fallback. | `docs/experiments/125-sparse-chroma-qualification.md` |
 | #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |

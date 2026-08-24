@@ -40,6 +40,8 @@
 
 #include <stddef.h>
 
+#include "xrdp_h264_annexb.h"
+
 /*
  * Verbatim encoder-argument passthrough.
  *
@@ -263,6 +265,17 @@ xrdp_ffmpeg_avc444_probe(const struct xrdp_ffmpeg_avc444_config *cfg,
 struct xrdp_ffmpeg_avc444 *
 xrdp_ffmpeg_avc444_create(const struct xrdp_ffmpeg_avc444_config *cfg,
                           int actual_width, int actual_height);
+
+/** Last typed auxiliary-leaf rejection on this handle, or OK. */
+enum xrdp_h264_leaf_reject_reason
+xrdp_ffmpeg_avc444_leaf_reject_reason(
+    const struct xrdp_ffmpeg_avc444 *self);
+
+/* Retain one bounded mode-0600 manifest for a post-confirmation backend
+ * failure. Repeated calls on the same handle do nothing. */
+void
+xrdp_ffmpeg_avc444_retain_failure(struct xrdp_ffmpeg_avc444 *self,
+                                  const char *reason);
 
 /* encode_pair / flush_next return codes */
 #define XRDP_FFMPEG_PAIR_READY   0  /* *result filled with a completed pair */

@@ -1,0 +1,67 @@
+# BACKLOG #125C: the single Ubuntu 24.04 / FFmpeg 6 CPU arm.
+# One monitor at 2560x1440; host endpoint 127.0.0.1:40055.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x039
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x039
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x039
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x039
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:i125c-u2404-frontier
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "banner"
+            - name: ARM_LABEL
+              value: "Ubuntu 24.04 FFmpeg 6 CPU leaf gate (port 40055)"
+          ports:
+            - containerPort: 3389
+              hostPort: 40055
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: banner
+              mountPath: /usr/local/bin/banner.sh
+              subPath: banner.sh
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 512Mi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: banner
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x039

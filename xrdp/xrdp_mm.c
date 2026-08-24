@@ -1387,6 +1387,13 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
                       sizeof(cfg.path) - 1);
             cfg.encoder_args =
                 self->wm->gfx_config->avc444_ffmpeg_encoder_args;
+            cfg.chroma_align =
+                self->wm->gfx_config->avc444_ffmpeg_chroma_align;
+            /* Certification must instantiate the same topology selected
+             * after login. AVC444 always uses either the forced-IDR leaf
+             * child or, when enabled, the auxiliary LTR child; AVC420 is
+             * the only single-child mode. */
+            cfg.aux_intra_leaf = !want_420;
             /* In-band header policy is STATIC administrator configuration
              * ([avc444_ffmpeg] dump_extra in gfx.toml). One verification
              * run against the declared policy; the result is never adapted

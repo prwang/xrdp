@@ -1,0 +1,27 @@
+# Deterministic post-confirmation child-exit fixture for the Ubuntu CPU arm.
+# The capability probe sends four frames to its single child and one frame to
+# each production-topology child, so five is enough for confirmation. The live
+# persistent children then exit after their fifth picture; the next damaged
+# frame must hang up the connection once and must not respawn them.
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+avc_mode = "444"
+aux_ltr_chain = false
+eager_slot_ack = false
+wire_window = 1
+chroma_refresh_ms = 0
+chroma_idle_ms = 0
+encoder_args = [
+  "-c:v", "libx264",
+  "-bf", "0",
+  "-preset", "ultrafast",
+  "-tune", "zerolatency",
+  "-crf", "18",
+  "-g", "240",
+  "-frames:v", "5",
+  "-x264-params", "repeat-headers=1:aud=1:cabac=1",
+]
