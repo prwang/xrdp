@@ -79,6 +79,14 @@ capability-response seam but shall not introduce a new mechanism there.
   `<prefix>.<pid>`, not the normal log. The documentation shall state that no
   producer timestamp crosses xup and explain the one-active-session
   limitation of a non-forking xrdp test configuration.
+* S142-R9: installed configuration, manual text, warnings and informational
+  messages shall use operator-facing terms only. They shall not expose PRD,
+  backlog, experiment or clean-room identifiers. The template shall be a
+  concise operable example and shall not advertise removed or inert keys. The
+  man page shall document every supported administrator key, its default,
+  range or accepted values, dependencies and material quality/latency tradeoff.
+  Claims derived from measurements shall appear only when their retained
+  evidence is admissible.
 
 ## Required tests and final gate
 
@@ -109,3 +117,12 @@ mode has enough byte or throughput value to be included here at all. Every run
 records the paired commit IDs, client identity, resolution, selected mode and
 trace-build state. No timing claim derived from a synchronous per-frame logger
 is admissible.
+
+The retained numerical replay is a repeated 2-by-2 comparison of
+`wire_window` 1/2 and dense/sparse chroma. Conditions A/B use window 1; C/D use
+window 2; A/C set both chroma intervals to zero; B/D set refresh/idle to
+1000/100 ms. Run eight 20-second legs in `A B C D D C B A` order. Report the
+sparse effect at both windows, the window effect under both chroma policies,
+and their interaction. A wider-window effect requires telemetry proving that
+the run reached a state window 1 could not admit. Every sparse leg shall prove
+both auxiliary omission and restoration on its own trace.

@@ -1,5 +1,5 @@
 .\"
-.TH "gfx.toml" "8" "@PACKAGE_VERSION@" "xrdp team" ""
+.TH "gfx.toml" "5" "@PACKAGE_VERSION@" "xrdp team" ""
 .SH "NAME"
 \fBgfx.toml\fR \- Configuration file for xrdp(8) graphics pipeline extension
 
@@ -20,6 +20,10 @@ The file contains following sections:
 .TP
 \fB[OpenH264]\fR \- parameters for Cisco OpenH264 encoder.
 
+.TP
+\fB[avc444_ffmpeg]\fR \- parameters for the external ffmpeg AVC444/AVC420
+encoder.
+
 .LP
 All options and values are case-sensitive, with some exception, and are
 described in detail below.
@@ -36,7 +40,8 @@ Strings in the array are case-insensitive, while others are case-sensitive.
 
 .TP
 \fBh264_encoder\fR = \fI<string>\fR
-Specify a preferred H.264 encoder, \fB"x264"\fR or \fB"OpenH264"\fR.
+Specify a preferred H.264 encoder: \fB"x264"\fR, \fB"OpenH264"\fR or
+\fB"ffmpeg"\fR.
 This parameter takes effect only when more than one encoder is
 enabled at compile time. If only one H.264 encoder is enabled, the encoder
 will be used regardless the value of this parameter. Defaults to \fB"x264"\fR
@@ -150,11 +155,11 @@ encoders (\fBh264_nvenc\fR, \fBh264_qsv\fR, \fBh264_vaapi\fR, and so on) can be
 expressed without changing xrdp.
 
 .PP
-The AVC444 version is negotiated automatically per client and needs no
-configuration. When the client advertises AVC444 v2 support (MS-RDPEGFX
-capability version 10.1 or later) xrdp emits AVC444 v2 (codec id 0x000F,
-ChromaV2), which avoids the magenta/purple chroma fringing that AVC444 v1
-produces on saturated colored text and edges; clients that advertise only v1
+With the recommended \fBavc_mode = "auto"\fR, the AVC version is negotiated
+automatically per client. When the client advertises AVC444 v2 support
+(MS-RDPEGFX capability version 10.1 or later) xrdp emits AVC444 v2 (codec id
+0x000F, ChromaV2), which avoids the magenta/purple chroma fringing that AVC444
+v1 produces on saturated colored text and edges; clients that advertise only v1
 (capability version 10.0) transparently receive AVC444 v1 (codec id 0x000E).
 Both versions feed the same two NV12 pictures per frame to \fBffmpeg\fR, so the
 \fBencoder_args\fR below apply unchanged to either version.
@@ -235,6 +240,44 @@ out strict decoders (the macOS Windows App). The pre\(hyconnect verification
 therefore refuses the AVC candidate loudly \(em with the failure class in the
 log \(em when the declared value does not match the encoder's real bitstream.
 The value is never adapted at runtime.
+
+.TP
+\fBstrip_sei\fR = \fItrue\fR | \fIfalse\fR
+Remove buffering-period and picture-timing supplemental enhancement
+information from encoder output. Default: \fBfalse\fR. This is a diagnostic
+interoperability transform for encoders whose timing metadata is rejected by a
+client; it is not a general quality or performance setting.
+
+.TP
+\fBsanitize_hrd\fR = \fItrue\fR | \fIfalse\fR
+Remove hypothetical reference decoder parameters from the H.264 sequence
+parameter set. Default: \fBfalse\fR. Enable it only for a client/encoder
+combination known to require the transform.
+
+.TP
+\fBstrip_pic_struct\fR = \fItrue\fR | \fIfalse\fR
+Clear the H.264 \fBpic_struct_present_flag\fR. Default: \fBfalse\fR. Enable it
+only for a client/encoder combination known to require the transform.
+
+.TP
+\fBaux_ltr_chain\fR = \fItrue\fR | \fIfalse\fR
+Use independent long-term-reference chains for the AVC444 main and auxiliary
+views. Default: \fBfalse\fR. This path is required for
+\fBeager_slot_ack\fR and sparse chroma. When enabled, both encoder children
+must support the configured low-latency, no-B-frame pipeline.
+
+.TP
+\fBintra_refresh_frames\fR = \fI<integer>\fR
+Main-view intra-refresh interval in pictures. Default: \fB250\fR; accepted
+range: \fB24\fR to \fB4096\fR. Applies only when \fBaux_ltr_chain\fR is
+enabled. Out-of-range values are refused and leave the default in effect.
+
+.TP
+\fBintra_refresh_frames_aux\fR = \fI<integer>\fR
+Auxiliary-view intra-refresh interval in auxiliary pictures. When omitted it
+follows \fBintra_refresh_frames\fR. Accepted range: \fB24\fR to \fB4096\fR.
+The interval is counted only on auxiliary pictures, so sparse omission does
+not advance it.
 
 .TP
 \fBltr_rekey_frame_num\fR = \fI<integer>\fR
@@ -372,17 +415,43 @@ flight is one more frame of delay between an action and seeing it, and one
 more frame of memory queued in the server. At 4K that is roughly 3.3 MB per
 unit. Raise it only as far as the round trip demands.
 
-\fBOn a multi\(hymonitor session, do not expect raising it to cure
-stuttering.\fR It was measured on two monitors: doubling the window made
-long waits rarer but left the typical wait unchanged, and did not change the
-frame rate. On a fast link the limit on a multi\(hymonitor session is the
-server encoding each screen in turn, not this window, and no value here
-addresses that.
+\fBOn a multi\(hymonitor session, do not assume raising this value will cure
+stuttering.\fR First establish that client acknowledgement credit is the
+binding limit. On a fast link the limit may instead be the server encoding
+each screen in turn, which this setting does not change.
 
 When the window is reached the server does not queue the frames it did not
 send; it does not capture them at all, and the damage they would have carried
 is merged into the next frame it does capture. A slow link therefore gets
 fewer frames, each of them current, rather than a backlog of stale ones.
+
+.TP
+\fBchroma_refresh_ms\fR = \fI<integer>\fR
+Maximum continuous-motion interval before the next arriving AVC444 frame also
+carries the auxiliary chroma view. Default: \fB0\fR, which disables sparse
+chroma and sends auxiliary chroma with every frame. A nonzero value enables
+sparse chroma and accepts \fB16\fR through \fB60000\fR milliseconds. Sparse
+chroma requires \fBaux_ltr_chain = true\fR.
+
+The interval is evaluated when a damaged frame arrives. It guarantees that
+the first frame at or after the interval carries chroma; it does not create an
+extra frame by itself. Sparse mode reduces auxiliary encoding and wire bytes
+at the cost of temporarily displaying affected fine-chroma detail using the
+main view's 4:2:0 reconstruction.
+
+.TP
+\fBchroma_idle_ms\fR = \fI<integer>\fR
+Quiet interval used to restore full chroma after a main-only update. Default:
+\fB0\fR; accepted range: \fB0\fR through \fB60000\fR milliseconds. It is used
+only when \fBchroma_refresh_ms\fR is nonzero. After a main-only frame, expiry
+requests one current full-screen capture so a surface with no later
+application damage converges to full chroma.
+
+This setting does not identify application objects. If damage recurs around
+the idle or refresh boundary, fine-chroma content inside the affected update
+may visibly alternate between 4:2:0 and 4:4:4 even when that content itself
+appears static. Use the default dense mode when stable fine chroma during
+motion is required.
 
 .TP
 \fBencoder_args\fR = \fI<array of strings>\fR

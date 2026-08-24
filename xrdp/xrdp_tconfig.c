@@ -429,20 +429,9 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         XRDP_H264_INTRA_REFRESH_FRAMES_AUX;
     config->avc444_ffmpeg_fault_aux_delay = 0;
     config->avc444_ffmpeg_fault_strip_mmco = 0;
-    /* BACKLOG #80: the credit frontier is the DEFAULT ack mechanism
-     * (owner directive, 2026-08-07), at the DEFAULT window of 1 (owner
-     * directive, 2026-08-10). It is an extension, not a replacement: at
-     * wire_window 1 it reproduces the legacy gate's behaviour exactly
-     * -- measured identical on frame period, tail, stall rate and the
-     * wire bound, which is why 1 is what ships -- and at wire_window 2
-     * it can additionally grant a credit the legacy gate has no
-     * variable to express, because that gate's value is
-     * frame_id_server, which advances only at egress. Widening the
-     * legacy window instead pays the same queue cost and buys none of
-     * it: measured 17.6 % of cycles still stalled at frames_in_flight
-     * = 3, against 2.6-3.9 % here. Records:
-     * PR-demo/mac_bisect_matrix/captures/i80_c1_nonregression_20260807_141752_s20
-     * and .../i80_widen_legacy_20260807_143617_s20. */
+    /* Preserve the historical one-frame client window by default. A larger
+     * deployment-specific value trades additional queued inventory and
+     * display latency for more acknowledgement headroom. */
     config->avc444_ffmpeg_eager_slot_ack = 1;
     config->avc444_ffmpeg_wire_window = XRDP_GFX_WIRE_WINDOW_DEFAULT;
     /* BACKLOG #92: OFF by default -- the aux view is sent on every
@@ -553,7 +542,7 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                  * loud. Parsing is unaffected -- an existing gfx.toml
                  * still loads, with this one line in the log. */
                 TCLOG(LOG_LEVEL_WARNING, "avc444_ffmpeg emit_thread was "
-                      "removed (BACKLOG #100): the EGFX assembly always "
+                      "removed: the EGFX assembly always "
                       "runs on the encoder worker. The key is ignored; "
                       "delete it from gfx.toml");
             }
@@ -1005,4 +994,3 @@ tconfig_load_gfx(const char *filename, struct xrdp_tconfig_gfx *config)
 
     return rv;
 }
-

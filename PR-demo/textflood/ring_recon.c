@@ -505,7 +505,7 @@ main(int argc, char **argv)
            "of %d px), corpus %d lines, step %d lines, frame %.1f MB\n",
            width, height, rows, line_height, rows_banded, line_px,
            cp.nlines, DEF_STEP, frame_bytes / 1048576.0);
-    printf("FR-BENCH-1 floor: 2 x %.1f pipeline fps = %.1f fps "
+    printf("Producer floor: 2 x %.1f pipeline fps = %.1f fps "
            "(<= %.2f ms/frame); pipeline period %.3f ms\n\n",
            PIPELINE_FPS, REQUIRED_FPS, 1000.0 / REQUIRED_FPS, PIPELINE_MS);
 

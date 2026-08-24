@@ -1,79 +1,45 @@
 [codec]
 order = [ "H.264", "RFX" ]
 
-# Specify a preferred H.264 encoder: "x264", "OpenH264", or "ffmpeg".
-# This parameter takes effect only when more than one encoder is
-# enabled at compile time. If only one encoder is enabled, the encoder
-# will be used regardless the value of this parameter.
-#
-# "ffmpeg" selects the external stock-ffmpeg AVC444/AVC420 backend (no linked
-# codec library). It encodes MS-RDPEGFX AVC444 v2 (0x000F) / AVC420 (0x000B)
-# via a stock `ffmpeg` child, and needs the matching xorgxrdp (>= the
-# CC_GFX_AVC444 capture) installed. See `man 5 gfx.toml` for the full contract.
+# Select "x264", "OpenH264", or "ffmpeg". This matters only when more than
+# one encoder was enabled at build time. The external ffmpeg backend requires
+# xorgxrdp from the same paired release. See gfx.toml(5) for the full contract.
 h264_encoder = "x264"
 
 # -----------------------------------------------------------------------------
-# External stock-ffmpeg AVC444/AVC420 backend. Uncomment [avc444_ffmpeg] AND set
-# h264_encoder = "ffmpeg" above to enable it. The encoder line (-c:v + tuning)
-# is passed verbatim to ffmpeg, so any encoder ffmpeg has works with no xrdp
-# change. The block below is the software (libx264) default; a hardware (VAAPI)
-# example follows.
+# External ffmpeg AVC444/AVC420 backend. To enable it, uncomment the table and
+# set h264_encoder = "ffmpeg" above. Changes take effect at the next login.
+# Defaults are shown explicitly; leave sparse chroma disabled unless its
+# documented bandwidth/quality tradeoff is acceptable for the deployment.
 # -----------------------------------------------------------------------------
-# NOTE: changes to this block take effect at the next fresh LOGIN
-# (logoff -> login), not on disconnect/reconnect to an existing session.
 # [avc444_ffmpeg]
 # path = "/usr/bin/ffmpeg"
-# # avc_mode: "auto" (recommended: prefer AVC444v2, use AVC444v1 only for a
-# # v1-only advertised capability, else AVC420) | "444" | "420" (force 420,
-# # e.g. to exercise 420 on mstsc, which advertises AVC444) | "444v1" (legacy
-# # interoperability/diagnostic: pin codec id 0x000E even for a v2-capable
-# # client). Forced v1 is not recommended for general deployment: the
-# # qualified macOS client rendered one-pixel red/blue detail incorrectly.
-# # Default auto.
+# # auto is recommended. Forced 444v1 is for legacy interoperability only;
+# # qualified macOS clients may render fine chroma detail incorrectly.
 # avc_mode = "auto"
-# # dump_extra: STATIC in-band parameter-set policy; set it to match the
-# # encoder chosen in encoder_args (default false).
-# #   false: the encoder itself repeats SPS/PPS in-band on every keyframe
-# #          (libx264 with repeat-headers=1, h264_vaapi).
-# #   true:  the encoder emits parameter sets only as global extradata
-# #          (h264_nvenc); the dump_extra bitstream filter reinserts them.
-# # The pre-connect verification refuses the AVC candidate LOUDLY when the
-# # declared value does not match the encoder's real bitstream (missing or
-# # duplicated SPS -- duplicates black out strict decoders such as the macOS
-# # Windows App). The value is never adapted at runtime.
+# chroma_align = 32
+# # Set dump_extra=true only for an encoder such as h264_nvenc which keeps
+# # SPS/PPS in global extradata. The connection probe rejects a mismatch.
 # dump_extra = false
-# # tail_flush: legacy backstop, off by default and normally unnecessary. The
-# # historical "last frame withheld until next input" lag was a runner bug
-# # (stale content emitted under the current damage region) fixed by the now-
-# # synchronous encode; nothing is left in flight, so this drain no-ops. The
-# # synchronous encode needs a zero-latency encoder pipeline (libx264
-# # -tune zerolatency, or h264_vaapi -async_depth 1); a deeper pipeline fails
-# # loudly at encode instead of lagging silently. Performance trace is a
-# # compile-time opt-in (`configure --enable-perf-trace`). Set
-# # XRDP_PERF_TRACE=<private-prefix> to arm its mode-0600 text sink and
-# # XRDP_GFX_TRACE=1 to select graphics events. Records are written to
-# # <private-prefix>.<xrdp-pid>, never to the normal log. The prefix directory
-# # must be administrator-owned and writable by xrdp's runtime user.
-# tail_flush = false
-# # wire_window: how far the client may fall behind, in frames, before the
-# # server stops capturing new ones. Default 1, range 1-64; a value outside
-# # the range is refused with a warning and the default kept.
-# #
-# # 1 allows exactly what xrdp allowed before this backend existed, so an
-# # upgrade that changes nothing here puts no more frames on the wire than
-# # it did before. 2 permits one additional client frame, which may improve
-# # overlap but costs more queued memory and one more frame between an
-# # action and seeing it. See `man 5 gfx.toml` for the multi-monitor
-# # arithmetic, which is
-# # NOT what it looks like: the window counts monitor-frames, not desktop
-# # refreshes, so adding a screen divides the headroom rather than
-# # duplicating it.
-# wire_window = 1
-# # eager_slot_ack: tell the X server a capture buffer is free as soon as
-# # the encoder has drained it, rather than when the frame's last byte has
-# # reached the network. Default true; false restores the older rule.
-# # wire_window has no effect when this is false.
+# strip_sei = false
+# sanitize_hrd = false
+# strip_pic_struct = false
+# # The long-term-reference path is required by eager acknowledgement and
+# # sparse chroma. Its refresh and re-key defaults are shown below.
+# aux_ltr_chain = false
+# intra_refresh_frames = 250
+# # Omit intra_refresh_frames_aux to follow the main interval.
+# ltr_rekey_frame_num = 65024
+# ltr_rekey_surface_reset = false
 # eager_slot_ack = true
+# wire_window = 1
+# # Zero keeps full chroma on every AVC444 frame. Nonzero refresh/idle enables
+# # sparse chroma and requires aux_ltr_chain=true. During recurrent damage,
+# # fine chroma may visibly alternate between 4:2:0 and 4:4:4; after damage
+# # stops, the final surface is restored to full chroma.
+# chroma_refresh_ms = 0
+# chroma_idle_ms = 0
+# # The default software encoder is a one-input/one-output low-latency pipe.
 # encoder_args = [
 #   "-c:v", "libx264",
 #   "-bf", "0",
@@ -84,10 +50,7 @@ h264_encoder = "x264"
 #   "-x264-params", "repeat-headers=1",
 # ]
 #
-# Hardware H.264 via VAAPI (Intel/AMD render node). ffmpeg runs as root under
-# xrdp so it can open the render node; frames arrive as system-memory NV12 and
-# are uploaded to the GPU (-vf format=nv12,hwupload) before h264_vaapi. Replace
-# the encoder_args above with:
+# VAAPI example (Intel/AMD render node). Replace encoder_args above with:
 # encoder_args = [
 #   "-vaapi_device", "/dev/dri/renderD128",
 #   "-vf", "format=nv12,hwupload",
@@ -96,9 +59,8 @@ h264_encoder = "x264"
 #   "-bf", "0", "-async_depth", "1",
 # ]
 #
-# Hardware H.264 via NVENC (NVIDIA). Tested: Tesla T4, driver 580.159.03,
-# Ubuntu ffmpeg 8.0.1, 2026-07-26. h264_nvenc keeps SPS/PPS in global
-# extradata only, so dump_extra = true is REQUIRED with these args:
+# NVENC example (NVIDIA). h264_nvenc keeps SPS/PPS in global extradata, so
+# dump_extra=true is required with these arguments:
 # dump_extra = true
 # encoder_args = [
 #   "-c:v", "h264_nvenc", "-preset", "p1", "-tune", "ll",

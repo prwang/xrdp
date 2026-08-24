@@ -1472,12 +1472,12 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             }
             if (self->avc444_chroma_refresh_ms > 0)
             {
-                LOG(LOG_LEVEL_INFO, "gfx.toml chroma_refresh_ms is ON "
-                    "(BACKLOG #92): the AVC444 aux (chroma) view is sent "
-                    "when the screen settles and at least every %d ms "
-                    "whatever it is doing; settle threshold %d ms",
-                    self->avc444_chroma_refresh_ms,
-                    self->avc444_chroma_idle_ms);
+                LOG(LOG_LEVEL_INFO, "gfx.toml sparse chroma is ON: the "
+                    "AVC444 auxiliary view is sent after %d ms without "
+                    "damage, and on the first damaged frame at or after "
+                    "each %d ms motion interval",
+                    self->avc444_chroma_idle_ms,
+                    self->avc444_chroma_refresh_ms);
             }
             self->avc444_ltr_rekey_surface_reset =
                 self->wm->gfx_config->avc444_ffmpeg_ltr_rekey_surface_reset;
@@ -1501,16 +1501,16 @@ xrdp_mm_egfx_caps_advertise(void *user, int caps_count,
             }
             if (self->avc444_eager_slot_ack)
             {
-                LOG(LOG_LEVEL_INFO, "gfx.toml eager_slot_ack is ON "
-                    "(BACKLOG #70): the capture slot is released when the "
+                LOG(LOG_LEVEL_INFO, "gfx.toml eager_slot_ack is ON: the "
+                    "capture slot is released when the "
                     "encoder children have absorbed the frame and the "
                     "previous frame has left for the transport");
             }
             if (self->avc444_aux_ltr_chain)
             {
-                LOG(LOG_LEVEL_WARNING, "gfx.toml aux_ltr_chain is ON: "
-                    "EXPERIMENTAL FR-H264-8 aux-refs-aux via long-term "
-                    "reference slots (leaf architecture bypassed); "
+                LOG(LOG_LEVEL_INFO, "gfx.toml aux_ltr_chain is ON: "
+                    "the main and auxiliary views use independent "
+                    "long-term reference slots; "
                     "scheduled intra refresh every %d main pictures and "
                     "every %d aux pictures, re-key at frame_num %d",
                     self->avc444_intra_refresh_frames,

@@ -328,7 +328,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         {
             LOG(LOG_LEVEL_WARNING, "xrdp_encoder_create: gfx.toml "
                 "tail_flush is inert under the splicable-capture "
-                "contract (FR-PROC-6) and is ignored");
+                "path and is ignored");
         }
     }
     else if (mm->avc420_ffmpeg)
@@ -362,7 +362,7 @@ xrdp_encoder_create(struct xrdp_mm *mm)
         {
             LOG(LOG_LEVEL_WARNING, "xrdp_encoder_create: gfx.toml "
                 "tail_flush is inert under the splicable-capture "
-                "contract (FR-PROC-6) and is ignored");
+                "path and is ignored");
         }
     }
 #if defined(XRDP_X264) || defined(XRDP_OPENH264)

@@ -47,13 +47,14 @@ EXTRA_DIST = \
   gfx/gfx_avc444_wire_window_bad.toml \
   gfx/gfx_avc444_removed_emit_thread.toml \
   gfx/fake_encoder_hang.sh \
+  check_operator_surface.sh \
   avc444/fixture_4frame.nut \
   avc444/PROVENANCE.md \
   avc444/repro_ffmpeg_latency.py \
   avc444/FINDINGS_ffmpeg_latency.md \
   avc444/FINDINGS_magenta_burr.md
 
-TESTS = test_xrdp
+TESTS = test_xrdp check_operator_surface.sh
 check_PROGRAMS = test_xrdp
 
 test_xrdp_SOURCES = \

@@ -1153,7 +1153,7 @@ run_selftest(const struct corpus *cp, int width, int height,
         double margin;
 
         margin = pipeline_ms / mean;
-        printf("\nFR-BENCH-1 against a %.3f ms pipeline period "
+        printf("\nProducer capacity against a %.3f ms pipeline period "
                "(%.1f sends/s):\n", pipeline_ms, 1000.0 / pipeline_ms);
         printf("  producer margin      %.2fx  %s\n", margin,
                margin >= 2.0 ? "(>= 2.0x floor)" : "(BELOW the 2.0x "
@@ -1209,9 +1209,9 @@ usage(void)
            "  --size N        font size in px (default %.0f)\n"
            "  --scroll MODE   full (default; the historical redraw, and\n"
            "                  what every archived capture was measured\n"
-           "                  with) or strip (BACKLOG #83 design B:\n"
-           "                  memmove the frame up, render only the\n"
-           "                  newly exposed bottom strip)\n"
+           "                  with) or strip (move existing pixels up,\n"
+           "                  then render only the newly exposed bottom\n"
+           "                  strip)\n"
            "  --step N        lines advanced per frame in live full mode\n"
            "                  when no rate is requested (default %d)\n"
            "  --lines-per-sec R  live content speed in either scroll mode\n"
@@ -1222,7 +1222,7 @@ usage(void)
            "  --frames N      freeze after N live frames until Escape or q;\n"
            "                  limits and exits an offline selftest\n"
            "  --stamps PATH   per-frame timing tsv (default %s;\n"
-           "                  FR-BENCH-1 producer telemetry)\n"
+           "                  producer timing telemetry)\n"
            "  --managed       let the window manager place the window\n"
            "                  (default: override-redirect, full root)\n"
            "  --monitor N     render only RandR output N (default:\n"
@@ -1231,8 +1231,7 @@ usage(void)
            "\n"
            "  offline, no X server and no session:\n"
            "  --selftest      measure this payload's own frame rate and\n"
-           "                  print the FR-BENCH-1 margin (required by\n"
-           "                  PRD FR-BENCH-1)\n"
+           "                  print its margin over --pipeline-ms\n"
            "  --verify N      render N frames down BOTH scroll paths and\n"
            "                  compare byte for byte; non-zero exit on\n"
            "                  the first differing pixel\n"

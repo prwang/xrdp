@@ -252,3 +252,53 @@ pairing and full-chroma convergence after actual quiescence. Scope A1 proved
 the last of these. Scope B now measures whether the opt-in mode provides enough
 byte or throughput value to justify retaining it; insufficient value withdraws
 the sparse slice instead of reopening semantic heuristics.
+
+## 2026-08-24 Scope A3 — operator surface and numerical plan
+
+The preceding Scope B plan fixed `wire_window=2` and compared only dense and
+sparse chroma. That plan could measure the sparse effect at one nondefault
+window, but could not qualify the shipped `wire_window=1`, show what widening
+the operator knob changes, or distinguish a sparse effect from an interaction
+with the wider window. It is retired before any hardware time is spent.
+
+The replacement is a repeated 2-by-2 comparison:
+
+| condition | wire window | chroma policy |
+|---|---:|---|
+| A | 1 | dense: refresh 0 ms, idle 0 ms |
+| B | 1 | sparse: refresh 1000 ms, idle 100 ms |
+| C | 2 | dense: refresh 0 ms, idle 0 ms |
+| D | 2 | sparse: refresh 1000 ms, idle 100 ms |
+
+Eight 20-second legs run in `A B C D D C B A` order, giving two repetitions
+per cell and balancing simple time drift. The comparisons are sparse versus
+dense at each window, window 2 versus 1 under each chroma policy, and their
+interaction. A window effect is admissible only if the trace proves that the
+wider leg reached a credit or lag state the one-frame window could not admit;
+otherwise the result is “wider window not exercised at this RTT/load.” Every
+sparse leg must independently show both auxiliary omission and restoration.
+
+The operator-surface audit found no literal internal label in the installed
+template, but the template omitted the sparse controls and several other
+supported settings, advertised inert `tail_flush`, and mixed current defaults
+with historical explanation. The manual used the wrong section number,
+omitted supported controls and the external encoder selector, and repeated a
+wire-window performance claim whose synchronous producer instrumentation was
+voided by #121. Runtime messages and benchmark help also exposed backlog and
+internal requirement identifiers.
+
+Scope A3 replaces those surfaces with operator-facing descriptions. The
+template now shows the dense default, sparse dependency and quality tradeoff,
+and no longer advertises `tail_flush`. The manual is section 5 and documents
+the external ffmpeg controls, including sparse intervals and their limitation.
+The active T4 profile, runtime messages and benchmark output use behavior names
+instead of project archaeology. Historical capture records and source comments
+remain unchanged where they are evidence rather than operator output.
+
+`tests/xrdp/check_operator_surface.sh` is a normal TAP test. It rejects
+internal work labels on the installed template, manual source, active T4
+profile, compiled xrdp runtime strings and textflood help; checks that the
+principal paired-reference, credit and sparse keys exist in both template and
+manual; and rejects an advertised `tail_flush` assignment. The manual renders
+without groff errors, the helper builds and its offline selftest passes, and
+the full configured `make check` result is 212/212 PASS.

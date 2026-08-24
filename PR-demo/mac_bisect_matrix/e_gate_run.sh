@@ -245,7 +245,7 @@ fi
 echo "target=$TARGET server=$SRV_NAME arm=$ARM port=$PORT mode=$MODE" \
      "user=$SU secs=$SECS out=$OUT"
 [ -n "$FREEZE_AT" ] && echo "LEG: FREEZE LEG — the client will be STOPPED" \
-    "${FREEZE_AT}s into the ${SECS}s leg (BACKLOG #80)"
+    "${FREEZE_AT}s into the ${SECS}s leg"
 
 # Record WHAT is deployed before measuring it: a gate result against an
 # unknown build is not a gate result.
@@ -744,7 +744,7 @@ numbers."
     echo "trace span: ${SPAN:-?}s for a ${SECS}s run"
 else
     echo "RED: no perf ring file under $PERF_DIR on $SRV_NAME —" \
-         "is XRDP_PERF_TRACE set for this arm? Since #61h the per-frame" \
+         "is XRDP_PERF_TRACE set for this arm? The per-frame" \
          "trace lives ONLY there, so E5/E4 will read an empty trace" >&2
     EVIDENCE_ERROR="no perf ring file was collected"
     : > "$OUT/gfx_trace.txt"
@@ -772,14 +772,14 @@ srv_cat "$STAMPS" > "$PRODSTAMPS" 2>/dev/null
 if [ ! -s "$PRODSTAMPS" ]; then
     rm -f "$PRODSTAMPS"
     PRODSTAMPS=
-    echo "no producer stamps at $STAMPS on $SRV_NAME — the FR-BENCH-1" \
+    echo "no producer stamps at $STAMPS on $SRV_NAME — the producer" \
          "margin will read NOT MEASURED (expected unless the payload is" \
          "textflood)"
 fi
 
 # --- the report ----------------------------------------------------------
 {
-    echo "=== #45 gate run: $ARM, $MODE client, ${SECS}s\
+    echo "=== performance gate run: $ARM, $MODE client, ${SECS}s\
 ${FREEZE_AT:+, FREEZE LEG at +${FREEZE_AT}s} ==="
     echo "image:    $(cat "$OUT/deployed_image.txt")"
     grep -E "xrdp-dev|xorgxrdp-dev" "$OUT/deployed_packages.txt" \
@@ -796,12 +796,12 @@ $(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
     # is stated here, above every number it contaminates.
     if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
         echo "pipe:     *** ENCODER INPUT PIPE TOO SMALL — THIS RUN IS"
-        echo "          NOT A VALID MEASUREMENT (BACKLOG #103) ***"
+        echo "          NOT A VALID MEASUREMENT (input pipe too small) ***"
         echo "          An encoder child got an input pipe below the"
         echo "          64 KiB minimum xrdp requires, $PIPE_N times."
         echo "          The pipe cannot then hold enough for xrdp and"
         echo "          the encoder to run at the same time, so they"
-        echo "          take turns; the standalone #103 reproducer measured"
+        echo "          take turns; the standalone pipe reproducer measured"
         echo "          5.84 ms per 13.8 MB picture. Every rate is then"
         echo "          depressed by an amount that has nothing to do"
         echo "          with the build or the config under test."
@@ -817,7 +817,7 @@ $(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
     # A freeze leg must never be readable as an ordinary one. Say so here,
     # in the VERDICT, above every number it contaminates.
     if [ -n "$FREEZE_AT" ]; then
-        echo "leg:      *** FREEZE LEG (BACKLOG #80) ***  the client"
+        echo "leg:      *** CLIENT-FREEZE DIAGNOSTIC ***  the client"
         echo "          process group was SIGSTOPped ${FREEZE_AT}s into"
         echo "          this ${SECS}s leg and resumed only at teardown."
         echo "          A stopped client stops READING the socket as well"
@@ -888,7 +888,7 @@ if len(t) < 3:
 inversions = sum(1 for a, b in zip(t, t[1:]) if b < a)
 if inversions:
     print("WARNING: %d of %d send stamps go BACKWARDS in file order — this "
-          "build predates the #52 step-0 log clock fix; percentiles below "
+          "build predates the log timestamp fix; percentiles below "
           "are unreliable (means are not)" % (inversions, len(t) - 1))
     t.sort()
 span = t[-1] - t[0]
@@ -978,7 +978,7 @@ if len(prod) >= 3:
     if prod_note:
         print("         NOTE: %s" % prod_note)
     margin = mean / pmean
-    print("FR-BENCH-1 margin = pipeline mean %.1f ms / producer mean "
+    print("producer margin = pipeline mean %.1f ms / producer mean "
           "%.1f ms = %.2fx" % (mean, pmean, margin))
     # THREE STATES, and never a run-failing one (owner directive,
     # 2026-08-06). The 2.0x floor stays a hard gate for claims that two
@@ -1005,7 +1005,7 @@ if len(prod) >= 3:
               % (margin, margin))
 else:
     print("producer frame interval: NOT MEASURED — no benchmark payload "
-          "stamps were collected, so the FR-BENCH-1 margin is unknown for "
+          "stamps were collected, so the producer margin is unknown for "
           "this run.")
     print("         This is neither a pass nor a fail. Without it nothing "
           "here can say whether the pipeline or the payload was the "
@@ -1068,11 +1068,11 @@ if per_surf:
                   % len(counts))
         else:
             print("         one monitor, one surface — this is the "
-                  "single-monitor control (BACKLOG #64)")
+                  "single-monitor control")
     elif len(counts) < 2 or hi > 3 * max(1, lo):
         print("         COVERAGE WARNING: one monitor carried the run "
               "(%d vs %d). This is the one-active-one-idle regime "
-              "(BACKLOG #53), NOT two-monitor batching — an E5 ratio from "
+              "not two-monitor batching — an E5 ratio from "
               "it is not an E5-2 result." % (hi, lo))
     else:
         print("         both monitors inked (worst imbalance %.2fx) — "
@@ -1230,7 +1230,7 @@ fi
 # next leg. A red result stays red.
 if [ "${PIPE_N:-0}" -gt 0 ] 2>/dev/null; then
     echo "EXIT NONZERO: the encoder input pipe was clamped; this run is" \
-         "not a valid measurement (BACKLOG #103). See the pipe: banner" \
+         "not a valid measurement. See the pipe-size banner" \
          "in $OUT/VERDICT.txt for the owner action." >&2
     exit 3
 fi

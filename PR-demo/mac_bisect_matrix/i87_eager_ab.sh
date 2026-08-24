@@ -85,7 +85,7 @@ run_leg()
         tail -15 "$legout/gate.txt"
         fail "leg $leg: gate run failed (rc=$rc)"
     fi
-    grep -aE "^sends:|send-to-send|FR-BENCH-1 margin" "$legout/gate.txt" \
+    grep -aE "^sends:|send-to-send|producer margin" "$legout/gate.txt" \
         | sed 's/^/   /'
 }
 
