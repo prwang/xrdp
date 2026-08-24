@@ -131,7 +131,7 @@ SSH_HOST=${E_SSH_HOST:-$(cat /root/.t4_host 2>/dev/null || true)}
 SSH_KEY=${E_SSH_KEY:-/root/.ssh/tmp_access_T4}
 if [ "$TARGET" = ssh ]; then
     SU=${E_USER:-ubuntu}
-    CRED=${E_CRED_FILE:-/root/.t4_rdp_cred}
+    CRED=${E_CRED_FILE:-/root/.ubuntu_cred}
 else
     SU=${E_USER:-probe444}
     CRED=${E_CRED_FILE:-/root/.oracle_cred}
@@ -241,7 +241,14 @@ else
     SRV_NAME=$POD
 fi
 
-[ -s "$CRED" ] || fail "no RDP credential at $CRED"
+if [ "$TARGET" = ssh ]; then
+    CRED_META=$(srv "sudo stat -c '%a %U:%G' '$CRED' 2>/dev/null" \
+                | tr -d '\r')
+    [ "$CRED_META" = "600 root:root" ] || fail "the remote RDP credential \
+$CRED must exist as mode 600 root:root; got '${CRED_META:-missing}'"
+else
+    [ -s "$CRED" ] || fail "no RDP credential at $CRED"
+fi
 echo "target=$TARGET server=$SRV_NAME arm=$ARM port=$PORT mode=$MODE" \
      "user=$SU secs=$SECS out=$OUT"
 [ -n "$FREEZE_AT" ] && echo "LEG: FREEZE LEG — the client will be STOPPED" \
@@ -460,10 +467,39 @@ fi
 # pkill/relaunch individual GUI processes inside a live session. E_COLD=0
 # measures an existing session on purpose.
 if [ "${E_COLD:-1}" = 1 ]; then
-    srv "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
-        >/dev/null 2>&1
-    srv "for i in \$(seq 1 25); do pgrep -u $SU -x Xorg >/dev/null \
-         || break; sleep 1; done" >/dev/null 2>&1
+    if [ "$TARGET" = ssh ]; then
+        srv "for session in \$(loginctl list-sessions --no-legend | \
+             awk '{print \$1}'); do \
+             [ \"\$(loginctl show-session \"\$session\" -p Name \
+                    --value)\" = '$SU' ] || continue; \
+             [ \"\$(loginctl show-session \"\$session\" -p Type \
+                    --value)\" = x11 ] || continue; \
+             sudo loginctl terminate-session \"\$session\"; done" \
+            >/dev/null 2>&1
+        srv "for i in \$(seq 1 25); do \
+             found=0; \
+             for session in \$(loginctl list-sessions --no-legend | \
+                  awk '{print \$1}'); do \
+                 [ \"\$(loginctl show-session \"\$session\" -p Name \
+                        --value)\" = '$SU' ] || continue; \
+                 [ \"\$(loginctl show-session \"\$session\" -p Type \
+                        --value)\" = x11 ] && found=1; \
+             done; \
+             [ \"\$found\" = 0 ] && break; sleep 1; done" \
+            >/dev/null 2>&1
+    else
+        srv "xpid=\$(pgrep -u '$SU' -x Xorg | head -1); \
+             [ -n \"\$xpid\" ] || exit 0; \
+             command -v xfce4-session-logout >/dev/null || exit 4; \
+             args=\$(tr '\\0' ' ' < /proc/\$xpid/cmdline); \
+             display=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE ' :[0-9]+ ' | head -1 | tr -d ' '); \
+             auth=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE -- '-auth [^ ]+' | head -1 | cut -d' ' -f2); \
+             su -s /bin/sh '$SU' -c \"DISPLAY=\$display \
+                 XAUTHORITY=\$auth xfce4-session-logout --logout\"" \
+            >/dev/null 2>&1 || fail "$ARM cannot log its whole session off"
+    fi
     # ...AND THEN WAIT FOR SESMAN TO FINISH THE TEARDOWN. The Xorg
     # process disappearing is not the end of the session: sesman still
     # has to reap the window manager and the channel server and retire
@@ -484,7 +520,12 @@ if [ "${E_COLD:-1}" = 1 ]; then
          || break; sleep 1; done" >/dev/null 2>&1
     sleep 3
 fi
-PW=$(cat "$CRED")
+if [ "$TARGET" = ssh ]; then
+    PW=$(srv "sudo cat '$CRED'")
+else
+    PW=$(cat "$CRED")
+fi
+[ -n "$PW" ] || fail "RDP credential is empty"
 if [ "$NMON" -eq 2 ]; then
     RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" \
                             "/multimon" \
@@ -572,7 +613,8 @@ echo "connected; recording for ${SECS}s ..."
 # runs has all three in it -- so it needs the same windowing xrdp.log
 # already gets from MARK_P. Without it a 60 s run on a 45-minute-old pod
 # reported "2629 sends over 2713.5 s" (2026-08-01).
-RUN_T0=$(date +%s)
+RUN_T0_NS=$(date +%s%N)
+RUN_T0=$((RUN_T0_NS / 1000000000))
 if [ -n "$FREEZE_AT" ]; then
     # `sleep N & wait` and not a plain `sleep N`. While bash is waiting on
     # a FOREGROUND child it defers a trapped signal until that child
@@ -625,7 +667,14 @@ print('               server is a local pod (E_TARGET=pod).')
 else
     sleep "$SECS"
 fi
-RUN_T1=$(date +%s)
+RUN_T1_NS=$(date +%s%N)
+RUN_T1=$((RUN_T1_NS / 1000000000))
+{
+    echo "start_epoch $RUN_T0"
+    echo "end_epoch $RUN_T1"
+    echo "start_epoch_ns $RUN_T0_NS"
+    echo "end_epoch_ns $RUN_T1_NS"
+} > "$OUT/measurement_window.txt"
 # SIGCONT before the teardown kill so a frozen group is running when it
 # is reaped; a no-op on an ordinary leg, where nothing was stopped.
 [ -n "$FREEZE_AT" ] && kill -CONT -- -"$CLIENT_PGID" 2>/dev/null
@@ -1202,8 +1251,28 @@ fi
 # a live session. E_KEEP_SESSION=1 keeps it, for when the next step is
 # eyeballing the same session onscreen.
 if [ "${E_KEEP_SESSION:-0}" != 1 ]; then
-    srv "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
-        >/dev/null 2>&1
+    if [ "$TARGET" = ssh ]; then
+        srv "for session in \$(loginctl list-sessions --no-legend | \
+             awk '{print \$1}'); do \
+             [ \"\$(loginctl show-session \"\$session\" -p Name \
+                    --value)\" = '$SU' ] || continue; \
+             [ \"\$(loginctl show-session \"\$session\" -p Type \
+                    --value)\" = x11 ] || continue; \
+             sudo loginctl terminate-session \"\$session\"; done" \
+            >/dev/null 2>&1
+    else
+        srv "xpid=\$(pgrep -u '$SU' -x Xorg | head -1); \
+             [ -n \"\$xpid\" ] || exit 0; \
+             command -v xfce4-session-logout >/dev/null || exit 4; \
+             args=\$(tr '\\0' ' ' < /proc/\$xpid/cmdline); \
+             display=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE ' :[0-9]+ ' | head -1 | tr -d ' '); \
+             auth=\$(printf '%s\\n' \"\$args\" | \
+                 grep -oE -- '-auth [^ ]+' | head -1 | cut -d' ' -f2); \
+             su -s /bin/sh '$SU' -c \"DISPLAY=\$display \
+                 XAUTHORITY=\$auth xfce4-session-logout --logout\"" \
+            >/dev/null 2>&1 || fail "$ARM cannot log its whole session off"
+    fi
     srv "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
          || break; sleep 1; done" >/dev/null 2>&1
     left=$(srv "pgrep -c -u $SU -x Xorg 2>/dev/null || true" \

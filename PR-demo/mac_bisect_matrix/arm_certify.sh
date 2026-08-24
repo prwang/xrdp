@@ -176,8 +176,17 @@ kill -TERM "$XPID" 2>/dev/null
 # to log the WHOLE session off, never to pkill individual GUI processes
 # in a live session (CLAUDE.md GUI lifecycle).
 kubectl -n "$NS" exec "$POD" -- bash -lc \
-    "pkill -TERM -u $SU -x xterm; pkill -TERM -u $SU Xorg" \
-    >/dev/null 2>&1
+    "xpid=\$(pgrep -u '$SU' -x Xorg | head -1); \
+     [ -n \"\$xpid\" ] || exit 0; \
+     command -v xfce4-session-logout >/dev/null || exit 4; \
+     args=\$(tr '\\0' ' ' < /proc/\$xpid/cmdline); \
+     display=\$(printf '%s\\n' \"\$args\" | \
+         grep -oE ' :[0-9]+ ' | head -1 | tr -d ' '); \
+     auth=\$(printf '%s\\n' \"\$args\" | \
+         grep -oE -- '-auth [^ ]+' | head -1 | cut -d' ' -f2); \
+     su -s /bin/sh '$SU' -c \"DISPLAY=\$display XAUTHORITY=\$auth \
+         xfce4-session-logout --logout\"" >/dev/null 2>&1 || \
+    fail "$ARM cannot log its whole session off"
 kubectl -n "$NS" exec "$POD" -- bash -lc \
     "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
      || break; sleep 1; done" >/dev/null 2>&1

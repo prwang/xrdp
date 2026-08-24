@@ -1,0 +1,78 @@
+#!/bin/sh
+
+# Select one of the installed T4 numerical-characterization profiles. A
+# profile is a fresh-session contract, so changing it while an RDP desktop is
+# alive is refused.
+
+set -eu
+
+profile_dir=/root/xrdp-benchmark-profiles
+live_config=/etc/xrdp/gfx.toml
+
+usage()
+{
+    echo "usage: $0 {status|dense-w1|sparse-w1|dense-w2|sparse-w2}" >&2
+    exit 2
+}
+
+find_x11_session()
+{
+    for session in $(loginctl list-sessions --no-legend 2>/dev/null |
+                     awk '{print $1}')
+    do
+        if [ "$(loginctl show-session "$session" -p Name --value)" = \
+                "ubuntu" ] &&
+                [ "$(loginctl show-session "$session" -p Type --value)" = \
+                "x11" ]
+        then
+            echo "$session"
+            return 0
+        fi
+    done
+    return 1
+}
+
+show_status()
+{
+    echo "xrdp service: $(systemctl is-active xrdp 2>/dev/null || true)"
+    echo "active graphics settings:"
+    sed -n \
+        -e '/^avc_mode[[:space:]]*=/p' \
+        -e '/^aux_ltr_chain[[:space:]]*=/p' \
+        -e '/^eager_slot_ack[[:space:]]*=/p' \
+        -e '/^wire_window[[:space:]]*=/p' \
+        -e '/^chroma_refresh_ms[[:space:]]*=/p' \
+        -e '/^chroma_idle_ms[[:space:]]*=/p' \
+        "$live_config"
+}
+
+[ "$#" -eq 1 ] || usage
+
+case "$1" in
+    status)
+        show_status
+        exit 0
+        ;;
+    dense-w1|sparse-w1|dense-w2|sparse-w2)
+        source_config=$profile_dir/$1.toml
+        ;;
+    *)
+        usage
+        ;;
+esac
+
+x11_session=$(find_x11_session || true)
+if [ -n "$x11_session" ]
+then
+    echo "refusing profile change: ubuntu X11 session $x11_session exists" >&2
+    echo "log out that desktop, then run this command again" >&2
+    exit 3
+fi
+
+test -f "$source_config"
+install -m 0644 "$source_config" "$live_config"
+systemctl restart xrdp
+systemctl is-active --quiet xrdp
+
+echo "installed profile: $1"
+show_status

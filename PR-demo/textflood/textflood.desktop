@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Text throughput payload
+Comment=Starts the full-screen text renderer at desktop login
+Exec=/usr/local/bin/textflood --corpus /usr/local/share/code_corpus.ansi --step 25 --repeat-to-edge
+Terminal=false
+NoDisplay=true
+X-GNOME-Autostart-enabled=true

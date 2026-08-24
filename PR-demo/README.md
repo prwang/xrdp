@@ -37,7 +37,9 @@ realistic payload rather than a diagnostic pattern.
   frame over MIT-SHM, because profiling showed an xterm scroll spends
   44.9 % of the session Xorg's core drawing itself against 13.8 % for the
   whole xrdp capture — i.e. the old payload measured the X server, not us.
-  `ring_recon.c` reconstructs what was actually shown.
+  `ring_recon.c` reconstructs what was actually shown;
+  `textflood.desktop` starts it through the permitted login-time autostart
+  lifecycle for an XFCE measurement session.
 * **`oracle_client/`** — the **timing** client: with `FREERDP_ORACLE_DUMP=1`
   it saves encoded payloads and acknowledges *before* decoding, so the rate
   measured server-side is the server plus network with no client decode in
@@ -79,6 +81,12 @@ realistic payload rather than a diagnostic pattern.
   host drift is bracketed rather than folded in. The analyser checks
   that the feature APPLIED before it will print a rate, and reports the
   chroma guarantee's worst gap as a red result in its own right.
+* **`mac_bisect_matrix/i125b_t4_matrix.sh`** + `i125b_analyze.py` — the
+  repeated T4 numerical matrix for dense versus sparse chroma at one- and
+  two-frame wire windows. It runs the eight named 20-second legs through the
+  oracle client, verifies the treatment from the perf trace before comparing
+  rates, closes command/byte and latency accounting, and leaves the T4 on the
+  sparse two-frame interactive profile.
 * **`mac_bisect_matrix/x264_keyint_probe.c`** — asks libx264 what
   keyframe interval xrdp's linked-library H.264 path actually gets,
   under the presets `gfx.toml` ships. It never sets `i_keyint_max`, so

@@ -19,6 +19,10 @@
   `gfx.toml`, restarts xrdp and reads the effective fields back. It refuses to
   change configuration while an `ubuntu` X11 session exists. The deployment
   installs it as `~/xrdp-profile` for the T4 login user.
+- `t4/xrdp-benchmark-profile` — root-only selector for the dense/sparse by
+  one-/two-frame-window numerical matrix. It installs a complete staged
+  profile, refuses to alter a live X11 desktop, restarts xrdp and prints the
+  effective settings.
 
 Helpers in target subdirectories are deliberately environment-specific. Their
 presence here is an inventory and provenance guarantee, not a claim that the

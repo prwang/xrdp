@@ -1,12 +1,12 @@
 arm:    x038
 mode:   AVC444
 image:  localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3
-gfx:    sha256:a9256c7ec5d3ea53
-key:    localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3|a9256c7ec5d3ea53
-when:   2026-08-23T19:36:58Z
-window: 3s at 1920x1080, 54484 bytes
+gfx:    sha256:f0f03e5beac27b47
+key:    localhost/xrdp-bisect:386ca6951a3d.xx10fa3aa23033-tf-xfce.p0796eea3|f0f03e5beac27b47
+when:   2026-08-24T13:46:15Z
+window: 3s at 1920x1080, 1072554 bytes
 
-=== encoder input pipe (BACKLOG #103) ===
+=== encoder input pipe ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
 after 3s of real encoding, so every encoder child got
 an input pipe of at least the 64 KiB minimum. Above that
@@ -18,34 +18,34 @@ whole of the requirement.
       P slices retargeted to OTHER slot    : 0
       P slices with NO list modification   : 0
       pictures self-marking into LT0      : 2/3
-      avg P size=366B   avg I/IDR size=27532B   inter share of pictures=66.7%
-aux  pictures=3      P(inter)=2      I(intra)=1     IDR=0
-      P slices retargeted to OWN slot LT1 : 2/2
+      avg P size=1585B   avg I/IDR size=383834B   inter share of pictures=66.7%
+aux  pictures=2      P(inter)=1      I(intra)=1     IDR=0
+      P slices retargeted to OWN slot LT1 : 1/1
       P slices retargeted to OTHER slot    : 0
       P slices with NO list modification   : 0
-      pictures self-marking into LT1      : 3/3
-      avg P size=364B   avg I/IDR size=25098B   inter share of pictures=66.7%
+      pictures self-marking into LT1      : 2/2
+      avg P size=32266B   avg I/IDR size=652936B   inter share of pictures=50.0%
 
-merged decode-order frame_num chain: 6 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
+merged decode-order frame_num chain: 5 pictures, 0 gaps (0 = one contiguous chain, as a single decoder requires)
 
 VERDICT: both views are inter-coded from their OWN previous picture (main<-LT0, aux<-LT1); no cross-view prediction.
 
 === ASSERT GATE (BACKLOG #45 step 0) ===
   A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
   A2 intra only on a scheduled index       PASS  unscheduled intra: main [] aux []
-  A3 cuts are paired across views          PASS  main intra ordinals [0] ... aux [0]
+  A3 cuts are paired across views          SKIP  NOT APPLICABLE: sparse aux cadence on the wire -- 2 aux pictures against 3 main (66.7%), so the two views' ordinals are different moments. main intra ordinals [0] ... aux [0]
   A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
   A5 own-slot refs and self-marks          PASS  all pictures conform
   A6 one contiguous frame_num chain        PASS  0 gap(s)
-  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 2 (bound 250) aux 2 (bound 250)
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 2 (bound 250) aux 1 (bound 250)
 
-ASSERT VERDICT: PASS -- 7 checks, all clean
+ASSERT VERDICT: PASS -- 6 checks clean, 1 NOT APPLICABLE to this capture (read the SKIP line above)
 wire audit exit: 0
 
 === black-frame check ===
 cert.bin
-  pictures in capture     : 6
-  frames decoded          : 6
+  pictures in capture     : 5
+  frames decoded          : 5
   black frames (any view) : 0 []
   black MAIN-view frames  : 0 []
   ... mid-stream          : 0 []
@@ -72,7 +72,7 @@ to chase A2-A4 -- that is the 10x tax this file exists to
 remove, and CI already pins the logic byte-exactly.
 
 If A3 reads SKIP above, this arm is running the SPARSE AUX
-cadence (BACKLOG #92): the aux view is sent on only some
+sparse cadence: the auxiliary view is sent on only some
 frames, so the two views hold different numbers of pictures
 and comparing their ordinals is not a check that can pass or
 fail. Owner ruling, 2026-08-08. The audit decides that from
