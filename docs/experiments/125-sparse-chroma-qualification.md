@@ -400,3 +400,54 @@ reduction are sufficient value without inventing content or object heuristics.
 Dense remains the default and quality-preserving choice, the recurrent-damage
 transition limitation remains explicit, and window 1 remains the shipped
 default. #125 is complete.
+
+## 2026-08-24 Scope C — prior completion retracted: CPU leaf probe false green
+
+The owner supplied a log from a separate manually deployed Ubuntu 24.04.4 LTS
+machine using its FFmpeg 6 CPU/libx264 path. The verbatim log and provenance
+notes are retained at
+`PR-demo/mac_bisect_matrix/captures/i125c_ubuntu2404_ffmpeg6_cpu_blackscreen_20260824T142954Z/`.
+This does not invalidate Scope B's T4/LTR measurements. It invalidates the
+claim that #125 had qualified every selectable runtime topology, so #125 is
+reopened and #126 remains blocked.
+
+At 10:29:54.689 -0400, xrdp probed `/usr/bin/ffmpeg` at 2560x1440. One child
+returned four packets in 99 ms and the capability path logged `probe OK` and
+`ffmpeg AVC444 verified OK`. After login, live AVC444 spawned two children,
+announced `aux_intra_leaf active`, and rejected the first leaf rewrite. The
+same deterministic sequence repeated 23 times in the supplied 2.261-second
+failure interval, spawning 46 ffmpeg processes and publishing no pair; the
+client therefore remained black.
+
+The certification and runtime did not run the same mechanism. The capability
+probe starts from `xrdp_ffmpeg_avc444_config_default()`, whose
+`aux_intra_leaf` value is false. It copies the configured `aux_ltr_chain` but
+does not enable the mandatory leaf topology. Later,
+`xrdp_avc444_cfg_from_encoder()` unconditionally enables `aux_intra_leaf` for
+live AVC444. With LTR off, that path spawns a second forced-IDR child and calls
+`xrdp_h264_aux_to_leaf()`; the probe never spawns that child or calls that
+transform. The real-ffmpeg pair test also leaves the leaf flag false, so its
+green result exercises the old single-child alternating pair, not the shipped
+integration.
+
+The black screen and restart storm are separate consequences. Refusing to
+publish a pair after a syntax/topology rewrite rejection is correct fail-loud
+behavior. Returning the same generic pair error as a recoverable child fault
+causes the caller to delete the handle; the next damage lazily recreates it,
+so a static incompatibility becomes an unbounded fork loop. A post-confirm
+child-creation, stream-contract or rewrite failure is terminal for that
+connection and must retain bounded encoded forensics before one teardown. It
+must not retry per damage or switch codec.
+
+The supplied generic error cannot identify the rejected field.
+`xrdp_h264_aux_to_leaf()` collapses incompatible SPS/PPS cache fields,
+unsupported POC/CABAC/scaling/slice structure, a non-IDR auxiliary VCL and
+slice conversion failure into one return code. Scope C therefore requires a
+typed rejection reason plus the first rejected main/aux access units. It is
+not yet established whether the cause is FFmpeg 6 itself, that distribution's
+libx264 build, or its exact encoder arguments.
+
+The T4 did not expose this gap because Scope B set `aux_ltr_chain=true`.
+Both its probe and runtime exercised the LTR rewriters, which take precedence
+over the leaf path. Scope B remains admissible for that configuration, but it
+is not evidence for the default CPU/leaf topology.

@@ -23,7 +23,12 @@ Target files are the auxiliary-leaf functions in
 * S137-R4: input that is not the expected auxiliary IDR, lacks the paired main
   reference VCL, contains unsupported slice structure, or is truncated shall
   fail before output publication.
-* S137-R5: the transform shall be bounded and deterministic. It shall preserve
+* S137-R5: the transform shall return a stable typed rejection reason for
+  incompatible main/aux parameter fields, unsupported slice structure,
+  missing reference VCL, non-IDR auxiliary input, truncation and bounded
+  allocation failure. A caller shall not have to infer a static stream
+  incompatibility from one generic error.
+* S137-R6: the transform shall be bounded and deterministic. It shall preserve
   unrelated NAL units admitted by #131 and shall not rebuild more syntax than
   the topology change requires.
 
@@ -33,5 +38,9 @@ Enable the four `Avc444H264` leaf cases: byte-exact golden transform,
 non-IDR rejection, required-main-reference rejection and truncation. Add two
 independent reference-graph simulations, one for each AVC444 mode, that prove
 no main node has an auxiliary ancestor and no leaf is retained. Run
-`CK_RUN_SUITE=Avc444H264 tests/xrdp/test_xrdp` and the simulations, then the
-README gate.
+`CK_RUN_SUITE=Avc444H264 tests/xrdp/test_xrdp` and the simulations. Add a
+real-ffmpeg integration case which enables the production auxiliary-leaf
+topology, spawns both the ordinary main child and forced-IDR auxiliary child,
+encodes one pair and runs the production transform. A single-child alternating
+pair is not this test. Run it against the supported FFmpeg 6 CPU baseline and
+the repository host ffmpeg, then the README gate.

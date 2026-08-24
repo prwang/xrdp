@@ -58,13 +58,43 @@ history until all retained replays are green.
 
 # Active dependency chain
 
-## #125 — DONE — sparse-chroma client and numerical qualification
+## #125 — IN PROGRESS — client, numerical and runtime qualification
 
-Retain sparse chroma as an opt-in bandwidth/quality tradeoff; dense and a
-one-frame wire window remain shipped defaults. Corrected convergence, the
-documented recurrent-damage limitation, real-client results and the T4 matrix
-are recorded in
+Scopes A/B remain green: retain sparse chroma as an opt-in bandwidth/quality
+tradeoff; dense and a one-frame wire window remain shipped defaults. Scope C
+is now the first open action and blocks #126. The record is
 [`docs/experiments/125-sparse-chroma-qualification.md`](docs/experiments/125-sparse-chroma-qualification.md).
+
+**Scope C — false-green CPU/leaf certification and restart storm.** An owner
+deployment on Ubuntu 24.04.4 LTS with its FFmpeg 6/libx264 path passed
+the pre-confirm behavioral probe at 2560x1440, then every post-login
+`aux_intra_leaf` rewrite failed. No pair was published, the client stayed
+black, and persistent damage caused about ten teardown/recreate cycles per
+second. The probe left `aux_intra_leaf` disabled while live AVC444 forces it
+on, and the real-ffmpeg pair test repeats that single-child mismatch. The
+original log is retained under
+`PR-demo/mac_bisect_matrix/captures/i125c_ubuntu2404_ffmpeg6_cpu_blackscreen_20260824T142954Z/`.
+
+Build exactly one local Ubuntu 24.04.4 arm with the affected FFmpeg 6 CPU
+profile and connect through the repository FreeRDP client at the recorded
+2560x1440 single-monitor geometry. Preserve the first rejected main and
+auxiliary encoded access units, exact argv/version/configuration and a typed
+rewrite reason before teardown; encoded forensics are bounded and mode 0600,
+and raw desktop pixels or credentials are never dumped.
+
+**Acceptance:** the unmodified frontier first reproduces probe-OK followed by
+the leaf rejection and black presentation. The repair probes the exact
+selected topology: an AVC444 leaf candidate spawns the real main and
+forced-IDR auxiliary children, encodes a pair and runs the production leaf
+transform before capability confirmation. An unsupported stream is rejected
+there with a typed reason. Any child-creation, stream-contract or rewrite
+failure which nevertheless occurs after confirmation terminates the affected
+connection/session once, after retaining the bounded forensics; later damage
+cannot spawn another child and no codec fallback masks it. A FreeRDP replay
+then proves either the affected FFmpeg 6 stream is correctly transformed and
+presented or is refused before AVC selection. Real-ffmpeg tests cover the
+actual leaf topology, not the old single-child stand-in, and the corrected
+requirements in PRD slices #137/#142 are green before #125 closes again.
 
 ---
 

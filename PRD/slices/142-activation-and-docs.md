@@ -26,8 +26,13 @@ capability-response seam but shall not introduce a new mechanism there.
 * S142-R1: the backend is opt-in through an `[avc444_ffmpeg]` table and codec
   order. Absence of the table preserves the base behavior exactly.
 * S142-R2: before RDPGFX confirmation, resolve requested mode with #132 and run
-  #133's behavioral probe. Advertise/select only a mode supported by client,
-  configuration and probe. The selected mode is immutable afterward.
+  a behavioral probe of the exact topology which will run after confirmation.
+  AVC420 probes the single main child. AVC444 with the topology from #137
+  probes the ordinary main child, the forced-IDR auxiliary child and the
+  production leaf transform on one pair. AVC444 with #138 enabled probes both
+  LTR rewriters. Advertise/select only a mode supported by client,
+  configuration and that complete probe. The selected mode is immutable
+  afterward.
 * S142-R3: document and validate executable path, bounded encoder argv,
   `avc_mode` (`auto`, forced AVC444, forced v1, forced AVC420),
   `chroma_align` (16 or 32), `dump_extra`, `strip_sei`, `sanitize_hrd`,
@@ -62,8 +67,13 @@ capability-response seam but shall not introduce a new mechanism there.
   `ltr_rekey_surface_reset` defaults false; true is documented only as a
   diagnostic reproduction of the known client-visible surface-churn flash,
   not as the normal wrap-protection mechanism.
-* S142-R7: runtime failure shall not switch codec. It shall preserve damage,
-  tear down children and fail the affected connection/path visibly.
+* S142-R7: runtime failure shall not switch codec. A child-creation,
+  stream-contract or rewrite failure after confirmation is terminal for the
+  affected connection/session: preserve damage, retain one bounded mode-0600
+  forensic bundle containing the exact ffmpeg version/argv, typed reason and
+  rejected encoded access units, tear down the children once and hang up the
+  session. Do not dump raw desktop pixels or credentials. Later damage shall
+  not recreate a child for that connection.
 * S142-R8: the man page and sample config shall state process cardinality,
   required host pipe capacity, security model, resize behavior, multi-monitor
   support, shipped credit values, sparse guarantee, sparse visual limitation
@@ -97,9 +107,11 @@ capability-response seam but shall not introduce a new mechanism there.
 The `GfxLoad` suite shall cover absence, defaults, every override, invalid and
 dependency values, removed-key warning, no excluded keys, codec order and the
 complete config-to-encoder transfer. Capability tests shall prove probe before
-confirmation, immutable choice, no fallback, all client capability versions
-and legacy codec preservation. Resize tests shall prove terminate/reap/new
-reset and no old bytes.
+confirmation with the exact selected topology, immutable choice, no fallback,
+all client capability versions and legacy codec preservation. A deterministic
+post-confirm leaf rejection fixture shall prove one forensic bundle, one
+teardown, session hangup and zero later respawns under repeated damage. Resize
+tests shall prove terminate/reap/new reset and no old bytes.
 
 Run every targeted AVC and PerfTrace suite, full `make check`, astyle and
 cppcheck in default and trace-enabled builds; run the paired xorgxrdp build
