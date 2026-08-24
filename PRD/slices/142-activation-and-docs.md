@@ -9,8 +9,9 @@ already implemented and green.
 Target files are `xrdp/xrdp_tconfig.c`, `xrdp/xrdp_tconfig.h`,
 `xrdp/xrdp_types.h`, `xrdp/xrdp_mm.c`, `xrdp/gfx.toml`,
 `docs/man/gfx.toml.5.in`, `tests/xrdp/test_tconfig.c`,
-`tests/xrdp/test_avc444_ffmpeg.c`, `tests/xrdp/test_xrdp_egfx.c`, and these
-fixtures, all below `tests/xrdp/gfx/`:
+`tests/xrdp/test_avc444_ffmpeg.c`, `tests/xrdp/test_xrdp_egfx.c`,
+`tests/xrdp/check_operator_surface.sh`, and these fixtures, all below
+`tests/xrdp/gfx/`:
 `gfx_avc444_ffmpeg.toml`, `gfx_avc444_empty_args.toml`,
 `gfx_avc444_intra_refresh.toml`, `gfx_avc444_intra_refresh_bad.toml`,
 `gfx_avc444_rekey.toml`, `gfx_avc444_rekey_bad.toml`,
@@ -86,7 +87,10 @@ capability-response seam but shall not introduce a new mechanism there.
   man page shall document every supported administrator key, its default,
   range or accepted values, dependencies and material quality/latency tradeoff.
   Claims derived from measurements shall appear only when their retained
-  evidence is admissible.
+  evidence is admissible. A TAP test shall reject internal work labels on the
+  installed template, manual source, compiled runtime strings and shipped help,
+  require the principal paired-reference, credit and sparse keys in the
+  template and manual, and reject any advertised removed key.
 
 ## Required tests and final gate
 
@@ -111,12 +115,10 @@ show that the one-shot trailing capture restores static one-pixel chroma after
 motion stops without later application damage.
 Visible 4:2:0/4:4:4 churn inside an affected update while damage continues is
 the documented sparse-mode limitation, not a failing visual gate. This final
-slice is an accounting and compatibility replay of the already-qualified
-development design; #125B decides on the development branch whether sparse
-mode has enough byte or throughput value to be included here at all. Every run
-records the paired commit IDs, client identity, resolution, selected mode and
-trace-build state. No timing claim derived from a synchronous per-frame logger
-is admissible.
+slice is an accounting and compatibility replay, not an opportunity to change
+the selected behavior. Every run records the paired commit IDs, client
+identity, resolution, selected mode and trace-build state. No timing claim
+derived from a synchronous per-frame logger is admissible.
 
 The retained numerical replay is a repeated 2-by-2 comparison of
 `wire_window` 1/2 and dense/sparse chroma. Conditions A/B use window 1; C/D use

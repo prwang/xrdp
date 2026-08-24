@@ -38,12 +38,53 @@ The development branches are evidence about the intended final behavior, not
 an implementation dependency. A clean-room author shall implement the
 behavior described here and shall not transplant commit history.
 
+## Clean-room authorship and review standard
+
+Before slice #126 starts, every qualification which can change the selected
+product behavior shall be closed and this specification shall contain the
+result. An open backlog item or experiment record may not be a hidden input to
+the clean-room author. The normative README and slice files must be sufficient
+to implement and review the complete series from the pinned bases.
+
+Each slice shall be re-derived from its normative behavior and the pinned-base
+seams. Development-tree paths listed in `BACKLOG.md` are an inventory used to
+check that no responsibility was omitted; they are not text to transplant. A
+slice shall not copy development functions, comments, tests, configuration or
+manual prose line by line. Every retained branch, field, interface and
+assertion shall be explainable from this specification or unchanged base
+behavior. Code needed only by a later slice shall wait for that slice.
+
+The clean-room diff shall contain only current, reviewable product prose:
+
+* Comments explain non-obvious protocol meaning, ownership/lifetime,
+  concurrency ordering, bounds, security, compatibility or failure behavior.
+  They do not restate syntax or narrate project history.
+* Production code, tests and public surfaces do not contain backlog numbers,
+  slice requirement IDs, experiment or fleet-arm names, dates, commit hashes,
+  `FR-*` shorthand, temporary diagnostics, fault injection, dead alternatives
+  or plans for later work. Tests and fixtures are named for the behavior they
+  prove.
+* Installed configuration is a concise valid starting point. It shows defaults,
+  accepted values, dependencies and material tradeoffs without advertising
+  removed or inert keys. The manual is the complete reference. Runtime and
+  help text state the operator impact and action in domain language.
+* Historical rationale belongs in the commit message or evidence record, not
+  beside shipped code. A measurement claim may enter product documentation
+  only when its retained evidence is admissible and the claim is still needed
+  by an operator.
+
+A slice is not self-contained if a reviewer needs the development branch to
+decode a name, justify a condition or understand the commit message. Its commit
+message shall state the outcome, why the change belongs at this boundary and
+the independent gates which passed; a work-item label or copied-file list is
+not a rationale.
+
 The pinned xrdp base already contains dynamic-virtual-channel dechunking,
-overflow-safe stream bounds, and corrected dynamic-resize ordering. The port
-shall add to those implementations: it shall not restore the old inline
-dechunker, weaken `trans_force_read_s()` bounds, remove the base tests, or
-create RDPGFX surfaces/encoders before resizing the screen bitmap. Base files
-that overlap a slice shall retain these changes and their tests.
+overflow-safe stream bounds, and corrected dynamic-resize ordering. The
+clean-room series shall add to those implementations: it shall not restore the
+old inline dechunker, weaken `trans_force_read_s()` bounds, remove the base
+tests, or create RDPGFX surfaces/encoders before resizing the screen bitmap.
+Base files that overlap a slice shall retain these changes and their tests.
 
 ## Cross-cutting requirements
 
@@ -199,15 +240,11 @@ addition, each commit shall pass these gates from a clean tree:
    build shall also pass #127's disabled-footprint test. From #128 onward,
    perform the paired xorgxrdp build in both matching trace modes; mixed modes
    shall fail the version-agreement test.
+8. Audit the complete slice diff against the authorship and prose standard
+   above. Every new production comment and user-visible string shall have a
+   current purpose; internal work labels, development archaeology, dead keys
+   and later-slice scaffolding make the gate red.
 
 Tests shall use specification-derived expected values or independent fixtures.
 Expected values shall not be copied from the implementation. A behavior test
 may be changed only in a separate, acknowledged specification change.
-
-## Legacy requirement names
-
-Older source comments use identifiers such as `FR-CAPTURE`, `FR-PROC`,
-`FR-NUT`, `FR-H264`, `FR-WIRE`, `FR-ACK`, `FR-CONFIG` and `FR-TRACE`.
-They map respectively to slices #128/#129/#136, #133/#139, #130,
-#131/#137/#138, #135, #140, #142 and #127. The slice documents, not the old
-identifier wording, are authoritative.

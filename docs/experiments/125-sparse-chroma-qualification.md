@@ -302,3 +302,37 @@ principal paired-reference, credit and sparse keys exist in both template and
 manual; and rejects an advertised `tail_flush` assignment. The manual renders
 without groff errors, the helper builds and its offline selftest passes, and
 the full configured `make check` result is 212/212 PASS.
+
+## 2026-08-24 Scope A3 follow-through — clean-room prose gate
+
+The A3 audit exposed a broader clean-room risk. The development implementation
+is an evolutionary record: correct current behavior is interleaved with work
+numbers, requirement shorthand, superseded alternatives, measurement claims,
+temporary diagnostics and comments explaining how the branch arrived there.
+A file-by-file transcription could reproduce the behavior while also carrying
+that archaeology into every reviewable commit. It would make the supposedly
+clean series depend on the development branch for vocabulary and rationale.
+
+The durable rule now separates three sources. `PRD/` defines behavior and
+independent gates. `BACKLOG.md` inventories development files only to prove
+coverage. The development code may reveal seams and edge cases, but supplies
+no text to copy. Each slice is re-authored from its pinned base and normative
+requirements, and is red if a reviewer needs the development branch to explain
+a field, condition, comment, test name or commit message.
+
+The per-slice prose review rejects internal work labels, history narratives,
+dead or commented-out settings, fault scaffolding, later-slice placeholders,
+copied test expectations and unsupported performance claims. A production
+comment must instead explain a current non-obvious invariant such as protocol
+meaning, ownership, ordering, bounds, security or compatibility. Operator
+surfaces must state defaults, ranges, dependencies, tradeoffs, impact and
+action entirely in domain language.
+
+The common rule lives in `AGENTS.md` (a symlink to `CLAUDE.md`) and
+`PRD/README.md`, so it applies once rather than being copied into all seventeen
+slice files. The backlog now labels every development path as inventory, and
+the final activation slice explicitly owns a TAP check for internal labels,
+required documented controls and removed-key leakage. The obsolete legacy
+requirement-name map was removed from the normative PRD because it encouraged
+clean-room authors to translate development shorthand instead of implementing
+the self-contained specification.

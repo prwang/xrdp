@@ -121,6 +121,92 @@ All durable rules and "memory" for this project live here, in-tree and committed
    `/* */` comments only (never `//`), newline before the function name in
    definitions, one declaration per line. Run astyle. Aim for C/C++ compatibility.
 
+## Clean-room reconstruction and prose quality
+
+The clean-room series is a re-authoring exercise, not a history transplant.
+Its purpose is to make each commit understandable from the pinned base, its
+normative `PRD/` slice and its tests, without requiring a reviewer to inspect
+the development branch or reconstruct months of experiments.
+
+### Re-author behavior; do not transcribe the development diff
+
+- Start every slice from the preceding clean-room commit. Read the slice
+  specification, the pinned-base code around each named seam and the existing
+  base tests before writing the change. State the current invariant, ownership
+  and failure behavior in domain terms, then implement the smallest cohesive
+  change which satisfies them.
+- `BACKLOG.md` may identify development files which prove that all required
+  pieces have been inventoried. Those files are evidence and a search index,
+  not source text. Do not copy a development commit, function, comment block,
+  test body, config stanza or man-page paragraph line by line into a slice.
+- Looking at development code is allowed to locate edge cases and integration
+  seams. Every retained branch, field and assertion must still be justified by
+  the normative slice or the pinned base. If the clean-room change cannot be
+  reviewed without opening the development tree, the slice is not
+  self-contained and shall not be committed.
+- Preserve unrelated improvements already present on the pinned base. A
+  development implementation which predates a base fix is not authority to
+  restore its older control flow, bounds, lifecycle or tests.
+- Carry only independently sourced fixtures with durable provenance. Test
+  expectations come from the specification, an independent derivation or the
+  recorded fixture source, never from running or transcribing the development
+  implementation.
+
+### Exclude development entropy from the clean-room tree
+
+Production code, tests, installed configuration, manuals, help and runtime
+messages shall describe the behavior which exists in that commit. Do not carry
+these common development artifacts forward:
+
+- backlog numbers, PRD/slice requirement IDs, experiment names, fleet-arm
+  names, dates, commit hashes or internal shorthand such as `FR-*`;
+- commented-out or inert settings, removed paths, temporary fault injection,
+  debug-only alternatives, one-off measurement hooks or plans for a later
+  slice;
+- historical narratives such as “used to”, “temporary”, “for the gate” or
+  “measured on arm X”, and performance claims whose retained evidence is not
+  part of the reviewed result;
+- comments which merely restate the next statement, narrate the edit, preserve
+  a conversation, or explain why the development branch happened to arrive at
+  its present shape.
+
+A production comment earns its place by explaining a non-obvious current
+invariant: protocol meaning, ownership or lifetime, concurrency ordering,
+bounds, security, compatibility, or why an apparently simpler operation is
+incorrect. Write that reason directly in domain language. Cite a public
+protocol section when useful; keep project history in the commit message,
+`docs/experiments/` or the PR evidence package.
+
+Operator-facing surfaces have a stricter boundary. A sample configuration is
+a short, valid starting point showing defaults, accepted values, dependencies
+and material tradeoffs. The man page is the complete reference. Help and log
+messages say what happened, its operator impact and the corrective action.
+None assumes access to `BACKLOG.md`, `PRD/`, experiment records or the
+clean-room plan. Tests and fixtures use behavior names, not work-item numbers,
+so a failure states what contract broke.
+
+### Per-slice prose gate
+
+Before committing each clean-room slice, review the complete diff as prose as
+well as code:
+
+1. Every added file, API, field and branch is owned by this slice's normative
+   requirements; no later-slice scaffolding or development-only residue is
+   present.
+2. Every changed comment still describes the final code beside it and explains
+   a current reason rather than history or syntax.
+3. Every user-visible string is understandable without project-internal
+   documents and is rate-appropriate under the logging rule.
+4. Public configuration and documentation agree with parser defaults, bounds,
+   dependencies and failure behavior. Removed or inert keys are absent except
+   for an intentional migration warning required by the specification.
+5. The commit message explains the user-visible or architectural outcome, why
+   the change belongs in this slice and which independent gates passed. “Port
+   item N” or a list of copied files is not a sufficient commit message.
+
+The common contract in `PRD/README.md` makes this a hard gate for every slice;
+individual slice files add only obligations unique to their behavior.
+
 ## Cooperation rule
 
 - Work is tracked **transparently in `BACKLOG.md`**, committed in-tree.

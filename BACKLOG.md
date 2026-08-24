@@ -86,7 +86,11 @@ tradeoff; `gfx.toml(5)` documents the supported controls without the voided
 window claim; dead `tail_flush` is no longer advertised; runtime and helper
 output use operator terms. A test rejects internal work labels on those
 surfaces. The audit and corrected Scope B design are recorded in the #125
-experiment record.
+experiment record. **Documentation-quality follow-through: DONE.** The
+repository-wide agent rules and common slice contract now require
+self-contained re-authoring and a per-slice prose gate; the plan labels dev
+paths as inventory rather than source text, and #142 owns the deterministic
+operator-surface check.
 
 **Scope B — T4 oracle numerical qualification: IN PROGRESS.** On the
 newly provisioned T4, first upgrade xrdp and xorgxrdp to the same functional
@@ -143,12 +147,21 @@ mode available at that point; the ordinary xrdp build contains no trace
 footprint; no intermediate commit advertises an incomplete backend; and
 nothing is pushed by the agent.
 
+The development paths below are an inventory proving that the plan covers the
+frontier; they are not text to transplant. Each slice is re-authored from its
+pinned base and normative specification. The common authorship/prose gate in
+`PRD/README.md` applies to every commit: no development-history comments,
+internal work labels, dead knobs, later-slice scaffolding or copied test
+expectations enter the clean-room tree. A reviewer must be able to understand
+the slice without opening the development branch.
+
 ## #126 — paired latent GFX H.264 shared-memory isolation fix
 
-**Status: TODO; blocked on #125.** Port the pre-existing AVC420/H.264
+**Status: TODO; blocked on #125.** Re-author the pre-existing AVC420/H.264
 multi-monitor plane-overwrite fix before any AVC444 feature.
 
-**Dev source:** xrdp `common/xup_client_info.h`, `xrdp/xrdp_encoder.c`,
+**Development inventory (not source text):** xrdp
+`common/xup_client_info.h`, `xrdp/xrdp_encoder.c`,
 `tests/xrdp/test_avc444_multimon.c`; xorgxrdp `module/rdpCapture.c`,
 `module/rdpClientCon.c`, `module/rdpClientCon.h`.
 
@@ -162,9 +175,9 @@ specification: [`PRD/slices/126-shmem-isolation.md`](PRD/slices/126-shmem-isolat
 **Status: TODO; blocked on #126.** Re-author the completed generic
 facility without AVC events or diagnostic xup payloads.
 
-**Dev source:** `common/perf_trace.{c,h}` and
-`tests/common/test_perf_trace.c`; lifecycle shape comes from #120. The
-transport queue counter belongs to #140, not this generic slice.
+**Development inventory (not source text):** `common/perf_trace.{c,h}` and
+`tests/common/test_perf_trace.c`. The transport queue counter belongs to #140,
+not this generic slice.
 
 **Acceptance:** the slice is independently usable; default builds contain no
 trace symbols, strings, state or argument evaluation; enabled builds pass all
@@ -177,7 +190,8 @@ generic lifecycle/security/format/concurrency tests. Normative specification:
 layout/geometry primitives and optional producer-timestamp fields. No AVC
 backend is selectable.
 
-**Dev source:** `common/xrdp_client_info.h`, `common/xup_client_info.h`,
+**Development inventory (not source text):** `common/xrdp_client_info.h`,
+`common/xup_client_info.h`,
 `xup/xup.c`, `tests/xrdp/test_avc444_multimon.c`; xorgxrdp
 `module/rdpClientCon.{c,h}`.
 
@@ -188,11 +202,12 @@ headers and builds agree. Normative specification:
 
 ## #129 — full-chroma view construction and producer packing
 
-**Status: TODO; blocked on #128.** Port v1, v2 and main-only AVC420 view
+**Status: TODO; blocked on #128.** Re-author v1, v2 and main-only AVC420 view
 construction, coded alignment, padding and the vectorized xorgxrdp producer.
 The backend remains unadvertised.
 
-**Dev source:** `xrdp/xrdp_avc444_convert.{c,h}`,
+**Development inventory (not source text):**
+`xrdp/xrdp_avc444_convert.{c,h}`,
 `tests/xrdp/test_avc444_convert.c`; xorgxrdp `module/rdpCapture.c`,
 `module/rdpClientCon.c`, `module/rdpYuvVectorize.h`.
 
@@ -204,10 +219,11 @@ Normative specification:
 
 ## #130 — bounded standard-NUT demuxer
 
-**Status: TODO; blocked on #129.** Port the independent standard-NUT subset as
-a pure leaf.
+**Status: TODO; blocked on #129.** Re-author the independent standard-NUT
+subset as a pure leaf.
 
-**Dev source:** `xrdp/xrdp_nut.{c,h}`, `tests/xrdp/test_avc444_nut.c`,
+**Development inventory (not source text):** `xrdp/xrdp_nut.{c,h}`,
+`tests/xrdp/test_avc444_nut.c`,
 `tests/xrdp/avc444/fixture_4frame.nut` and `PROVENANCE.md`.
 
 **Acceptance:** valid fixture, byte fragmentation, truncation, CRC, file-id
@@ -216,12 +232,13 @@ and total-ceiling cases pass; no server caller exists. Normative specification:
 
 ## #131 — Annex-B validation and parameter-set policy
 
-**Status: TODO; blocked on #130.** Port bounded Annex-B inspection plus the
+**Status: TODO; blocked on #130.** Re-author bounded Annex-B inspection plus the
 recorded SPS/SEI interoperability transforms used by current hardware
 profiles. LTR rewriting is not in this slice.
 
-**Dev source:** base functions in `xrdp/xrdp_h264_annexb.{c,h}` and base cases
-in `tests/xrdp/test_avc444_h264.c`.
+**Development inventory (not source text):** base functions in
+`xrdp/xrdp_h264_annexb.{c,h}` and base cases in
+`tests/xrdp/test_avc444_h264.c`.
 
 **Acceptance:** reset packet, missing/duplicate parameter sets, malformed NAL,
 HRD sanitization and `pic_struct` vectors pass. Explicit `fault_*` injections
@@ -230,10 +247,11 @@ remain dev-only. Normative specification:
 
 ## #132 — pure AVC capability classification
 
-**Status: TODO; blocked on #131.** Port client-capability classification and
-server mode choice as pure logic. Do not advertise a live backend.
+**Status: TODO; blocked on #131.** Re-author client-capability classification
+and server mode choice as pure logic. Do not advertise a live backend.
 
-**Dev source:** `xrdp/xrdp_avc444_caps.{c,h}` and
+**Development inventory (not source text):**
+`xrdp/xrdp_avc444_caps.{c,h}` and
 `tests/xrdp/test_avc444_caps.c`.
 
 **Acceptance:** table-driven v8/v8.1/v10.0/v10.1/v10.2–10.7, AVC-disabled,
@@ -242,12 +260,13 @@ unknown-version and v2-support cases pass. Normative specification:
 
 ## #133 — secure ffmpeg runner and behavioral probe
 
-**Status: TODO; blocked on #132.** Port spawn, descriptor layout,
+**Status: TODO; blocked on #132.** Re-author spawn, descriptor layout,
 nonblocking pipe pump, bounded collection, termination/reaping, static
 `dump_extra` verification, one-frame `probesize`, pipe-size negotiation and
 failure classification. LTR and multi-monitor pump-set behavior are later.
 
-**Dev source:** base portions of `xrdp/xrdp_encoder_ffmpeg.{c,h}` and
+**Development inventory (not source text):** base portions of
+`xrdp/xrdp_encoder_ffmpeg.{c,h}` and
 `tests/xrdp/test_avc444_ffmpeg.c`, plus
 `tests/xrdp/gfx/fake_encoder_hang.sh`.
 
@@ -262,7 +281,8 @@ resize/reap and small-geometry startup. Normative specification:
 mode state and dispatch without making the backend selectable or advertising
 an AVC capability.
 
-**Dev source:** relevant portions of `xrdp/xrdp_encoder.{c,h}`,
+**Development inventory (not source text):** relevant portions of
+`xrdp/xrdp_encoder.{c,h}`,
 `xrdp/xrdp_mm.c`, `xrdp/xrdp_types.h` and `tests/xrdp/test_xrdp_egfx.c`.
 
 **Acceptance:** existing x264/OpenH264 paths are unchanged; internal
@@ -275,7 +295,8 @@ reach the new path. Normative specification:
 **Status: TODO; blocked on #134.** Add AVC420 and AVC444 serializers. AVC444
 is born as luma LC=1 followed by chroma LC=2; LC=0 never enters history.
 
-**Dev source:** serializer portions of `xrdp/xrdp_encoder.{c,h}` and
+**Development inventory (not source text):** serializer portions of
+`xrdp/xrdp_encoder.{c,h}` and
 `tests/xrdp/test_avc444_metablock.c`.
 
 **Acceptance:** exact metablock, even-origin/even-extent, region, codec-id and
@@ -285,11 +306,12 @@ specification:
 
 ## #136 — two-slot capture and fail-early shared memory
 
-**Status: TODO; blocked on #135.** Port two slots per monitor, per-monitor
+**Status: TODO; blocked on #135.** Re-author two slots per monitor, per-monitor
 slot rotation, snapshot ownership and up-front backing-store reservation.
 
-**Dev source:** `common/os_calls.c`, `common/xup_client_info.h`, capture portions
-of `xrdp/xrdp_encoder.{c,h}` and `xrdp/xrdp_mm.c`,
+**Development inventory (not source text):** `common/os_calls.c`,
+`common/xup_client_info.h`, capture portions of
+`xrdp/xrdp_encoder.{c,h}` and `xrdp/xrdp_mm.c`,
 `tests/xrdp/test_avc444_multimon.c`; xorgxrdp `module/rdpClientCon.{c,h}` and
 `module/rdpMisc.c`.
 
@@ -300,11 +322,12 @@ Normative specification:
 
 ## #137 — reference-safe AVC444 topology
 
-**Status: TODO; blocked on #136.** Port the mandatory decode-topology
+**Status: TODO; blocked on #136.** Re-author the mandatory decode-topology
 invariant: main pictures never reference auxiliary pictures; auxiliary IDRs
 become non-IDR intra leaves on the shared chain.
 
-**Dev source:** relevant functions in `xrdp/xrdp_h264_annexb.{c,h}` and
+**Development inventory (not source text):** relevant functions in
+`xrdp/xrdp_h264_annexb.{c,h}` and
 `xrdp/xrdp_encoder_ffmpeg.{c,h}`; leaf cases in
 `tests/xrdp/test_avc444_h264.c`.
 
@@ -314,11 +337,12 @@ decoder-topology simulations pass. Normative specification:
 
 ## #138 — long-term-reference chain, re-key and scheduled intra refresh
 
-**Status: TODO; blocked on #137.** Port per-view LT0/LT1 rewriting, bounded
+**Status: TODO; blocked on #137.** Re-author per-view LT0/LT1 rewriting, bounded
 frame-number re-key without surface churn, and independent scheduled main/aux
 intra refresh.
 
-**Dev source:** LTR portions of `xrdp/xrdp_h264_annexb.{c,h}`,
+**Development inventory (not source text):** LTR portions of
+`xrdp/xrdp_h264_annexb.{c,h}`,
 `xrdp/xrdp_encoder_ffmpeg.{c,h}`, `xrdp/xrdp_encoder.{c,h}` and
 `xrdp/xrdp_mm.c`; `tests/xrdp/test_avc444_ltr.c`, its two golden headers, and
 LTR/re-key/intra cases in `test_avc444_ffmpeg.c` and `test_tconfig.c`.
@@ -330,11 +354,12 @@ cut cases pass. Normative specification:
 
 ## #139 — one-thread multi-monitor pump set and batch emission
 
-**Status: TODO; blocked on #138.** Port one encoder pair per monitor,
+**Status: TODO; blocked on #138.** Re-author one encoder pair per monitor,
 one poll set over all children, shared deadline, per-monitor geometry/LTR state
 and inline batch assembly. The removed emit thread does not return.
 
-**Dev source:** multi-monitor portions of `xrdp/xrdp_encoder.{c,h}`,
+**Development inventory (not source text):** multi-monitor portions of
+`xrdp/xrdp_encoder.{c,h}`,
 `xrdp/xrdp_encoder_ffmpeg.{c,h}`, `xrdp/xrdp_mm.c`, `xrdp/xrdp.h`,
 `tests/xrdp/test_avc444_multimon.c`, `test_avc444_emit_split.c`,
 `test_avc444_ffmpeg.c` and `test_xrdp_egfx.c`.
@@ -346,12 +371,13 @@ Normative specification:
 
 ## #140 — paired credit frontier and split acknowledgement
 
-**Status: TODO; blocked on #139.** Port per-monitor capture admission,
+**Status: TODO; blocked on #139.** Re-author per-monitor capture admission,
 slot-only acknowledgements, separate region frontier, bounded wire credit and
 trace-only transport queue accounting. Shipped `wire_window` is 1;
 `eager_slot_ack` is on.
 
-**Dev source:** `common/xup_client_info.h`, `common/trans.{c,h}`, `xup/xup.c`,
+**Development inventory (not source text):** `common/xup_client_info.h`,
+`common/trans.{c,h}`, `xup/xup.c`,
 frontier portions of `xrdp/xrdp_encoder.{c,h}`, `xrdp/xrdp_mm.c`,
 `xrdp/xrdp_types.h`, `tests/xrdp/test_avc444_credit_frontier.c`,
 `test_avc444_multimon.c` and `test_xrdp_egfx.c`; xorgxrdp
@@ -365,10 +391,11 @@ wire serialization pass. Normative specification:
 ## #141 — sparse auxiliary cadence
 
 **Status: TODO; blocked on #140.**
-Port time-based chroma refresh/idle scheduling and skip auxiliary submission
-before it can advance the encoder DPB.
+Re-author time-based chroma refresh/idle scheduling and skip auxiliary
+submission before it can advance the encoder DPB.
 
-**Dev source:** sparse portions of `xrdp/xrdp_encoder.{c,h}`,
+**Development inventory (not source text):** sparse portions of
+`xrdp/xrdp_encoder.{c,h}`,
 `xrdp/xrdp_encoder_ffmpeg.{c,h}`, `xrdp/xrdp_h264_annexb.{c,h}`,
 `xrdp/xrdp_mm.c`, `xrdp/xrdp_tconfig.{c,h}`,
 `tests/xrdp/test_avc444_chroma_due.c`, `test_avc444_convert.c`, sparse cases in
@@ -377,26 +404,28 @@ before it can advance the encoder DPB.
 **Acceptance:** disabled equivalence, refresh-plus-one-frame bound, settle/rate
 clamps, one-shot trailing restoration without future damage, independent
 intra schedules and DPB continuity pass. This internal
-slice has no real-client replay; the activated candidate replays #125 only in
-#142. Normative specification:
+slice has no real-client replay; the activated candidate runs the live client
+gate specified by #142 only after activation. Normative specification:
 [`PRD/slices/141-sparse-chroma.md`](PRD/slices/141-sparse-chroma.md).
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
 **Status: TODO; blocked on #141.** Make the fully assembled backend
 selectable only here. Add the user-facing configuration and documentation for
-the mechanisms already green; do not port `tail_flush` or explicit fault
+the mechanisms already green; do not carry `tail_flush` or explicit fault
 injection.
 
-**Dev source:** `xrdp/xrdp_tconfig.{c,h}`, `xrdp/xrdp_types.h`,
+**Development inventory (not source text):** `xrdp/xrdp_tconfig.{c,h}`,
+`xrdp/xrdp_types.h`,
 `xrdp/xrdp_mm.c`, `xrdp/gfx.toml`, `docs/man/gfx.toml.5.in`,
-`tests/xrdp/test_tconfig.c` and its `tests/xrdp/gfx/*.toml` fixtures.
+`tests/xrdp/check_operator_surface.sh`, `tests/xrdp/test_tconfig.c` and its
+`tests/xrdp/gfx/*.toml` fixtures.
 
 **Acceptance:** bounds/refusals/defaults, removed-key warning, capability
-activation, probe-before-confirm, no fallback, resize lifecycle and all three
-real clients plus multi-monitor pass on builds made from the clean-room paired
-branches. The frozen #124 and #125 client procedures pass without changing
-their arms, checks or interpretation. Default and trace-enabled CI-equivalent
+activation, probe-before-confirm, no fallback, resize lifecycle, operator
+surface entropy scan and the complete client, multi-monitor, sparse and
+numerical gates defined by the normative specification pass on builds made
+from the clean-room paired branches. Default and trace-enabled CI-equivalent
 matrices are green. Normative specification:
 [`PRD/slices/142-activation-and-docs.md`](PRD/slices/142-activation-and-docs.md).
 
