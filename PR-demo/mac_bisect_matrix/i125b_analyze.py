@@ -71,6 +71,43 @@ def grouped(records, event):
     return [record for record in records if record["event"] == event]
 
 
+def classify_video_commands(records, frame_ids):
+    commands_by_id = {}
+    for record in records:
+        commands_by_id.setdefault(record["frame_id"], []).append(record)
+    main_only_count = 0
+    paired_count = 0
+    main_only_bytes = 0
+    paired_bytes = 0
+    unclassified = []
+    for frame_id in sorted(frame_ids):
+        commands = commands_by_id.get(frame_id, [])
+        size = sum(record["bytes"] for record in commands)
+        if len(commands) == 1 and commands[0]["view"] == 1:
+            main_only_count += 1
+            main_only_bytes += size
+        elif (len(commands) == 2 and commands[0]["view"] == 1 and
+              commands[1]["view"] == 2):
+            paired_count += 1
+            paired_bytes += size
+        else:
+            unclassified.append({"frame_id": frame_id,
+                                 "views": [r["view"] for r in commands]})
+    return {
+        "main_only_frames": main_only_count,
+        "main_plus_aux_frames": paired_count,
+        "main_only_commands": main_only_count,
+        "main_plus_aux_commands": paired_count * 2,
+        "main_only_bytes": main_only_bytes,
+        "main_plus_aux_bytes": paired_bytes,
+        "total_commands": len(records),
+        "total_bytes": sum(record["bytes"] for record in records),
+        "classified_commands": main_only_count + paired_count * 2,
+        "classified_bytes": main_only_bytes + paired_bytes,
+        "unclassified": unclassified,
+    }
+
+
 def analyze_leg(leg_dir):
     condition = read_pairs(os.path.join(leg_dir, "condition.txt"))
     records, start_ns, end_ns = load_windowed(leg_dir)
@@ -108,46 +145,10 @@ def analyze_leg(leg_dir):
                    for left, right in zip(chroma_times, chroma_times[1:])]
     result["chroma_gap_ms"] = distribution(chroma_gaps)
 
-    sends_by_id = {}
-    for record in grouped(records, "send"):
-        sends_by_id.setdefault(record["frame_id"], []).append(record)
-    main_only_count = 0
-    paired_count = 0
-    main_only_bytes = 0
-    paired_bytes = 0
-    command_count = 0
-    command_bytes = 0
-    unclassified = []
-    for frame_id in sorted(egress_by_id):
-        commands = sends_by_id.get(frame_id, [])
-        count = len(commands)
-        size = sum(record["bytes"] for record in commands)
-        command_count += count
-        command_bytes += size
-        if count == 1 and commands[0]["last"] == 1:
-            main_only_count += 1
-            main_only_bytes += size
-        elif (count == 2 and commands[0]["last"] == 0 and
-              commands[1]["last"] == 1):
-            paired_count += 1
-            paired_bytes += size
-        else:
-            unclassified.append({"frame_id": frame_id,
-                                 "last": [r["last"] for r in commands]})
-    result["video_commands"] = {
-        "main_only_frames": main_only_count,
-        "main_plus_aux_frames": paired_count,
-        "main_only_commands": main_only_count,
-        "main_plus_aux_commands": paired_count * 2,
-        "main_only_bytes": main_only_bytes,
-        "main_plus_aux_bytes": paired_bytes,
-        "total_commands": command_count,
-        "total_bytes": command_bytes,
-        "classified_commands": main_only_count + paired_count * 2,
-        "classified_bytes": main_only_bytes + paired_bytes,
-        "unclassified": unclassified,
-    }
-    result["bytes_per_frame"] = (command_bytes / len(egress)
+    result["video_commands"] = classify_video_commands(
+        grouped(records, "video_cmd"), egress_by_id)
+    result["bytes_per_frame"] = (
+        result["video_commands"]["total_bytes"] / len(egress)
                                   if egress else math.nan)
 
     slot_acks = [record for record in grouped(records, "ack")
@@ -318,6 +319,15 @@ def main():
     if len(sys.argv) == 2 and sys.argv[1] == "--selftest":
         assert percentile([1, 2, 3, 4, 5], 90) == 5
         assert distribution([2, 4])["mean"] == 3
+        commands = classify_video_commands(
+            [{"frame_id": 1, "view": 1, "bytes": 40},
+             {"frame_id": 2, "view": 1, "bytes": 50},
+             {"frame_id": 2, "view": 2, "bytes": 30}], {1: {}, 2: {}})
+        assert commands["main_only_frames"] == 1
+        assert commands["main_plus_aux_frames"] == 1
+        assert commands["total_commands"] == 3
+        assert commands["total_bytes"] == 120
+        assert not commands["unclassified"]
         print("PASS: i125b analyzer arithmetic selftest")
         return 0
     if len(sys.argv) != 2:

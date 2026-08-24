@@ -1994,7 +1994,7 @@ gfx_avc444_parse_submit(struct xrdp_encoder *self, XRDP_ENC_DATA *enc,
 static struct stream *
 gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
                           struct xrdp_egfx_bulk *bulk, struct stream *in_s,
-                          XRDP_ENC_DATA *enc)
+                          XRDP_ENC_DATA *enc, int frame_id)
 {
     int index;
     int surface_id;
@@ -2356,6 +2356,8 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
              * enc_done, because with no LC=2 PDU behind it, it is this
              * command's last one. */
             rv = s_luma;
+            PERF_TRACE("event=video_cmd frame_id=%d view=%d bytes=%d",
+                       frame_id, 1, (int)(s_luma->end - s_luma->data));
         }
         else if (gfx_send_done(self, enc,
                                (int)(s_luma->end - s_luma->data), 0,
@@ -2368,6 +2370,8 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         }
         else
         {
+            PERF_TRACE("event=video_cmd frame_id=%d view=%d bytes=%d",
+                       frame_id, 1, (int)(s_luma->end - s_luma->data));
             g_free(s_luma); /* ->data now owned by the queued enc_done */
         }
     }
@@ -2387,6 +2391,11 @@ gfx_wiretosurface1_avc444(struct xrdp_encoder *self,
         rv = xrdp_egfx_wire_to_surface1(bulk, surface_id, codec_id,
                                         pixel_format, &dst_rect, s->data,
                                         bitmap_data_length);
+        if (rv != NULL)
+        {
+            PERF_TRACE("event=video_cmd frame_id=%d view=%d bytes=%d",
+                       frame_id, 2, (int)(rv->end - rv->data));
+        }
     }
     g_free(s->data);
     g_free(d_rects);
@@ -3069,11 +3078,11 @@ gfx_batch_run_set(struct xrdp_encoder *self, XRDP_ENC_DATA **set,
 static struct stream *
 gfx_wiretosurface1(struct xrdp_encoder *self,
                    struct xrdp_egfx_bulk *bulk, struct stream *in_s,
-                   XRDP_ENC_DATA *enc)
+                   XRDP_ENC_DATA *enc, int frame_id)
 {
     if (self->avc444_ffmpeg)
     {
-        return gfx_wiretosurface1_avc444(self, bulk, in_s, enc);
+        return gfx_wiretosurface1_avc444(self, bulk, in_s, enc, frame_id);
     }
     if (self->avc420_ffmpeg)
     {
@@ -3765,7 +3774,8 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         switch (cmd_id)
         {
             case XR_RDPGFX_CMDID_WIRETOSURFACE_1:       /* 0x0001 */
-                s = gfx_wiretosurface1(self, bulk, &in_s, enc);
+                s = gfx_wiretosurface1(self, bulk, &in_s, enc,
+                                       term_frame_id);
                 break;
             case XR_RDPGFX_CMDID_WIRETOSURFACE_2:       /* 0x0002 */
                 s = gfx_wiretosurface2(self, bulk, &in_s, enc);
