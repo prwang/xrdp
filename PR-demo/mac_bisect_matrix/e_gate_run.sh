@@ -743,7 +743,7 @@ fi
 PERF_DIR=/var/log/xrdp-perf
 EVIDENCE_ERROR=
 mkdir -p "$OUT/perf"
-PERF_FILES=$(srv "sudo ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" \
+PERF_FILES=$(srv "sudo sh -c 'ls -t $PERF_DIR/enc.* 2>/dev/null | head -4'" \
     | tr -d '\r')
 if [ -n "$PERF_FILES" ]; then
     for f in $PERF_FILES; do
