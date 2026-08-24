@@ -743,7 +743,8 @@ fi
 PERF_DIR=/var/log/xrdp-perf
 EVIDENCE_ERROR=
 mkdir -p "$OUT/perf"
-PERF_FILES=$(srv "ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" | tr -d '\r')
+PERF_FILES=$(srv "sudo ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" \
+    | tr -d '\r')
 if [ -n "$PERF_FILES" ]; then
     for f in $PERF_FILES; do
         srv_cat "$f" > "$OUT/perf/$(basename "$f")" 2>/dev/null
@@ -1193,12 +1194,16 @@ PY
     echo
 
     echo "=== E2 — server log, four things that must be zero ==="
-    for pat in "rewrite failed" "unsupported" "did not return" \
-               "budget exceeded" "third capture" "fifo_to_proc_depth"; do
+    for pat in "rewrite failed" "did not return" "budget exceeded" \
+               "third capture" "fifo_to_proc_depth"; do
         printf '%-24s %s\n' "$pat" \
             "$(grep -aci "$pat" "$OUT/xrdp.log" "$OUT/session-xorg.log" \
                2>/dev/null | awk -F: '{s+=$2} END{print s+0}')"
     done
+    # The NVIDIA Xorg device probe normally says "unsupported render node";
+    # that is unrelated to the H.264 rewrite. Count the codec process only.
+    printf '%-24s %s\n' "rewrite unsupported" \
+        "$(grep -aci "unsupported" "$OUT/xrdp.log" 2>/dev/null || true)"
     echo
 } | tee "$OUT/VERDICT.txt"
 
