@@ -23,6 +23,9 @@
   one-/two-frame-window numerical matrix. It installs a complete staged
   profile, refuses to alter a live X11 desktop, restarts xrdp and prints the
   effective settings.
+- `t4/xrdp-perf-trace.conf` — service environment for the #125B matrix. It
+  enables the compile-time trace ring with the filename prefix consumed by
+  the gate harness; it does not enable the ordinary mutex-backed logger.
 
 Helpers in target subdirectories are deliberately environment-specific. Their
 presence here is an inventory and provenance guarantee, not a claim that the

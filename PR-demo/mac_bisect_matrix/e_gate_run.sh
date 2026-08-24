@@ -400,8 +400,9 @@ MARK_X=${MARK_X:-0}
 # the container's stdout: kubectl logs carries only the entrypoint's own
 # output, which is why a first version of this harness reported zero
 # GFX_TRACE records on a session that was in fact running.
-MARK_P=$(srv 'sudo wc -l < /var/log/xrdp.log 2>/dev/null \
-    || wc -l < /var/log/xrdp.log 2>/dev/null' | tr -d ' \r')
+MARK_P=$(srv 'sudo wc -l /var/log/xrdp.log 2>/dev/null \
+    || wc -l /var/log/xrdp.log 2>/dev/null' \
+    | awk '{print $1}' | tr -d ' \r')
 MARK_P=${MARK_P:-0}
 echo "log marks: session-xorg $MARK_X lines, xrdp.log $MARK_P lines"
 

@@ -17,6 +17,7 @@ OUT=${I125B_OUT:-$D/captures/i125b_t4_matrix_${STAMP}}
 BASE=$ROOT/PR-demo/t4_profile/gfx-t4-nvenc-ltr.toml
 SELECTOR=$ROOT/PR-demo/lib/t4/xrdp-benchmark-profile
 DISABLE_CHROMA=$ROOT/PR-demo/t4_profile/chroma-probe-disabled.desktop
+TRACE_DROPIN=$ROOT/PR-demo/lib/t4/xrdp-perf-trace.conf
 TUNNEL_PID=
 
 fail()
@@ -47,6 +48,7 @@ trap cleanup EXIT INT TERM
 [ -f "$BASE" ] || fail "missing T4 profile $BASE"
 [ -x "$SELECTOR" ] || fail "selector is not executable: $SELECTOR"
 [ -f "$DISABLE_CHROMA" ] || fail "missing chroma-probe override"
+[ -f "$TRACE_DROPIN" ] || fail "missing perf-trace service drop-in"
 mkdir -p "$OUT/profiles"
 
 make_profile()
@@ -82,7 +84,7 @@ done > "$OUT/profile-common-sha256.txt"
 [ "$(awk '{print $1}' "$OUT/profile-common-sha256.txt" | sort -u | wc -l)" = 1 ] ||
     fail "the matrix profiles differ outside the three treatment settings"
 
-scp -q -i "$KEY" "$SELECTOR" "$DISABLE_CHROMA" \
+scp -q -i "$KEY" "$SELECTOR" "$DISABLE_CHROMA" "$TRACE_DROPIN" \
     "$OUT"/profiles/*.toml "$HOST:/tmp/"
 remote 'sudo install -d -m 0700 /root/xrdp-benchmark-profiles && \
         sudo install -m 0755 /tmp/xrdp-benchmark-profile \
@@ -95,10 +97,15 @@ remote 'sudo install -d -m 0700 /root/xrdp-benchmark-profiles && \
             /root/xrdp-benchmark-profiles/dense-w2.toml && \
         sudo install -m 0644 /tmp/sparse-w2.toml \
             /root/xrdp-benchmark-profiles/sparse-w2.toml && \
+        sudo install -d -m 0755 /etc/systemd/system/xrdp.service.d && \
+        sudo install -m 0644 /tmp/xrdp-perf-trace.conf \
+            /etc/systemd/system/xrdp.service.d/frontier-qa.conf && \
+        sudo systemctl daemon-reload && \
         install -d -m 0700 /home/ubuntu/.config/autostart && \
         install -m 0644 /tmp/chroma-probe-disabled.desktop \
             /home/ubuntu/.config/autostart/chroma-probe.desktop && \
-        sudo sh -c "printf %s\\n textflood > /etc/xrdp-e52-payload"'
+        printf "%s\\n" textflood | \
+            sudo tee /etc/xrdp-e52-payload >/dev/null'
 
 ssh -n -i "$KEY" -o BatchMode=yes -o ConnectTimeout=10 \
     -o ExitOnForwardFailure=yes -o ServerAliveInterval=15 \
