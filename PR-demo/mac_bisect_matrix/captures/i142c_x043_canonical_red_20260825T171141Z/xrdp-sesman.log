@@ -1,0 +1,23 @@
+[2026-08-25T17:11:37.103+0000] [INFO ] starting xrdp-sesman with pid 29
+[2026-08-25T17:11:37.105+0000] [INFO ] Sesman now listening on /var/run/xrdp/sesman.socket
+[2026-08-25T17:11:41.469+0000] [INFO ] Socket 12: connection accepted from AF_UNIX
+[2026-08-25T17:11:41.474+0000] [INFO ] Received system login request from xrdp for user: probe444 IP: 10.42.0.1
+[2026-08-25T17:11:41.478+0000] [INFO ] starting xrdp-sesexec with pid 194
+[2026-08-25T17:11:41.484+0000] [INFO ] TerminalServerUsers group tsusers doesn't exist. Access granted for probe444
+[2026-08-25T17:11:41.486+0000] [INFO ] Access permitted for user: probe444
+[2026-08-25T17:11:41.488+0000] [INFO ] Received sys login status for probe444 : logged in
+[2026-08-25T17:11:41.492+0000] [INFO ] Received request from xrdp to create a session for user probe444
+[2026-08-25T17:11:41.494+0000] [INFO ] Passing session creation request to sesexec
+[2026-08-25T17:11:41.498+0000] [INFO ] Starting X server on display X11-10: Xorg :10 -auth /var/run/xrdp/1101/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log 
+[2026-08-25T17:11:42.504+0000] [INFO ] Display X11-10 is working
+[2026-08-25T17:11:42.508+0000] [INFO ] Starting window manager for display X11-10
+[2026-08-25T17:11:42.511+0000] [INFO ] Starting the xrdp channel server for display X11-10
+[2026-08-25T17:11:42.512+0000] [INFO ] Waiting for 1500 ms for session to start
+[2026-08-25T17:11:42.512+0000] [INFO ] Using the default window manager on display X11-10: /etc/xrdp/startwm.sh
+[2026-08-25T17:11:44.014+0000] [INFO ] Session in progress on display X11-10. Waiting until the window manager (pid 203) exits to end the session
+[2026-08-25T17:11:44.020+0000] [INFO ] sesman: Session on display X11-10 is now running
+[2026-08-25T17:11:44.026+0000] [INFO ] Forwarding request from probe444 to connect to a session
+[2026-08-25T17:11:44.028+0000] [INFO ] sesman: Session on display X11-10 is connected from client 'xrdp-resize-con'
+[2026-08-25T17:11:44.028+0000] [INFO ] User probe444 has connected to a session
+[2026-08-25T17:11:48.427+0000] [INFO ] sesexec_main_loop: xrdp connection has exited (client 'xrdp-resize-con')
+[2026-08-25T17:11:48.429+0000] [INFO ] sesman: Session on display X11-10 has no client connection

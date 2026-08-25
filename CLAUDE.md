@@ -47,6 +47,17 @@ All durable rules and "memory" for this project live here, in-tree and committed
   both sides, so a branch that exists on one and not the other is a pair of
   builds that disagree about the protocol. Check `git -C /workUpdateXorgXrdp
   rev-parse --abbrev-ref HEAD` before doing pipeline work.
+- **Development exists only in the canonical checkouts `/work` and
+  `/workUpdateXorgXrdp`, with one linear history (owner directive,
+  2026-08-25).** Make every development edit and commit there, and build every
+  development package or deployment from those literal paths. Do not create
+  or use a linked worktree, clone or scratch source directory for development,
+  even when it shares the same Git objects and commit IDs. Comparison arms are
+  immutable checkpoints on the same ancestry, not divergent development
+  trees; a branch name may retain a checkpoint, but the next implementation
+  commit descends from it in the canonical checkout. The separately directed
+  clean-room checkouts remain `/workCleanroom` and
+  `/workUpdateXorgXrdpCleanroom` and are not development substitutes.
 - Read it whenever a question is about what the PRODUCER does — capture
   admission (`rdpClientConMonitorHasCapacity`), the ack frontiers
   (`rect_id_ack` for slots, `rect_id_ack_shown` for regions), damage

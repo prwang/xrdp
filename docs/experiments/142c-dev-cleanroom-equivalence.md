@@ -103,3 +103,20 @@ GFX-envelope parser case was added; it has not been rerun at this point. Both
 deployed packages were rebuilt with tracing compile-time absent. Temporary
 one-shot resize diagnostics were removed before the final package build and
 the final red reproduction.
+
+## 2026-08-25 canonical-path provenance correction
+
+The preceding 40059 result was built from `/workDevReconciled`, a linked
+worktree sharing `/work`'s repository and linear commit ancestry. The owner
+clarified that sharing commits is insufficient: development must be edited,
+committed and built only in the literal canonical checkouts `/work` and
+`/workUpdateXorgXrdp`. The auxiliary worktrees were retired, both canonical
+checkouts were advanced to the same reconciled history, and 40059 was rebuilt
+and redeployed from them.
+
+The canonical rerun used xrdp `253efd0a41f9` and xorgxrdp `8cf120e5db7f`.
+It reproduced the same mechanism and outcome: the producer reused
+16,760,832 bytes after growing to 2412 by 1344, xrdp rejected the stale
+snapshot, and FreeRDP exited with status 12. The owner had already confirmed
+the equivalent preceding arm interactively. Canonical evidence is indexed at
+[`PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md`](../../PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md).
