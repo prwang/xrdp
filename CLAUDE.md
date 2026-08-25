@@ -58,6 +58,13 @@ All durable rules and "memory" for this project live here, in-tree and committed
   commit descends from it in the canonical checkout. The separately directed
   clean-room checkouts remain `/workCleanroom` and
   `/workUpdateXorgXrdpCleanroom` and are not development substitutes.
+  **The sole authorized development branch in both repositories is
+  `dev/avc444_metablock_checkpoint`.** Do not create, rename, switch to or
+  split off another development branch without the owner's explicit
+  authorization. A red/green comparison retains immutable commit IDs on this
+  one ancestry; it does not create a branch per arm. Fetching `origin/devel`
+  for base comparison does not make it an implementation branch and never
+  authorizes committing there.
 - Read it whenever a question is about what the PRODUCER does — capture
   admission (`rdpClientConMonitorHasCapacity`), the ack frontiers
   (`rect_id_ack` for slots, `rect_id_ack_shown` for regions), damage
