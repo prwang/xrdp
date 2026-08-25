@@ -1,0 +1,986 @@
+[
+  {
+    "aux_decisions": 281,
+    "aux_sent": 281,
+    "aux_skipped": 0,
+    "bytes_per_frame": 2477117.4714285713,
+    "chroma_gap_ms": {
+      "count": 280,
+      "max": 5944.372547,
+      "mean": 60.40092755,
+      "min": 30.096587,
+      "p50": 35.758603,
+      "p90": 38.937587,
+      "p99": 49.558341
+    },
+    "frame_interval_ms": {
+      "count": 279,
+      "max": 5970.644824,
+      "mean": 60.409386992831536,
+      "min": 21.712422,
+      "p50": 35.858649,
+      "p90": 40.861577,
+      "p99": 45.795078
+    },
+    "frames": 280,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 280,
+        "max": 28.057032,
+        "mean": 1.8751896714285712,
+        "min": 0.002049,
+        "p50": 0.01076,
+        "p90": 5.909936,
+        "p99": 8.793791
+      },
+      "feed": {
+        "count": 280,
+        "max": 5.453812,
+        "mean": 2.7673327071428573,
+        "min": 1.464287,
+        "p50": 2.151042,
+        "p90": 4.300804,
+        "p99": 4.715539
+      },
+      "finish_transport_credit": {
+        "count": 280,
+        "max": 15.779397,
+        "mean": 10.873358117857142,
+        "min": 0.316059,
+        "p50": 10.849356,
+        "p90": 12.455698,
+        "p99": 14.434066
+      },
+      "full": {
+        "count": 280,
+        "max": 47.706799,
+        "mean": 32.565826832142854,
+        "min": 11.202664,
+        "p50": 32.569548,
+        "p90": 35.928137,
+        "p99": 40.177962
+      },
+      "residual": {
+        "count": 280,
+        "max": 7.105427357601002e-15,
+        "mean": -1.395708945243054e-16,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 7.105427357601002e-15
+      },
+      "wait_output": {
+        "count": 280,
+        "max": 25.097289,
+        "mean": 17.049946335714285,
+        "min": 4.584844,
+        "p50": 17.240974,
+        "p90": 20.829924,
+        "p99": 23.470998
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "A1",
+    "measurement_seconds": 20.002441968,
+    "producer_idle_ms": {
+      "count": 280,
+      "max": 5933.338318,
+      "mean": 43.97056741785715,
+      "min": 0.0016,
+      "p50": 9.819354,
+      "p90": 14.367059,
+      "p99": 21.858387
+    },
+    "producer_idle_over_1ms": 276,
+    "profile": "dense-w1",
+    "records": 10678,
+    "refresh_values_ms": [
+      0
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": NaN,
+    "throughput_fps": 16.553718714587596,
+    "video_commands": {
+      "boundary_bytes": 2638210,
+      "boundary_commands": 2,
+      "classified_bytes": 693592892,
+      "classified_commands": 560,
+      "main_only_bytes": 0,
+      "main_only_commands": 0,
+      "main_only_frames": 0,
+      "main_plus_aux_bytes": 693592892,
+      "main_plus_aux_commands": 560,
+      "main_plus_aux_frames": 280,
+      "total_bytes": 693592892,
+      "total_commands": 560,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 0,
+    "wire_window_values": [
+      1
+    ]
+  },
+  {
+    "aux_decisions": 303,
+    "aux_sent": 13,
+    "aux_skipped": 290,
+    "bytes_per_frame": 1260276.4801324503,
+    "chroma_gap_ms": {
+      "count": 12,
+      "max": 3871.272514,
+      "mean": 1344.3810285833333,
+      "min": 950.431268,
+      "p50": 1019.769851,
+      "p90": 2160.431745,
+      "p99": 3871.272514
+    },
+    "frame_interval_ms": {
+      "count": 301,
+      "max": 3898.857223,
+      "mean": 56.0254100332226,
+      "min": 15.966081,
+      "p50": 33.275583,
+      "p90": 37.855127,
+      "p99": 54.688535
+    },
+    "frames": 302,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 302,
+        "max": 28.747987,
+        "mean": 0.22797224834437085,
+        "min": 0.00185,
+        "p50": 0.00502,
+        "p90": 0.00762,
+        "p99": 6.501994
+      },
+      "feed": {
+        "count": 302,
+        "max": 5.579647,
+        "mean": 2.4434575529801323,
+        "min": 1.405259,
+        "p50": 2.104983,
+        "p90": 4.300944,
+        "p99": 4.929791
+      },
+      "finish_transport_credit": {
+        "count": 302,
+        "max": 13.577617,
+        "mean": 4.6608346986754965,
+        "min": 0.2973,
+        "p50": 4.332663,
+        "p90": 5.634165,
+        "p99": 11.888569
+      },
+      "full": {
+        "count": 302,
+        "max": 47.770777,
+        "mean": 18.906641311258277,
+        "min": 10.322776,
+        "p50": 18.053034,
+        "p90": 21.377484,
+        "p99": 38.124836
+      },
+      "residual": {
+        "count": 302,
+        "max": 3.552713678800501e-15,
+        "mean": -8.234766805166724e-17,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 3.552713678800501e-15
+      },
+      "wait_output": {
+        "count": 302,
+        "max": 22.436636,
+        "mean": 11.574376811258277,
+        "min": 4.936941,
+        "p50": 11.244972,
+        "p90": 13.792599,
+        "p99": 19.085027
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "B1",
+    "measurement_seconds": 20.002853887,
+    "producer_idle_ms": {
+      "count": 303,
+      "max": 3861.124382,
+      "mean": 49.2193731980198,
+      "min": 6.527483,
+      "p50": 18.372033,
+      "p90": 21.002458,
+      "p99": 901.02103
+    },
+    "producer_idle_over_1ms": 303,
+    "profile": "sparse-w1",
+    "records": 10344,
+    "refresh_values_ms": [
+      1000
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": 997,
+    "throughput_fps": 17.849043842910003,
+    "video_commands": {
+      "boundary_bytes": 0,
+      "boundary_commands": 0,
+      "classified_bytes": 380603497,
+      "classified_commands": 315,
+      "main_only_bytes": 354567161,
+      "main_only_commands": 289,
+      "main_only_frames": 289,
+      "main_plus_aux_bytes": 26036336,
+      "main_plus_aux_commands": 26,
+      "main_plus_aux_frames": 13,
+      "total_bytes": 380603497,
+      "total_commands": 315,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 0,
+    "wire_window_values": [
+      1
+    ]
+  },
+  {
+    "aux_decisions": 277,
+    "aux_sent": 277,
+    "aux_skipped": 0,
+    "bytes_per_frame": 2478233.3804347827,
+    "chroma_gap_ms": {
+      "count": 276,
+      "max": 6485.551817,
+      "mean": 61.28818785144927,
+      "min": 28.39096,
+      "p50": 36.189457,
+      "p90": 39.236776,
+      "p99": 43.846598
+    },
+    "frame_interval_ms": {
+      "count": 275,
+      "max": 6511.66829,
+      "mean": 61.29985394545454,
+      "min": 21.663093,
+      "p50": 35.808151,
+      "p90": 42.195649,
+      "p99": 50.771227
+    },
+    "frames": 276,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 276,
+        "max": 34.44946,
+        "mean": 2.4453811195652175,
+        "min": 0.00237,
+        "p50": 0.743903,
+        "p90": 6.701017,
+        "p99": 8.678705
+      },
+      "feed": {
+        "count": 276,
+        "max": 5.52519,
+        "mean": 2.785885717391304,
+        "min": 1.518135,
+        "p50": 2.2165,
+        "p90": 4.579064,
+        "p99": 5.122124
+      },
+      "finish_transport_credit": {
+        "count": 276,
+        "max": 15.888273,
+        "mean": 11.054281902173912,
+        "min": 0.26944,
+        "p50": 10.957702,
+        "p90": 13.052616,
+        "p99": 14.946308
+      },
+      "full": {
+        "count": 276,
+        "max": 52.295722,
+        "mean": 32.77707906884058,
+        "min": 9.446107,
+        "p50": 32.616486,
+        "p90": 36.90572,
+        "p99": 40.345685
+      },
+      "residual": {
+        "count": 276,
+        "max": 7.105427357601002e-15,
+        "mean": 0.0,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 7.105427357601002e-15
+      },
+      "wait_output": {
+        "count": 276,
+        "max": 25.232974,
+        "mean": 16.491530329710145,
+        "min": 4.791686,
+        "p50": 16.764491,
+        "p90": 20.799945,
+        "p99": 24.209861
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "C1",
+    "measurement_seconds": 20.002613843,
+    "producer_idle_ms": {
+      "count": 276,
+      "max": 6476.233375,
+      "mean": 44.812915706521736,
+      "min": 0.00212,
+      "p50": 9.667189,
+      "p90": 14.314331,
+      "p99": 32.715932
+    },
+    "producer_idle_over_1ms": 275,
+    "profile": "dense-w2",
+    "records": 10526,
+    "refresh_values_ms": [
+      0
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": NaN,
+    "throughput_fps": 16.31325257136524,
+    "video_commands": {
+      "boundary_bytes": 2379450,
+      "boundary_commands": 2,
+      "classified_bytes": 683992413,
+      "classified_commands": 552,
+      "main_only_bytes": 0,
+      "main_only_commands": 0,
+      "main_only_frames": 0,
+      "main_plus_aux_bytes": 683992413,
+      "main_plus_aux_commands": 552,
+      "main_plus_aux_frames": 276,
+      "total_bytes": 683992413,
+      "total_commands": 552,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 114,
+    "wire_window_values": [
+      2
+    ]
+  },
+  {
+    "aux_decisions": 299,
+    "aux_sent": 12,
+    "aux_skipped": 287,
+    "bytes_per_frame": 1266190.18729097,
+    "chroma_gap_ms": {
+      "count": 11,
+      "max": 6119.064453,
+      "mean": 1465.3165834545455,
+      "min": 869.849772,
+      "p50": 1011.523351,
+      "p90": 1029.881044,
+      "p99": 6119.064453
+    },
+    "frame_interval_ms": {
+      "count": 298,
+      "max": 6138.061723,
+      "mean": 56.563495486577175,
+      "min": 16.538559,
+      "p50": 33.392138,
+      "p90": 38.03728,
+      "p99": 52.64544
+    },
+    "frames": 299,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 299,
+        "max": 32.211091,
+        "mean": 0.1960155652173913,
+        "min": 0.00233,
+        "p50": 0.00524,
+        "p90": 0.009719,
+        "p99": 4.022084
+      },
+      "feed": {
+        "count": 299,
+        "max": 4.923141,
+        "mean": 2.566280551839465,
+        "min": 1.715308,
+        "p50": 2.135122,
+        "p90": 4.415359,
+        "p99": 4.764307
+      },
+      "finish_transport_credit": {
+        "count": 299,
+        "max": 13.349946,
+        "mean": 4.768134076923077,
+        "min": 0.28871,
+        "p50": 4.450108,
+        "p90": 5.586668,
+        "p99": 11.793112
+      },
+      "full": {
+        "count": 299,
+        "max": 52.256983,
+        "mean": 19.54154189297659,
+        "min": 14.931058,
+        "p50": 18.637154,
+        "p90": 22.277701,
+        "p99": 36.6437
+      },
+      "residual": {
+        "count": 299,
+        "max": 3.552713678800501e-15,
+        "mean": -5.940992773913881e-18,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 3.552713678800501e-15
+      },
+      "wait_output": {
+        "count": 299,
+        "max": 25.570872,
+        "mean": 12.011111698996654,
+        "min": 8.624578,
+        "p50": 11.464994,
+        "p90": 14.575251,
+        "p99": 20.189857
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "D1",
+    "measurement_seconds": 20.002909466,
+    "producer_idle_ms": {
+      "count": 299,
+      "max": 6098.349764,
+      "mean": 49.44342027424749,
+      "min": 6.220154,
+      "p50": 18.098403,
+      "p90": 20.495716,
+      "p99": 25.572962
+    },
+    "producer_idle_over_1ms": 299,
+    "profile": "sparse-w2",
+    "records": 10222,
+    "refresh_values_ms": [
+      1000
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": 997,
+    "throughput_fps": 17.67924686050043,
+    "video_commands": {
+      "boundary_bytes": 0,
+      "boundary_commands": 0,
+      "classified_bytes": 378590866,
+      "classified_commands": 311,
+      "main_only_bytes": 351907642,
+      "main_only_commands": 287,
+      "main_only_frames": 287,
+      "main_plus_aux_bytes": 26683224,
+      "main_plus_aux_commands": 24,
+      "main_plus_aux_frames": 12,
+      "total_bytes": 378590866,
+      "total_commands": 311,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 5,
+    "wire_window_values": [
+      2
+    ]
+  },
+  {
+    "aux_decisions": 511,
+    "aux_sent": 17,
+    "aux_skipped": 494,
+    "bytes_per_frame": 1268103.7784313725,
+    "chroma_gap_ms": {
+      "count": 16,
+      "max": 1029.083663,
+      "mean": 1017.7380415,
+      "min": 1002.98343,
+      "p50": 1020.192755,
+      "p90": 1028.703757,
+      "p99": 1029.083663
+    },
+    "frame_interval_ms": {
+      "count": 509,
+      "max": 56.776309,
+      "mean": 33.07729495481336,
+      "min": 14.506563,
+      "p50": 32.922185,
+      "p90": 36.716067,
+      "p99": 52.455026
+    },
+    "frames": 510,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 510,
+        "max": 30.098798,
+        "mean": 0.20475273921568626,
+        "min": 0.00214,
+        "p50": 0.00519,
+        "p90": 0.01003,
+        "p99": 6.669108
+      },
+      "feed": {
+        "count": 510,
+        "max": 5.919776,
+        "mean": 2.6431373333333332,
+        "min": 1.37988,
+        "p50": 2.225519,
+        "p90": 4.657051,
+        "p99": 5.135164
+      },
+      "finish_transport_credit": {
+        "count": 510,
+        "max": 15.029274,
+        "mean": 4.626220660784314,
+        "min": 3.020111,
+        "p50": 4.333573,
+        "p90": 5.356575,
+        "p99": 11.580449
+      },
+      "full": {
+        "count": 510,
+        "max": 80.608994,
+        "mean": 18.8282699627451,
+        "min": 14.171646,
+        "p50": 17.983057,
+        "p90": 21.055676,
+        "p99": 36.577253
+      },
+      "residual": {
+        "count": 510,
+        "max": 7.105427357601002e-15,
+        "mean": 4.527968414157501e-17,
+        "min": -3.552713678800501e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 3.552713678800501e-15
+      },
+      "wait_output": {
+        "count": 510,
+        "max": 31.155479,
+        "mean": 11.354159229411765,
+        "min": 8.423745,
+        "p50": 10.902014,
+        "p90": 13.325677,
+        "p99": 19.958675
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "D2",
+    "measurement_seconds": 20.002169139,
+    "producer_idle_ms": {
+      "count": 509,
+      "max": 2670.163575,
+      "mean": 23.067076218074654,
+      "min": 0.00165,
+      "p50": 18.361584,
+      "p90": 20.38049,
+      "p99": 25.89697
+    },
+    "producer_idle_over_1ms": 508,
+    "profile": "sparse-w2",
+    "records": 17439,
+    "refresh_values_ms": [
+      1000
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": 996,
+    "throughput_fps": 30.232218244148815,
+    "video_commands": {
+      "boundary_bytes": 1172390,
+      "boundary_commands": 1,
+      "classified_bytes": 646732927,
+      "classified_commands": 527,
+      "main_only_bytes": 602262047,
+      "main_only_commands": 493,
+      "main_only_frames": 493,
+      "main_plus_aux_bytes": 44470880,
+      "main_plus_aux_commands": 34,
+      "main_plus_aux_frames": 17,
+      "total_bytes": 646732927,
+      "total_commands": 527,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 18,
+    "wire_window_values": [
+      2
+    ]
+  },
+  {
+    "aux_decisions": 279,
+    "aux_sent": 279,
+    "aux_skipped": 0,
+    "bytes_per_frame": 2485684.7661870504,
+    "chroma_gap_ms": {
+      "count": 278,
+      "max": 6167.911011,
+      "mean": 60.903950003597124,
+      "min": 24.496181,
+      "p50": 36.009343,
+      "p90": 38.820781,
+      "p99": 43.235951
+    },
+    "frame_interval_ms": {
+      "count": 277,
+      "max": 6200.71864,
+      "mean": 60.90825042238267,
+      "min": 24.26538,
+      "p50": 35.719954,
+      "p90": 40.686343,
+      "p99": 45.45675
+    },
+    "frames": 278,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 278,
+        "max": 34.296005,
+        "mean": 2.355982798561151,
+        "min": 0.00193,
+        "p50": 1.026782,
+        "p90": 6.289982,
+        "p99": 9.288143
+      },
+      "feed": {
+        "count": 278,
+        "max": 5.51248,
+        "mean": 2.8115946798561153,
+        "min": 1.623011,
+        "p50": 2.225099,
+        "p90": 4.557794,
+        "p99": 5.170753
+      },
+      "finish_transport_credit": {
+        "count": 278,
+        "max": 17.997987,
+        "mean": 11.041386712230215,
+        "min": 0.326068,
+        "p50": 10.972502,
+        "p90": 12.614332,
+        "p99": 14.31897
+      },
+      "full": {
+        "count": 278,
+        "max": 54.194513,
+        "mean": 33.44736670503597,
+        "min": 20.697749,
+        "p50": 32.886987,
+        "p90": 37.094253,
+        "p99": 42.662561
+      },
+      "residual": {
+        "count": 278,
+        "max": 7.105427357601002e-15,
+        "mean": -1.7891363850074465e-16,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 7.105427357601002e-15
+      },
+      "wait_output": {
+        "count": 278,
+        "max": 36.320012,
+        "mean": 17.23840251438849,
+        "min": 10.040445,
+        "p50": 17.455417,
+        "p90": 21.533329,
+        "p99": 25.961398
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "C2",
+    "measurement_seconds": 20.002437654,
+    "producer_idle_ms": {
+      "count": 275,
+      "max": 6147.393955,
+      "mean": 44.23533900363636,
+      "min": 0.00219,
+      "p50": 9.09516,
+      "p90": 13.197631,
+      "p99": 17.813693
+    },
+    "producer_idle_over_1ms": 269,
+    "profile": "dense-w2",
+    "records": 10573,
+    "refresh_values_ms": [
+      0
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": NaN,
+    "throughput_fps": 16.418137002216667,
+    "video_commands": {
+      "boundary_bytes": 0,
+      "boundary_commands": 0,
+      "classified_bytes": 691020365,
+      "classified_commands": 556,
+      "main_only_bytes": 0,
+      "main_only_commands": 0,
+      "main_only_frames": 0,
+      "main_plus_aux_bytes": 691020365,
+      "main_plus_aux_commands": 556,
+      "main_plus_aux_frames": 278,
+      "total_bytes": 691020365,
+      "total_commands": 556,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 121,
+    "wire_window_values": [
+      2
+    ]
+  },
+  {
+    "aux_decisions": 302,
+    "aux_sent": 12,
+    "aux_skipped": 290,
+    "bytes_per_frame": 1265131.9701986755,
+    "chroma_gap_ms": {
+      "count": 11,
+      "max": 6061.743387,
+      "mean": 1469.6750793636363,
+      "min": 938.098455,
+      "p50": 1019.168133,
+      "p90": 1028.597851,
+      "p99": 6061.743387
+    },
+    "frame_interval_ms": {
+      "count": 301,
+      "max": 6076.293699,
+      "mean": 56.09669624916943,
+      "min": 16.53575,
+      "p50": 33.099618,
+      "p90": 36.64733,
+      "p99": 52.745326
+    },
+    "frames": 302,
+    "latency_max_abs_residual_ms": 3.552713678800501e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 302,
+        "max": 31.914971,
+        "mean": 0.22314602649006623,
+        "min": 0.00206,
+        "p50": 0.00485,
+        "p90": 0.009379,
+        "p99": 6.498684
+      },
+      "feed": {
+        "count": 302,
+        "max": 6.422317,
+        "mean": 2.8195707185430465,
+        "min": 1.680469,
+        "p50": 2.315666,
+        "p90": 4.786576,
+        "p99": 5.566768
+      },
+      "finish_transport_credit": {
+        "count": 302,
+        "max": 12.641702,
+        "mean": 4.628690198675497,
+        "min": 0.321178,
+        "p50": 4.376251,
+        "p90": 5.545479,
+        "p99": 10.988792
+      },
+      "full": {
+        "count": 302,
+        "max": 50.635362,
+        "mean": 19.017538125827812,
+        "min": 14.139966,
+        "p50": 18.264087,
+        "p90": 21.105154,
+        "p99": 36.612982
+      },
+      "residual": {
+        "count": 302,
+        "max": 3.552713678800501e-15,
+        "mean": -6.470173918345283e-17,
+        "min": -3.552713678800501e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 3.552713678800501e-15
+      },
+      "wait_output": {
+        "count": 302,
+        "max": 21.364814,
+        "mean": 11.346131182119205,
+        "min": 8.663396,
+        "p50": 10.984232,
+        "p90": 12.988958,
+        "p99": 20.186947
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "B2",
+    "measurement_seconds": 20.002301064,
+    "producer_idle_ms": {
+      "count": 302,
+      "max": 6036.910928,
+      "mean": 49.25768352649006,
+      "min": 6.730236,
+      "p50": 18.161071,
+      "p90": 20.221497,
+      "p99": 26.441821
+    },
+    "producer_idle_over_1ms": 302,
+    "profile": "sparse-w1",
+    "records": 10326,
+    "refresh_values_ms": [
+      1000
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": 996,
+    "throughput_fps": 17.826361744339017,
+    "video_commands": {
+      "boundary_bytes": 0,
+      "boundary_commands": 0,
+      "classified_bytes": 382069855,
+      "classified_commands": 314,
+      "main_only_bytes": 355654463,
+      "main_only_commands": 290,
+      "main_only_frames": 290,
+      "main_plus_aux_bytes": 26415392,
+      "main_plus_aux_commands": 24,
+      "main_plus_aux_frames": 12,
+      "total_bytes": 382069855,
+      "total_commands": 314,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 0,
+    "wire_window_values": [
+      1
+    ]
+  },
+  {
+    "aux_decisions": 276,
+    "aux_sent": 276,
+    "aux_skipped": 0,
+    "bytes_per_frame": 2487308.0836363635,
+    "chroma_gap_ms": {
+      "count": 275,
+      "max": 6080.602545,
+      "mean": 61.604845749090906,
+      "min": 30.390597,
+      "p50": 36.09553,
+      "p90": 39.308404,
+      "p99": 49.392737
+    },
+    "frame_interval_ms": {
+      "count": 274,
+      "max": 6098.206605,
+      "mean": 61.623255963503645,
+      "min": 28.170348,
+      "p50": 35.919767,
+      "p90": 40.952984,
+      "p99": 51.080446
+    },
+    "frames": 275,
+    "latency_max_abs_residual_ms": 7.105427357601002e-15,
+    "latency_ms": {
+      "drain": {
+        "count": 275,
+        "max": 33.963687,
+        "mean": 2.9354135927272726,
+        "min": 0.002219,
+        "p50": 2.896405,
+        "p90": 6.719396,
+        "p99": 8.687984
+      },
+      "feed": {
+        "count": 275,
+        "max": 5.693663,
+        "mean": 2.7470395345454546,
+        "min": 1.679669,
+        "p50": 2.21147,
+        "p90": 4.417159,
+        "p99": 5.152363
+      },
+      "finish_transport_credit": {
+        "count": 275,
+        "max": 16.26058,
+        "mean": 11.18095128,
+        "min": 0.335168,
+        "p50": 10.983221,
+        "p90": 13.2104,
+        "p99": 15.102412
+      },
+      "full": {
+        "count": 275,
+        "max": 52.274893,
+        "mean": 32.558130861818185,
+        "min": 18.005967,
+        "p50": 32.290908,
+        "p90": 36.743396,
+        "p99": 39.264325
+      },
+      "residual": {
+        "count": 275,
+        "max": 7.105427357601002e-15,
+        "mean": -6.45947941600091e-17,
+        "min": -7.105427357601002e-15,
+        "p50": 0.0,
+        "p90": 0.0,
+        "p99": 7.105427357601002e-15
+      },
+      "wait_output": {
+        "count": 275,
+        "max": 24.825559,
+        "mean": 15.694726454545457,
+        "min": 9.320852,
+        "p50": 15.840686,
+        "p90": 19.884418,
+        "p99": 23.889143
+      }
+    },
+    "latency_negative_segments": 0,
+    "latency_pairing_errors": [],
+    "leg": "A2",
+    "measurement_seconds": 20.002623532,
+    "producer_idle_ms": {
+      "count": 276,
+      "max": 6062.729343,
+      "mean": 45.28327216666667,
+      "min": 0.00257,
+      "p50": 10.101844,
+      "p90": 14.05393,
+      "p99": 23.386671
+    },
+    "producer_idle_over_1ms": 274,
+    "profile": "dense-w1",
+    "records": 10470,
+    "refresh_values_ms": [
+      0
+    ],
+    "seconds_requested": 20,
+    "skipped_since_aux_max_ms": NaN,
+    "throughput_fps": 16.227639782491362,
+    "video_commands": {
+      "boundary_bytes": 0,
+      "boundary_commands": 0,
+      "classified_bytes": 684009723,
+      "classified_commands": 550,
+      "main_only_bytes": 0,
+      "main_only_commands": 0,
+      "main_only_frames": 0,
+      "main_plus_aux_bytes": 684009723,
+      "main_plus_aux_commands": 550,
+      "main_plus_aux_frames": 275,
+      "total_bytes": 684009723,
+      "total_commands": 550,
+      "unclassified": []
+    },
+    "window_two_counterfactual_advances": 0,
+    "wire_window_values": [
+      1
+    ]
+  }
+]

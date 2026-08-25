@@ -19,16 +19,16 @@ the same branch name in `/workUpdateXorgXrdpCleanroom`, based on
 | 130 | `00da39087ef899911799c28c98eff5d06f06cb07` | — |
 | 131 | `c6dc433a9fdc9dab49381d998019e3bca17a9771` | — |
 | 132 | `71163af8fb83c7c213571134591ad709b73c06e5` | — |
-| 133 | `131c3ca0d49194e2a65ea39f348b311515ac6c1f` | — |
-| 134 | `e0d4102435d39914c44478a5960b6964242e16b6` | — |
-| 135 | `422503d997ecfa2daee815070436a066d3c50e10` | — |
-| 136 | `181f0c825438940c0680eafbfcc6765f25cf9a8f` | `5b5288f08fb11a5c3e8df2896e721c01cec76fc4` |
-| 137 | `b75a876f95109e07c01565d990b60dd85015735c` | — |
-| 138 | `409dc7e21a3580d172de7f10f79a8f089a322237` | — |
-| 139 | `6260fc3fae28984f8c9557d15c19b4b8abf3e107` | — |
-| 140 | `447278dbbc378484b6e1c4157730432b8617ad4f` | `aa03d860137d9be95a6bbf41c9ba29608fc6ec5d` |
-| 141 | `9e53e16235795d5c9fa6454c7b9d8f06a86613e1` | — |
-| 142 | `ae2a4674ab96c5b30b71afaa2ca915fc5cf8972e` | — |
+| 133 | `6e9347610f334f32b0200863c4d02ddf197d79f6` | — |
+| 134 | `be9f0bd49ec92755a5f7dac2cb9dc774be037d64` | — |
+| 135 | `cc03a3059df0b4735093526fc18cd67ae2b3a6e9` | — |
+| 136 | `0faf5f899b5f2bad025d8fd75a7b445bc9bfbd8e` | `5b5288f08fb11a5c3e8df2896e721c01cec76fc4` |
+| 137 | `6b4d116cb93bb9406eb11fc3d061e00dbbc2cee7` | — |
+| 138 | `d027e24578004fbd7fb03a40fb6641509b28bbf9` | — |
+| 139 | `53bd4152ad3085e05a209a6878687cb0a57167b5` | — |
+| 140 | `4170f97b9dfd406511f3ddc9a8a0d9961f8ff5d6` | `aa03d860137d9be95a6bbf41c9ba29608fc6ec5d` |
+| 141 | `e4a0ae47bb10ac679694b5b5b111ac3fb4c67014` | — |
+| 142 | `a18d1305b2e930fa231045661e424bb333e20964` | — |
 
 Each slice was authored and committed in dependency order. The backend is not
 operator-selectable in an intermediate commit; activation and its complete
@@ -37,7 +37,7 @@ operator surface first appear in #142.
 ## Automated gates
 
 The final trace-enabled xrdp tree passed the complete test matrix, including
-195/195 xrdp tests. The default build also passed the complete matrix; its
+203/203 xrdp tests. The default build also passed the complete matrix; its
 disabled-trace TAP case proved there is no trace code, data, event string,
 state or argument evaluation. Cppcheck 2.20.0, the version pinned by CI,
 completed without a diagnostic. The four paired xorgxrdp tests passed: both
@@ -77,39 +77,78 @@ including its no-monitor session fallback. #133 through #142 were replayed;
 the commit table above is the corrected history. The normative requirements
 now state this shared geometry obligation explicitly.
 
+The numerical replay then exercised the trace schema as a consumer for the
+first time and found omissions which source-only gates could not expose. The
+corrections were likewise folded into their owning slices: #126's formatter
+uses only its supported integer conversions and keeps child-role state
+compile-time absent; #139 identifies main and auxiliary child events; #140
+emits runtime-selectable, terminal-only transport and acknowledgement records
+with frame identity, exact byte count and all frontiers needed to evaluate the
+configured window. A source TAP now checks the selectors, guards, roles and
+schemas. With tracing disabled, these fields, strings, branches and argument
+evaluation remain absent. No production policy changed in these corrections.
+
+## Final numerical replay
+
+The retained capture is
+`PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/`.
+It certifies and runs dense/sparse chroma crossed with wire windows 1/2 in the
+prescribed `A B C D D C B A` order. Each leg is an exact 20-second,
+one-monitor 3840x2400 oracle-client run with full-screen textflood.
+
+Sparse raised this producer-paced workload's delivered rate by 8.3% at
+window 1 and 9.0% at window 2, reduced classified video-command bytes per
+frame by 49.3--49.4%, and reduced mean encoder-pump-to-transport/credit
+latency from 32.6--33.2 ms to 18.8--19.5 ms. All eight rates close to terminal
+frame count divided by the complete window. Command/byte accounting closes by
+frame identity, every latency segment is non-negative, and all decompositions
+close within `7.11e-15` ms.
+
+Every leg has a 1.00x producer margin, so these are comparable end-to-end
+textflood workload results, not unconstrained server ceilings and not evidence
+about absent pipeline overlap. Window 2 was genuinely exercised: its traces
+contain states window 1 cannot admit. Its rate effect remained below 1% in
+both policies, providing no reason to change the shipped window-1 default.
+
+The preceding red captures are retained beside the result. They supplied no
+timing claim and drove corrections to certification topology, trace schema and
+roles, terminal-only egress identity, readiness, exact-window rate closure and
+explicit boundary accounting. Details and all distributions are in the
+retained capture README.
+
 ## Local interactive arm
 
-The corrected pair is deployed as x040 on host endpoint
-`127.0.0.1:40056`. It runs Ubuntu 24.04 with FFmpeg 6.1.1, a regular minimal
+The final pair is deployed as x042 on host endpoint
+`127.0.0.1:40058`. It runs Ubuntu 24.04 with FFmpeg 6.1.1, a regular minimal
 XFCE desktop, LXTerminal for antialiased text and an unmodified default xterm.
 No visual payload or measurement sidecar autostarts.
 
 The immutable image is
-`localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983`.
+`localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce-notrace.pfe378533`.
 It contains:
 
 * `xrdp-dev` version
-  `0.10.80+git20260825041007.ae2a4674ab96`, package SHA-256
-  `26d79257660324829c25d3115f7a265973b2006345ee7c9145b3e8b466fd536c`;
+  `0.10.80+git20260825052420.a18d1305b2e9`, package SHA-256
+  `fe378533a2f7cbaeedb078612631df93e05279d47b66d7402457a34130ddfc23`;
 * `xorgxrdp-dev` version
   `1:0.10.80+git20260825030213.aa03d860137d`, package SHA-256
   `112b1c21b9c4cf584ad8e4a6e790f3b7ef46569ed542cc2ecb8cf5b1029b8e9a`;
 * dense AVC with automatic mode selection, libx264, 32-pixel chroma width
   alignment, eager slot acknowledgement, a one-frame wire window, sparse
-  chroma disabled, and the trace build armed to `/var/log/xrdp-perf/enc`.
+  chroma disabled, and performance tracing compile-time absent.
 
 The live `gfx.toml` SHA-256 is
-`2646d4b1152cc3c59a7e3d8f358426f56b675e7fc5416323d4144985fafc7c5e`.
+`216aed1fd3b78c26ee3aaa1d922ee53e970f5cece8f8ccb17e5e8a0cff9f3971`.
 The post-smoke state has no tester Xorg session, no payload autostart and no
 smoke configuration marker. `chroma-probe`, `colorkey_x11`,
 `codescroll10.sh`, `textflood`, `lxterminal` and `xterm` are installed for the
 owner's interactive replay.
 
-## Remaining #142 gates
+## Remaining #142 gate
 
-#126 through #141 are complete. #142 remains open for the retained real-client
-matrix and the specified eight-leg numerical replay. The interactive matrix
+#126 through #141 are complete. #142's numerical and automated gates are
+complete. It remains open only for the owner's retained real-client matrix on
+x042. The interactive matrix
 must still cover the supported AVC420/AVC444 modes, Windows and macOS, one and
-two monitors, resize, fine chroma and motion. The numerical replay must retain
-the prescribed `A B C D D C B A` order and semantic trace accounting; the
-qualitative smoke above cannot substitute for either result.
+two monitors, resize, fine chroma and motion. The local oracle smoke and
+numerical replay cannot substitute for real-client rendering evidence.

@@ -1,0 +1,24 @@
+# Numerical replay baseline. The matrix changes only wire_window and the two
+# sparse-chroma intervals; every other encoder and transport setting is fixed.
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+avc_mode = "444"
+chroma_align = 32
+encoder_args = [
+  "-c:v", "libx264", "-bf", "0", "-preset", "ultrafast",
+  "-tune", "zerolatency", "-crf", "18", "-g", "240",
+  "-x264-params", "repeat-headers=1:aud=1:cabac=1",
+]
+dump_extra = false
+strip_sei = false
+sanitize_hrd = false
+strip_pic_struct = false
+aux_ltr_chain = true
+eager_slot_ack = true
+wire_window = 2
+chroma_refresh_ms = 1000
+chroma_idle_ms = 100

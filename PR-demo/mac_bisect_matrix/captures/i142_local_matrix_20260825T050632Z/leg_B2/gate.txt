@@ -1,0 +1,54 @@
+target=pod server=xrdp-x041-75ff5c5749-cvn7d arm=x041 port=40057 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T050632Z/leg_B2
+identity OK: arm=x041 pod=xrdp-x041-75ff5c5749-cvn7d
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 0 lines, xrdp.log 5 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 685: 2551852 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 378054502 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 259 lines, mark was 0); taking it whole
+perf_trace_lines: 3319 records rendered, 6359 unclassed records left in the trace, 0 outside the run window
+trace presence OK: 3319 records (minimum 100 for 20s)
+trace span: 19s for a 20s run
+=== performance gate run: x041, oracle client, 20s ===
+image:    localhost/xrdp-bisect:cleanroom-b53bead6-aa03d860-u2404-xfce.p81d9d41f
+package: xorgxrdp-dev 1:0.10.80+git20260825030213.aa03d860137d
+package: xrdp-dev 0.10.80+git20260825050320.b53bead65628
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = xfce-textflood
+selector: TEXTFLOOD_MONITOR = all
+refresh:  intra_refresh_frames = 
+pipe:     encoder input pipe at or above the 64 KiB
+          minimum (no PIPE_TOO_SMALL in xrdp-x041-75ff5c5749-cvn7d's log)
+
+=== E5 / rate — send interval from the server's own log ===
+RED: only 0 GFX_TRACE send records — is XRDP_GFX_TRACE=1 set in the arm's env?
+
+=== E4 — poll-set size the worker actually armed ===
+    289 kids_armed=1
+     12 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+rewrite unsupported      0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x041
+mode:   AVC444 (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:cleanroom-b53bead6-aa03d860-u2404-xfce.p81d9d41f
+gfx:    sha256:6e85c7b4851cee68
+key:    localhost/xrdp-bisect:cleanroom-b53bead6-aa03d860-u2404-xfce.p81d9d41f|6e85c7b4851cee68
+when:   2026-08-25T05:07:50Z
+  ASSERT VERDICT: PASS -- 6 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T050632Z/certs/sparse-w1.cert
+producer stamps archived: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T050632Z/leg_B2/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T050632Z/leg_B2

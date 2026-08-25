@@ -107,10 +107,13 @@
 #   E_MODE0/E_MODE1/E_POS1/E_MODELINE0/E_MODELINE1 (client geometry) ·
 #   E_FREEZE_AT (BACKLOG #80 freeze leg, default OFF — see below) ·
 #   E_STAMPS (benchmark payload's own per-frame stamps file, server side)
+#   E_READY_STAMP_LINES (wait for this many payload frames before measuring)
+#   E_GFX_FILE/E_CERTFILE (generated profile and its exact deploy certificate)
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 SECS=${1:-120}
 ARM=${E_ARM:-arm-r}
+GFX_FILE=${E_GFX_FILE:-$D/gfx/$ARM.toml}
 # BACKLOG #104: DERIVE the port from the arm's own manifest, exactly as
 # arm_certify.sh does. It used to default to a hardcoded 40017, which
 # was one arm's port in a fleet that has since been replaced twice --
@@ -178,6 +181,9 @@ XCONF=${E_XORG_CONF:-$MMCONF/xorg-dummy-2mon-4k.conf}
 # reading and withholds only RDPGFX_FRAME_ACKNOWLEDGE; this harness
 # cannot produce that condition and does not claim to.
 FREEZE_AT=${E_FREEZE_AT:-}
+WARMUP_SECS=${E_WARMUP_SECS:-0}
+STAMPS=${E_STAMPS:-/tmp/e52_textflood_stamps.tsv}
+READY_STAMP_LINES=${E_READY_STAMP_LINES:-0}
 # Set as soon as the client is launched, so the freeze trap knows whether
 # there is a group to resume. Declared here for `set -u`.
 CLIENT_PGID=
@@ -330,13 +336,13 @@ fi
 # either invalidates it, exactly like the ARM_TAG / manifest pin guard:
 # a stale certificate covering a different pair is the same class of lie
 # as a manifest pinning another arm's binary.
-CERTFILE=$D/certs/$ARM.cert
+CERTFILE=${E_CERTFILE:-$D/certs/$ARM.cert}
 if [ "$TARGET" = pod ]; then
     [ -f "$CERTFILE" ] || fail "$ARM has no certificate at $CERTFILE — its \
 bytes have never been checked. Run: $D/arm_certify.sh $ARM"
     WANT_IMAGE=$(kubectl -n "$NS" get pod "$POD" \
                  -o jsonpath='{.spec.containers[0].image}')
-    WANT_GFX=$(sha256sum "$D/gfx/$ARM.toml" | cut -c1-16)
+    WANT_GFX=$(sha256sum "$GFX_FILE" | cut -c1-16)
     GOT_KEY=$(sed -n 's/^key: *//p' "$CERTFILE")
     if [ "$GOT_KEY" != "$WANT_IMAGE|$WANT_GFX" ]; then
         fail "$ARM's certificate is STALE — it certifies
@@ -546,6 +552,30 @@ else
                             "/size:$E_SIZE" \
                             "/gfx:AVC444" "/cert:ignore" "/log-level:WARN")
 fi
+case "$WARMUP_SECS" in
+    ''|*[!0-9]*) fail "E_WARMUP_SECS must be a non-negative integer" ;;
+esac
+case "$READY_STAMP_LINES" in
+    ''|*[!0-9]*) fail "E_READY_STAMP_LINES must be a non-negative integer" ;;
+esac
+READY_WAIT_SECS=0
+READY_OBSERVED_LINES=0
+if [ "$READY_STAMP_LINES" -gt 0 ]; then
+    case "$STAMPS" in
+        /*) ;;
+        *) fail "E_STAMPS must be an absolute path for the readiness gate" ;;
+    esac
+    case "$STAMPS" in
+        *[!A-Za-z0-9_./-]*)
+            fail "E_STAMPS contains characters unsafe for the readiness gate"
+            ;;
+    esac
+    # This is the benchmark payload's disposable stamp file, not a GUI
+    # process. Removing it before client launch gives this session an
+    # unambiguous zero point. The bounded poll ends before RUN_T0, so no
+    # readiness sidecar runs on the measured path.
+    srv "rm -f -- '$STAMPS'"
+fi
 if [ "$MODE" = oracle ]; then
     [ -x "$ORACLE_BIN" ] || fail "oracle client missing at $ORACLE_BIN"
     echo "client: ORACLE (save-only, acks before decode) — server ceiling"
@@ -608,7 +638,29 @@ if [ -n "$FREEZE_AT" ]; then
     trap 'freeze_release; exit 130' INT
     trap 'freeze_release; exit 143' TERM
 fi
-echo "connected; recording for ${SECS}s ..."
+if [ "$READY_STAMP_LINES" -gt 0 ]; then
+    while [ "$READY_WAIT_SECS" -lt 45 ]
+    do
+        READY_OBSERVED_LINES=$(srv \
+            "wc -l < '$STAMPS' 2>/dev/null || echo 0" | tail -1)
+        case "$READY_OBSERVED_LINES" in
+            ''|*[!0-9]*) READY_OBSERVED_LINES=0 ;;
+        esac
+        [ "$READY_OBSERVED_LINES" -ge "$READY_STAMP_LINES" ] && break
+        sleep 1
+        READY_WAIT_SECS=$((READY_WAIT_SECS + 1))
+    done
+    [ "$READY_OBSERVED_LINES" -ge "$READY_STAMP_LINES" ] ||
+        fail "payload readiness timed out after 45s: observed \
+$READY_OBSERVED_LINES of $READY_STAMP_LINES required stamp lines"
+    echo "payload ready: $READY_OBSERVED_LINES stamp lines after" \
+         "${READY_WAIT_SECS}s"
+fi
+if [ "$WARMUP_SECS" -gt 0 ]; then
+    echo "connected; warming the fresh desktop for ${WARMUP_SECS}s ..."
+    sleep "$WARMUP_SECS"
+fi
+echo "recording for ${SECS}s ..."
 # The run window, for cutting the perf ring down to THIS run. The ring
 # file is the xrdp process's whole life -- a pod that has served three
 # runs has all three in it -- so it needs the same windowing xrdp.log
@@ -675,6 +727,10 @@ RUN_T1=$((RUN_T1_NS / 1000000000))
     echo "end_epoch $RUN_T1"
     echo "start_epoch_ns $RUN_T0_NS"
     echo "end_epoch_ns $RUN_T1_NS"
+    echo "warmup_seconds $WARMUP_SECS"
+    echo "ready_stamp_lines_required $READY_STAMP_LINES"
+    echo "ready_stamp_lines_observed $READY_OBSERVED_LINES"
+    echo "ready_wait_seconds $READY_WAIT_SECS"
 } > "$OUT/measurement_window.txt"
 # SIGCONT before the teardown kill so a frozen group is running when it
 # is reaped; a no-op on an ordinary leg, where nothing was stopped.
@@ -743,7 +799,7 @@ fi
 PERF_DIR=/var/log/xrdp-perf
 EVIDENCE_ERROR=
 mkdir -p "$OUT/perf"
-PERF_FILES=$(srv "sudo sh -c 'ls -t $PERF_DIR/enc.* 2>/dev/null | head -4'" \
+PERF_FILES=$(srv "ls -t $PERF_DIR/enc.* 2>/dev/null | head -4" \
     | tr -d '\r')
 if [ -n "$PERF_FILES" ]; then
     for f in $PERF_FILES; do
@@ -817,7 +873,6 @@ fi
 # belongs to the session this run created. The other payloads (code,
 # codeflood, gpuflood) write no stamps at all and the margin below is
 # then reported NOT MEASURED, never as a pass.
-STAMPS=${E_STAMPS:-/tmp/e52_textflood_stamps.tsv}
 PRODSTAMPS=$OUT/textflood_stamps.tsv
 srv_cat "$STAMPS" > "$PRODSTAMPS" 2>/dev/null
 if [ ! -s "$PRODSTAMPS" ]; then
@@ -883,6 +938,7 @@ $(sed -n 's/^ *intra_refresh_frames *= *\([0-9][0-9]*\).*/\1/p' \
     echo "=== E5 / rate — send interval from the server's own log ==="
     python3 - "$OUT/gfx_trace.txt" "$MODE" "$E5_BASE_MS" "$NMON" \
              "$PRODSTAMPS" "$RUN_T0" "$RUN_T1" <<'PY'
+import datetime
 import re
 import sys
 
@@ -899,20 +955,23 @@ def secs(line):
     m = TS.match(line)
     if not m:
         return None
-    h, mi, s, frac = int(m.group(4)), int(m.group(5)), int(m.group(6)), \
-        m.group(7)
-    return h * 3600 + mi * 60 + s + float("0." + frac)
+    whole = datetime.datetime(
+        int(m.group(1)), int(m.group(2)), int(m.group(3)),
+        int(m.group(4)), int(m.group(5)), int(m.group(6)),
+        tzinfo=datetime.timezone.utc).timestamp()
+    return whole + float("0." + m.group(7))
 
 
 t = []
 events = []
 bboxes = []
+run_t0 = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0
+run_t1 = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
 for line in open(sys.argv[1], errors="replace"):
     v = secs(line)
     if v is None:
         continue
-    if "GFX_TRACE enc submitted_seq" in line:
-        t.append(v)
+    if run_t1 > run_t0 and not run_t0 <= v <= run_t1:
         continue
     m = DMG.search(line)
     if m:
@@ -927,9 +986,11 @@ for line in open(sys.argv[1], errors="replace"):
         continue
     m = SEND.search(line)
     if m and m.group(2) == "1":
+        t.append(v)
         events.append((v, "last", int(m.group(3))))
 if len(t) < 3:
-    print("RED: only %d GFX_TRACE send records — is XRDP_GFX_TRACE=1 set "
+    print("RED: only %d terminal GFX_TRACE send records — is "
+          "XRDP_GFX_TRACE=1 set "
           "in the arm's env?" % len(t))
     raise SystemExit(0)
 # File order is write order. Out-of-order stamps mean the deployed xrdp
@@ -965,8 +1026,6 @@ nmon = int(sys.argv[4]) if len(sys.argv) > 4 else 2
 # The comment header carries an epoch/monotonic anchor pair so those
 # stamps can be laid on the wall clock the server's records use.
 prod_path = sys.argv[5] if len(sys.argv) > 5 else ""
-run_t0 = float(sys.argv[6]) if len(sys.argv) > 6 else 0.0
-run_t1 = float(sys.argv[7]) if len(sys.argv) > 7 else 0.0
 prod = []
 anchor = None
 prod_note = ""

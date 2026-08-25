@@ -1,0 +1,8 @@
+A1 dense-w1
+B1 sparse-w1
+C1 dense-w2
+D1 sparse-w2
+D2 sparse-w2
+C2 dense-w2
+B2 sparse-w1
+A2 dense-w1

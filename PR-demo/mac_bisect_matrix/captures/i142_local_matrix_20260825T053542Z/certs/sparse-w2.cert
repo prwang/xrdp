@@ -1,0 +1,61 @@
+arm:    x041
+mode:   AVC444 (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c
+gfx:    sha256:0436e39f43d7e7dd
+key:    localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c|0436e39f43d7e7dd
+when:   2026-08-25T05:37:48Z
+window: 3s at 1920x1080, 30726 bytes
+
+=== encoder input pipe ===
+PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
+after 3s of real encoding, so every encoder child got
+an input pipe of at least the 64 KiB minimum. Above that
+the handover cost is flat (0.71 ms at 512 KiB against
+0.60 ms at 1 MiB for a 13.82 MB picture), so this is the
+whole of the requirement.
+
+=== wire audit (--assert) ===
+=== x041 deploy certification ===
+SPS: 1024x768 profile=77 level=42 max_num_ref_frames=1 log2_max_frame_num=4 poc_type=2 gaps=0  (1 SPS NALs, views: main)
+PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
+
+first 12 pictures (decode order):
+  main fn=0      IDR none       ltr_flag=0    3908B
+  aux  fn=1      I   none       []            1023B
+  main fn=1      P   none       [('sliding_window', None)]     103B
+  aux  fn=2      I   none       []             679B
+
+default auxiliary-leaf topology: 2 main, 2 auxiliary picture(s)
+The auxiliary view is expected to be non-reference intra;
+the main view alone owns the inter-picture reference chain.
+
+=== ASSERT GATE (AVC444 auxiliary-leaf topology) ===
+  LTR assertions A1-A7 are not run: this configuration
+  deliberately uses a non-reference intra auxiliary leaf.
+  L1 both AVC444 views are present         PASS  2 main and 2 auxiliary picture(s)
+  L2 every auxiliary picture is a leaf     PASS  all auxiliary pictures are non-IDR, non-reference intra
+  L3 main pictures retain reference ownership PASS  all main pictures are reference-bearing
+  L4 auxiliary cadence cannot exceed main cadence PASS  2 auxiliary against 2 main picture(s)
+  L5 main frame numbers are contiguous     PASS  one chain per IDR period
+  L6 parameter sets belong to the main view PASS  2 main and 0 auxiliary parameter-set NAL(s)
+
+ASSERT VERDICT: PASS -- 6 checks, all clean
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 4
+  frames decoded          : 4
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+This profile uses the default auxiliary-leaf topology, not
+the optional LTR chain. The live gate proves a reference-
+bearing main chain, parameter-set-free non-reference intra
+auxiliary leaves, valid cadence and decode without black
+frames. LTR slot and scheduled-cut assertions do not apply.

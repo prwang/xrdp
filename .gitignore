@@ -94,4 +94,4 @@ node_modules/
 PR-demo/textflood/textflood
 PR-demo/textflood/ring_recon
 PR-demo/mac_bisect_matrix/.build-i125c-u2404/
-PR-demo/mac_bisect_matrix/.build-x040-cleanroom/
+PR-demo/mac_bisect_matrix/.build-x*-cleanroom/

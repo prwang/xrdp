@@ -71,6 +71,13 @@ def grouped(records, event):
     return [record for record in records if record["event"] == event]
 
 
+def frame_identity(record):
+    """Read either the current schema or an archived development capture."""
+    if "frame" in record:
+        return record["frame"]
+    return record["id"]
+
+
 def classify_video_commands(records, frame_ids):
     in_scope = [record for record in records
                 if record["frame_id"] in frame_ids]
@@ -86,6 +93,8 @@ def classify_video_commands(records, frame_ids):
     unclassified = []
     for frame_id in sorted(frame_ids):
         commands = commands_by_id.get(frame_id, [])
+        if not commands:
+            continue
         size = sum(record["bytes"] for record in commands)
         if len(commands) == 1 and commands[0]["view"] == 1:
             main_only_count += 1
@@ -108,6 +117,8 @@ def classify_video_commands(records, frame_ids):
         "total_bytes": sum(record["bytes"] for record in in_scope),
         "classified_commands": main_only_count + paired_count * 2,
         "classified_bytes": main_only_bytes + paired_bytes,
+        "classified_frames": main_only_count + paired_count,
+        "boundary_terminal_frames": len(frame_ids) - len(commands_by_id),
         "boundary_commands": len(boundary),
         "boundary_bytes": sum(record["bytes"] for record in boundary),
         "unclassified": unclassified,
@@ -126,15 +137,22 @@ def analyze_leg(leg_dir):
     }
 
     egress = grouped(records, "egress")
-    egress_by_id = {record["id"]: record for record in egress}
+    egress_by_id = {frame_identity(record): record for record in egress}
     egress_times = sorted(record["mono_ns"] for record in egress)
     intervals = [(right - left) / 1e6
                  for left, right in zip(egress_times, egress_times[1:])]
     result["frame_interval_ms"] = distribution(intervals)
     result["frames"] = len(egress)
-    result["throughput_fps"] = (len(intervals) * 1e9 /
-                                (egress_times[-1] - egress_times[0])
-                                if len(egress_times) > 1 else math.nan)
+    result["unique_frame_identities"] = len(egress_by_id)
+    result["active_span_seconds"] = (
+        (egress_times[-1] - egress_times[0]) / 1e9
+        if len(egress_times) > 1 else math.nan)
+    result["throughput_fps"] = (
+        len(egress) / result["measurement_seconds"]
+        if result["measurement_seconds"] > 0 else math.nan)
+    result["throughput_count_closure"] = (
+        result["throughput_fps"] * result["measurement_seconds"] -
+        len(egress))
 
     aux = grouped(records, "auxdue")
     result["aux_decisions"] = len(aux)
@@ -154,13 +172,14 @@ def analyze_leg(leg_dir):
     result["video_commands"] = classify_video_commands(
         grouped(records, "video_cmd"), egress_by_id)
     result["bytes_per_frame"] = (
-        result["video_commands"]["total_bytes"] / len(egress)
-                                  if egress else math.nan)
+        result["video_commands"]["total_bytes"] /
+        result["video_commands"]["classified_frames"]
+        if result["video_commands"]["classified_frames"] else math.nan)
 
     slot_acks = [record for record in grouped(records, "ack")
                  if record.get("class") == "ACK_TRACE" and
                  record.get("kind") == "slot"]
-    slot_by_id = {record["id"]: record for record in slot_acks}
+    slot_by_id = {frame_identity(record): record for record in slot_acks}
     result["wire_window_values"] = sorted({record["window"]
                                             for record in slot_acks})
     result["window_two_counterfactual_advances"] = sum(
@@ -201,11 +220,11 @@ def analyze_leg(leg_dir):
                          next_begin_ns]
         main_feeds = {record["sequence"]: record for record in cycle_records
                       if record["event"] == "feedend" and
-                      record["main"] == 0}
+                      record["main"] == 1}
         main_outputs = {record["sequence"]: record
                         for record in cycle_records
                         if record["event"] == "outfirst" and
-                        record["main"] == 0}
+                        record["main"] == 1}
         sequences = sorted(set(main_feeds) & set(main_outputs))
         emits = [record for record in cycle_records
                  if record["event"] == "emit_beg" and
@@ -262,6 +281,14 @@ def validate(results):
     for result in results:
         profile = result["profile"]
         commands = result["video_commands"]
+        if result["frames"] == 0:
+            failures.append("%s delivered no frame" % result["leg"])
+        if result["unique_frame_identities"] != result["frames"]:
+            failures.append("%s has duplicate terminal frame identities" %
+                            result["leg"])
+        if abs(result["throughput_count_closure"]) > 0.000001:
+            failures.append("%s throughput does not close to frame count" %
+                            result["leg"])
         if result["wire_window_values"] != [expected_window[profile]]:
             failures.append("%s did not trace its requested wire window" %
                             result["leg"])
@@ -308,10 +335,11 @@ def validate(results):
         if len(legs) != 2:
             failures.append("%s does not have exactly two repetitions" % profile)
             continue
-        values = [result["frame_interval_ms"]["mean"] for result in legs]
+        values = [result["throughput_fps"] for result in legs]
         spread = 100.0 * (max(values) - min(values)) / min(values)
         if spread > 15.0:
-            failures.append("%s repetitions differ by %.1f%%" %
+            failures.append("%s exact-window throughput repetitions differ "
+                            "by %.1f%%" %
                             (profile, spread))
     return failures
 
@@ -333,13 +361,21 @@ def main():
         assert commands["main_plus_aux_frames"] == 1
         assert commands["total_commands"] == 3
         assert commands["total_bytes"] == 120
+        assert commands["classified_frames"] == 2
+        assert commands["boundary_terminal_frames"] == 0
         assert commands["boundary_commands"] == 0
         boundary = classify_video_commands(
             [{"frame_id": 3, "view": 1, "bytes": 60}], {1: {}, 2: {}})
         assert boundary["total_commands"] == 0
         assert boundary["boundary_commands"] == 1
         assert boundary["boundary_bytes"] == 60
+        missing = classify_video_commands([], {1: {}, 2: {}})
+        assert missing["boundary_terminal_frames"] == 2
         assert not commands["unclassified"]
+        seconds = 20.0
+        frames = 500
+        rate = frames / seconds
+        assert rate * seconds - frames == 0
         print("PASS: i125b analyzer arithmetic selftest")
         return 0
     if len(sys.argv) != 2:
@@ -357,16 +393,17 @@ def main():
         stream.write("\n")
 
     print("=== mechanism and accounting ===")
-    print("leg profile    frames aux+/aux- main-only paired commands edge-cmd "
-          "bytes-MB idle>1ms W2-extra")
+    print("leg profile    frames aux+/aux- main-only paired commands "
+          "edge-in/edge-out bytes-MB idle>1ms W2-extra")
     for result in results:
         commands = result["video_commands"]
-        print("%-3s %-10s %6d %4d/%-4d %9d %6d %8d %8d %8s %8d %8d" %
+        print("%-3s %-10s %6d %4d/%-4d %9d %6d %8d %7d/%-7d %8s %8d %8d" %
               (result["leg"], result["profile"], result["frames"],
                result["aux_sent"], result["aux_skipped"],
                commands["main_only_frames"],
                commands["main_plus_aux_frames"],
                commands["total_commands"],
+               commands["boundary_terminal_frames"],
                commands["boundary_commands"],
                fmt(commands["total_bytes"] / 1e6, 1),
                result["producer_idle_over_1ms"],
@@ -374,11 +411,13 @@ def main():
     print()
     print("Each paired frame contributes two video commands; each main-only "
           "frame contributes one. Their command and byte sums equal the "
-          "audited totals in every row. Edge commands have an explicit frame "
-          "identity whose terminal egress fell outside the measurement "
-          "window; they are shown but excluded from both sums.")
+          "audited totals in every row. Edge-in frames reached terminal "
+          "egress inside the window after their command was built before it; "
+          "edge-out commands were built inside before terminal egress after "
+          "it. Both are named by identity and excluded from byte-per-frame "
+          "rather than being paired by time.")
     print()
-    print("=== delivered-frame interval and throughput ===")
+    print("=== delivered-frame interval and exact-window throughput ===")
     print("leg profile      mean-ms p50-ms p90-ms p99-ms frames/s bytes/frame-MB")
     for result in results:
         dist = result["frame_interval_ms"]
@@ -387,6 +426,9 @@ def main():
                fmt(dist["p50"]), fmt(dist["p90"]), fmt(dist["p99"]),
                fmt(result["throughput_fps"]),
                fmt(result["bytes_per_frame"] / 1e6, 3)))
+    print("Throughput is terminal frame count divided by the complete recorded "
+          "measurement window. Interval percentiles describe spacing between "
+          "active frames and do not discard idle time from the rate.")
     print()
     print("=== mean latency from encoder-pump start to transport/credit "
           "completion ===")

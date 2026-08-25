@@ -1,0 +1,3 @@
+condition B2
+profile sparse-w1
+seconds 20

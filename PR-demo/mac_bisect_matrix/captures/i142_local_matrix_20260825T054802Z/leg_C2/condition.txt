@@ -1,0 +1,4 @@
+condition C2
+profile dense-w2
+seconds 20
+ready_stamp_lines 60

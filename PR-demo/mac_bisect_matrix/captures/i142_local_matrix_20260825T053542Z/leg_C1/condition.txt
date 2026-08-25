@@ -1,0 +1,4 @@
+condition C1
+profile dense-w2
+seconds 20
+warmup_seconds 8

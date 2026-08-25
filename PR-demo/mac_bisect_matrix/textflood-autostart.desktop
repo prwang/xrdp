@@ -1,0 +1,6 @@
+[Desktop Entry]
+Type=Application
+Name=Numerical replay payload
+Exec=/usr/local/bin/textflood --corpus /usr/local/share/code_corpus.ansi --repeat-to-edge --stamps /tmp/e52_textflood_stamps.tsv
+Terminal=false
+X-GNOME-Autostart-enabled=true

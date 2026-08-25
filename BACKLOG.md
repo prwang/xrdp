@@ -159,9 +159,10 @@ coded height, and independently gated; see
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: IN PROGRESS; implementation and automated gates are green.** The
-clean-room x040 arm is ready for the retained Windows/macOS interactive matrix;
-the prescribed eight-leg numerical replay is also still open. Execution
+**Status: IN PROGRESS; implementation, automated gates and the numerical replay
+are green.** The trace-disabled clean-room x042 arm is ready at
+`127.0.0.1:40058` for the retained Windows/macOS interactive matrix, which is
+the only remaining gate. Execution
 record: [`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
 
 The fully assembled backend becomes selectable only here. The user-facing

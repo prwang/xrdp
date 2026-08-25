@@ -1,0 +1,45 @@
+=== mechanism and accounting ===
+leg profile    frames aux+/aux- main-only paired commands edge-cmd bytes-MB idle>1ms W2-extra
+A1  dense-w1      498  499/0            0    498      996        0   1245.5      498        0
+B1  sparse-w1     537   18/520        519     18      555        1    682.2      536        0
+C1  dense-w2      498  499/0            0    498      996        0   1245.5      486      235
+D1  sparse-w2     538   18/521        520     18      556        0    683.4      538       10
+D2  sparse-w2     592   20/572        572     20      612        0    749.6      592       17
+C2  dense-w2      497  498/0            0    497      994        2   1242.9      484      220
+B2  sparse-w1     532   18/515        514     18      550        1    676.2      529        0
+A2  dense-w1      491  491/0            0    491      982        0   1227.4      490        0
+
+Each paired frame contributes two video commands; each main-only frame contributes one. Their command and byte sums equal the audited totals in every row. Edge commands have an explicit frame identity whose terminal egress fell outside the measurement window; they are shown but excluded from both sums.
+
+=== delivered-frame interval and throughput ===
+leg profile      mean-ms p50-ms p90-ms p99-ms frames/s bytes/frame-MB
+A1  dense-w1      36.15   35.94   40.72   47.23    27.66          2.501
+B1  sparse-w1     33.39   33.27   37.11   52.68    29.95          1.270
+C1  dense-w2      36.06   35.91   40.69   45.68    27.73          2.501
+D1  sparse-w2     33.38   33.38   37.13   53.03    29.96          1.270
+D2  sparse-w2     33.78   33.50   38.60   52.07    29.60          1.266
+C2  dense-w2      36.12   35.90   40.89   45.74    27.68          2.501
+B2  sparse-w1     33.69   33.43   38.23   52.82    29.68          1.271
+A2  dense-w1      36.62   36.40   41.17   46.71    27.31          2.500
+
+=== mean latency from encoder-pump start to transport/credit completion ===
+leg profile      feed-ms wait-output drain-ms finish-ms full-ms residual
+A1  dense-w1      2.63       15.61     2.95     11.13   32.32 0.000000
+B1  sparse-w1     2.61       11.55     0.19      4.84   19.19 -0.000000
+C1  dense-w2      2.81       17.77     1.39     11.23   33.20 -0.000000
+D1  sparse-w2     2.60       11.32     0.09      4.89   18.90 0.000000
+D2  sparse-w2     2.59       11.97     0.13      4.89   19.58 0.000000
+C2  dense-w2      2.97       16.57     2.46     11.06   33.05 0.000000
+B2  sparse-w1     2.63       11.80     0.14      4.74   19.31 -0.000000
+A2  dense-w1      2.52       15.28     3.27     11.29   32.36 -0.000000
+
+Feed ends when the main child's complete raw picture has entered its pipe; wait-output ends at that same child/sequence's first encoded byte; drain ends when the shared child pump completes; finish ends after the same frame identity has both reached the transport and released slot credit.
+
+=== paired effects (mean of each profile's two repetitions) ===
+window 1: sparse throughput +8.5%; bytes/frame -49.2%
+window 2: sparse throughput +7.5%; bytes/frame -49.3%
+dense: window 2 throughput +0.8%; bytes/frame +0.0%
+sparse: window 2 throughput -0.1%; bytes/frame -0.2%
+
+PASS: all eight legs satisfy the mechanism, accounting, latency and repetition checks
+Raw per-leg distributions: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T053542Z/raw-distributions.json

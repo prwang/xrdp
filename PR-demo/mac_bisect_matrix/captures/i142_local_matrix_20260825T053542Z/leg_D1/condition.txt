@@ -1,0 +1,4 @@
+condition D1
+profile sparse-w2
+seconds 20
+warmup_seconds 8

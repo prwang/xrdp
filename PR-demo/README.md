@@ -67,9 +67,11 @@ realistic payload rather than a diagnostic pattern.
   `i125c_ubuntu2404_deploy.sh` define the one Ubuntu 24.04 / FFmpeg 6 CPU
   compatibility arm on `127.0.0.1:40055`; its deliberately incompatible
   CAVLC configuration verifies rejection before AVC selection.
-  `deploy_x040_cleanroom.sh` and `k8s/x040.yaml` define the paired clean-room
-  interactive candidate on `127.0.0.1:40056`, using a regular XFCE desktop
-  and the indexed visual payloads.
+  `deploy_x042_cleanroom.sh` and `k8s/x042.yaml` define the final paired
+  clean-room interactive candidate on `127.0.0.1:40058`, using the
+  trace-disabled production-default build, a regular XFCE desktop and the
+  indexed visual payloads. x040 on port 40056 is the earlier checkpoint and
+  is not mutated by the numerical replay.
 * **`multimon_offline/`** — drives a real two-monitor `xfreerdp /multimon`
   login and asserts the server took the multi-monitor AVC444 path.
   `setup_monitors.sh` verifies each output's **active pixel geometry**, not
@@ -95,6 +97,12 @@ realistic payload rather than a diagnostic pattern.
   oracle client, verifies the treatment from the perf trace before comparing
   rates, closes command/byte and latency accounting, and leaves the T4 on the
   sparse two-frame interactive profile.
+* **`mac_bisect_matrix/i142_local_matrix.sh`** — reuses that analyzer for the
+  clean-room final replay on one disposable local arm. It certifies four exact
+  generated profiles, runs `A B C D D C B A`, and never changes interactive
+  arms x040 or x042. The retained result is
+  `captures/i142_local_matrix_20260825T054802Z/`; earlier sibling captures are
+  red shakedowns and provide no timing claim.
 * **`mac_bisect_matrix/x264_keyint_probe.c`** — asks libx264 what
   keyframe interval xrdp's linked-library H.264 path actually gets,
   under the presets `gfx.toml` ships. It never sets `i_keyint_max`, so

@@ -1,0 +1,70 @@
+# Final clean-room interactive candidate, built without performance tracing.
+# One monitor at the client-selected size; host endpoint 127.0.0.1:40058.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x042
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x042
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x042
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x042
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce-notrace.pfe378533
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "xfce"
+            - name: ARM_LABEL
+              value: "Final clean-room AVC444 FFmpeg candidate (port 40058)"
+          ports:
+            - containerPort: 3389
+              hostPort: 40058
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: payloads
+              mountPath: /usr/local/bin/codescroll10.sh
+              subPath: codescroll10.sh
+            - name: payloads
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: payloads
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x042

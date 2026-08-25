@@ -1,0 +1,4 @@
+condition B2
+profile sparse-w1
+seconds 20
+ready_stamp_lines 60

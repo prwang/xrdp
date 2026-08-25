@@ -37,10 +37,13 @@
 # ELSE. A measurement run does not dump and does not walk a dump.
 #
 # Usage: arm_certify.sh <arm> [port]      (port defaults from k8s/<arm>.yaml)
+# E_GFX_FILE and E_CERTFILE select an exact generated profile and its
+# profile-specific certificate for a sequential matrix on one arm.
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 ARM=${1:?usage: arm_certify.sh <arm> [port]}
 NS=${E_NS:-bisect-matrix}
+GFX_FILE=${E_GFX_FILE:-$D/gfx/$ARM.toml}
 SECS=${CERT_SECS:-3}
 # how long the session may take to come up before the encoder sees a
 # frame; NOT part of the certified window (see the wait loop below)
@@ -55,7 +58,7 @@ LOGIN_GRACE=${CERT_LOGIN_GRACE:-30}
 arm_toml_int()
 {
     sed -n "s/^ *$1 *= *\\([0-9][0-9]*\\).*/\\1/p" \
-        "$D/gfx/$ARM.toml" 2>/dev/null | head -1
+        "$GFX_FILE" 2>/dev/null | head -1
 }
 # The arm's CODEC MODE, read the same way. An arm configured
 # avc_mode = "420" is a legitimate, shipped configuration -- an
@@ -70,12 +73,24 @@ arm_toml_int()
 arm_toml_str()
 {
     sed -n "s/^ *$1 *= *\"\([^\"]*\)\".*/\1/p" \
-        "$D/gfx/$ARM.toml" 2>/dev/null | head -1
+        "$GFX_FILE" 2>/dev/null | head -1
+}
+arm_toml_bool()
+{
+    sed -n "s/^ *$1 *= *\(true\|false\).*/\1/p" \
+        "$GFX_FILE" 2>/dev/null | head -1
 }
 AVC_MODE=$(arm_toml_str avc_mode)
 AVC_MODE=${AVC_MODE:-444}
 AUDIT_ARGS=""
-[ "$AVC_MODE" = "420" ] && AUDIT_ARGS="--single-view"
+TOPOLOGY="long-term-reference"
+if [ "$AVC_MODE" = "420" ]; then
+    AUDIT_ARGS="--single-view"
+    TOPOLOGY="single-view"
+elif [ "$(arm_toml_bool aux_ltr_chain)" != "true" ]; then
+    AUDIT_ARGS="--aux-leaf"
+    TOPOLOGY="auxiliary-leaf"
+fi
 
 REFRESH=${E_REFRESH:-$(arm_toml_int intra_refresh_frames)}
 REFRESH=${REFRESH:-250}
@@ -107,11 +122,12 @@ POD=$(kubectl -n "$NS" get pod -l "arm=$ARM" --field-selector \
 # manifest pin guard exists for.
 IMAGE=$(kubectl -n "$NS" get pod "$POD" \
         -o jsonpath='{.spec.containers[0].image}')
-GFXSUM=$(sha256sum "$D/gfx/$ARM.toml" | cut -c1-16)
+GFXSUM=$(sha256sum "$GFX_FILE" | cut -c1-16)
 KEY="$IMAGE|$GFXSUM"
 
 mkdir -p "$CERTDIR"
-CERT=$CERTDIR/$ARM.cert
+CERT=${E_CERTFILE:-$CERTDIR/$ARM.cert}
+mkdir -p "$(dirname "$CERT")"
 WORK=$(mktemp -d)
 trap 'rm -rf "$WORK"' EXIT
 
@@ -175,21 +191,34 @@ kill -TERM "$XPID" 2>/dev/null
 # 85 % of a core 2 h 33 min after the run). The sanctioned operation is
 # to log the WHOLE session off, never to pkill individual GUI processes
 # in a live session (CLAUDE.md GUI lifecycle).
-kubectl -n "$NS" exec "$POD" -- bash -lc \
+logout_ok=0
+for attempt in 1 2
+do
+    if timeout 30s kubectl -n "$NS" exec "$POD" -- bash -lc \
     "xpid=\$(pgrep -u '$SU' -x Xorg | head -1); \
      [ -n \"\$xpid\" ] || exit 0; \
      command -v xfce4-session-logout >/dev/null || exit 4; \
+     uid=\$(id -u '$SU'); \
      args=\$(tr '\\0' ' ' < /proc/\$xpid/cmdline); \
      display=\$(printf '%s\\n' \"\$args\" | \
          grep -oE ' :[0-9]+ ' | head -1 | tr -d ' '); \
      auth=\$(printf '%s\\n' \"\$args\" | \
          grep -oE -- '-auth [^ ]+' | head -1 | cut -d' ' -f2); \
-     su -s /bin/sh '$SU' -c \"DISPLAY=\$display XAUTHORITY=\$auth \
-         xfce4-session-logout --logout\"" >/dev/null 2>&1 || \
-    fail "$ARM cannot log its whole session off"
-kubectl -n "$NS" exec "$POD" -- bash -lc \
-    "for i in \$(seq 1 20); do pgrep -u $SU -f sesexec >/dev/null \
-     || break; sleep 1; done" >/dev/null 2>&1
+     timeout 20s runuser -u '$SU' -- env DISPLAY=\$display \
+         XAUTHORITY=\$auth XDG_RUNTIME_DIR=/run/user/\$uid \
+         xfce4-session-logout --fast --logout" >/dev/null 2>&1
+    then
+        logout_ok=1
+        break
+    fi
+    echo "  whole-session logout attempt $attempt did not complete" >&2
+    sleep 1
+done
+[ "$logout_ok" = 1 ] || fail "$ARM cannot log its whole session off"
+timeout 25s kubectl -n "$NS" exec "$POD" -- bash -lc \
+    "for i in \$(seq 1 20); do pgrep -u '$SU' -x Xorg >/dev/null \
+     || exit 0; sleep 1; done; exit 1" >/dev/null 2>&1 || \
+    fail "$ARM session did not end after whole-session logout"
 
 # --- ENCODER INPUT PIPE GUARD (BACKLOG #103) ---------------------------
 # The certification is what says "this deployed pair is fit to measure",
@@ -229,9 +258,7 @@ BYTES=$(stat -c %s "$DUMP")
 
 {
     echo "arm:    $ARM"
-    echo "mode:   AVC$AVC_MODE$([ -n "$AUDIT_ARGS" ] \
-        && echo "  (single-view gate: the AVC444 two-view assertions do \
-not apply)")"
+    echo "mode:   AVC$AVC_MODE ($TOPOLOGY topology)"
     echo "image:  $IMAGE"
     echo "gfx:    sha256:$GFXSUM"
     echo "key:    $KEY"
@@ -277,30 +304,26 @@ not apply)")"
     python3 "$D/oracle_black_frame_check.py" "$DUMP" 2>&1 | tail -15
     echo
     echo "=== COVERAGE LIMIT OF A ${SECS}s WINDOW — read this ==="
-    echo "A ${SECS}s window holds roughly 100 frames. The scheduled intra"
-    echo "refresh is every $REFRESH main pictures and every $REFRESH_AUX"
-    echo "aux pictures, so this certification"
-    echo "typically contains NO scheduled cut, and asserts A2 (intra only"
-    echo "on a scheduled index), A3 (cuts paired across views) and A4 (no"
-    echo "scheduled cut skipped) VACUOUSLY. What it does prove on real"
-    echo "bytes from this image: A1 no mid-stream IDR, A5 own-slot refs"
-    echo "and self-marking, A6 one contiguous frame_num chain, A7 chain"
-    echo "depth within bound, and that every picture decodes without a"
-    echo "black frame."
-    echo "The cut schedule itself is covered by CI against golden vectors"
-    echo "(tests/xrdp/test_avc444_ltr.c: test_ltr_dpb_scheduled_paired_cut"
-    echo "_both_modes, test_ltr_schedule_observed_vs_requested,"
-    echo "test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window"
-    echo "to chase A2-A4 -- that is the 10x tax this file exists to"
-    echo "remove, and CI already pins the logic byte-exactly."
-    echo
-    echo "If A3 reads SKIP above, this arm is running the SPARSE AUX"
-    echo "sparse cadence: the auxiliary view is sent on only some"
-    echo "frames, so the two views hold different numbers of pictures"
-    echo "and comparing their ordinals is not a check that can pass or"
-    echo "fail. Owner ruling, 2026-08-08. The audit decides that from"
-    echo "the PICTURE COUNTS in the capture, never from a config flag,"
-    echo "and A3 keeps full force at 1:1 -- which is what ships."
+    if [ "$TOPOLOGY" = "long-term-reference" ]; then
+        echo "A ${SECS}s window normally cannot reach the configured intra"
+        echo "periods ($REFRESH main, $REFRESH_AUX auxiliary). It proves"
+        echo "the live encoder shape, slot ownership, contiguous shared"
+        echo "frame numbers, bounded chain depth and decode without black"
+        echo "frames. Scheduled-cut behavior remains covered byte-exactly"
+        echo "by tests/xrdp/test_avc444_ltr.c; do not lengthen deployment"
+        echo "certification to duplicate that deterministic gate."
+    elif [ "$TOPOLOGY" = "auxiliary-leaf" ]; then
+        echo "This profile uses the default auxiliary-leaf topology, not"
+        echo "the optional LTR chain. The live gate proves a reference-"
+        echo "bearing main chain, parameter-set-free non-reference intra"
+        echo "auxiliary leaves, valid cadence and decode without black"
+        echo "frames. LTR slot and scheduled-cut assertions do not apply."
+    else
+        echo "This profile is single-view AVC420. The live gate proves"
+        echo "capture framing, an in-band parameter set, a contiguous main"
+        echo "chain within each IDR period and decode without black frames."
+        echo "Two-view topology and sparse-auxiliary assertions do not apply."
+    fi
 } > "$CERT.tmp" 2>&1
 
 if grep -q "ASSERT VERDICT: PASS" "$CERT.tmp" \

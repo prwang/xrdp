@@ -1,0 +1,80 @@
+arm:    x041
+mode:   AVC444
+image:  localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+gfx:    sha256:830fb93b825113ac
+key:    localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983|830fb93b825113ac
+when:   2026-08-25T04:31:23Z
+window: 3s at 1920x1080, 44563040 bytes
+
+=== encoder input pipe ===
+PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
+after 3s of real encoding, so every encoder child got
+an input pipe of at least the 64 KiB minimum. Above that
+the handover cost is flat (0.71 ms at 512 KiB against
+0.60 ms at 1 MiB for a 13.82 MB picture), so this is the
+whole of the requirement.
+
+=== wire audit (--assert) ===
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 197
+      pictures self-marking into LT0      : 0/198
+      avg P size=8909B   avg I/IDR size=25436B   inter share of pictures=99.5%
+aux  pictures=198    P(inter)=0      I(intra)=198   IDR=0
+      P slices retargeted to OWN slot LT1 : 0/0
+      P slices retargeted to OTHER slot    : 0
+      P slices with NO list modification   : 0
+      pictures self-marking into LT1      : 0/198
+      avg P size=0B   avg I/IDR size=9360B   inter share of pictures=0.0%
+
+merged decode-order frame_num chain: 396 pictures, 197 gaps (0 = one contiguous chain, as a single decoder requires)
+
+VERDICT: PROBLEMS -- main: 197 P slices carry no list modification; main: 0/197 non-IDR pictures self-mark; aux: 0/198 non-IDR pictures self-mark; frame_num chain has 197 gaps
+
+=== ASSERT GATE (BACKLOG #45 step 0) ===
+  A1 no mid-stream IDR                     PASS  0 mid-stream IDR(s)
+  A2 intra only on a scheduled index       FAIL  unscheduled intra: main [] aux [1, 2, 3, 4, 5, 6, 7, 8]
+  A3 cuts are paired across views          FAIL  main intra ordinals [0] ... aux [0, 1, 2, 3, 4, 5, 6, 7]
+  A4 no scheduled cut skipped              PASS  scheduled ordinals with no intra: main [] aux []
+  A5 own-slot refs and self-marks          FAIL  main: 197/197 P not retargeted to LT0; main: 197/198 non-IDR pictures do not self-mark LT0; aux: 198/198 non-IDR pictures do not self-mark LT1
+  A6 one contiguous frame_num chain        FAIL  197 gap(s) at decode indices [2, 4, 6, 8, 10, 12, 14, 16]
+  A7 chain depth <= intra_refresh_frames   PASS  worst depth: main 197 (bound 250) aux 0 (bound 250)
+
+ASSERT VERDICT: FAIL -- 4 of 7 checks violated
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 396
+  frames decoded          : 396
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+A 3s window holds roughly 100 frames. The scheduled intra
+refresh is every 250 main pictures and every 250
+aux pictures, so this certification
+typically contains NO scheduled cut, and asserts A2 (intra only
+on a scheduled index), A3 (cuts paired across views) and A4 (no
+scheduled cut skipped) VACUOUSLY. What it does prove on real
+bytes from this image: A1 no mid-stream IDR, A5 own-slot refs
+and self-marking, A6 one contiguous frame_num chain, A7 chain
+depth within bound, and that every picture decodes without a
+black frame.
+The cut schedule itself is covered by CI against golden vectors
+(tests/xrdp/test_avc444_ltr.c: test_ltr_dpb_scheduled_paired_cut
+_both_modes, test_ltr_schedule_observed_vs_requested,
+test_ltr_cut_sequence_byte_exact). Do NOT lengthen this window
+to chase A2-A4 -- that is the 10x tax this file exists to
+remove, and CI already pins the logic byte-exactly.
+
+If A3 reads SKIP above, this arm is running the SPARSE AUX
+sparse cadence: the auxiliary view is sent on only some
+frames, so the two views hold different numbers of pictures
+and comparing their ordinals is not a check that can pass or
+fail. Owner ruling, 2026-08-08. The audit decides that from
+the PICTURE COUNTS in the capture, never from a config flag,
+and A3 keeps full force at 1:1 -- which is what ships.

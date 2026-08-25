@@ -1,0 +1,4 @@
+condition A2
+profile dense-w1
+seconds 20
+warmup_seconds 8

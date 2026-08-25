@@ -18,7 +18,8 @@ the encoder; a stream that does not match the guard shape is reported as
 such rather than silently mis-parsed.
 
 Usage: avc444_ltr_wire_audit.py [--annexb] [--assert] [--intra-refresh N]
-                                [--allow-idr K] <file> [label] [max_pictures]
+                                [--allow-idr K] [--aux-leaf]
+                                <file> [label] [max_pictures]
   --annexb: <file> is a RAW Annex-B elementary stream from a child
   encoder; report its shape and whether ltr_cache_ok() accepts it.
   --assert: turn the report into a GATE (BACKLOG #45 step 0). Every
@@ -35,7 +36,11 @@ Usage: avc444_ltr_wire_audit.py [--annexb] [--assert] [--intra-refresh N]
   child is fed fewer pictures than the main one, so the same ordinal is
   a different moment in each view.
   --allow-idr K: tolerate K mid-stream IDRs (only a frame_num-wrap
-  re-key may legitimately produce one; default 0).
+                 re-key may legitimately produce one; default 0).
+  --aux-leaf: audit the default AVC444 topology: the main view is a normal
+              reference chain and every auxiliary picture is a non-reference
+              intra leaf. This is a different contract from the optional
+              two-slot LTR chain and therefore has its own assertions.
 
 The assertions, and why each one has teeth:
   A1 no mid-stream IDR              FR-H264-6: a refresh is a non-IDR I;
@@ -280,6 +285,7 @@ def nals_of(buf):
 # ones on 2026-08-10, and every two-view assertion duly failed on a
 # stream that was perfectly correct for its configuration.
 SINGLE_VIEW = False
+AUX_LEAF = False
 
 
 def views_of(rec):
@@ -307,6 +313,7 @@ def audit(path, label, max_pics):
     pps = None
     pics = []                    # per picture, decode order
     sps_seen = []
+    pps_seen = []
     pos = 0
     while pos + 4 <= len(data) and len(pics) < max_pics:
         (ln,) = struct.unpack_from('<I', data, pos)
@@ -326,6 +333,7 @@ def audit(path, label, max_pics):
                     sps_seen.append((view, sps))
                 elif t == 8:
                     pps = parse_pps(nal)
+                    pps_seen.append((view, pps))
                 elif t in (1, 5):
                     if sps is None or pps is None:
                         continue
@@ -335,7 +343,7 @@ def audit(path, label, max_pics):
                     sh['view'] = view
                     sh['bytes'] = len(nal)
                     pics.append(sh)
-    return sps_seen, sps, pps, pics
+    return sps_seen, pps_seen, sps, pps, pics
 
 
 def describe(sh):
@@ -634,8 +642,73 @@ def assert_gate_single_view(sps_seen, sps, pics):
     return out
 
 
+def assert_gate_aux_leaf(sps_seen, pps_seen, sps, pics):
+    """Assert the default two-view topology emitted by the leaf rewriter.
+
+    The auxiliary picture is deliberately intra-coded and non-reference, so
+    LTR list-modification, self-marking and shared-frame-number assertions do
+    not apply. Decoder safety instead comes from a normal reference-bearing
+    main chain followed by a parameter-set-free non-reference intra leaf.
+    """
+    out = []
+    main = [sh for sh in pics if sh['view'] == 'main']
+    aux = [sh for sh in pics if sh['view'] == 'aux']
+
+    out.append(('L1 both AVC444 views are present', bool(main and aux),
+                '%d main and %d auxiliary picture(s)' %
+                (len(main), len(aux))))
+
+    bad_aux = [i for i, sh in enumerate(aux)
+               if sh['idr'] or sh['slice_type'] != I or
+               sh['nal_ref_idc'] != 0]
+    out.append(('L2 every auxiliary picture is a leaf', not bad_aux,
+                'all auxiliary pictures are non-IDR, non-reference intra'
+                if not bad_aux else
+                '%d malformed leaf picture(s), first ordinals %s' %
+                (len(bad_aux), bad_aux[:8])))
+
+    bad_main = [i for i, sh in enumerate(main) if sh['nal_ref_idc'] == 0]
+    out.append(('L3 main pictures retain reference ownership', not bad_main,
+                'all main pictures are reference-bearing'
+                if not bad_main else
+                '%d non-reference main picture(s), first ordinals %s' %
+                (len(bad_main), bad_main[:8])))
+
+    out.append(('L4 auxiliary cadence cannot exceed main cadence',
+                0 < len(aux) <= len(main),
+                '%d auxiliary against %d main picture(s)' %
+                (len(aux), len(main))))
+
+    gaps = []
+    expect = None
+    for i, sh in enumerate(main):
+        if sh['idr']:
+            expect = ((sh['frame_num'] + 1) %
+                      (1 << sps['log2_max_frame_num']))
+            continue
+        if expect is not None and sh['frame_num'] != expect:
+            gaps.append((i, expect, sh['frame_num']))
+        expect = ((sh['frame_num'] + 1) %
+                  (1 << sps['log2_max_frame_num']))
+    out.append(('L5 main frame numbers are contiguous', not gaps,
+                'one chain per IDR period'
+                if not gaps else '%d break(s), first at main ordinal %d: '
+                'expected %d, got %d' %
+                (len(gaps), gaps[0][0], gaps[0][1], gaps[0][2])))
+
+    aux_parameter_sets = sum(1 for view, _ in sps_seen if view == 'aux') + \
+                         sum(1 for view, _ in pps_seen if view == 'aux')
+    main_parameter_sets = sum(1 for view, _ in sps_seen if view == 'main') + \
+                          sum(1 for view, _ in pps_seen if view == 'main')
+    out.append(('L6 parameter sets belong to the main view',
+                main_parameter_sets > 0 and aux_parameter_sets == 0,
+                '%d main and %d auxiliary parameter-set NAL(s)' %
+                (main_parameter_sets, aux_parameter_sets)))
+    return out
+
+
 def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None,
-                    sps_seen=None):
+                    sps_seen=None, pps_seen=None):
     if SINGLE_VIEW:
         checks = assert_gate_single_view(sps_seen or [], sps, pics)
         print('=== ASSERT GATE (single view, AVC420) ===')
@@ -644,6 +717,12 @@ def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None,
         print('  two views, which this configuration does not have. The')
         print('  checks below are what a single-view stream can be held')
         print('  to. See assert_gate_single_view().')
+    elif AUX_LEAF:
+        checks = assert_gate_aux_leaf(sps_seen or [], pps_seen or [], sps,
+                                      pics)
+        print('=== ASSERT GATE (AVC444 auxiliary-leaf topology) ===')
+        print('  LTR assertions A1-A7 are not run: this configuration')
+        print('  deliberately uses a non-reference intra auxiliary leaf.')
     else:
         checks = assert_gate(sps, pics, refresh, allow_idr, refresh_aux)
         print('=== ASSERT GATE (BACKLOG #45 step 0) ===')
@@ -673,7 +752,7 @@ def run_assert_gate(sps, pics, refresh, allow_idr, refresh_aux=None,
 
 
 def main():
-    global SINGLE_VIEW
+    global AUX_LEAF, SINGLE_VIEW
     argv = sys.argv[1:]
     annexb = False
     do_assert = False
@@ -700,6 +779,8 @@ def main():
                 sys.exit('--intra-refresh-aux must be >= 1')
         elif a == '--single-view':
             SINGLE_VIEW = True
+        elif a == '--aux-leaf':
+            AUX_LEAF = True
         elif a == '--allow-idr':
             i += 1
             allow_idr = int(argv[i])
@@ -709,6 +790,8 @@ def main():
     argv = rest
     if not argv:
         sys.exit(__doc__)
+    if SINGLE_VIEW and AUX_LEAF:
+        sys.exit('--single-view and --aux-leaf are mutually exclusive')
     path = argv[0]
     label = argv[1] if len(argv) > 1 else path
     max_pics = int(argv[2]) if len(argv) > 2 else 10 ** 9
@@ -717,7 +800,7 @@ def main():
         if do_assert and rv != 0:
             print('ASSERT VERDICT: FAIL -- child stream fails the guard')
         sys.exit(rv)
-    sps_seen, sps, pps, pics = audit(path, label, max_pics)
+    sps_seen, pps_seen, sps, pps, pics = audit(path, label, max_pics)
     if not pics:
         sys.exit('%s: no pictures parsed' % label)
 
@@ -741,6 +824,19 @@ def main():
                  sh['bytes']))
     print()
 
+    if AUX_LEAF:
+        main_pictures = sum(1 for sh in pics if sh['view'] == 'main')
+        aux_pictures = sum(1 for sh in pics if sh['view'] == 'aux')
+        print('default auxiliary-leaf topology: %d main, %d auxiliary '
+              'picture(s)' % (main_pictures, aux_pictures))
+        print('The auxiliary view is expected to be non-reference intra;')
+        print('the main view alone owns the inter-picture reference chain.')
+        print()
+        if do_assert:
+            sys.exit(run_assert_gate(sps, pics, refresh, allow_idr,
+                                     refresh_aux, sps_seen, pps_seen))
+        sys.exit(0)
+
     own_slot = {'main': 0, 'aux': 1}
     problems = []
     # The narrative below reasons about LTR slots, cross-view prediction
@@ -755,7 +851,7 @@ def main():
         print()
         if do_assert:
             sys.exit(run_assert_gate(sps, pics, refresh, allow_idr,
-                                     refresh_aux, sps_seen))
+                                     refresh_aux, sps_seen, pps_seen))
         sys.exit(0)
     for view in ('main', 'aux'):
         sel = [s for s in pics if s['view'] == view]

@@ -1,0 +1,8 @@
+start_epoch 1787637362
+end_epoch 1787637382
+start_epoch_ns 1787637362963377674
+end_epoch_ns 1787637382965707965
+warmup_seconds 0
+ready_stamp_lines_required 60
+ready_stamp_lines_observed 83
+ready_wait_seconds 12

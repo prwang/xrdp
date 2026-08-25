@@ -1,0 +1,55 @@
+target=pod server=xrdp-x041-f5dc689f6-mndrx arm=x041 port=40057 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T045120Z/leg_A1
+identity OK: arm=x041 pod=xrdp-x041-f5dc689f6-mndrx
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 0 lines, xrdp.log 5 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+connected; recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 685: 2455219 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 681509974 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 259 lines, mark was 0); taking it whole
+bash: line 1: sudo: command not found
+command terminated with exit code 127
+RED: no perf ring file under /var/log/xrdp-perf on xrdp-x041-f5dc689f6-mndrx — is XRDP_PERF_TRACE set for this arm? The per-frame trace lives ONLY there, so E5/E4 will read an empty trace
+=== performance gate run: x041, oracle client, 20s ===
+image:    localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+package: xorgxrdp-dev 1:0.10.80+git20260825030213.aa03d860137d
+package: xrdp-dev 0.10.80+git20260825041007.ae2a4674ab96
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = xfce-textflood
+selector: TEXTFLOOD_MONITOR = all
+refresh:  intra_refresh_frames = 
+pipe:     encoder input pipe at or above the 64 KiB
+          minimum (no PIPE_TOO_SMALL in xrdp-x041-f5dc689f6-mndrx's log)
+
+=== E5 / rate — send interval from the server's own log ===
+RED: only 0 GFX_TRACE send records — is XRDP_GFX_TRACE=1 set in the arm's env?
+
+=== E4 — poll-set size the worker actually armed ===
+no set-size records in this window (step 7 logs them; with
+one monitor damaged per cycle the set is 2 children, not 4)
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+rewrite unsupported      0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x041
+mode:   AVC444 (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+gfx:    sha256:830fb93b825113ac
+key:    localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983|830fb93b825113ac
+when:   2026-08-25T04:51:55Z
+  ASSERT VERDICT: PASS -- 6 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T045120Z/certs/dense-w1.cert
+producer stamps archived: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T045120Z/leg_A1/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T045120Z/leg_A1
+ABORT: no perf ring file was collected; the session was logged off and no result from this run is admissible

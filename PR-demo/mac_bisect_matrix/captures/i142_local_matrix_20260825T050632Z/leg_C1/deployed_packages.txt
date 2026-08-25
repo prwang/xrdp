@@ -1,0 +1,2 @@
+ii  xorgxrdp-dev                   1:0.10.80+git20260825030213.aa03d860137d amd64        xorgxrdp development build from git aa03d860137d
+ii  xrdp-dev                       0.10.80+git20260825050320.b53bead65628   amd64        xrdp RDP server (developer build from git b53bead65628)

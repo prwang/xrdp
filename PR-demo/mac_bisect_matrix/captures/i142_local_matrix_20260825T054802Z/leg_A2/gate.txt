@@ -1,0 +1,77 @@
+target=pod server=xrdp-x041-68589b4cdd-dhqlw arm=x041 port=40057 mode=oracle user=probe444 secs=20 out=/work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/leg_A2
+identity OK: arm=x041 pod=xrdp-x041-68589b4cdd-dhqlw
+starting dummy Xorg on :94 (xorg-dummy-2mon-4k.conf) ...
+OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+log marks: session-xorg 0 lines, xrdp.log 5 lines
+client: ORACLE (save-only, acks before decode) — server ceiling
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+bash: line 1: /tmp/e52_textflood_stamps.tsv: No such file or directory
+payload ready: 83 stamp lines after 12s
+recording for 20s ...
+/work/PR-demo/mac_bisect_matrix/e_gate_run.sh: line 739: 2770408 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$OUT/client.log" 2>&1
+oracle dump discarded after the run (E_KEEP_DUMP=1 to keep); size was 1567999279 bytes
+session Xorg log is this run's own (/home/probe444/.xorgxrdp.10.log, 260 lines, mark was 0); taking it whole
+perf_trace_lines: 8167 records rendered, 15787 unclassed records left in the trace, 27 outside the run window
+trace presence OK: 8167 records (minimum 100 for 20s)
+trace span: 23s for a 20s run
+=== performance gate run: x041, oracle client, 20s ===
+image:    localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c
+package: xorgxrdp-dev 1:0.10.80+git20260825030213.aa03d860137d
+package: xrdp-dev 0.10.80+git20260825052420.a18d1305b2e9
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = xfce-textflood
+selector: TEXTFLOOD_MONITOR = all
+refresh:  intra_refresh_frames = 
+pipe:     encoder input pipe at or above the 64 KiB
+          minimum (no PIPE_TOO_SMALL in xrdp-x041-68589b4cdd-dhqlw's log)
+
+=== E5 / rate — send interval from the server's own log ===
+sends: 546 over 20.0 s
+send-to-send gap: mean 36.7 ms  p50 37 ms  p90 41 ms  p99 45 ms
+producer frame interval (the benchmark payload's own per-frame stamps, 546 of 769 session frames — inside this leg): mean 36.6 ms  p50 36.6 ms  p90 39.4 ms
+producer margin = pipeline mean 36.7 ms / producer mean 36.6 ms = 1.00x
+         PRODUCER-LIMITED at 1.00x, under the 2.0x floor. Any claim from this run about two pipeline stages OVERLAPPING is VOID: the payload is close enough to the pipeline that a missing second frame cannot be told from a stage that failed to overlap. Throughput and regression comparisons against an arm sharing this payload, geometry and client REMAIN VALID -- quote this 1.00x beside every number taken from them (owner directive, 2026-08-06).
+session geometry (max damage extent): 3840x2400 = 9.22 Mpx over 546 damage records
+27.33 sends/s = 27.33 pairs/s per monitor (1 monitor)
+damage coverage: surface 59: 1  surface 60: 1  surface 61: 1  surface 62: 1  surface 63: 1  surface 64: 1  surface 65: 1  surface 66: 1  surface 67: 1  surface 68: 1  surface 69: 1  surface 70: 1  surface 71: 1  surface 72: 1  surface 73: 1  surface 74: 1  surface 75: 1  surface 76: 1  surface 77: 1  surface 78: 1  surface 79: 1  surface 80: 1  surface 81: 1  surface 82: 1  surface 83: 1  surface 84: 1  surface 85: 1  surface 86: 1  surface 87: 1  surface 88: 1  surface 89: 1  surface 90: 1  surface 91: 1  surface 92: 1  surface 93: 1  surface 94: 1  surface 95: 1  surface 96: 1  surface 97: 1  surface 98: 1  surface 99: 1  surface 100: 1  surface 101: 1  surface 102: 1  surface 103: 1  surface 104: 1  surface 105: 1  surface 106: 1  surface 107: 1  surface 108: 1  surface 109: 1  surface 110: 1  surface 111: 1  surface 112: 1  surface 113: 1  surface 114: 1  surface 115: 1  surface 116: 1  surface 117: 1  surface 118: 1  surface 119: 1  surface 120: 1  surface 121: 1  surface 122: 1  surface 123: 1  surface 124: 1  surface 125: 1  surface 126: 1  surface 127: 1  surface 128: 1  surface 129: 1  surface 130: 1  surface 131: 1  surface 132: 1  surface 133: 1  surface 134: 1  surface 135: 1  surface 136: 1  surface 137: 1  surface 138: 1  surface 139: 1  surface 140: 1  surface 141: 1  surface 142: 1  surface 143: 1  surface 144: 1  surface 145: 1  surface 146: 1  surface 147: 1  surface 148: 1  surface 149: 1  surface 150: 1  surface 151: 1  surface 152: 1  surface 153: 1  surface 154: 1  surface 155: 1  surface 156: 1  surface 157: 1  surface 158: 1  surface 159: 1  surface 160: 1  surface 161: 1  surface 162: 1  surface 163: 1  surface 164: 1  surface 165: 1  surface 166: 1  surface 167: 1  surface 168: 1  surface 169: 1  surface 170: 1  surface 171: 1  surface 172: 1  surface 173: 1  surface 174: 1  surface 175: 1  surface 176: 1  surface 177: 1  surface 178: 1  surface 179: 1  surface 180: 1  surface 181: 1  surface 182: 1  surface 183: 1  surface 184: 1  surface 185: 1  surface 186: 1  surface 187: 1  surface 188: 1  surface 189: 1  surface 190: 1  surface 191: 1  surface 192: 1  surface 193: 1  surface 194: 1  surface 195: 1  surface 196: 1  surface 197: 1  surface 198: 1  surface 199: 1  surface 200: 1  surface 201: 1  surface 202: 1  surface 203: 1  surface 204: 1  surface 205: 1  surface 206: 1  surface 207: 1  surface 208: 1  surface 209: 1  surface 210: 1  surface 211: 1  surface 212: 1  surface 213: 1  surface 214: 1  surface 215: 1  surface 216: 1  surface 217: 1  surface 218: 1  surface 219: 1  surface 220: 1  surface 221: 1  surface 222: 1  surface 223: 1  surface 224: 1  surface 225: 1  surface 226: 1  surface 227: 1  surface 228: 1  surface 229: 1  surface 230: 1  surface 231: 1  surface 232: 1  surface 233: 1  surface 234: 1  surface 235: 1  surface 236: 1  surface 237: 1  surface 238: 1  surface 239: 1  surface 240: 1  surface 241: 1  surface 242: 1  surface 243: 1  surface 244: 1  surface 245: 1  surface 246: 1  surface 247: 1  surface 248: 1  surface 249: 1  surface 250: 1  surface 251: 1  surface 252: 1  surface 253: 1  surface 254: 1  surface 255: 1  surface 256: 1  surface 257: 1  surface 258: 1  surface 259: 1  surface 260: 1  surface 261: 1  surface 262: 1  surface 263: 1  surface 264: 1  surface 265: 1  surface 266: 1  surface 267: 1  surface 268: 1  surface 269: 1  surface 270: 1  surface 271: 1  surface 272: 1  surface 273: 1  surface 274: 1  surface 275: 1  surface 276: 1  surface 277: 1  surface 278: 1  surface 279: 1  surface 280: 1  surface 281: 1  surface 282: 1  surface 283: 1  surface 284: 1  surface 285: 1  surface 286: 1  surface 287: 1  surface 288: 1  surface 289: 1  surface 290: 1  surface 291: 1  surface 292: 1  surface 293: 1  surface 294: 1  surface 295: 1  surface 296: 1  surface 297: 1  surface 298: 1  surface 299: 1  surface 300: 1  surface 301: 1  surface 302: 1  surface 303: 1  surface 304: 1  surface 305: 1  surface 306: 1  surface 307: 1  surface 308: 1  surface 309: 1  surface 310: 1  surface 311: 1  surface 312: 1  surface 313: 1  surface 314: 1  surface 315: 1  surface 316: 1  surface 317: 1  surface 318: 1  surface 319: 1  surface 320: 1  surface 321: 1  surface 322: 1  surface 323: 1  surface 324: 1  surface 325: 1  surface 326: 1  surface 327: 1  surface 328: 1  surface 329: 1  surface 330: 1  surface 331: 1  surface 332: 1  surface 333: 1  surface 334: 1  surface 335: 1  surface 336: 1  surface 337: 1  surface 338: 1  surface 339: 1  surface 340: 1  surface 341: 1  surface 342: 1  surface 343: 1  surface 344: 1  surface 345: 1  surface 346: 1  surface 347: 1  surface 348: 1  surface 349: 1  surface 350: 1  surface 351: 1  surface 352: 1  surface 353: 1  surface 354: 1  surface 355: 1  surface 356: 1  surface 357: 1  surface 358: 1  surface 359: 1  surface 360: 1  surface 361: 1  surface 362: 1  surface 363: 1  surface 364: 1  surface 365: 1  surface 366: 1  surface 367: 1  surface 368: 1  surface 369: 1  surface 370: 1  surface 371: 1  surface 372: 1  surface 373: 1  surface 374: 1  surface 375: 1  surface 376: 1  surface 377: 1  surface 378: 1  surface 379: 1  surface 380: 1  surface 381: 1  surface 382: 1  surface 383: 1  surface 384: 1  surface 385: 1  surface 386: 1  surface 387: 1  surface 388: 1  surface 389: 1  surface 390: 1  surface 391: 1  surface 392: 1  surface 393: 1  surface 394: 1  surface 395: 1  surface 396: 1  surface 397: 1  surface 398: 1  surface 399: 1  surface 400: 1  surface 401: 1  surface 402: 1  surface 403: 1  surface 404: 1  surface 405: 1  surface 406: 1  surface 407: 1  surface 408: 1  surface 409: 1  surface 410: 1  surface 411: 1  surface 412: 1  surface 413: 1  surface 414: 1  surface 415: 1  surface 416: 1  surface 417: 1  surface 418: 1  surface 419: 1  surface 420: 1  surface 421: 1  surface 422: 1  surface 423: 1  surface 424: 1  surface 425: 1  surface 426: 1  surface 427: 1  surface 428: 1  surface 429: 1  surface 430: 1  surface 431: 1  surface 432: 1  surface 433: 1  surface 434: 1  surface 435: 1  surface 436: 1  surface 437: 1  surface 438: 1  surface 439: 1  surface 440: 1  surface 441: 1  surface 442: 1  surface 443: 1  surface 444: 1  surface 445: 1  surface 446: 1  surface 447: 1  surface 448: 1  surface 449: 1  surface 450: 1  surface 451: 1  surface 452: 1  surface 453: 1  surface 454: 1  surface 455: 1  surface 456: 1  surface 457: 1  surface 458: 1  surface 459: 1  surface 460: 1  surface 461: 1  surface 462: 1  surface 463: 1  surface 464: 1  surface 465: 1  surface 466: 1  surface 467: 1  surface 468: 1  surface 469: 1  surface 470: 1  surface 471: 1  surface 472: 1  surface 473: 1  surface 474: 1  surface 475: 1  surface 476: 1  surface 477: 1  surface 478: 1  surface 479: 1  surface 480: 1  surface 481: 1  surface 482: 1  surface 483: 1  surface 484: 1  surface 485: 1  surface 486: 1  surface 487: 1  surface 488: 1  surface 489: 1  surface 490: 1  surface 491: 1  surface 492: 1  surface 493: 1  surface 494: 1  surface 495: 1  surface 496: 1  surface 497: 1  surface 498: 1  surface 499: 1  surface 500: 1  surface 501: 1  surface 502: 1  surface 503: 1  surface 504: 1  surface 505: 1  surface 506: 1  surface 507: 1  surface 508: 1  surface 509: 1  surface 510: 1  surface 511: 1  surface 512: 1  surface 513: 1  surface 514: 1  surface 515: 1  surface 516: 1  surface 517: 1  surface 518: 1  surface 519: 1  surface 520: 1  surface 521: 1  surface 522: 1  surface 523: 1  surface 524: 1  surface 525: 1  surface 526: 1  surface 527: 1  surface 528: 1  surface 529: 1  surface 530: 1  surface 531: 1  surface 532: 1  surface 533: 1  surface 534: 1  surface 535: 1  surface 536: 1  surface 537: 1  surface 538: 1  surface 539: 1  surface 540: 1  surface 541: 1  surface 542: 1  surface 543: 1  surface 544: 1  surface 545: 1  surface 546: 1  surface 547: 1  surface 548: 1  surface 549: 1  surface 550: 1  surface 551: 1  surface 552: 1  surface 553: 1  surface 554: 1  surface 555: 1  surface 556: 1  surface 557: 1  surface 558: 1  surface 559: 1  surface 560: 1  surface 561: 1  surface 562: 1  surface 563: 1  surface 564: 1  surface 565: 1  surface 566: 1  surface 567: 1  surface 568: 1  surface 569: 1  surface 570: 1  surface 571: 1  surface 572: 1  surface 573: 1  surface 574: 1  surface 575: 1  surface 576: 1  surface 577: 1  surface 578: 1  surface 579: 1  surface 580: 1  surface 581: 1  surface 582: 1  surface 583: 1  surface 584: 1  surface 585: 1  surface 586: 1  surface 587: 1  surface 588: 1  surface 589: 1  surface 590: 1  surface 591: 1  surface 592: 1  surface 593: 1  surface 594: 1  surface 595: 1  surface 596: 1  surface 597: 1  surface 598: 1  surface 599: 1  surface 600: 1  surface 601: 1  surface 602: 1  surface 603: 1  surface 604: 1
+         COVERAGE WARNING: E_MONITORS=1 but 546 surfaces were damaged — the client presented more than one monitor and this is not a single-monitor run
+cycles: 546   kids_armed: 2:546 (100%)
+worker busy (batch arm -> last=1): 8.2 s of 20.0 s = 41%   mean service 15.0 ms
+             (100% busy = the pipeline is the limit; a low number with a long interval = the payload or capture is)
+
+E5 GATE: NOT REQUESTED — this characterization has no same-payload serialized baseline
+
+=== E4 — poll-set size the worker actually armed ===
+    629 kids_armed=2
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+rewrite unsupported      0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x041
+mode:   AVC444 (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c
+gfx:    sha256:830fb93b825113ac
+key:    localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c|830fb93b825113ac
+when:   2026-08-25T05:48:40Z
+  ASSERT VERDICT: PASS -- 6 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/certs/dense-w1.cert
+producer stamps archived: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/leg_A2/textflood_stamps.tsv.gz
+session logged off (E_KEEP_SESSION=1 to keep it)
+
+evidence: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/leg_A2

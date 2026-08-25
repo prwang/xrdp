@@ -1,0 +1,46 @@
+=== mechanism and accounting ===
+leg profile    frames aux+/aux- main-only paired commands edge-in/edge-out bytes-MB idle>1ms W2-extra
+A1  dense-w1      547  547/0            0    546     1092       1/0         1365.2      545        0
+B1  sparse-w1     590   20/570        570     20      610       0/0          748.5      589        0
+C1  dense-w2      552  552/0            0    552     1104       0/0         1380.5      546      221
+D1  sparse-w2     594   20/574        574     20      614       0/0          752.7      592       20
+D2  sparse-w2     599   19/579        579     19      617       1/0          754.5      595       18
+C2  dense-w2      543  543/0            0    542     1084       1/0         1355.6      540      205
+B2  sparse-w1     593   20/572        573     20      613       0/0          751.6      590        0
+A2  dense-w1      545  545/0            0    545     1090       0/0         1362.7      543        0
+
+Each paired frame contributes two video commands; each main-only frame contributes one. Their command and byte sums equal the audited totals in every row. Edge-in frames reached terminal egress inside the window after their command was built before it; edge-out commands were built inside before terminal egress after it. Both are named by identity and excluded from byte-per-frame rather than being paired by time.
+
+=== delivered-frame interval and exact-window throughput ===
+leg profile      mean-ms p50-ms p90-ms p99-ms frames/s bytes/frame-MB
+A1  dense-w1      36.62   36.70   41.49   44.61    27.35          2.500
+B1  sparse-w1     33.86   33.66   38.15   51.97    29.50          1.269
+C1  dense-w2      36.28   36.10   41.21   46.14    27.60          2.501
+D1  sparse-w2     33.69   33.57   37.86   55.60    29.70          1.267
+D2  sparse-w2     33.44   33.26   38.09   50.40    29.95          1.262
+C2  dense-w2      36.88   36.27   41.55   48.04    27.15          2.501
+B2  sparse-w1     33.75   33.52   37.43   56.09    29.65          1.268
+A2  dense-w1      36.67   36.68   40.62   45.32    27.25          2.500
+Throughput is terminal frame count divided by the complete recorded measurement window. Interval percentiles describe spacing between active frames and do not discard idle time from the rate.
+
+=== mean latency from encoder-pump start to transport/credit completion ===
+leg profile      feed-ms wait-output drain-ms finish-ms full-ms residual
+A1  dense-w1      2.59       16.68     2.09     11.21   32.57 -0.000000
+B1  sparse-w1     2.52       11.37     0.20      4.83   18.91 0.000000
+C1  dense-w2      2.82       16.69     2.06     11.11   32.68 -0.000000
+D1  sparse-w2     2.83       11.37     0.28      4.79   19.27 0.000000
+D2  sparse-w2     2.81       11.84     0.12      4.67   19.45 -0.000000
+C2  dense-w2      2.77       16.84     1.93     11.24   32.79 0.000000
+B2  sparse-w1     2.69       11.12     0.29      4.71   18.80 0.000000
+A2  dense-w1      2.91       17.70     1.20     11.36   33.16 0.000000
+
+Feed ends when the main child's complete raw picture has entered its pipe; wait-output ends at that same child/sequence's first encoded byte; drain ends when the shared child pump completes; finish ends after the same frame identity has both reached the transport and released slot credit.
+
+=== paired effects (mean of each profile's two repetitions) ===
+window 1: sparse throughput +8.3%; bytes/frame -49.3%
+window 2: sparse throughput +9.0%; bytes/frame -49.4%
+dense: window 2 throughput +0.3%; bytes/frame +0.0%
+sparse: window 2 throughput +0.8%; bytes/frame -0.3%
+
+PASS: all eight legs satisfy the mechanism, accounting, latency and repetition checks
+Raw per-leg distributions: PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T054802Z/raw-distributions.json

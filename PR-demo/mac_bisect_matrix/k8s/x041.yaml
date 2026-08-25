@@ -1,0 +1,82 @@
+# Disposable one-arm numerical replay for the clean-room paired build.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x041
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x041
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x041
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x041
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:cleanroom-a18d1305-aa03d860-u2404-xfce.pf545752c
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "xfce-textflood"
+            - name: ARM_LABEL
+              value: "Clean-room numerical replay (port 40057)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40057
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: payloads
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+            - name: benchmark-session
+              mountPath: /etc/xrdp/startwm.sh
+              subPath: startwm.sh
+            - name: benchmark-session
+              mountPath: /etc/xdg/autostart/xrdp-textflood.desktop
+              subPath: textflood.desktop
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: payloads
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: benchmark-session
+          configMap:
+            name: xrdp-benchmark-x041
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x041

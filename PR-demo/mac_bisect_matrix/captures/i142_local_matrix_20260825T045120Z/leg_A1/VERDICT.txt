@@ -1,0 +1,37 @@
+=== performance gate run: x041, oracle client, 20s ===
+image:    localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+package: xorgxrdp-dev 1:0.10.80+git20260825030213.aa03d860137d
+package: xrdp-dev 0.10.80+git20260825041007.ae2a4674ab96
+monitors: OK: 1 monitor (3840x2400R at 0x0; DUMMY1 off)
+payload:  SESSION_KIND = xfce-textflood
+selector: TEXTFLOOD_MONITOR = all
+refresh:  intra_refresh_frames = 
+pipe:     encoder input pipe at or above the 64 KiB
+          minimum (no PIPE_TOO_SMALL in xrdp-x041-f5dc689f6-mndrx's log)
+
+=== E5 / rate — send interval from the server's own log ===
+RED: only 0 GFX_TRACE send records — is XRDP_GFX_TRACE=1 set in the arm's env?
+
+=== E4 — poll-set size the worker actually armed ===
+no set-size records in this window (step 7 logs them; with
+one monitor damaged per cycle the set is 2 children, not 4)
+
+=== E2 — server log, four things that must be zero ===
+rewrite failed           0
+did not return           0
+budget exceeded          0
+third capture            0
+fifo_to_proc_depth       0
+rewrite unsupported      0
+
+=== arm certification (arm_certify.sh, at deploy time) ===
+arm:    x041
+mode:   AVC444 (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+gfx:    sha256:830fb93b825113ac
+key:    localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983|830fb93b825113ac
+when:   2026-08-25T04:51:55Z
+  ASSERT VERDICT: PASS -- 6 checks, all clean
+    black frames (any view) : 0 []
+    VERDICT: PASS
+  full certificate: /work/PR-demo/mac_bisect_matrix/captures/i142_local_matrix_20260825T045120Z/certs/dense-w1.cert
