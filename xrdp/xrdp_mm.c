@@ -2028,7 +2028,6 @@ sync_dynamic_monitor_data(struct xrdp_wm *wm,
     g_memcpy(display_sizes->minfo_wm,
              description->minfo_wm,
              MAXIMUM_MONITOR_SIZE);
-    wm->mm->resize_snapshot_diagnostic_pending = 1;
 }
 
 /******************************************************************************/
@@ -5077,26 +5076,6 @@ server_paint_rects_ex(struct xrdp_mod *mod,
     mm = wm->mm;
 
     LOG(LOG_LEVEL_TRACE, "server_paint_rects_ex: %p", mm->encoder);
-
-    if (mm->resize_snapshot_diagnostic_pending)
-    {
-        struct xup_avc444_capture_layout expected;
-        int layout_error;
-
-        layout_error = xup_avc444_layout_build(
-                           &wm->client_info->display_sizes,
-                           wm->client_info->capture_format,
-                           wm->client_info->avc444_chroma_align, &expected);
-        LOG(LOG_LEVEL_INFO,
-            "First post-resize snapshot: geometry=%dx%d capture-code=%d "
-            "layout-error=%d expected-bytes=%u received-bytes=%d flags=0x%x",
-            wm->client_info->display_sizes.session_width,
-            wm->client_info->display_sizes.session_height,
-            wm->client_info->capture_code, layout_error,
-            layout_error == 0 ? expected.total_bytes : 0U, shmem_bytes,
-            (unsigned int)flags);
-        mm->resize_snapshot_diagnostic_pending = 0;
-    }
 
     if (mm->encoder != 0)
     {
