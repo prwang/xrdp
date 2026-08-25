@@ -479,6 +479,21 @@ START_TEST(test_tconfig_gfx_avc444_removed_key_still_parses)
 }
 END_TEST
 
+START_TEST(test_tconfig_gfx_avc444_development_key_disables_h264)
+{
+    struct xrdp_tconfig_gfx gfxconfig;
+    int rv;
+
+    rv = tconfig_load_gfx(GFXCONF_STUBDIR
+                          "/gfx_avc444_development_key.toml",
+                          &gfxconfig);
+    ck_assert_int_ne(rv, 0);
+    ck_assert_int_eq(gfxconfig.codec.codec_count, 1);
+    ck_assert_int_eq(gfxconfig.codec.codecs[0], XTC_RFX);
+    ck_assert_int_eq(gfxconfig.avc444_ffmpeg_fault_aux_delay, 0);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_tconfig_load_gfx(void)
@@ -527,6 +542,8 @@ make_suite_tconfig_load_gfx(void)
                    test_tconfig_gfx_avc444_empty_args_fallback);
     tcase_add_test(tc_tconfig_load_gfx,
                    test_tconfig_gfx_avc444_removed_key_still_parses);
+    tcase_add_test(tc_tconfig_load_gfx,
+                   test_tconfig_gfx_avc444_development_key_disables_h264);
 
     suite_add_tcase(s, tc_tconfig_load_gfx);
 

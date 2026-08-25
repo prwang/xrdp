@@ -46,6 +46,7 @@ EXTRA_DIST = \
   gfx/gfx_avc444_wire_window.toml \
   gfx/gfx_avc444_wire_window_bad.toml \
   gfx/gfx_avc444_removed_emit_thread.toml \
+  gfx/gfx_avc444_development_key.toml \
   gfx/fake_encoder_hang.sh \
   check_operator_surface.sh \
   avc444/fixture_4frame.nut \

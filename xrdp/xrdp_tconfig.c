@@ -369,6 +369,17 @@ tconfig_load_gfx_x264_ct(toml_table_t *tfile, const int connection_type,
     return 0;
 }
 
+static void
+disable_codec(struct xrdp_tconfig_gfx_codec_order *co,
+              enum xrdp_tconfig_codecs code);
+
+enum h264_encoder_load_status
+{
+    H264_ENCODER_LOAD_OK = 0,
+    H264_ENCODER_LOAD_DEFAULTED,
+    H264_ENCODER_LOAD_DISABLED
+};
+
 static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfig_gfx *config)
 {
     TCLOG(LOG_LEVEL_TRACE, "[codec]");
@@ -444,11 +455,20 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
         toml_table_t *avc = toml_table_in(tfile, "avc444_ffmpeg");
         if (avc != NULL)
         {
+            if (toml_raw_in(avc, "tail_flush") != NULL ||
+                    toml_raw_in(avc, "fault_aux_delay") != NULL ||
+                    toml_raw_in(avc, "fault_strip_mmco") != NULL)
+            {
+                TCLOG(LOG_LEVEL_WARNING, "[avc444_ffmpeg] contains an "
+                      "unsupported development-only setting; disabling "
+                      "H.264");
+                disable_codec(&config->codec, XTC_H264);
+                return H264_ENCODER_LOAD_DISABLED;
+            }
             toml_datum_t path = toml_string_in(avc, "path");
             toml_array_t *ea = toml_array_in(avc, "encoder_args");
             toml_datum_t ca = toml_int_in(avc, "chroma_align");
             toml_datum_t am = toml_string_in(avc, "avc_mode");
-            toml_datum_t tf = toml_bool_in(avc, "tail_flush");
             toml_datum_t de = toml_bool_in(avc, "dump_extra");
             toml_datum_t ss = toml_bool_in(avc, "strip_sei");
             toml_datum_t sh = toml_bool_in(avc, "sanitize_hrd");
@@ -460,8 +480,6 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                                           "intra_refresh_frames_aux");
             toml_datum_t rs = toml_bool_in(avc,
                                            "ltr_rekey_surface_reset");
-            toml_datum_t fa = toml_bool_in(avc, "fault_aux_delay");
-            toml_datum_t fm = toml_bool_in(avc, "fault_strip_mmco");
             toml_datum_t es = toml_bool_in(avc, "eager_slot_ack");
             toml_datum_t et = toml_bool_in(avc, "emit_thread");
             toml_datum_t ww = toml_int_in(avc, "wire_window");
@@ -545,10 +563,6 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                       "removed: the EGFX assembly always "
                       "runs on the encoder worker. The key is ignored; "
                       "delete it from gfx.toml");
-            }
-            if (tf.ok)
-            {
-                config->avc444_ffmpeg_tail_flush = tf.u.b ? 1 : 0;
             }
             if (de.ok)
             {
@@ -688,14 +702,6 @@ static int tconfig_load_gfx_h264_encoder(toml_table_t *tfile, struct xrdp_tconfi
                     config->avc444_ffmpeg_intra_refresh_frames_aux =
                         config->avc444_ffmpeg_intra_refresh_frames;
                 }
-            }
-            if (fa.ok)
-            {
-                config->avc444_ffmpeg_fault_aux_delay = fa.u.b ? 1 : 0;
-            }
-            if (fm.ok)
-            {
-                config->avc444_ffmpeg_fault_strip_mmco = fm.u.b ? 1 : 0;
             }
             if (am.ok)
             {
@@ -936,7 +942,11 @@ tconfig_load_gfx(const char *filename, struct xrdp_tconfig_gfx *config)
     /* Load GFX codec order */
     tconfig_load_gfx_order(tfile, config);
     /* Load H.264 encoder */
-    tconfig_load_gfx_h264_encoder(tfile, config);
+    if (tconfig_load_gfx_h264_encoder(tfile, config) ==
+            H264_ENCODER_LOAD_DISABLED)
+    {
+        rv = 1;
+    }
 
     /* H.264 configuration */
     if (codec_enabled(&config->codec, XTC_H264))

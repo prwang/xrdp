@@ -1,0 +1,7 @@
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+avc_mode = "auto"
+fault_aux_delay = true
