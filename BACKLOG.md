@@ -198,12 +198,13 @@ green. Normative specification:
 
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
-**Status: IN PROGRESS; plan committed before implementation.** #142 is
-blocked on a complete semantic audit of every #126–#142 requirement across the
-current paired development and clean-room trees. Source-shape differences are
-allowed; any normative behavior, bound, default, failure policy or operator
-surface present in only one implementation is not. The audit must classify and
-resolve every divergence before either live comparison arm is built.
+**Status: IN PROGRESS; semantic audit complete, 40059 execution pending.** The
+committed requirement matrix in
+[`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
+classifies every #126–#142 requirement. Reconciliation adds the clean-room-only
+typed capture-layout/slot-identity validation and rejects three removed
+development-only configuration keys. No normative development-only behavior
+was found.
 
 After reconciliation, port `40059` runs the full development frontier plus
 every normative behavior found only in clean-room, retaining the observed stale
