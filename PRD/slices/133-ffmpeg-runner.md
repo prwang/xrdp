@@ -35,9 +35,13 @@ Target files are `xrdp/xrdp_encoder_ffmpeg.c`,
   per submitted view and bounded total bytes, and associate by FIFO submission
   identity. Extra, missing or late packets fail.
 * S133-R6: before capability confirmation, run a bounded behavioral probe at
-  representative aligned geometry. It shall verify NUT, Annex-B, parameter
-  placement, exactly one SPS per keyframe, and supported `dump_extra`
-  behavior. A timeout or mismatch marks the backend unavailable.
+  representative aligned geometry using the exact executable, argv, header
+  policy and one-child or alternating-pair runner topology supplied to this
+  slice. It shall verify NUT, Annex-B, parameter placement, exactly one SPS per
+  keyframe, and supported `dump_extra` behavior. A timeout or mismatch marks
+  the backend unavailable. The probe certifies only mechanisms it actually
+  executes; a later slice which adds a production transform or child role must
+  extend this same probe before that topology can be supported.
 * S133-R7: the ffmpeg input command shall include an explicit one-frame
   `probesize` so small geometry cannot wait for additional frames.
 * S133-R8: close/recycle shall terminate, reap and release every descriptor
@@ -50,15 +54,31 @@ Target files are `xrdp/xrdp_encoder_ffmpeg.c`,
   `monitor` when a whole input view has been consumed, and `outfirst` with
   those fields plus `bytes` when its first output arrives. These events exist
   only in a trace-enabled build.
+* S133-R11: failures shall retain a stable class covering bad configuration,
+  child creation, timeout, pipe/pump, parse and stream-contract rejection. The
+  runner shall be able to retain one bounded diagnostic record containing the
+  exact executable version and argv, visible/coded dimensions and typed class.
+  It shall not retain raw desktop pixels or credentials. Persistence shall use
+  a server-wide first-failure slot per class, a mode-0700 directory and
+  mode-0600 files created without following symlinks; repeated test or client
+  attempts shall not multiply records. Production shall use the fixed
+  `/var/log/xrdp/ffmpeg-forensics` root. Deterministic tests may pass a private
+  temporary root to the same internal writer; no client value, administrator
+  key or environment variable may redirect production retention. Later
+  transform slices may add rejected encoded access units when those bytes
+  exist.
 
 ## Required tests and gate
 
 `Avc444Ffmpeg` shall initially enable probe success, global-header handling,
 duplicate-header rejection, timeout classification, one-SPS policy,
 synchronous pair identity, synchronous single identity and resize/reap.
-Add a ninth deterministic static-bitstream-filter argv/policy case. Tests
-requiring LTR, sparse cadence, pump sets or server config belong to
-later slices. The fake hanging encoder shall prove the deadline and reap path.
+Add a ninth deterministic static-bitstream-filter argv/policy case. Add
+deterministic failure-record tests for exact argv/version and dimensions,
+permissions, exclusive first-failure retention, bounded output and absence of
+raw input pixels. Tests requiring the leaf transform, LTR, sparse cadence,
+pump sets or server config belong to later slices. The fake hanging encoder
+shall prove the deadline and reap path.
 Before the result can be green, verify `/usr/bin/ffmpeg` is an executable stock
 build with libx264, then run
 `XRDP_TEST_FFMPEG_PATH=/usr/bin/ffmpeg CK_RUN_SUITE=Avc444Ffmpeg tests/xrdp/test_xrdp`.

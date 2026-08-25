@@ -39,6 +39,12 @@ in `tests/xrdp/test_avc444_ffmpeg.c`. Register the LTR suite in
   for an identical input/state pair.
 * S138-R7: disabling the optional LTR chain shall preserve #137 topology and
   existing reset behavior.
+* S138-R8: extend the behavioral probe again when LTR is selected. Using the
+  exact production executable, argv, child roles and LTR settings, it shall
+  process a matched main/auxiliary pair through both production LTR rewriters
+  before reporting support. Leaf-probe success shall not certify LTR. A stream
+  shape rejected by either LTR rewriter shall be unavailable before
+  activation, with the stable content-rejection class from #133.
 
 ## Required tests and gate
 
@@ -52,5 +58,7 @@ observed-vs-requested scheduling, independent auxiliary period and both-mode
 paired/sparse cuts. Golden inputs are immutable fixtures.
 
 Enable `test_ffmpeg_ltr_rekey_cycle` and
-`test_ffmpeg_scheduled_paired_cut_live` in `Avc444Ffmpeg`. Run both targeted
-suites, then the README gate.
+`test_ffmpeg_scheduled_paired_cut_live` in `Avc444Ffmpeg`. Add a direct LTR
+probe case which proves both rewriters execute on the positive configuration
+and that an independently incompatible stream shape is rejected by the probe,
+not deferred to a live encode. Run both targeted suites, then the README gate.

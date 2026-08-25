@@ -9,9 +9,8 @@ already implemented and green.
 Target files are `xrdp/xrdp_tconfig.c`, `xrdp/xrdp_tconfig.h`,
 `xrdp/xrdp_types.h`, `xrdp/xrdp_mm.c`, `xrdp/gfx.toml`,
 `docs/man/gfx.toml.5.in`, `tests/xrdp/test_tconfig.c`,
-`tests/xrdp/test_avc444_ffmpeg.c`, `tests/xrdp/test_xrdp_egfx.c`,
-`tests/xrdp/check_operator_surface.sh`, and these fixtures, all below
-`tests/xrdp/gfx/`:
+`tests/xrdp/test_xrdp_egfx.c`, `tests/xrdp/check_operator_surface.sh`, and
+these fixtures, all below `tests/xrdp/gfx/`:
 `gfx_avc444_ffmpeg.toml`, `gfx_avc444_empty_args.toml`,
 `gfx_avc444_intra_refresh.toml`, `gfx_avc444_intra_refresh_bad.toml`,
 `gfx_avc444_rekey.toml`, `gfx_avc444_rekey_bad.toml`,
@@ -25,14 +24,15 @@ capability-response seam but shall not introduce a new mechanism there.
 
 * S142-R1: the backend is opt-in through an `[avc444_ffmpeg]` table and codec
   order. Absence of the table preserves the base behavior exactly.
-* S142-R2: before RDPGFX confirmation, resolve requested mode with #132 and run
-  a behavioral probe of the exact topology which will run after confirmation.
-  AVC420 probes the single main child. AVC444 with the topology from #137
-  probes the ordinary main child, the forced-IDR auxiliary child and the
-  production leaf transform on one pair. AVC444 with #138 enabled probes both
-  LTR rewriters. Advertise/select only a mode supported by client,
-  configuration and that complete probe. The selected mode is immutable
-  afterward.
+* S142-R2: before RDPGFX confirmation, resolve the requested mode with #132,
+  construct the complete runner configuration from the loaded operator values
+  and invoke the behavioral probe already extended by #133, #137 and #138.
+  AVC420 supplies the single-main topology. AVC444 supplies either the
+  two-child leaf topology or the selected LTR topology. No field may be
+  restored from a simpler default between configuration loading and the probe.
+  Advertise/select only a mode supported by the client, configuration and that
+  complete probe. The selected mode is immutable afterward. This slice wires
+  the probe to capability selection; it does not add a new probe or transform.
 * S142-R3: document and validate executable path, bounded encoder argv,
   `avc_mode` (`auto`, forced AVC444, forced v1, forced AVC420),
   `chroma_align` (16 or 32), `dump_extra`, `strip_sei`, `sanitize_hrd`,
@@ -52,7 +52,10 @@ capability-response seam but shall not introduce a new mechanism there.
   `-bf`, `0`, `-preset`, `ultrafast`, `-tune`, `zerolatency`, `-crf`, `18`,
   `-g`, `240`, `-x264-params`, `repeat-headers=1:aud=1:cabac=1`. CABAC is
   explicit because the auxiliary-leaf transform requires it and libx264's
-  `ultrafast` preset otherwise selects Constrained Baseline/CAVLC.
+  `ultrafast` preset otherwise selects Constrained Baseline/CAVLC. An omitted
+  or empty argument array shall select the already-tested #137 runner default;
+  the loader shall not carry an independent divergent copy. The commented
+  software example shall reproduce that default exactly.
 * S142-R5: invalid mode, alignment, window, interval, dependency or argument
   shall produce a clear warning/error and keep the backend unavailable or the
   documented safe default. It shall never be silently clamped into a
@@ -69,17 +72,15 @@ capability-response seam but shall not introduce a new mechanism there.
   `ltr_rekey_surface_reset` defaults false; true is documented only as a
   diagnostic reproduction of the known client-visible surface-churn flash,
   not as the normal wrap-protection mechanism.
-* S142-R7: runtime failure shall not switch codec. A child-creation,
-  stream-contract or rewrite failure after confirmation is terminal for the
-  affected connection/session: preserve damage, retain one bounded mode-0600
-  forensic bundle containing the exact ffmpeg version/argv and typed reason,
-  plus the rejected encoded access units when encoded units exist, tear down
-  the children once and hang up the session. A creation failure or an already
-  exited child has no access unit to retain. Do not dump raw desktop pixels or
-  credentials. Later damage shall not recreate a child for that connection.
-  Retention shall have a server-wide fixed bound: an incompatible
-  pre-confirmation configuration is remotely triggerable and must not allocate
-  another bundle for every connection.
+* S142-R7: activation shall connect #134's already-tested terminal backend
+  result to one connection hangup. A child-creation, stream-contract or rewrite
+  failure after confirmation shall preserve damage, use the bounded forensic
+  record assembled by #133 and #137, tear down the children once and signal the
+  hangup. A creation failure or an already exited child has no access unit to
+  retain; a leaf rejection retains the untouched encoded pair. Later damage
+  shall observe the terminal latch and shall not recreate a child or switch
+  codec. This slice shall not add a retry policy, a fallback, or a second
+  forensic mechanism.
 * S142-R8: the man page and sample config shall state process cardinality,
   required host pipe capacity, security model, resize behavior, multi-monitor
   support, shipped credit values, sparse guarantee, sparse visual limitation
@@ -107,28 +108,17 @@ capability-response seam but shall not introduce a new mechanism there.
   installed template, manual source, compiled runtime strings and shipped help,
   require the principal paired-reference, credit and sparse keys in the
   template and manual, and reject any advertised removed key.
-* S142-R10: configuration is an end-to-end contract, with independent defenses
-  at every layer. A commented sample is executable operator surface: restoring
-  it verbatim shall produce an operational configuration, shall agree with the
-  built-in default it replaces, and shall not depend on a hidden correction
-  elsewhere. The manual shall explain the correctness, latency or quality
-  purpose of every non-obvious argument in the default software encoder block
-  rather than present a magic string.
-
-  The pre-confirmation probe shall use the exact loaded executable, argv, mode,
-  child count, child roles, header policy and production syntax transforms that
-  the confirmed session would use. It shall process representative output
-  through every selected transform before reporting success; success from a
-  simpler topology shall never certify a more complex live topology. A
-  configuration which starts ffmpeg but violates a downstream contract is an
-  unavailable backend, not a successful probe.
-
-  After confirmation, child creation, pump, parse, stream-contract and rewrite
-  failures shall all enter the same latched terminal state before teardown.
-  Event or damage re-entry shall observe that latch and shall not lazily create
-  another child. The bounded forensic record and hangup in S142-R7 are required
-  for this path. Passing any one of the sample, probe or terminal-lifecycle
-  defenses does not compensate for omitting either of the other two.
+* S142-R10: configuration is an end-to-end contract with three independent
+  final checks. A commented sample is executable operator surface: restoring
+  it verbatim shall produce an operational configuration, agree with the
+  built-in default it replaces and not depend on a hidden correction elsewhere.
+  The manual shall explain the correctness, latency or quality purpose of every
+  non-obvious argument in the default software encoder block rather than
+  present a magic string. The configuration-to-probe test shall prove that the
+  exact loaded executable, argv, mode, child roles and transform selection
+  reach the earlier probe unchanged. The post-confirm test shall prove the
+  earlier terminal latch and forensic path remain effective after activation.
+  Passing any one check does not compensate for omitting either of the others.
 
 ## Required tests and final gate
 
@@ -136,12 +126,14 @@ The `GfxLoad` suite shall cover absence, defaults, every override, invalid and
 dependency values, removed-key warning, no excluded keys, codec order and the
 complete config-to-encoder transfer. The operator-surface gate shall require
 the complete copy-safe software argument token in both the installed template
-and manual. Capability tests shall prove probe before confirmation with the
-exact selected topology, including a supported-CABAC positive case and a CAVLC
-leaf-rejection case, immutable choice, no fallback, all client capability
-versions and legacy codec preservation. A deterministic post-confirm leaf
-rejection fixture shall prove one forensic bundle, one teardown, session
-hangup and zero later respawns under repeated damage. Resize tests shall prove
+and manual, and shall prove the full commented software block agrees with the
+runner default. Capability tests shall prove the exact loaded configuration is
+passed to the earlier probe before confirmation, immutable choice, no fallback,
+all client capability versions and legacy codec preservation. The CABAC/CAVLC
+and LTR probe mechanisms are already gated by #137 and #138; this slice proves
+their results control advertisement. A deterministic post-confirm rejection
+fixture shall prove one bounded forensic bundle, one teardown, session hangup
+and zero later respawns under repeated damage. Resize tests shall prove
 terminate/reap/new reset and no old bytes.
 
 Run every targeted AVC and PerfTrace suite, full `make check`, astyle and

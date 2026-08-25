@@ -9,12 +9,15 @@ requirements live in `PRD/`; per-run evidence stays with its capture under
 Do not add result tables or completed narratives here. A closed item keeps one
 stub at the end of this file and points to its record.
 
-## Current repository state — 2026-08-23
+## Current repository state — 2026-08-25
 
 * `/work` and `/workUpdateXorgXrdp` are both on
-  `dev/avc444_metablock_checkpoint`; the committed dev-qualification
-  frontiers are xrdp `00bce44e` and xorgxrdp `c190343`. They include the
-  completed #120 trace lifecycle and producer-logger removal.
+  `dev/avc444_metablock_checkpoint`; the qualified runtime frontiers are xrdp
+  `518e9575` and xorgxrdp `c190343`. The xrdp branch head additionally carries
+  the copy-safe operator and clean-room documentation. The runtime frontier
+  includes #125C's exact-topology probe and terminal no-respawn handling;
+  xorgxrdp remains at the qualified producer frontier which includes #120's
+  per-frame logger removal.
 * The xrdp clean-room base is pinned to
   `fe850a22c08a624c66bbac07e310251782e6f828`. Its compatibility audit is
   complete and found no breaking AVC API, configuration or wire change.
@@ -181,31 +184,36 @@ unknown-version and v2-support cases pass. Normative specification:
 **Status: TODO; blocked on #132.** Re-author spawn, descriptor layout,
 nonblocking pipe pump, bounded collection, termination/reaping, static
 `dump_extra` verification, one-frame `probesize`, pipe-size negotiation and
-failure classification. LTR and multi-monitor pump-set behavior are later.
+failure classification. Add bounded first-failure process/stream forensics;
+leaf-specific encoded units, LTR and multi-monitor pump-set behavior are later.
 
 **Development inventory (not source text):** base portions of
 `xrdp/xrdp_encoder_ffmpeg.{c,h}` and
 `tests/xrdp/test_avc444_ffmpeg.c`, plus
 `tests/xrdp/gfx/fake_encoder_hang.sh`.
 
-**Acceptance:** pure and real-ffmpeg gates cover probe success, header-policy
-mismatch, duplicate headers, timeout, synchronous pair/single identity,
-resize/reap and small-geometry startup. Normative specification:
+**Acceptance:** pure and real-ffmpeg gates cover exact-config probe success,
+header-policy mismatch, duplicate headers, timeout, synchronous pair/single
+identity, resize/reap, small-geometry startup and bounded secure forensic
+retention. Normative specification:
 [`PRD/slices/133-ffmpeg-runner.md`](PRD/slices/133-ffmpeg-runner.md).
 
 ## #134 — inactive server encoder integration
 
 **Status: TODO; blocked on #133.** Add internal encoder ownership,
 mode state and dispatch without making the backend selectable or advertising
-an AVC capability.
+an AVC capability. The first backend error latches terminal state before
+teardown; later work cannot recreate a child or substitute a codec.
 
 **Development inventory (not source text):** relevant portions of
 `xrdp/xrdp_encoder.{c,h}`,
-`xrdp/xrdp_mm.c`, `xrdp/xrdp_types.h` and `tests/xrdp/test_xrdp_egfx.c`.
+`xrdp/xrdp_mm.c`, `xrdp/xrdp_types.h`, `tests/xrdp/test_xrdp_egfx.c` and the
+terminal-latch case in `tests/xrdp/test_avc444_ffmpeg.c`.
 
 **Acceptance:** existing x264/OpenH264 paths are unchanged; internal
-AVC420/444 transactions are unit-testable; no configuration or capability can
-reach the new path. Normative specification:
+AVC420/444 transactions are unit-testable; an injected failure produces one
+notification, one teardown and zero later spawns under repeated work; no
+configuration or capability can reach the new path. Normative specification:
 [`PRD/slices/134-inactive-encoder-integration.md`](PRD/slices/134-inactive-encoder-integration.md).
 
 ## #135 — LC=1/LC=2 wire serialization
@@ -246,11 +254,13 @@ become non-IDR intra leaves on the shared chain.
 
 **Development inventory (not source text):** relevant functions in
 `xrdp/xrdp_h264_annexb.{c,h}` and
-`xrdp/xrdp_encoder_ffmpeg.{c,h}`; leaf cases in
-`tests/xrdp/test_avc444_h264.c`.
+`xrdp/xrdp_encoder_ffmpeg.{c,h}`; leaf and probe cases in
+`tests/xrdp/test_avc444_h264.c` and `test_avc444_ffmpeg.c`.
 
-**Acceptance:** golden leaf vectors, malformed/truncated rejection and both
-decoder-topology simulations pass. Normative specification:
+**Acceptance:** golden leaf vectors, stable typed rejection, malformed and
+truncated rejection, both decoder-topology simulations, CABAC-positive/CAVLC-
+negative exact two-child probe and bounded rejected-unit retention pass.
+Normative specification:
 [`PRD/slices/137-reference-safe-topology.md`](PRD/slices/137-reference-safe-topology.md).
 
 ## #138 — long-term-reference chain, re-key and scheduled intra refresh
@@ -266,8 +276,9 @@ intra refresh.
 LTR/re-key/intra cases in `test_avc444_ffmpeg.c` and `test_tconfig.c`.
 
 **Acceptance:** golden bytes, Windows-field cross-check, both decode modes,
-sparse cadence, wrap/restart, observed-vs-requested cuts and live real-ffmpeg
-cut cases pass. Normative specification:
+sparse cadence, wrap/restart, observed-vs-requested cuts, live real-ffmpeg cut
+cases and an exact two-child probe through both selected LTR rewriters pass.
+Normative specification:
 [`PRD/slices/138-ltr-rekey-intra.md`](PRD/slices/138-ltr-rekey-intra.md).
 
 ## #139 — one-thread multi-monitor pump set and batch emission
@@ -330,17 +341,20 @@ gate specified by #142 only after activation. Normative specification:
 
 **Status: TODO; blocked on #141.** Make the fully assembled backend
 selectable only here. Add the user-facing configuration and documentation for
-the mechanisms already green; do not carry `tail_flush` or explicit fault
-injection.
+the mechanisms already green, bind the exact loaded configuration to their
+probe, and map the existing terminal result to connection hangup. Do not carry
+`tail_flush` or explicit fault injection and do not add another probe, retry or
+forensic mechanism.
 
 **Development inventory (not source text):** `xrdp/xrdp_tconfig.{c,h}`,
 `xrdp/xrdp_types.h`,
 `xrdp/xrdp_mm.c`, `xrdp/gfx.toml`, `docs/man/gfx.toml.5.in`,
-`tests/xrdp/check_operator_surface.sh`, `tests/xrdp/test_tconfig.c` and its
-`tests/xrdp/gfx/*.toml` fixtures.
+`tests/xrdp/check_operator_surface.sh`, `tests/xrdp/test_tconfig.c`,
+`tests/xrdp/test_xrdp_egfx.c` and the `tests/xrdp/gfx/*.toml` fixtures.
 
 **Acceptance:** bounds/refusals/defaults, removed-key warning, capability
-activation, probe-before-confirm, no fallback, resize lifecycle, operator
+activation from the earlier exact-probe result, configuration-to-probe
+identity, terminal hangup/no-respawn, no fallback, resize lifecycle, operator
 surface entropy scan and the complete client, multi-monitor, sparse and
 numerical gates defined by the normative specification pass on builds made
 from the clean-room paired branches. Default and trace-enabled CI-equivalent

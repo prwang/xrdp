@@ -18,15 +18,20 @@ Target files are `xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder.h`,
 * S134-R2: internal AVC420 shall submit the main view to one child. Internal
   AVC444 shall submit matched main and auxiliary views and shall not publish a
   partial pair.
-* S134-R3: every failure shall return the capture ownership or preserve dirty
-  damage according to existing semantics, tear down the affected process
-  state and surface an error. It shall not invoke x264/OpenH264 as fallback.
+* S134-R3: the first backend failure shall latch a terminal state before
+  teardown, return capture ownership or preserve dirty damage according to
+  existing semantics, tear down the affected process state and surface one
+  error. Every later submit, collect, event or damage entry shall observe the
+  latch before child creation and shall not restart the runner. It shall not
+  invoke x264/OpenH264 as fallback. The integration remains unselectable here;
+  #142 connects this already-tested terminal result to connection hangup.
 * S134-R4: the existing x264 and OpenH264 dispatch, queue ownership, surface
   creation and completion behavior shall remain unchanged.
 * S134-R5: there shall be no parser/config key, codec-order value, capability
   response or runtime branch by which a session can select this integration.
 * S134-R6: lifecycle calls shall be safe for a never-started, partially
-  started, completed and failed context.
+  started, completed and terminally failed context. Terminal notification and
+  teardown shall be idempotent.
 * S134-R7: trace-enabled builds shall record damage geometry (`dmg`), encoder
   submitted/returned/ready state (`enc`), worker enqueue/take FIFO identity
   (`enq`, `take`) and worker waiting/draining brackets (`wait_beg`,
@@ -42,7 +47,10 @@ Target files are `xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder.h`,
 
 Add deterministic EGFX/encoder tests for an internal AVC420 transaction, a
 matched AVC444 transaction, partial-pair suppression, failure ownership and
-unchanged legacy dispatch. The test shall call the internal seam directly;
-it shall also prove live capability selection cannot reach it. Run
+unchanged legacy dispatch. Inject one child failure, then repeat work and
+damage entries; assert one terminal notification, one teardown, zero later
+child creations and no codec substitution. The test shall call the internal
+seam directly; it shall also prove live capability selection cannot reach it.
+Run
 `CK_RUN_SUITE=test_xrdp_egfx_base_functions tests/xrdp/test_xrdp`, the legacy
 H.264 suites, and the README gate.
