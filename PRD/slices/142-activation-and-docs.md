@@ -34,6 +34,11 @@ capability-response seam but shall not introduce a new mechanism there.
   AVC420 supplies the single-main topology. AVC444 supplies either the
   two-child leaf topology or the selected LTR topology. No field may be
   restored from a simpler default between configuration loading and the probe.
+  Every monitor probe shall use the exact coded geometry which the capture
+  contract will supply, including 16-row height alignment. Session geometry
+  used when no monitor layout is available follows the same rule; for example,
+  1920-by-1080 visible geometry is probed as 1920-by-1088. A probe of a smaller
+  even-height frame does not certify the production capture.
   Advertise/select only a mode supported by the client, configuration and that
   complete probe. The selected mode is immutable afterward. This slice wires
   the probe to capability selection and connects confirmed raw captures to the
@@ -135,7 +140,8 @@ the complete copy-safe software argument token in both the installed template
 and manual, and shall prove the full commented software block agrees with the
 runner default. Capability tests shall prove the exact loaded configuration is
 passed to the earlier probe before confirmation, immutable choice, no fallback,
-all client capability versions and legacy codec preservation. The CABAC/CAVLC
+all client capability versions, 16-row coded geometry and legacy codec
+preservation. The CABAC/CAVLC
 and LTR probe mechanisms are already gated by #137 and #138; this slice proves
 their results control advertisement. A deterministic post-confirm rejection
 fixture shall prove one bounded forensic bundle, one teardown, session hangup

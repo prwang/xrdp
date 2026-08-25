@@ -20,7 +20,12 @@ Target files are `xrdp/xrdp_encoder_ffmpeg.c`,
   argv elements between xrdp's fixed input and output contract tokens.
 * S133-R2: each child shall have one rawvideo input and one NUT output.
   Intended endpoints survive exec; all others are close-on-exec. Parent ends
-  are nonblocking and owned by one handle.
+  are nonblocking and owned by one handle. The runner's coded geometry shall
+  be identical to the capture contract: width is rounded to the selected
+  16- or 32-pixel alignment and height is rounded to 16 rows. The visible
+  1920-by-1080 case therefore consumes a 1920-by-1088 view, including the
+  producer-supplied edge padding; the runner must not recompute a smaller
+  two-row-aligned input.
 * S133-R3: input shall be committed only after the complete view is available.
   The pump shall handle partial writes and reads, `EINTR`, `EAGAIN`, child exit
   and a monotonic deadline without blocking one direction behind the other.
@@ -73,6 +78,8 @@ Target files are `xrdp/xrdp_encoder_ffmpeg.c`,
 `Avc444Ffmpeg` shall initially enable probe success, global-header handling,
 duplicate-header rejection, timeout classification, one-SPS policy,
 synchronous pair identity, synchronous single identity and resize/reap.
+The resize/geometry cases shall include 1920-by-1080 visible input and derive
+the expected 1920-by-1088 coded input from the capture alignment contract.
 Add a ninth deterministic static-bitstream-filter argv/policy case. Add
 deterministic failure-record tests for exact argv/version and dimensions,
 permissions, exclusive first-failure retention, bounded output and absence of

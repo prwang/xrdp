@@ -1,0 +1,76 @@
+# Ubuntu 24.04 / FFmpeg 6 clean-room interactive candidate.
+# One monitor at the client-selected size; host endpoint 127.0.0.1:40056.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x040
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x040
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x040
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x040
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:cleanroom-ae2a4674-aa03d860-u2404-xfce.p736e0983
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "xfce"
+            - name: ARM_LABEL
+              value: "Clean-room AVC444 FFmpeg baseline (port 40056)"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/enc"
+          ports:
+            - containerPort: 3389
+              hostPort: 40056
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: payloads
+              mountPath: /usr/local/bin/codescroll10.sh
+              subPath: codescroll10.sh
+            - name: payloads
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: payloads
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x040

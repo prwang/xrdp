@@ -1,8 +1,23 @@
-# Container for BACKLOG #125C's distribution-specific CPU/leaf gate.
+# Ubuntu 24.04 container for CPU-encoder compatibility and interactive gates.
 #
 # Keep this separate from Containerfile: the ordinary matrix deliberately
 # models the Debian development host, while this arm must exercise Ubuntu
 # 24.04's FFmpeg 6/libx264 bitstream.
+FROM ubuntu:24.04 AS visual-build
+
+ENV DEBIAN_FRONTEND=noninteractive
+RUN apt-get update && apt-get install -y --no-install-recommends \
+        build-essential pkg-config \
+        libcairo2-dev libx11-dev libxext-dev libxrandr-dev \
+    && rm -rf /var/lib/apt/lists/*
+COPY textflood.c colorkey_x11.c chroma_strip_anim.c /src/
+RUN cc -O2 -Wall -Wextra -Wno-unused-parameter -o /src/textflood \
+        /src/textflood.c $(pkg-config --cflags --libs cairo x11 xext xrandr) \
+    && cc -O2 -Wall -Wextra -o /src/colorkey_x11 \
+        /src/colorkey_x11.c -lX11 \
+    && cc -O2 -Wall -o /src/chroma_strip_anim \
+        /src/chroma_strip_anim.c -lX11
+
 FROM ubuntu:24.04
 
 ARG XRDP_DEB
@@ -15,8 +30,25 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
         xserver-xorg-core xserver-xorg-legacy \
         x11-xserver-utils xterm xfonts-base fonts-dejavu-core \
         dbus procps openssl ca-certificates xdotool \
-        libx11-6 libxfixes3 libxrandr2 \
+        libcairo2 libx11-6 libxext6 libxfixes3 libxrandr2 python3-tk \
     && rm -rf /var/lib/apt/lists/*
+
+COPY --from=visual-build /src/textflood /usr/local/bin/textflood
+COPY --from=visual-build /src/colorkey_x11 /usr/local/bin/colorkey_x11
+COPY --from=visual-build /src/chroma_strip_anim \
+     /usr/local/bin/chroma_strip_anim
+COPY chroma_probe.py /usr/local/bin/chroma-probe
+RUN chmod 755 /usr/local/bin/textflood /usr/local/bin/colorkey_x11 \
+              /usr/local/bin/chroma_strip_anim /usr/local/bin/chroma-probe
+
+ARG INSTALL_XFCE=0
+RUN if [ "$INSTALL_XFCE" = "1" ]; then \
+        apt-get update \
+        && apt-get install -y --no-install-recommends \
+            xfce4-session xfwm4 xfdesktop4 xfce4-panel xfce4-settings \
+            xfce4-terminal lxterminal dbus-x11 \
+        && rm -rf /var/lib/apt/lists/*; \
+    fi
 
 COPY ${XRDP_DEB} ${XORGXRDP_DEB} /tmp/debs/
 RUN apt-get update \

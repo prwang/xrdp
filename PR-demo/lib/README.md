@@ -5,6 +5,9 @@
   a config mismatch instead of validating the wrong codec).
 - `show_img.sh`      — displays an image fullscreen in the tester session
   (wrapper used by the visual A/B scripts).
+- `build_xorgxrdp_dev_deb.sh` — stages an already-built GLAMOR xorgxrdp tree
+  as a commit-identified `xorgxrdp-dev` package without changing the live host
+  installation.
 - `windows_rdp/rdc_burr_sweep.ps1` — Windows-client helper which resizes an
   existing RDCMan or mstsc window and captures each width for the AVC444
   resize-comb investigation. It runs on the client, not this Linux box.
