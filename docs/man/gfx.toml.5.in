@@ -550,19 +550,19 @@ explicit \fBLIBVA_DRIVER_NAME\fR cannot currently be steered through
 
 .SH "FFMPEG FAILURE FORENSICS"
 
-An incompatible auxiliary(hyleaf stream is refused before AVC selection.
+An incompatible auxiliary\(hyleaf stream is refused before AVC selection.
 If the ffmpeg backend nevertheless fails after AVC confirmation, the
 connection is closed once; xrdp does not respawn the child for later damage
 and does not switch codec.
 
 The first failure of each class reserves a persistent slot under
 \fB/var/log/xrdp/ffmpeg-forensics\fR. The directory is mode 0700 and files are
-mode 0600. A leaf(hyrewrite record contains the untouched encoded main and
+mode 0600. A leaf\(hyrewrite record contains the untouched encoded main and
 auxiliary access units, typed rejection reason, dimensions, ffmpeg version and
 exact argv. A creation failure or an already exited child has no access unit,
 so its record contains the remaining metadata only. Raw desktop pixels and
 credentials are never written. Slots are not multiplied by later client
-connections; archive and remove a class's \fB*-first*\fR files to re(hyarm
+connections; archive and remove a class's \fB*-first*\fR files to re\(hyarm
 that class after resolving or changing the configuration.
 
 .SH "PERFORMANCE TRACE"

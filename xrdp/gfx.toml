@@ -40,6 +40,7 @@ h264_encoder = "x264"
 # chroma_refresh_ms = 0
 # chroma_idle_ms = 0
 # # The default software encoder is a one-input/one-output low-latency pipe.
+# # Keep cabac=1: the AVC444 auxiliary-leaf transform rejects CAVLC.
 # encoder_args = [
 #   "-c:v", "libx264",
 #   "-bf", "0",

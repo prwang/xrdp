@@ -52,6 +52,16 @@ do
         fail "$key missing from gfx.toml(5)"
 done
 
+# The installed software example is an operational configuration, not prose.
+# libx264's ultrafast preset otherwise selects CAVLC, which the AVC444
+# auxiliary-leaf transform must reject before capability confirmation.
+grep -Fq 'repeat-headers=1:aud=1:cabac=1' \
+    "$source_root/xrdp/gfx.toml" ||
+    fail "installed libx264 example omits the required CABAC setting"
+grep -Fq 'repeat\-headers=1:aud=1:cabac=1' \
+    "$source_root/docs/man/gfx.toml.5.in" ||
+    fail "gfx.toml(5) libx264 example disagrees with the installed template"
+
 if grep -q 'tail_flush[[:space:]]*=' "$source_root/xrdp/gfx.toml"
 then
     fail "removed tail_flush key is advertised by the installed template"

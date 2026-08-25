@@ -527,3 +527,15 @@ Use explicit CABAC in the built-in libx264 arguments, probe every selected
 runtime topology before confirmation, refuse an incompatible custom stream
 there, and make any later backend failure terminal for that connection after
 one bounded forensic record. #126 is now the first open clean-room slice.
+
+## 2026-08-25 post-close operator-template correction
+
+The root cause also made the previously shipped commented software example
+unsafe to copy verbatim: uncommenting it replaced the corrected built-in argv
+with an explicit `ultrafast` argument list that omitted `cabac=1`. Commit
+`518e9575` corrected both the installed `xrdp/gfx.toml` source (there is no
+`gfx.toml.in`) and the `gfx.toml(5)` software example. A follow-up operator
+surface gate now requires the complete
+`repeat-headers=1:aud=1:cabac=1` token in both files, and the template itself
+states why CABAC must remain. This is a documentation completion of Scope C;
+it does not reopen its runtime result.
