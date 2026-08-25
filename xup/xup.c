@@ -197,6 +197,7 @@ convert_xrdp_client_info_to_xup_client_info(
     const struct xrdp_client_info *src,
     struct xup_client_info *dst)
 {
+    memset(dst, 0, sizeof(*dst));
     dst->size = sizeof(*dst);
     dst->version = XUP_CLIENT_INFO_CURRENT_VERSION;
     dst->bpp = src->bpp;
@@ -215,6 +216,14 @@ convert_xrdp_client_info_to_xup_client_info(
     dst->capture_code = src->capture_code;
     dst->capture_format = src->capture_format;
     dst->avc444_chroma_align = src->avc444_chroma_align;
+    if (src->capture_code == CC_GFX_AVC444 &&
+            xup_avc444_layout_build(&src->display_sizes,
+                                    src->capture_format,
+                                    src->avc444_chroma_align,
+                                    &dst->avc444_layout) != 0)
+    {
+        memset(&dst->avc444_layout, 0, sizeof(dst->avc444_layout));
+    }
 
     memcpy(dst->model, src->model, CI_KBD_MODEL_SIZE);
     memcpy(dst->layout, src->layout, CI_KBD_LAYOUT_SIZE);

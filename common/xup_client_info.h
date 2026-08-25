@@ -24,7 +24,50 @@
 #if !defined(XUP_CLIENT_INFO_H)
 #define XUP_CLIENT_INFO_H
 
+#include <limits.h>
+#include <stdint.h>
+#include <string.h>
+
 #include "xrdp_client_info.h"
+
+#define XUP_AVC444_LAYOUT_VERSION 2U
+#define XUP_AVC444_MAX_DIRTY_RECTS 15U
+#define XUP_AVC444_MAX_DIMENSION 16384U
+#define XUP_AVC444_CAPTURE_SLOTS 2U
+
+#define XUP_AVC444_MONITOR_SHIFT 28U
+#define XUP_AVC444_MONITOR_MASK 0xf0000000U
+#define XUP_AVC444_CAPTURE_MARKER 0x08000000U
+#define XUP_AVC444_SLOT_SHIFT 26U
+#define XUP_AVC444_SLOT_MASK 0x04000000U
+
+struct xup_avc444_monitor_layout
+{
+    int32_t left;
+    int32_t top;
+    uint32_t visible_width;
+    uint32_t visible_height;
+    uint32_t coded_width;
+    uint32_t coded_height;
+    uint32_t region_offset;
+    uint32_t region_bytes;
+    uint32_t slot_bytes;
+    uint32_t main_offset;
+    uint32_t main_bytes;
+    uint32_t auxiliary_offset;
+    uint32_t auxiliary_bytes;
+};
+
+struct xup_avc444_capture_layout
+{
+    uint32_t version;
+    uint32_t capture_format;
+    uint32_t width_alignment;
+    uint32_t monitor_count;
+    uint32_t total_bytes;
+    struct xup_avc444_monitor_layout
+        monitors[CLIENT_MONITOR_DATA_MAXIMUM_MONITORS];
+};
 
 /**
  * Flags of the xup paint-rect-ex ack (message 106), PRD FR-ACK-1.
@@ -118,6 +161,7 @@ struct xup_client_info
      * FreeRDP-derived clients, 32 for mstsc); the capture packs at the
      * FINAL coded geometry so the shmem is splicable (PRD FR-CAPTURE-6) */
     int avc444_chroma_align;
+    struct xup_avc444_capture_layout avc444_layout;
 };
 
 /* yyyymmdd of last incompatible change to xup_client_info OR to the
@@ -150,7 +194,7 @@ struct xup_client_info
  * 20260731 (BACKLOG #70): XUP_ACK_FLAGS_SLOT_ONLY. A producer that does
  * not know the bit would retire a held region on an ack that only means
  * "the slot is free", so the pair must match exactly. */
-#define XUP_CLIENT_INFO_CURRENT_VERSION 20260731
+#define XUP_CLIENT_INFO_CURRENT_VERSION 20260830
 
 /*
  * Shared-memory layout for the GFX H.264 capture family
@@ -174,6 +218,264 @@ struct xup_client_info
 /* each per-monitor region AND each view within it starts page aligned:
  * whole pages are what vmsplice moves by reference (PRD FR-PROC-6) */
 #define XUP_CAP_PAGE_ALIGN 4096
+
+static inline int
+xup_avc444_format_has_auxiliary(uint32_t capture_format)
+{
+    return capture_format == XRDP_yuv444_v1_stream_709fr ||
+           capture_format == XRDP_yuv444_v2_stream_709fr;
+}
+
+static inline int
+xup_avc444_layout_build(const struct display_size_description *displays,
+                        uint32_t capture_format, uint32_t width_alignment,
+                        struct xup_avc444_capture_layout *layout)
+{
+    unsigned int monitor_count;
+    unsigned int index;
+    uint64_t total;
+
+    if (displays == NULL || layout == NULL ||
+            (capture_format != XRDP_nv12_709fr &&
+             !xup_avc444_format_has_auxiliary(capture_format)) ||
+            (width_alignment != 16U && width_alignment != 32U) ||
+            displays->monitorCount > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+    {
+        return 1;
+    }
+
+    memset(layout, 0, sizeof(*layout));
+    layout->version = XUP_AVC444_LAYOUT_VERSION;
+    layout->capture_format = capture_format;
+    layout->width_alignment = width_alignment;
+    monitor_count = displays->monitorCount;
+    if (monitor_count == 0)
+    {
+        monitor_count = 1;
+    }
+    layout->monitor_count = monitor_count;
+    total = 0;
+
+    for (index = 0; index < monitor_count; ++index)
+    {
+        struct xup_avc444_monitor_layout *monitor;
+        int64_t width;
+        int64_t height;
+        uint64_t coded_width;
+        uint64_t coded_height;
+        uint64_t view_bytes;
+        uint64_t auxiliary_offset;
+        uint64_t slot_end;
+        uint64_t slot_bytes;
+        uint64_t region_end;
+
+        monitor = &layout->monitors[index];
+        if (displays->monitorCount == 0)
+        {
+            monitor->left = 0;
+            monitor->top = 0;
+            width = displays->session_width;
+            height = displays->session_height;
+        }
+        else
+        {
+            monitor->left = displays->minfo[index].left;
+            monitor->top = displays->minfo[index].top;
+            width = (int64_t)displays->minfo[index].right -
+                    displays->minfo[index].left + 1;
+            height = (int64_t)displays->minfo[index].bottom -
+                     displays->minfo[index].top + 1;
+        }
+        if (width < 1 || height < 1 ||
+                width > XUP_AVC444_MAX_DIMENSION ||
+                height > XUP_AVC444_MAX_DIMENSION)
+        {
+            return 1;
+        }
+
+        coded_width = ((uint64_t)width + width_alignment - 1U) &
+                      ~(uint64_t)(width_alignment - 1U);
+        coded_height = ((uint64_t)height + 15U) & ~15ULL;
+        view_bytes = coded_width * coded_height * 3U / 2U;
+        total = (total + XUP_CAP_PAGE_ALIGN - 1U) &
+                ~(uint64_t)(XUP_CAP_PAGE_ALIGN - 1U);
+        auxiliary_offset = (total + view_bytes + XUP_CAP_PAGE_ALIGN - 1U) &
+                           ~(uint64_t)(XUP_CAP_PAGE_ALIGN - 1U);
+        slot_end = xup_avc444_format_has_auxiliary(capture_format) ?
+                   auxiliary_offset + view_bytes : total + view_bytes;
+        slot_bytes = (slot_end - total + XUP_CAP_PAGE_ALIGN - 1U) &
+                     ~(uint64_t)(XUP_CAP_PAGE_ALIGN - 1U);
+        region_end = total + XUP_AVC444_CAPTURE_SLOTS * slot_bytes;
+        if (region_end > UINT32_MAX)
+        {
+            return 1;
+        }
+
+        monitor->visible_width = (uint32_t)width;
+        monitor->visible_height = (uint32_t)height;
+        monitor->coded_width = (uint32_t)coded_width;
+        monitor->coded_height = (uint32_t)coded_height;
+        monitor->region_offset = (uint32_t)total;
+        monitor->region_bytes = (uint32_t)(region_end - total);
+        monitor->slot_bytes = (uint32_t)slot_bytes;
+        monitor->main_offset = (uint32_t)total;
+        monitor->main_bytes = (uint32_t)view_bytes;
+        if (xup_avc444_format_has_auxiliary(capture_format))
+        {
+            monitor->auxiliary_offset = (uint32_t)auxiliary_offset;
+            monitor->auxiliary_bytes = (uint32_t)view_bytes;
+        }
+        total = region_end;
+    }
+    layout->total_bytes = (uint32_t)total;
+    return 0;
+}
+
+static inline int
+xup_avc444_layout_valid(const struct xup_avc444_capture_layout *layout)
+{
+    uint64_t previous_end;
+    unsigned int index;
+
+    if (layout == NULL || layout->version != XUP_AVC444_LAYOUT_VERSION ||
+            (layout->capture_format != XRDP_nv12_709fr &&
+             !xup_avc444_format_has_auxiliary(layout->capture_format)) ||
+            (layout->width_alignment != 16U &&
+             layout->width_alignment != 32U) ||
+            layout->monitor_count < 1 ||
+            layout->monitor_count > CLIENT_MONITOR_DATA_MAXIMUM_MONITORS)
+    {
+        return 0;
+    }
+
+    previous_end = 0;
+    for (index = 0; index < layout->monitor_count; ++index)
+    {
+        const struct xup_avc444_monitor_layout *monitor;
+        uint64_t region_end;
+        uint64_t first_slot_end;
+        uint64_t main_end;
+        uint64_t auxiliary_end;
+
+        monitor = &layout->monitors[index];
+        region_end = (uint64_t)monitor->region_offset +
+                     monitor->region_bytes;
+        first_slot_end = (uint64_t)monitor->region_offset +
+                         monitor->slot_bytes;
+        main_end = (uint64_t)monitor->main_offset + monitor->main_bytes;
+        auxiliary_end = (uint64_t)monitor->auxiliary_offset +
+                        monitor->auxiliary_bytes;
+        if (monitor->visible_width < 1 || monitor->visible_height < 1 ||
+                monitor->visible_width > XUP_AVC444_MAX_DIMENSION ||
+                monitor->visible_height > XUP_AVC444_MAX_DIMENSION ||
+                monitor->coded_width < monitor->visible_width ||
+                monitor->coded_height < monitor->visible_height ||
+                monitor->coded_width % layout->width_alignment != 0 ||
+                monitor->coded_height % 16U != 0 ||
+                monitor->region_offset % XUP_CAP_PAGE_ALIGN != 0 ||
+                monitor->slot_bytes == 0 ||
+                monitor->slot_bytes % XUP_CAP_PAGE_ALIGN != 0 ||
+                (uint64_t)monitor->region_bytes !=
+                XUP_AVC444_CAPTURE_SLOTS * (uint64_t)monitor->slot_bytes ||
+                monitor->main_offset != monitor->region_offset ||
+                monitor->main_bytes == 0 ||
+                monitor->region_offset < previous_end ||
+                main_end > first_slot_end ||
+                region_end > layout->total_bytes)
+        {
+            return 0;
+        }
+        if (xup_avc444_format_has_auxiliary(layout->capture_format))
+        {
+            if (monitor->auxiliary_bytes != monitor->main_bytes ||
+                    monitor->auxiliary_offset % XUP_CAP_PAGE_ALIGN != 0 ||
+                    monitor->auxiliary_offset < main_end ||
+                    auxiliary_end > first_slot_end)
+            {
+                return 0;
+            }
+        }
+        else if (monitor->auxiliary_offset != 0 ||
+                 monitor->auxiliary_bytes != 0)
+        {
+            return 0;
+        }
+        previous_end = region_end;
+    }
+    return previous_end == layout->total_bytes;
+}
+
+static inline int
+xup_avc444_slot_view_offsets(const struct xup_avc444_monitor_layout *monitor,
+                             uint32_t slot, uint32_t *main_offset,
+                             uint32_t *auxiliary_offset)
+{
+    uint64_t delta;
+    uint64_t main;
+    uint64_t auxiliary;
+    uint64_t region_end;
+
+    if (monitor == NULL || main_offset == NULL || auxiliary_offset == NULL ||
+            slot >= XUP_AVC444_CAPTURE_SLOTS || monitor->slot_bytes == 0)
+    {
+        return 1;
+    }
+    delta = (uint64_t)slot * monitor->slot_bytes;
+    main = (uint64_t)monitor->main_offset + delta;
+    auxiliary = monitor->auxiliary_bytes == 0 ? 0 :
+                (uint64_t)monitor->auxiliary_offset + delta;
+    region_end = (uint64_t)monitor->region_offset + monitor->region_bytes;
+    if (main + monitor->main_bytes > region_end ||
+            (monitor->auxiliary_bytes != 0 &&
+             auxiliary + monitor->auxiliary_bytes > region_end))
+    {
+        return 1;
+    }
+    *main_offset = (uint32_t)main;
+    *auxiliary_offset = (uint32_t)auxiliary;
+    return 0;
+}
+
+static inline uint32_t
+xup_avc444_capture_flags(uint32_t flags, uint32_t monitor, uint32_t slot)
+{
+    return (flags & ~(XUP_AVC444_MONITOR_MASK | XUP_AVC444_SLOT_MASK |
+                      XUP_AVC444_CAPTURE_MARKER)) |
+           ((monitor << XUP_AVC444_MONITOR_SHIFT) &
+            XUP_AVC444_MONITOR_MASK) |
+           ((slot << XUP_AVC444_SLOT_SHIFT) & XUP_AVC444_SLOT_MASK) |
+           XUP_AVC444_CAPTURE_MARKER;
+}
+
+static inline int
+xup_avc444_capture_identity(uint32_t flags, uint32_t *monitor,
+                            uint32_t *slot)
+{
+    if (monitor == NULL || slot == NULL ||
+            (flags & XUP_AVC444_CAPTURE_MARKER) == 0)
+    {
+        return 1;
+    }
+    *monitor = (flags & XUP_AVC444_MONITOR_MASK) >>
+               XUP_AVC444_MONITOR_SHIFT;
+    *slot = (flags & XUP_AVC444_SLOT_MASK) >> XUP_AVC444_SLOT_SHIFT;
+    return *monitor >= CLIENT_MONITOR_DATA_MAXIMUM_MONITORS ||
+           *slot >= XUP_AVC444_CAPTURE_SLOTS;
+}
+
+static inline int
+xup_avc444_layout_matches(const struct display_size_description *displays,
+                          uint32_t capture_format,
+                          uint32_t width_alignment,
+                          const struct xup_avc444_capture_layout *layout)
+{
+    struct xup_avc444_capture_layout expected;
+
+    return xup_avc444_layout_valid(layout) &&
+           xup_avc444_layout_build(displays, capture_format, width_alignment,
+                                   &expected) == 0 &&
+           memcmp(&expected, layout, sizeof(expected)) == 0;
+}
 
 static inline int
 xup_cap_page_align(int v)

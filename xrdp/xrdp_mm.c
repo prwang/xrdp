@@ -5009,6 +5009,53 @@ server_composite(struct xrdp_mod *mod, int srcidx, int srcformat,
 
 /*****************************************************************************/
 static int
+xrdp_mm_avc444_snapshot_valid(struct xrdp_mm *mm, int flags, int frame_id,
+                              const char *data, const void *shared_memory,
+                              int shared_memory_bytes)
+{
+    struct xup_avc444_capture_layout layout;
+    const struct xup_avc444_monitor_layout *monitor_layout;
+    uint32_t monitor;
+    uint32_t slot;
+    uint32_t main_offset;
+    uint32_t auxiliary_offset;
+    uintptr_t base;
+    uintptr_t pixels;
+
+    if (xup_avc444_layout_build(&mm->wm->client_info->display_sizes,
+                                mm->wm->client_info->capture_format,
+                                mm->wm->client_info->avc444_chroma_align,
+                                &layout) != 0)
+    {
+        return 0;
+    }
+    if (frame_id <= 0 || shared_memory == NULL || data == NULL ||
+            shared_memory_bytes < 0 ||
+            (uint32_t)shared_memory_bytes != layout.total_bytes ||
+            xup_avc444_capture_identity((uint32_t)flags, &monitor,
+                                        &slot) != 0 ||
+            monitor >= layout.monitor_count)
+    {
+        return 0;
+    }
+    monitor_layout = &layout.monitors[monitor];
+    if (xup_avc444_slot_view_offsets(monitor_layout, slot, &main_offset,
+                                     &auxiliary_offset) != 0)
+    {
+        return 0;
+    }
+    base = (uintptr_t)shared_memory;
+    pixels = (uintptr_t)data;
+    return pixels >= base && pixels - base == main_offset &&
+           (uint64_t)main_offset + monitor_layout->main_bytes <=
+           (uint32_t)shared_memory_bytes &&
+           (monitor_layout->auxiliary_bytes == 0 ||
+            (uint64_t)auxiliary_offset + monitor_layout->auxiliary_bytes <=
+            (uint32_t)shared_memory_bytes);
+}
+
+/*****************************************************************************/
+static int
 server_paint_rects_ex(struct xrdp_mod *mod,
                       int num_drects, short *drects,
                       int num_crects, short *crects,
@@ -5032,6 +5079,18 @@ server_paint_rects_ex(struct xrdp_mod *mod,
 
     if (mm->encoder != 0)
     {
+        if (wm->client_info->capture_code == CC_GFX_AVC444 &&
+                !xrdp_mm_avc444_snapshot_valid(mm, flags, frame_id, data,
+                                               shmem_ptr, shmem_bytes))
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "Refusing a full-chroma capture with invalid slot identity");
+            if (shmem_ptr != NULL)
+            {
+                g_munmap(shmem_ptr, shmem_bytes);
+            }
+            return 1;
+        }
         /* copy formal params to XRDP_ENC_DATA */
         enc_data = (XRDP_ENC_DATA *) g_malloc(sizeof(XRDP_ENC_DATA), 1);
         if (enc_data == 0)

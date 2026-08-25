@@ -1815,6 +1815,56 @@ START_TEST(test_absorb_only_ack_bufferbloats_and_the_metric_shows_it)
 }
 END_TEST
 
+START_TEST(test_capture_contract_rejects_a_previous_resize_layout)
+{
+    struct display_size_description initial;
+    struct display_size_description same_coded_size;
+    struct display_size_description grown;
+    struct xup_avc444_capture_layout layout;
+    uint32_t monitor;
+    uint32_t slot;
+    uint32_t flags;
+
+    g_memset(&initial, 0, sizeof(initial));
+    initial.monitorCount = 1;
+    initial.session_width = 2196;
+    initial.session_height = 1250;
+    set_monitor_cap(&initial, 0, 0, 0, 2195, 1249);
+
+    same_coded_size = initial;
+    same_coded_size.session_width = 2198;
+    same_coded_size.minfo[0].right = 2197;
+    grown = same_coded_size;
+    grown.session_width = 2412;
+    grown.session_height = 1344;
+    grown.minfo[0].right = 2411;
+    grown.minfo[0].bottom = 1343;
+
+    ck_assert_int_eq(xup_avc444_layout_build(
+                         &initial, XRDP_yuv444_v2_stream_709fr, 32,
+                         &layout), 0);
+    ck_assert_uint_eq(layout.total_bytes, 16760832U);
+    ck_assert_int_eq(xup_avc444_layout_matches(
+                         &same_coded_size, XRDP_yuv444_v2_stream_709fr,
+                         32, &layout), 0);
+    ck_assert_int_eq(xup_avc444_layout_matches(
+                         &grown, XRDP_yuv444_v2_stream_709fr,
+                         32, &layout), 0);
+    ck_assert_int_eq(xup_avc444_layout_build(
+                         &grown, XRDP_yuv444_v2_stream_709fr, 32,
+                         &layout), 0);
+    ck_assert_uint_eq(layout.total_bytes, 19611648U);
+    ck_assert_int_eq(xup_avc444_layout_matches(
+                         &grown, XRDP_yuv444_v2_stream_709fr,
+                         32, &layout), 1);
+
+    flags = xup_avc444_capture_flags(0, 0, 1);
+    ck_assert_int_eq(xup_avc444_capture_identity(flags, &monitor, &slot), 0);
+    ck_assert_uint_eq(monitor, 0U);
+    ck_assert_uint_eq(slot, 1U);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_multimon(void)
@@ -1866,6 +1916,8 @@ make_suite_avc444_multimon(void)
     tcase_add_test(tc,
                    test_eager_ack_never_drops_a_region_a_failing_tail_owes_back);
     tcase_add_test(tc, test_absorb_only_ack_bufferbloats_and_the_metric_shows_it);
+    tcase_add_test(tc,
+                   test_capture_contract_rejects_a_previous_resize_layout);
     suite_add_tcase(s, tc);
     return s;
 }
