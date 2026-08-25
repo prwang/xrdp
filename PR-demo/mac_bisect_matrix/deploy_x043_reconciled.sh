@@ -4,9 +4,9 @@ set -eu
 
 D=$(cd "$(dirname "$0")" && pwd)
 DIST=${DIST:-/work/dist/reconciled-142c}
-XRDP_DEB=${XRDP_DEB:-xrdp-dev_0.10.80+git20260825155548.24710989c74b_amd64.deb}
-XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260825153944.13740e5216b0_amd64.deb}
-IMAGE=${IMAGE:-localhost/xrdp-bisect:reconciled-2471098-13740e5-u2404-xfce-notrace}
+XRDP_DEB=${XRDP_DEB:-xrdp-dev_0.10.80+git20260825160036.b282b0c19ec1_amd64.deb}
+XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260825160036.8cf120e5db7f_amd64.deb}
+IMAGE=${IMAGE:-localhost/xrdp-bisect:reconciled-b282b0c-8cf120e-u2404-xfce-notrace}
 BUILD="$D/.build-x043-reconciled"
 
 test -f "$DIST/$XRDP_DEB"
