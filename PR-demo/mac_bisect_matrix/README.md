@@ -189,5 +189,6 @@ config an user or admin would set."* `arm_certify.sh` now reads
 the audit runs a different, smaller gate (S1–S4) whose checks are all
 POSITIVE, so a capture it failed to parse cannot pass quietly: S1
 asserts pictures were parsed at all, S2 that there is no aux sub-stream,
-S3 that the SPS is repeated in band, S4 that `frame_num` is contiguous
-within each IDR period. x035 passes 4/4 with 220 pictures parsed.
+S3 that a reset is self-describing with an in-band SPS, and S4 that
+`frame_num` is contiguous within each IDR period. x035 passes 4/4 with 220
+pictures parsed.

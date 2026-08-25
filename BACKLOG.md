@@ -159,11 +159,13 @@ coded height, and independently gated; see
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: IN PROGRESS; implementation, automated gates and the numerical replay
-are green.** The trace-disabled clean-room x042 arm is ready at
-`127.0.0.1:40058` for the retained Windows/macOS interactive matrix, which is
-the only remaining gate. Execution
-record: [`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
+**Status: IN PROGRESS; implementation, automated gates, the numerical replay
+and all five local profile certificates are green.** The trace-disabled
+clean-room x042 arm is restored to automatic dense AVC at
+`127.0.0.1:40058`. `x042_profile.sh` provides the certified `auto`, `444`,
+`444v1`, `420` and `sparse` conditions for the retained Windows/macOS matrix,
+which is the only remaining gate. Execution record:
+[`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
 
 The fully assembled backend becomes selectable only here. The user-facing
 configuration and documentation bind the exact loaded configuration to the

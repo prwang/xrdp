@@ -42,6 +42,7 @@ one.
 Usage:
   oracle_black_frame_check.py <oracle_avc_s*.bin> ...
   oracle_black_frame_check.py <capture_dir>/       # every dump in it
+  oracle_black_frame_check.py --single-view <oracle_avc_s*.bin>
 """
 import os
 import re
@@ -56,7 +57,7 @@ def avc420_nals(buf):
     return buf[4 + nrects * 8 + nrects * 2:]
 
 
-def interleaved_stream(path):
+def interleaved_stream(path, single_view=False):
     """Every record's NALs, in wire order -> one contiguous chain."""
     data = open(path, 'rb').read()
     out = bytearray()
@@ -70,6 +71,10 @@ def interleaved_stream(path):
         if len(rec) != ln or ln < 8:
             break
         try:
+            if single_view:
+                out += avc420_nals(rec)
+                views.append('main')
+                continue
             (w,) = struct.unpack_from('<I', rec, 0)
             avc1len = w & 0x3FFFFFFF
             lc = (w >> 30) & 0x3
@@ -104,8 +109,8 @@ def decode_black_frames(stream):
     return (int(counts[-1]) if counts else 0), black, err
 
 
-def check(path):
-    stream, views = interleaved_stream(path)
+def check(path, single_view=False):
+    stream, views = interleaved_stream(path, single_view)
     n_frames, black, err = decode_black_frames(stream)
     n_expected = len(views)
     print('%s' % os.path.basename(path))
@@ -137,6 +142,10 @@ def main():
     if not args:
         print(__doc__)
         return 2
+    single_view = False
+    if '--single-view' in args:
+        single_view = True
+        args.remove('--single-view')
     targets = []
     for a in args:
         if os.path.isdir(a):
@@ -147,7 +156,7 @@ def main():
             targets.append(a)
     ok = True
     for t in targets:
-        ok = check(t) and ok
+        ok = check(t, single_view) and ok
         print()
     print('NO MID-STREAM BLACK FRAME: %s' % ('PASS' if ok else 'FAIL'))
     return 0 if ok else 1

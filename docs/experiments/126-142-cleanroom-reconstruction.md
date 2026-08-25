@@ -152,3 +152,52 @@ x042. The interactive matrix
 must still cover the supported AVC420/AVC444 modes, Windows and macOS, one and
 two monitors, resize, fine chroma and motion. The local oracle smoke and
 numerical replay cannot substitute for real-client rendering evidence.
+
+## 2026-08-25 reword-only history rewrite and certificate correction
+
+The source tree recorded above was not changed, but closure review found that
+the #129, #132 and #140 commit messages did not meet the per-slice prose gate.
+The series was rewritten only to correct those messages. The old and new final
+tree are both `5ceed6c1fb3a52d7daa1343b0da6029a3aa7f2f1`; the current commit
+map is:
+
+| slice | current xrdp commit |
+|---|---|
+| 126 | `9417122630b0161832ab38db973fb321a1f2f79b` |
+| 127 | `b1293ffad32cbb786e4a271d45f2631525e5937b` |
+| 128 | `1364cf8019fc1522c8345debc6e5b4bd869c4975` |
+| 129 | `36eda78d65b15944541294b393fe4034f6e97057` |
+| 130 | `cc561ae8c85c1cc186edf809d22307ad4f0048f2` |
+| 131 | `1fa455617ea252b730b189278e9d751d51c9b089` |
+| 132 | `775e2f7b638a56760f65a25faa1d7d63a148570d` |
+| 133 | `0695f0ff7883e8ded2f0039ca1ab973f9d2f2394` |
+| 134 | `80943d8ada3a66c0c0b21adf4c710092685914f1` |
+| 135 | `6b8a6c44adcbb0e19592346f4e34688e50987fb2` |
+| 136 | `b66e087e3350f829b5897ea7126796ea82640e31` |
+| 137 | `a8b38592cfa49761f83ab2b4b9050c686b3e9b53` |
+| 138 | `c149c431b33df20594d3033629ce902e3a359605` |
+| 139 | `1580c13cb13119a66e5ec4730665239f4c5dcdd0` |
+| 140 | `702f4061bca2d89edb329431cbe6f2aabaf98547` |
+| 141 | `6c42be1ebd2e3e30ca7638f518e2992f12e412ab` |
+| 142 | `e0ee19616fcd4f4ca20fa95df88207e69360c79f` |
+
+Fresh default and trace-enabled builds each passed the complete test matrix,
+including 203/203 xrdp tests. The default package is
+`0.10.80+git20260825061317.e0ee19616fcd`, SHA-256
+`f254dc5b429c26ea202aac3c801a2803c99c2c59d6ba5e0c8cf66854f1c21d23`.
+The paired xorgxrdp commit and package are unchanged.
+
+x042 was rebuilt from that final commit as image
+`localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b`.
+Profile closure then found that the old certificates claiming 1920x1080 had
+actually negotiated 1024x768, plus independent AVC420 framing, reset-header
+and verdict-matching defects in the certifier. The invalid certificates and
+both correction rounds are retained in
+`PR-demo/mac_bisect_matrix/captures/i142_x042_profile_cert_20260825T062424Z/`.
+
+After correction, automatic AVC444v2, forced AVC444v2, AVC444v1, AVC420 and
+sparse AVC444v2 each passed the pipe, topology-specific wire and black-frame
+gates at negotiated 1920x1080. The automatic profile was restored and the
+rendered smoke again passed 8/8 transitions, zero lag, edge fidelity 1.000 and
+zero encoder errors at both 1920x1080 and 1024x768. The remaining real-client
+matrix stated above is unchanged.

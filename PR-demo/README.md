@@ -70,8 +70,10 @@ realistic payload rather than a diagnostic pattern.
   `deploy_x042_cleanroom.sh` and `k8s/x042.yaml` define the final paired
   clean-room interactive candidate on `127.0.0.1:40058`, using the
   trace-disabled production-default build, a regular XFCE desktop and the
-  indexed visual payloads. x040 on port 40056 is the earlier checkpoint and
-  is not mutated by the numerical replay.
+  indexed visual payloads. `x042_profile.sh` switches and wire-certifies the
+  exact `auto`, `444`, `444v1`, `420` or `sparse` profile, refusing to change
+  a live tester session. x040 on port 40056 is the earlier checkpoint and is
+  not mutated by the numerical replay.
 * **`multimon_offline/`** — drives a real two-monitor `xfreerdp /multimon`
   login and asserts the server took the multi-monitor AVC444 path.
   `setup_monitors.sh` verifies each output's **active pixel geometry**, not

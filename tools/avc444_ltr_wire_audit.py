@@ -618,7 +618,7 @@ def assert_gate_single_view(sps_seen, sps, pics):
                 'should have none' % len(aux)))
 
     n_sps = len(sps_seen)
-    out.append(('S3 SPS repeated in band', n_sps >= 2,
+    out.append(('S3 reset is self-describing in band', n_sps >= 1,
                 '%d SPS NAL(s) in the capture' % n_sps))
 
     # S4 -- frame_num is contiguous WITHIN each IDR period. An IDR

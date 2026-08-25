@@ -1,0 +1,61 @@
+arm:    x042
+mode:   AVC420 (single-view topology)
+image:  localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b
+gfx:    sha256:751c41ac18d7c01d
+key:    localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b|751c41ac18d7c01d
+when:   2026-08-25T06:19:52Z
+window: 3s at 1920x1080, 13837 bytes
+
+=== encoder input pipe ===
+PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
+after 3s of real encoding, so every encoder child got
+an input pipe of at least the 64 KiB minimum. Above that
+the handover cost is flat (0.71 ms at 512 KiB against
+0.60 ms at 1 MiB for a 13.82 MB picture), so this is the
+whole of the requirement.
+
+=== wire audit (--assert) ===
+=== x042 deploy certification ===
+SPS: 1024x768 profile=77 level=42 max_num_ref_frames=1 log2_max_frame_num=4 poc_type=2 gaps=0  (1 SPS NALs, views: main)
+PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
+
+first 12 pictures (decode order):
+  main fn=0      IDR none       ltr_flag=0    3896B
+  main fn=1      P   none       [('sliding_window', None)]     103B
+
+single view (AVC420): the LTR / cross-view narrative does
+not apply and is not printed. 2 picture(s) parsed.
+
+=== ASSERT GATE (single view, AVC420) ===
+  The AVC444 two-view assertions A1-A7 are NOT run: they
+  assert properties of a long-term-reference chain across
+  two views, which this configuration does not have. The
+  checks below are what a single-view stream can be held
+  to. See assert_gate_single_view().
+  S1 pictures parsed from the capture      PASS  2 picture(s) parsed
+  S2 single view, no aux sub-stream        PASS  no aux pictures, as an AVC420 arm must emit
+  S3 SPS repeated in band                  FAIL  1 SPS NAL(s) in the capture
+  S4 frame_num contiguous within each IDR period PASS  one chain per IDR period
+
+ASSERT VERDICT: FAIL -- 1 of 4 checks violated
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 0
+  frames decoded          : 0
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  decoder errors          :
+      Error opening output file -.
+      Error opening output files: Invalid argument
+  VERDICT: FAIL
+
+NO MID-STREAM BLACK FRAME: FAIL
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+This profile is single-view AVC420. The live gate proves
+capture framing, an in-band parameter set, a contiguous main
+chain within each IDR period and decode without black frames.
+Two-view topology and sparse-auxiliary assertions do not apply.

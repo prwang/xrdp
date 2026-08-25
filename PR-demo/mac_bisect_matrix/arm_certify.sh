@@ -40,6 +40,7 @@
 # E_GFX_FILE and E_CERTFILE select an exact generated profile and its
 # profile-specific certificate for a sequential matrix on one arm.
 set -u
+set -o pipefail
 D=$(cd "$(dirname "$0")" && pwd)
 ARM=${1:?usage: arm_certify.sh <arm> [port]}
 NS=${E_NS:-bisect-matrix}
@@ -82,10 +83,14 @@ arm_toml_bool()
 }
 AVC_MODE=$(arm_toml_str avc_mode)
 AVC_MODE=${AVC_MODE:-444}
+MODE_LABEL="AVC$AVC_MODE"
+[ "$AVC_MODE" = "auto" ] && MODE_LABEL="automatic AVC"
 AUDIT_ARGS=""
+BLACK_ARGS=""
 TOPOLOGY="long-term-reference"
 if [ "$AVC_MODE" = "420" ]; then
     AUDIT_ARGS="--single-view"
+    BLACK_ARGS="--single-view"
     TOPOLOGY="single-view"
 elif [ "$(arm_toml_bool aux_ltr_chain)" != "true" ]; then
     AUDIT_ARGS="--aux-leaf"
@@ -141,10 +146,25 @@ if [ -n "$XPID" ] && kill -0 "$XPID" 2>/dev/null; then
     kill -TERM "$XPID" 2>/dev/null
     for _ in 1 2 3 4 5; do kill -0 "$XPID" 2>/dev/null || break; sleep 1; done
 fi
-setsid Xorg "$CLI" -config "$D/../multimon_offline/xorg-dummy-2mon-4k.conf" \
-    -noreset -logfile "$WORK/xorg.log" </dev/null >/dev/null 2>&1 &
+# This is a single-monitor certificate.  Use the same exact-size Xvfb rig as
+# smoke_gate/keytest.sh.  The former dummy-Xorg setup started at 1024x768
+# unless setup_monitors.sh installed a modeline; xfreerdp then clamped the
+# requested window to that root screen while the certificate still printed
+# $SIZE.  The server log is checked below as a second, independent guard.
+setsid Xvfb "$CLI" -screen 0 "${SIZE}x24" -noreset \
+    -fbdir "$WORK" </dev/null >/dev/null 2>&1 &
 XPID=$!
-sleep 4
+sleep 2
+DISPLAY=$CLI xdotool getdisplaygeometry >"$WORK/client-geometry.txt" \
+    2>&1 || fail "cannot query the client X geometry"
+EXPECTED_GEOMETRY="${SIZE%x*} ${SIZE#*x}"
+ACTUAL_GEOMETRY=$(cat "$WORK/client-geometry.txt")
+[ "$ACTUAL_GEOMETRY" = "$EXPECTED_GEOMETRY" ] || \
+    fail "client X geometry is $ACTUAL_GEOMETRY, expected $EXPECTED_GEOMETRY"
+
+XRDP_LOG_MARK=$(kubectl -n "$NS" exec "$POD" -- bash -lc \
+    'wc -l < /var/log/xrdp.log' 2>/dev/null | tr -d ' \r')
+XRDP_LOG_MARK=${XRDP_LOG_MARK:-0}
 
 PW=$(cat "$CRED")
 RDPARGS=$(printf '%s\n' "/v:127.0.0.1:$PORT" "/u:$SU" "/p:$PW" \
@@ -184,6 +204,15 @@ sleep "$SECS"
 kill -9 -- -"$PGID" 2>/dev/null
 sleep 1
 kill -TERM "$XPID" 2>/dev/null
+
+WIDTH=${SIZE%x*}
+HEIGHT=${SIZE#*x}
+NEGOTIATED_GEOMETRY=$(kubectl -n "$NS" exec "$POD" -- bash -lc \
+    "tail -n +$((XRDP_LOG_MARK + 1)) /var/log/xrdp.log" 2>/dev/null | \
+    sed -n 's/.*xrdp_egfx_reset_graphics: width \([0-9][0-9]*\) height \([0-9][0-9]*\).*/\1x\2/p' | \
+    tail -1)
+[ "$NEGOTIATED_GEOMETRY" = "${WIDTH}x${HEIGHT}" ] || \
+    fail "server negotiated ${NEGOTIATED_GEOMETRY:-no graphics reset}, expected $SIZE"
 
 # LOG THE SESSION OFF. A certification creates a session and the payload
 # in it keeps running after the client goes away -- forever, at full
@@ -258,7 +287,7 @@ BYTES=$(stat -c %s "$DUMP")
 
 {
     echo "arm:    $ARM"
-    echo "mode:   AVC$AVC_MODE ($TOPOLOGY topology)"
+    echo "mode:   $MODE_LABEL ($TOPOLOGY topology)"
     echo "image:  $IMAGE"
     echo "gfx:    sha256:$GFXSUM"
     echo "key:    $KEY"
@@ -301,7 +330,8 @@ BYTES=$(stat -c %s "$DUMP")
     echo "wire audit exit: $WA"
     echo
     echo "=== black-frame check ==="
-    python3 "$D/oracle_black_frame_check.py" "$DUMP" 2>&1 | tail -15
+    python3 "$D/oracle_black_frame_check.py" $BLACK_ARGS "$DUMP" \
+        2>&1 | tail -15
     echo
     echo "=== COVERAGE LIMIT OF A ${SECS}s WINDOW — read this ==="
     if [ "$TOPOLOGY" = "long-term-reference" ]; then
@@ -327,7 +357,7 @@ BYTES=$(stat -c %s "$DUMP")
 } > "$CERT.tmp" 2>&1
 
 if grep -q "ASSERT VERDICT: PASS" "$CERT.tmp" \
-        && grep -q "VERDICT: PASS" "$CERT.tmp" \
+        && grep -q "^NO MID-STREAM BLACK FRAME: PASS$" "$CERT.tmp" \
         && grep -q "PIPE VERDICT: OK" "$CERT.tmp"; then
     mv "$CERT.tmp" "$CERT"
     echo "CERTIFIED: $ARM -> $CERT"
