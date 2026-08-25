@@ -1,0 +1,7 @@
+port=40059
+client_pid=363739
+window=2097154
+requested=2198x1250 client_alive=yes
+requested=2412x1344 client_alive_immediate=yes
+client_alive_after_5s=no
+client_exit=12

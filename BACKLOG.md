@@ -198,13 +198,20 @@ green. Normative specification:
 
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
-**Status: IN PROGRESS; semantic audit complete, 40059 execution pending.** The
+**Status: IN PROGRESS; semantic audit and 40059 red proof complete; 40060 is
+pending.** The
 committed requirement matrix in
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
 classifies every #126–#142 requirement. Reconciliation adds the clean-room-only
 typed capture-layout/slot-identity validation and rejects three removed
 development-only configuration keys. No normative development-only behavior
 was found.
+
+The final trace-disabled 40059 packages reproduce the intended mechanism:
+Xorg grows to 2412 by 1344 while retaining the login-sized 16,760,832-byte
+mapping, xrdp derives the current 19,611,648-byte requirement and terminates
+the connection on the stale snapshot. Evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_x043_reconciled_red_20260825T160510Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x043_reconciled_red_20260825T160510Z/README.md).
 
 After reconciliation, port `40059` runs the full development frontier plus
 every normative behavior found only in clean-room, retaining the observed stale
