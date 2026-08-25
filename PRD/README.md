@@ -4,6 +4,8 @@ This directory is the sole normative specification for the paired xrdp and
 xorgxrdp clean-room implementation. `BACKLOG.md` tracks open work and may name
 the development-tree files used as inventory. Experiment records explain how
 decisions were reached. Neither is a substitute for the requirements here.
+`slices/` owns the requirements for each clean-room commit; `gates/` owns
+cross-tree qualification which does not itself append a product commit.
 
 The clean-room series is based on xrdp
 `fe850a22c08a624c66bbac07e310251782e6f828` and xorgxrdp
@@ -36,7 +38,12 @@ explicitly; otherwise the earlier invariant remains in force.
 
 The development branches are evidence about the intended final behavior, not
 an implementation dependency. A clean-room author shall implement the
-behavior described here and shall not transplant commit history.
+behavior described here and shall not transplant commit history. Development
+and clean-room trees are independent implementations of this same normative
+contract: implementation shape may differ, but externally observable behavior,
+failure policy, bounds, defaults and operator surface may not. A behavior which
+exists in only one tree is a red equivalence result until it is either
+implemented in the other tree or shown to be non-normative residue and removed.
 
 ## Clean-room authorship and review standard
 
@@ -221,6 +228,12 @@ parallel or out-of-order commits.
 | #140 | [Credit frontier](slices/140-credit-frontier.md) | #136, #139 | internal only |
 | #141 | [Sparse chroma](slices/141-sparse-chroma.md) | #138, #140 | internal only |
 | #142 | [Activation and documentation](slices/142-activation-and-docs.md) | #126–#141 | selectable backend |
+
+After the assembled series, the
+[development/clean-room equivalence gate](gates/142c-dev-cleanroom-equivalence.md)
+must pass before #142 can close. It is a qualification gate over the complete
+series, not another product commit and not permission to append a repair after
+the final slice.
 
 ## Gate contract for every slice
 

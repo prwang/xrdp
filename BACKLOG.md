@@ -196,6 +196,29 @@ snapshot is emitted. Default and trace-enabled CI-equivalent matrices are
 green. Normative specification:
 [`PRD/slices/142-activation-and-docs.md`](PRD/slices/142-activation-and-docs.md).
 
+## #142C — reconcile dev/clean-room behavior and prove resize correction
+
+**Status: IN PROGRESS; plan committed before implementation.** #142 is
+blocked on a complete semantic audit of every #126–#142 requirement across the
+current paired development and clean-room trees. Source-shape differences are
+allowed; any normative behavior, bound, default, failure policy or operator
+surface present in only one implementation is not. The audit must classify and
+resolve every divergence before either live comparison arm is built.
+
+After reconciliation, port `40059` runs the full development frontier plus
+every normative behavior found only in clean-room, retaining the observed stale
+growth-resize behavior. Port `40060` is the same paired build and configuration
+plus only the proposed resize repair. One versioned dynamic-resolution client
+script must make `40059` reproduce the stale 16,760,832-byte mapping and
+disconnect, while `40060` allocates 19,611,648 bytes, stays connected and
+renders after the same 2412-by-1344 update. No trace, retry, fallback or codec
+change is part of the comparison.
+
+Only a green development audit, paired CI and red/green arm proof authorizes
+re-authoring the repair into its owning clean-room slice and replaying all
+descendants through #142. Normative plan and complete acceptance:
+[`PRD/gates/142c-dev-cleanroom-equivalence.md`](PRD/gates/142c-dev-cleanroom-equivalence.md).
+
 ## #143 — host pipe setting, comparable baselines and zero-copy decision
 
 **Status: TODO; blocked on #142; outside the port.** The implemented 64 KiB
