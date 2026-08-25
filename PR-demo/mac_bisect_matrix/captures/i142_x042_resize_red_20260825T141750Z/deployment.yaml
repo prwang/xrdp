@@ -1,0 +1,109 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  annotations:
+    deployment.kubernetes.io/revision: "26"
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"apps/v1","kind":"Deployment","metadata":{"annotations":{},"labels":{"app":"xrdp-bisect","arm":"x042"},"name":"xrdp-x042","namespace":"bisect-matrix"},"spec":{"replicas":1,"selector":{"matchLabels":{"arm":"x042"}},"strategy":{"type":"Recreate"},"template":{"metadata":{"labels":{"app":"xrdp-bisect","arm":"x042"}},"spec":{"containers":[{"env":[{"name":"SESSION_KIND","value":"xfce"},{"name":"ARM_LABEL","value":"Final clean-room AVC444 FFmpeg candidate (port 40058)"}],"image":"localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0","imagePullPolicy":"Never","name":"xrdp","ports":[{"containerPort":3389,"hostIP":"127.0.0.1","hostPort":40058,"protocol":"TCP"}],"securityContext":{"privileged":true},"volumeMounts":[{"mountPath":"/dev/shm","name":"dshm"},{"mountPath":"/run/matrix","name":"matrix-cred","readOnly":true},{"mountPath":"/etc/xrdp/gfx.toml","name":"gfx","subPath":"gfx.toml"},{"mountPath":"/usr/local/bin/codescroll10.sh","name":"payloads","subPath":"codescroll10.sh"},{"mountPath":"/usr/local/share/code_corpus.ansi","name":"payloads","subPath":"code_corpus.ansi"}]}],"volumes":[{"emptyDir":{"medium":"Memory","sizeLimit":"1Gi"},"name":"dshm"},{"hostPath":{"path":"/etc/xrdp-matrix","type":"Directory"},"name":"matrix-cred"},{"configMap":{"defaultMode":493,"name":"xrdp-banner"},"name":"payloads"},{"configMap":{"name":"xrdp-gfx-x042"},"name":"gfx"}]}}}}
+  creationTimestamp: "2026-08-25T05:59:29Z"
+  generation: 26
+  labels:
+    app: xrdp-bisect
+    arm: x042
+  name: xrdp-x042
+  namespace: bisect-matrix
+  resourceVersion: "1040953"
+  uid: 568a3c7a-75a6-487e-87f2-5596dd5d1751
+spec:
+  progressDeadlineSeconds: 600
+  replicas: 1
+  revisionHistoryLimit: 10
+  selector:
+    matchLabels:
+      arm: x042
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      annotations:
+        interactive-profile-sha: 216aed1fd3b78c26ee3aaa1d922ee53e970f5cece8f8ccb17e5e8a0cff9f3971
+      labels:
+        app: xrdp-bisect
+        arm: x042
+    spec:
+      containers:
+      - env:
+        - name: SESSION_KIND
+          value: xfce
+        - name: ARM_LABEL
+          value: Final clean-room AVC444 FFmpeg candidate (port 40058)
+        image: localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+        imagePullPolicy: Never
+        name: xrdp
+        ports:
+        - containerPort: 3389
+          hostIP: 127.0.0.1
+          hostPort: 40058
+          protocol: TCP
+        resources: {}
+        securityContext:
+          privileged: true
+        terminationMessagePath: /dev/termination-log
+        terminationMessagePolicy: File
+        volumeMounts:
+        - mountPath: /dev/shm
+          name: dshm
+        - mountPath: /run/matrix
+          name: matrix-cred
+          readOnly: true
+        - mountPath: /etc/xrdp/gfx.toml
+          name: gfx
+          subPath: gfx.toml
+        - mountPath: /usr/local/bin/codescroll10.sh
+          name: payloads
+          subPath: codescroll10.sh
+        - mountPath: /usr/local/share/code_corpus.ansi
+          name: payloads
+          subPath: code_corpus.ansi
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir:
+          medium: Memory
+          sizeLimit: 1Gi
+        name: dshm
+      - hostPath:
+          path: /etc/xrdp-matrix
+          type: Directory
+        name: matrix-cred
+      - configMap:
+          defaultMode: 493
+          name: xrdp-banner
+        name: payloads
+      - configMap:
+          defaultMode: 420
+          name: xrdp-gfx-x042
+        name: gfx
+status:
+  availableReplicas: 1
+  conditions:
+  - lastTransitionTime: "2026-08-25T05:59:29Z"
+    lastUpdateTime: "2026-08-25T07:59:47Z"
+    message: ReplicaSet "xrdp-x042-788587f46d" has successfully progressed.
+    reason: NewReplicaSetAvailable
+    status: "True"
+    type: Progressing
+  - lastTransitionTime: "2026-08-25T08:00:21Z"
+    lastUpdateTime: "2026-08-25T08:00:21Z"
+    message: Deployment has minimum availability.
+    reason: MinimumReplicasAvailable
+    status: "True"
+    type: Available
+  observedGeneration: 26
+  readyReplicas: 1
+  replicas: 1
+  terminatingReplicas: 0
+  updatedReplicas: 1

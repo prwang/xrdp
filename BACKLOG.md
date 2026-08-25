@@ -159,12 +159,15 @@ coded height, and independently gated; see
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: IN PROGRESS; implementation, exact-commit automated gates, the
-numerical replay and all five local profile certificates are green.** The trace-disabled
-clean-room x042 arm is restored to automatic dense AVC at
-`127.0.0.1:40058`. `x042_profile.sh` provides the certified `auto`, `444`,
-`444v1`, `420` and `sparse` conditions for the retained Windows/macOS matrix,
-which is the only remaining gate. Execution record:
+**Status: IN PROGRESS; real-client dynamic resize is red.** The trace-disabled
+clean-room x042 arm on `127.0.0.1:40058` disconnected after a growth resize:
+xorgxrdp retained the old AVC444 capture layout while xrdp advanced to the new
+geometry, and xrdp correctly rejected the first mismatched slot snapshot. The
+development pair must first reproduce or exclude the defect under the same
+geometry transition; any fix is implemented and validated there before the
+owning clean-room slice is corrected and its descendants replayed. Automated
+gates, the numerical replay and all five local profile certificates preceding
+this live failure remain recorded evidence, not closure. Execution record:
 [`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
 
 The fully assembled backend becomes selectable only here. The user-facing
@@ -186,8 +189,11 @@ activation from the earlier exact-probe result, configuration-to-probe
 identity, terminal hangup/no-respawn, no fallback, resize lifecycle, operator
 surface entropy scan and the complete client, multi-monitor, sparse and
 numerical gates defined by the normative specification pass on builds made
-from the clean-room paired branches. Default and trace-enabled CI-equivalent
-matrices are green. Normative specification:
+from the clean-room paired branches. A growth resize shall rebuild the producer
+layout and backing store atomically before capture resumes, and a deterministic
+test plus one short dynamic-resolution client run shall prove that no old-size
+snapshot is emitted. Default and trace-enabled CI-equivalent matrices are
+green. Normative specification:
 [`PRD/slices/142-activation-and-docs.md`](PRD/slices/142-activation-and-docs.md).
 
 ## #143 — host pipe setting, comparable baselines and zero-copy decision

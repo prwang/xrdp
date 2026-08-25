@@ -1,0 +1,22 @@
+xorgxrdp-dev	1:0.10.80+git20260825064920.3dc52da13216
+xrdp-dev	0.10.80+git20260825074835.b38c63473c52
+    PID    PPID USER                      STARTED STAT COMMAND
+      1       0 root     Tue Aug 25 08:00:21 2026 Ss   /usr/sbin/xrdp --nodaemon
+     29       1 root     Tue Aug 25 08:00:21 2026 S    /usr/sbin/xrdp-sesman
+   1451       0 root     Tue Aug 25 08:06:47 2026 Ss   /bin/bash /usr/local/bin/codescroll10.sh --help
+   1794      29 root     Tue Aug 25 14:17:35 2026 S    xrdp-sesexec
+   1795    1794 tester   Tue Aug 25 14:17:44 2026 Sl   /usr/lib/xorg/Xorg :10 -auth /var/run/xrdp/1100/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log
+   1803    1794 tester   Tue Aug 25 14:17:45 2026 Sl   xfce4-session
+   1804    1794 tester   Tue Aug 25 14:17:45 2026 Sl   /usr/sbin/xrdp-chansrv
+   1809       1 tester   Tue Aug 25 14:17:45 2026 S    dbus-launch --exit-with-session startxfce4
+   1810       1 tester   Tue Aug 25 14:17:45 2026 Ss   /usr/bin/dbus-daemon --syslog --fork --print-pid 5 --print-address 7 --session
+   1825       1 tester   Tue Aug 25 14:17:45 2026 Sl   /usr/lib/x86_64-linux-gnu/xfce4/xfconf/xfconfd
+   1833    1803 tester   Tue Aug 25 14:17:45 2026 Sl   xfwm4
+   1838    1803 tester   Tue Aug 25 14:17:46 2026 Sl   xfsettingsd
+   1842    1803 tester   Tue Aug 25 14:17:46 2026 Sl   xfce4-panel
+   1849    1803 tester   Tue Aug 25 14:17:46 2026 Sl   xfdesktop
+   1863    1842 tester   Tue Aug 25 14:17:46 2026 Sl   /usr/lib/x86_64-linux-gnu/xfce4/panel/wrapper-2.0 /usr/lib/x86_64-linux-gnu/xfce4/panel/plugins/libsystray.so 6 14680076 systray Status Tray Plugin Provides status notifier items (application indicators) and legacy systray items
+   1867    1842 tester   Tue Aug 25 14:17:46 2026 Sl   /usr/lib/x86_64-linux-gnu/xfce4/panel/wrapper-2.0 /usr/lib/x86_64-linux-gnu/xfce4/panel/plugins/libactions.so 14 14680077 actions Action Buttons Log out, lock or other system actions
+   2171       0 root     Tue Aug 25 14:21:52 2026 Ss   sh -c dpkg-query -W xrdp-dev xorgxrdp-dev; ps -eo pid,ppid,user,lstart,stat,args; sha256sum /etc/xrdp/gfx.toml
+   2178    2171 root     Tue Aug 25 14:21:52 2026 R    ps -eo pid,ppid,user,lstart,stat,args
+216aed1fd3b78c26ee3aaa1d922ee53e970f5cece8f8ccb17e5e8a0cff9f3971  /etc/xrdp/gfx.toml

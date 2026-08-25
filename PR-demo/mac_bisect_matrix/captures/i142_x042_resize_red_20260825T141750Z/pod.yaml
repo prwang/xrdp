@@ -1,0 +1,190 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  annotations:
+    interactive-profile-sha: 216aed1fd3b78c26ee3aaa1d922ee53e970f5cece8f8ccb17e5e8a0cff9f3971
+  creationTimestamp: "2026-08-25T08:00:21Z"
+  generateName: xrdp-x042-54d84b7cb5-
+  generation: 1
+  labels:
+    app: xrdp-bisect
+    arm: x042
+    pod-template-hash: 54d84b7cb5
+  name: xrdp-x042-54d84b7cb5-ljcqf
+  namespace: bisect-matrix
+  ownerReferences:
+  - apiVersion: apps/v1
+    blockOwnerDeletion: true
+    controller: true
+    kind: ReplicaSet
+    name: xrdp-x042-54d84b7cb5
+    uid: d7d99e6c-54ae-4f50-9c75-5dc0aa6cd063
+  resourceVersion: "1040951"
+  uid: 25cf7571-f447-42bd-a97e-4415412904ed
+spec:
+  containers:
+  - env:
+    - name: SESSION_KIND
+      value: xfce
+    - name: ARM_LABEL
+      value: Final clean-room AVC444 FFmpeg candidate (port 40058)
+    image: localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+    imagePullPolicy: Never
+    name: xrdp
+    ports:
+    - containerPort: 3389
+      hostIP: 127.0.0.1
+      hostPort: 40058
+      protocol: TCP
+    resources: {}
+    securityContext:
+      privileged: true
+    terminationMessagePath: /dev/termination-log
+    terminationMessagePolicy: File
+    volumeMounts:
+    - mountPath: /dev/shm
+      name: dshm
+    - mountPath: /run/matrix
+      name: matrix-cred
+      readOnly: true
+    - mountPath: /etc/xrdp/gfx.toml
+      name: gfx
+      subPath: gfx.toml
+    - mountPath: /usr/local/bin/codescroll10.sh
+      name: payloads
+      subPath: codescroll10.sh
+    - mountPath: /usr/local/share/code_corpus.ansi
+      name: payloads
+      subPath: code_corpus.ansi
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-g9szc
+      readOnly: true
+  dnsPolicy: ClusterFirst
+  enableServiceLinks: true
+  nodeName: xrdp-fixdpi
+  preemptionPolicy: PreemptLowerPriority
+  priority: 0
+  restartPolicy: Always
+  schedulerName: default-scheduler
+  securityContext: {}
+  serviceAccount: default
+  serviceAccountName: default
+  terminationGracePeriodSeconds: 30
+  tolerations:
+  - effect: NoExecute
+    key: node.kubernetes.io/not-ready
+    operator: Exists
+    tolerationSeconds: 300
+  - effect: NoExecute
+    key: node.kubernetes.io/unreachable
+    operator: Exists
+    tolerationSeconds: 300
+  volumes:
+  - emptyDir:
+      medium: Memory
+      sizeLimit: 1Gi
+    name: dshm
+  - hostPath:
+      path: /etc/xrdp-matrix
+      type: Directory
+    name: matrix-cred
+  - configMap:
+      defaultMode: 493
+      name: xrdp-banner
+    name: payloads
+  - configMap:
+      defaultMode: 420
+      name: xrdp-gfx-x042
+    name: gfx
+  - name: kube-api-access-g9szc
+    projected:
+      defaultMode: 420
+      sources:
+      - serviceAccountToken:
+          expirationSeconds: 3607
+          path: token
+      - configMap:
+          items:
+          - key: ca.crt
+            path: ca.crt
+          name: kube-root-ca.crt
+      - downwardAPI:
+          items:
+          - fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace
+            path: namespace
+status:
+  conditions:
+  - lastProbeTime: null
+    lastTransitionTime: "2026-08-25T08:00:21Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodReadyToStartContainers
+  - lastProbeTime: null
+    lastTransitionTime: "2026-08-25T08:00:21Z"
+    observedGeneration: 1
+    status: "True"
+    type: Initialized
+  - lastProbeTime: null
+    lastTransitionTime: "2026-08-25T08:00:21Z"
+    observedGeneration: 1
+    status: "True"
+    type: Ready
+  - lastProbeTime: null
+    lastTransitionTime: "2026-08-25T08:00:21Z"
+    observedGeneration: 1
+    status: "True"
+    type: ContainersReady
+  - lastProbeTime: null
+    lastTransitionTime: "2026-08-25T08:00:21Z"
+    observedGeneration: 1
+    status: "True"
+    type: PodScheduled
+  containerStatuses:
+  - containerID: containerd://c83d08c6700d4de01d237776823d421ea6919dc54b6acb8b0e34f8812a7376b1
+    image: localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+    imageID: sha256:8f0bf6f3061cd4415c12a8e610ebd877459d456ab305b6fcd59ed48de6e038ae
+    lastState: {}
+    name: xrdp
+    ready: true
+    resources: {}
+    restartCount: 0
+    started: true
+    state:
+      running:
+        startedAt: "2026-08-25T08:00:21Z"
+    user:
+      linux:
+        gid: 0
+        supplementalGroups:
+        - 0
+        uid: 0
+    volumeMounts:
+    - mountPath: /dev/shm
+      name: dshm
+    - mountPath: /run/matrix
+      name: matrix-cred
+      readOnly: true
+      recursiveReadOnly: Disabled
+    - mountPath: /etc/xrdp/gfx.toml
+      name: gfx
+    - mountPath: /usr/local/bin/codescroll10.sh
+      name: payloads
+    - mountPath: /usr/local/share/code_corpus.ansi
+      name: payloads
+    - mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+      name: kube-api-access-g9szc
+      readOnly: true
+      recursiveReadOnly: Disabled
+  hostIP: 10.177.0.113
+  hostIPs:
+  - ip: 10.177.0.113
+  observedGeneration: 1
+  phase: Running
+  podIP: 10.42.0.115
+  podIPs:
+  - ip: 10.42.0.115
+  qosClass: BestEffort
+  resources: {}
+  startTime: "2026-08-25T08:00:21Z"

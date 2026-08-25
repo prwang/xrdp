@@ -29,12 +29,19 @@ Target files are xrdp `common/os_calls.c`, `common/xup_client_info.h`,
   shall be reported before mapping use and shall never become a later SIGBUS.
 * S136-R6: cleanup shall unmap/close partial allocations and clear ownership.
   Existing single-slot capture codes shall retain their old layout.
+* S136-R7: a geometry or monitor-layout change shall derive a new two-slot
+  layout from the new display description before capture resumes. The producer
+  shall allocate or reuse backing memory only against that new byte length and
+  shall publish offsets, slot identity and mapping length from the same layout.
+  No capture from the old layout may cross the resize completion boundary.
 
 ## Required tests and gate
 
 `Avc444Multimon` shall cover session fallback, one/two/unequal monitors,
 two-slot strides, empty budget, capacity one and two, refused third capture,
 per-monitor isolation, alternating slot identity, acknowledge-all, stale
-acknowledgement and overflow/allocation failure. A paired test shall prove the
-producer cannot acquire a live slot. Run the targeted suite and both paired
+acknowledgement, growth/shrink resize, monitor-layout replacement and
+overflow/allocation failure. A paired test shall prove the producer cannot
+acquire a live slot and that a growth resize publishes the new slot offsets and
+mapping length before its first capture. Run the targeted suite and both paired
 builds, then the README gate.

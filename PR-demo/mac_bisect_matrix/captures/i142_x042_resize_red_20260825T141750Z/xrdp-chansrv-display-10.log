@@ -1,0 +1,21 @@
+[2026-08-25T14:17:47.689+0000] [INFO ] Socket 14: connection accepted from AF_UNIX
+[2026-08-25T14:17:47.773+0000] [INFO ] sound_process_output_format:
+[2026-08-25T14:17:47.776+0000] [INFO ]       wFormatNo       0
+[2026-08-25T14:17:47.777+0000] [INFO ]       wFormatTag      WAVE_FORMAT_PCM
+[2026-08-25T14:17:47.779+0000] [INFO ]       nChannels       2
+[2026-08-25T14:17:47.781+0000] [INFO ]       nSamplesPerSec  44100
+[2026-08-25T14:17:47.783+0000] [INFO ]       nAvgBytesPerSec 176400
+[2026-08-25T14:17:47.785+0000] [INFO ]       nBlockAlign     4
+[2026-08-25T14:17:47.786+0000] [INFO ]       wBitsPerSample  16
+[2026-08-25T14:17:47.789+0000] [INFO ]       cbSize          0
+[2026-08-25T14:17:47.791+0000] [INFO ] sound_process_output_format:
+[2026-08-25T14:17:47.793+0000] [INFO ]       wFormatNo       1
+[2026-08-25T14:17:47.795+0000] [INFO ]       wFormatTag      WAVE_FORMAT_PCM
+[2026-08-25T14:17:47.796+0000] [INFO ]       nChannels       2
+[2026-08-25T14:17:47.798+0000] [INFO ]       nSamplesPerSec  22050
+[2026-08-25T14:17:47.800+0000] [INFO ]       nAvgBytesPerSec 88200
+[2026-08-25T14:17:47.802+0000] [INFO ]       nBlockAlign     4
+[2026-08-25T14:17:47.804+0000] [INFO ]       wBitsPerSample  16
+[2026-08-25T14:17:47.805+0000] [INFO ]       cbSize          0
+[2026-08-25T14:17:47.808+0000] [INFO ] sound_process_training: round trip time 2
+[2026-08-25T14:17:47.810+0000] [INFO ] Detected remote smartcard 'SCARD'

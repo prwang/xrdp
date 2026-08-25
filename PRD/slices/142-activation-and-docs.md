@@ -146,7 +146,8 @@ and LTR probe mechanisms are already gated by #137 and #138; this slice proves
 their results control advertisement. A deterministic post-confirm rejection
 fixture shall prove one bounded forensic bundle, one teardown, session hangup
 and zero later respawns under repeated damage. Resize tests shall prove
-terminate/reap/new reset and no old bytes.
+terminate/reap/new reset, no old encoder bytes and no capture snapshot whose
+layout or mapping length belongs to the preceding geometry.
 
 Run every targeted AVC and PerfTrace suite, full `make check`, astyle and
 cppcheck in default and trace-enabled builds; run the paired xorgxrdp build

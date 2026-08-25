@@ -1,0 +1,37 @@
+apiVersion: v1
+data:
+  gfx.toml: |
+    # Clean-room software-encoder interactive candidate. Dense AVC444 is the
+    # quality-preserving default; a one-frame client window minimizes latency.
+    [codec]
+    order = [ "H.264", "RFX" ]
+    h264_encoder = "ffmpeg"
+
+    [avc444_ffmpeg]
+    path = "/usr/bin/ffmpeg"
+    avc_mode = "auto"
+    chroma_align = 32
+    encoder_args = [
+      "-c:v", "libx264", "-bf", "0", "-preset", "ultrafast",
+      "-tune", "zerolatency", "-crf", "18", "-g", "240",
+      "-x264-params", "repeat-headers=1:aud=1:cabac=1",
+    ]
+    dump_extra = false
+    strip_sei = false
+    sanitize_hrd = false
+    strip_pic_struct = false
+    aux_ltr_chain = false
+    eager_slot_ack = true
+    wire_window = 1
+    chroma_refresh_ms = 0
+    chroma_idle_ms = 0
+kind: ConfigMap
+metadata:
+  annotations:
+    kubectl.kubernetes.io/last-applied-configuration: |
+      {"apiVersion":"v1","data":{"gfx.toml":"# Clean-room software-encoder interactive candidate. Dense AVC444 is the\n# quality-preserving default; a one-frame client window minimizes latency.\n[codec]\norder = [ \"H.264\", \"RFX\" ]\nh264_encoder = \"ffmpeg\"\n\n[avc444_ffmpeg]\npath = \"/usr/bin/ffmpeg\"\navc_mode = \"auto\"\nchroma_align = 32\nencoder_args = [\n  \"-c:v\", \"libx264\", \"-bf\", \"0\", \"-preset\", \"ultrafast\",\n  \"-tune\", \"zerolatency\", \"-crf\", \"18\", \"-g\", \"240\",\n  \"-x264-params\", \"repeat-headers=1:aud=1:cabac=1\",\n]\ndump_extra = false\nstrip_sei = false\nsanitize_hrd = false\nstrip_pic_struct = false\naux_ltr_chain = false\neager_slot_ack = true\nwire_window = 1\nchroma_refresh_ms = 0\nchroma_idle_ms = 0\n"},"kind":"ConfigMap","metadata":{"annotations":{},"name":"xrdp-gfx-x042","namespace":"bisect-matrix"}}
+  creationTimestamp: "2026-08-25T05:59:29Z"
+  name: xrdp-gfx-x042
+  namespace: bisect-matrix
+  resourceVersion: "1040916"
+  uid: 54127f30-7d50-4826-91fb-f54065c6a150
