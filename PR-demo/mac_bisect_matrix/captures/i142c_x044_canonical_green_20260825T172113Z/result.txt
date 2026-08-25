@@ -1,0 +1,9 @@
+port=40060
+client_pid=416055
+window=2097154
+requested=2198x1250 client_alive=yes
+requested=2412x1344 client_alive_immediate=yes
+client_alive_after_5s=yes
+client_exit=still-running
+post_resize_capture_width=2412
+post_resize_capture_height=1344

@@ -62,6 +62,33 @@ fault-injection switch. The consumer independently rebuilds the expected
 layout from current client geometry, so growth outside the original alignment
 class must be rejected.
 
+## Exact development delta used to construct 40059
+
+The requirement matrix above guided the reconciliation; 40059 was not built by
+copying only the clean-room resize or FFmpeg lifecycle. The functional delta
+from development xrdp `daa64d8f` to the reconciled red xrdp `253efd0a`, and
+from xorgxrdp `c190343` to `8cf120e`, is limited to the four category-2
+contracts below. Deployment, evidence and temporary diagnostics commits in
+those ranges are not product behavior; the diagnostics were removed from the
+packages used for the final arm.
+
+| new development behavior | owning commits and code seams | principal regression risk | independent defence before clean-room replay |
+|---|---|---|---|
+| Complete fixed-width capture layout crosses the xup boundary, and the producer requires an exact structure size/version and validates format, alignment, geometry, disjoint regions and total bytes. | xrdp `64e69727`: `common/xup_client_info.h`, `xup/xup.c`; xorgxrdp `f8a0489`: `module/rdpClientCon.c` | **High, paired-ABI and allocation risk.** Mixed packages now fail explicitly. Treating the login layout as permanent caused the growth-resize defect exposed by 40059. | Specification-derived layout sizes, bounds and disjointness in `Avc444Multimon`; paired xorg tests; exact package identities. The resize defect is corrected and separately proven by 40060 below. |
+| Every full-chroma capture carries explicit monitor/slot identity; xorgxrdp selects the typed slot planes and xrdp validates identity, mapping size and offset on development's real message-62 GFX ingress before queuing an encode. | xrdp `64e69727`, corrected ingress in `24710989`: `common/xup_client_info.h`, `xrdp/xrdp_mm.c`, `xrdp/xrdp_encoder.{c,h}`; xorgxrdp `f8a0489`: `module/rdpCapture.c`, `module/rdpClientCon.c` | **High, data-plane and fail-closed risk.** A wrong identity could select another monitor's pages; an over-strict or misplaced validator could terminate valid sessions. The first attempt was misplaced on the clean-room-only paint ingress and failed to reproduce the defect. | Pure identity/offset/layout cases, exact-envelope parser truncation tests and complete suites in both repositories. 40059 proves the actual ingress rejects a genuinely stale mapping; 40060 proves a current mapping passes it and renders. |
+| Producer capture-slot ownership resets at the resize boundary after xrdp has deleted the encoder and acknowledged all borrowed slots. | xorgxrdp `25a273a`: `module/rdpClientCon.c` | **High if the boundary precondition is false.** Resetting while a consumer still borrows a slot would permit page reuse and content/region desynchronization. | Existing two-slot ownership/frontier tests establish the no-alias rule; the resize state machine supplies the terminal acknowledgement before Xorg changes geometry. The paired real-client arms exercise the boundary without fallback or retry. |
+| Removed development-only keys `tail_flush`, `fault_aux_delay` and `fault_strip_mmco` make H.264 unavailable instead of silently activating stale diagnostic behavior. | xrdp `264e010b`: `xrdp/xrdp_tconfig.c`, config fixture and `test_tconfig.c` | **Medium, operator-visible activation risk.** A stale private configuration intentionally loses H.264 rather than running a mode absent from the PRD. Ordinary configurations must remain unchanged. | Dedicated removed-development-key parser test plus the complete `GfxLoad` suite; both live arms use the tracked operator configuration without those keys and negotiate AVC444v2. |
+
+No FFmpeg process runner, encoder arguments, H.264 parser/rewriter, metablock
+serializer, sparse cadence, wire-credit policy or multi-monitor pump behavior
+was newly ported into development for 40059. Those rows are category 1 in the
+matrix: independently shaped implementations already met the same normative
+behavior and were left intact. This is also the limit of the audit's current
+claim. The live red/green proof covers one-monitor growth resize; the retained
+deterministic suites carry the multi-monitor, malformed-input, exact-wire and
+configuration cases until the corrected clean-room descendants repeat their
+complete gates.
+
 ## 40059 result and cause
 
 The final trace-disabled arm used xrdp `b282b0c19ec1` and xorgxrdp
@@ -120,3 +147,25 @@ It reproduced the same mechanism and outcome: the producer reused
 snapshot, and FreeRDP exited with status 12. The owner had already confirmed
 the equivalent preceding arm interactively. Canonical evidence is indexed at
 [`PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md`](../../PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md).
+
+## 40060 repair result
+
+The repaired trace-disabled arm retains the 40059 xrdp package at
+`253efd0a41f9` and changes only xorgxrdp from `8cf120e5db7f` to
+`985bc42d335a`. The latter transactionally rebuilds and validates the typed
+layout from the updated display description before it changes the mapping,
+screen geometry or capture ownership. The shared pure refresh helper and its
+failure-preserves-old-layout test are xrdp commit `346624e5b632`; that helper
+does not change the deployed xrdp runtime in this comparison.
+
+The same versioned client remained connected through 2198 by 1250 and
+2412 by 1344. At the second update Xorg allocated 19,611,648 bytes rather than
+reusing 16,760,832, then invalidated the 2412-by-1344 screen. xrdp completed
+the update in 37 ms with no invalid-snapshot rejection. After five seconds the
+client was still connected and a lossless 2412-by-1344 screenshot showed the
+rendered XFCE desktop. Thus the intervention applied, the dimensions close and
+the repaired behavior did not come from a codec, config, payload, retry,
+fallback or tracing change.
+
+Evidence is indexed at
+[`PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md).

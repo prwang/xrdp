@@ -198,8 +198,8 @@ green. Normative specification:
 
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
-**Status: IN PROGRESS; canonical 40059 red proof and owner interactive
-confirmation complete; 40060 is in progress.** The
+**Status: IN PROGRESS; development reconciliation and the canonical 40059 /
+40060 red-green proof are complete; clean-room correction and replay remain.** The
 committed requirement matrix in
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
 classifies every #126–#142 requirement. Reconciliation adds the clean-room-only
@@ -214,14 +214,16 @@ mapping, xrdp derives the current 19,611,648-byte requirement and terminates
 the connection on the stale snapshot. Evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x043_canonical_red_20260825T171141Z/README.md).
 
-After reconciliation, port `40059` runs the full development frontier plus
-every normative behavior found only in clean-room, retaining the observed stale
-growth-resize behavior. Port `40060` is the same paired build and configuration
-plus only the proposed resize repair. One versioned dynamic-resolution client
-script must make `40059` reproduce the stale 16,760,832-byte mapping and
-disconnect, while `40060` allocates 19,611,648 bytes, stays connected and
-renders after the same 2412-by-1344 update. No trace, retry, fallback or codec
-change is part of the comparison.
+The same client sequence on repaired port `40060` caused Xorg to allocate the
+required 19,611,648-byte mapping before capture resumed. The client remained
+connected and a lossless 2412-by-1344 rendered frame was captured after five
+seconds. Only the xorgxrdp resize repair differs at runtime. Evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md).
+
+Ports `40059` and `40060` remain available for interactive comparison. The
+next action is to re-author the transactional layout refresh in the clean-room
+slice which first owns resize-safe capture allocation, then replay and gate
+every descendant through #142. Do not append the repair after #142.
 
 Only a green development audit, paired CI and red/green arm proof authorizes
 re-authoring the repair into its owning clean-room slice and replaying all

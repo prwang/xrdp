@@ -1,0 +1,2 @@
+width=2412
+height=1344

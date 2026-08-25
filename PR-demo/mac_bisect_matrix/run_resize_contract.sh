@@ -63,7 +63,15 @@ sleep 5
 
 if kill -0 "$CLIENT_PID" 2>/dev/null
 then
+    DISPLAY="$DISPLAY_NAME" timeout 5s xwd -silent -id "$WINDOW" \
+        -out "$OUT/post-resize.xwd"
+    ffprobe -v error -select_streams v:0 \
+        -show_entries stream=width,height \
+        -of default=noprint_wrappers=1 "$OUT/post-resize.xwd" \
+        >"$OUT/post-resize-dimensions.txt"
     printf 'client_alive_after_5s=yes\nclient_exit=still-running\n' \
+        | tee -a "$OUT/result.txt"
+    sed 's/^/post_resize_capture_/' "$OUT/post-resize-dimensions.txt" \
         | tee -a "$OUT/result.txt"
 else
     set +e
