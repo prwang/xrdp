@@ -1,0 +1,147 @@
+Cppcheck 2.20.0
+Command: /root/cppcheck.local/2.20.0/bin/cppcheck --quiet --force --std=c11 --std=c++11 --inline-suppr                     --enable=warning,missingInclude,style,portability,performance --error-exitcode=1                     -i third_party                     -i vrplayer                     --suppress=constParameterCallback --suppress=variableScope --suppress=constParameterPointer --suppress=constVariablePointer --suppress=duplicateCondition --suppress=redundantAssignment --suppress=knownConditionTrueFalse --suppress=unreadVariable --suppress=constParameter --suppress=shadowFunction --suppress=unusedStructMember --suppress=duplicateExpression --suppress=unsignedLessThanZero --suppress=shadowVariable --suppress=unreachableCode --suppress=noExplicitConstructor --suppress=constParameterReference --suppress=functionStatic --suppress=shadowArgument --suppress=truncLongCastAssignment --suppress=cstyleCast --suppress=constVariableReference --suppress=badBitmaskCheck                     --suppress=missingIncludeSystem                     --suppress=uninitMemberVar:ulalaca/ulalaca.cpp                     --suppress=dangerousTypeCast:ulalaca/XrdpStream.template.cpp                     --suppress=shiftTooManyBits:libxrdp/xrdp_mppc_enc.c                 --suppress=normalCheckLevelMaxBranches --check-level=normal                     -I .                     -I common                     -I libipm                     -I libpainter/include                     -I librfxcodec/include                     -I librfxcodec/src                     -I librfxcodec/src/neon                     -I librfxcodec/src/sse2                     -I libxrdp                     -I sesman/libsesman                     -I sesman/sesexec                     -I third_party                     -I third_party/tomlc99                     -I xrdp                     -I xrdpapi                     -I xrdpvr -D__cppcheck__ -j 32 .
+Check level: normal
+common/timers.c:27:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+libipm/scp_sync.c:28:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+common/pixman-region16.c:30:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+common/string_calls.c:39:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+common/os_calls.c:29:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+sesman/chansrv/chansrv_fuse.c:183:2: error: failed to evaluate #if condition, undefined function-like macro invocation: FUSE_MAKE_VERSION( ... ) [syntaxError]
+#if FUSE_VERSION >= FUSE_MAKE_VERSION(3,7)
+ ^
+sesman/sesexec/xwait.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+sesman/sesman.c:53:2: information: Include file: "xrdp_configure_options.h" not found. [missingInclude]
+#include "xrdp_configure_options.h"
+ ^
+sesman/sesman_restart.c:28:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+sesman/sesexec/session.c:33:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+sesman/session_list.c:33:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_base64.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_common_main.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_fifo_calls.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_guid.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_list16_calls.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_list_calls.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_os_calls.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_os_calls_signals.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_scancode.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_set_int.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_dechunker.c:29:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_parse.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_ssl_calls.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_timers.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_string_calls_unicode.c:7:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/common/test_string_calls.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libipm/test_libipm_main.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libxrdp/test_libxrdp_main.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libipm/test_libipm_send_calls.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libipm/test_libipm_recv_calls.c:3:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libxrdp/test_libxrdp_process_monitor_stream.c:164:5: portability: Shifting a negative value is technically undefined behaviour [shiftNegativeLHS]
+    out_uint32_le(s, -10); //orientation
+    ^
+tests/libxrdp/test_libxrdp_process_monitor_stream.c:165:5: portability: Shifting a negative value is technically undefined behaviour [shiftNegativeLHS]
+    out_uint32_le(s, -100); //desktop scale factor
+    ^
+tests/xrdp/test_avc444_multimon.c:8:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libxrdp/test_libxrdp_process_monitor_stream.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_tconfig.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/libxrdp/test_xrdp_sec_process_mcs_data_monitors.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_xrdp_egfx.c:31:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_bitmap_load.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_xrdp_main.c:31:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tools/chkpriv/xrdp-droppriv.c:23:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_xrdp_keymap.c:2:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+tests/xrdp/test_xrdp_region.c:31:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+waitforx/waitforx.c:9:2: information: Include file: "config_ac.h" not found. [missingInclude]
+#include "config_ac.h"
+ ^
+xrdp/xrdp.c:29:2: information: Include file: "xrdp_configure_options.h" not found. [missingInclude]
+#include "xrdp_configure_options.h"
+ ^
+xrdp/xrdp.c:403:5: error: #error unusable int size, must be 4 [preprocessorErrorDirective]
+#   error unusable int size, must be 4
+    ^
+common/os_calls.c:181:18: style: Variable 'cuda_func_name' can be declared as const array [constVariable]
+            char cuda_func_name[] = "cuInit";
+                 ^
+xrdp/xrdpwin.c:312:5: error: #error unusable int size, must be 4 [preprocessorErrorDirective]
+#   error unusable int size, must be 4
+    ^

@@ -4,9 +4,9 @@ set -eu
 
 D=$(cd "$(dirname "$0")" && pwd)
 DIST=${DIST:-/work/dist}
-XRDP_DEB=${XRDP_DEB:-default/xrdp-dev_0.10.80+git20260825061317.e0ee19616fcd_amd64.deb}
-XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260825030213.aa03d860137d_amd64.deb}
-IMAGE=${IMAGE:-localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b}
+XRDP_DEB=${XRDP_DEB:-default/xrdp-dev_0.10.80+git20260825074835.b38c63473c52_amd64.deb}
+XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260825064920.3dc52da13216_amd64.deb}
+IMAGE=${IMAGE:-localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0}
 BUILD="$D/.build-x042-cleanroom"
 
 test -f "$DIST/$XRDP_DEB"

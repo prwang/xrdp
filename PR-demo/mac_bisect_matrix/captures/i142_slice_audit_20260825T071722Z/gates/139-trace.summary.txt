@@ -1,0 +1,47 @@
+command: ./bootstrap && ./configure --prefix=/usr --enable-tests --enable-x264 --enable-perf-trace && make -jN && make check
+commit: a0c171caee2b84e68b875d6e10ae7e4684d0c8dd
+
+=== tests/common/test-suite.log ===
+# TOTAL: 181
+# PASS:  180
+# SKIP:  1
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+
+=== tests/libipm/test-suite.log ===
+# TOTAL: 35
+# PASS:  35
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+
+=== tests/libxrdp/test-suite.log ===
+# TOTAL: 13
+# PASS:  13
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+
+=== tests/memtest/test-suite.log ===
+# TOTAL: 1
+# PASS:  1
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+
+=== tests/xrdp/test-suite.log ===
+# TOTAL: 155
+# PASS:  155
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0

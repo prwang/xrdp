@@ -1,0 +1,29 @@
+Artistic Style Version 3.4.14
+Command: /root/astyle.local/3.4.14/usr/bin/astyle --options=astyle_config.as --exclude=third_party ./\*.c ./\*.h
+------------------------------------------------------------
+Directory  .//*.c
+Exclude  third_party
+Exclude  librfxcodec
+Exclude  libpainter
+------------------------------------------------------------
+Formatted  xrdp/xrdp_encoder_ffmpeg.c
+------------------------------------------------------------
+Directory  .//*.h
+Exclude  xrdp_configure_options.h
+Exclude  third_party
+Exclude  librfxcodec
+Exclude  libpainter
+------------------------------------------------------------
+diff --git a/xrdp/xrdp_encoder_ffmpeg.c b/xrdp/xrdp_encoder_ffmpeg.c
+index cc3dd5ce..6671c152 100644
+--- a/xrdp/xrdp_encoder_ffmpeg.c
++++ b/xrdp/xrdp_encoder_ffmpeg.c
+@@ -1663,7 +1663,7 @@ collect_armed_pair(struct xrdp_ffmpeg *ffmpeg,
+ 
+         main_capacity = main_encoded.main_bytes +
+                         xrdp_h264_ltr_growth_budget(main_encoded.main_data,
+-                                main_encoded.main_bytes);
++                            main_encoded.main_bytes);
+         auxiliary_capacity = 0;
+         if (ffmpeg->auxiliary_armed)
+         {

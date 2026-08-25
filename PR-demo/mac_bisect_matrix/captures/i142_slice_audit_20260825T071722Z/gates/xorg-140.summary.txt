@@ -1,0 +1,21 @@
+command: ./bootstrap && ./configure --prefix=/usr --enable-glamor XRDP_CFLAGS=-I<paired-xrdp>/common && make -jN && make check
+commit: 3dc52da1321644bda7678fb246d815dc27bd9bef
+paired xrdp: ed6db7a434c37ac50da46c7fdab0ee8d496aa102
+
+=== tests/yuv2rgb/test-suite.log ===
+# TOTAL: 1
+# PASS:  1
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+
+=== tests/yuv444/test-suite.log ===
+# TOTAL: 2
+# PASS:  2
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0

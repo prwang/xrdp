@@ -1,0 +1,261 @@
+Formatted  module/rdpCapture.c
+Formatted  module/rdpClientCon.c
+Formatted  module/rdpClientCon.h
+diff --git a/module/rdpCapture.c b/module/rdpCapture.c
+index 0e291bb..4904932 100644
+--- a/module/rdpCapture.c
++++ b/module/rdpCapture.c
+@@ -714,9 +714,9 @@ rdpCopyBox_a8r8g8b8_to_nv12_709fr(rdpClientCon *clientCon,
+         width = box->x2 - box->x1;
+         height = box->y2 - box->y1;
+         clientCon->dev->a8r8g8b8_to_nv12_709fr_box(s8, src_stride,
+-                                                   d8_y, dst_stride_y,
+-                                                   d8_uv, dst_stride_uv,
+-                                                   width, height);
++                d8_y, dst_stride_y,
++                d8_uv, dst_stride_uv,
++                width, height);
+     }
+     return 0;
+ }
+@@ -766,23 +766,25 @@ rdpCopyBoxList(rdpClientCon *clientCon, PixmapPtr dstPixmap,
+         if ((width > 0) && (height > 0))
+         {
+             copyGC->ops->CopyArea(&(hwPixmap->drawable),
+-                                    &(dstPixmap->drawable), copyGC,
+-                                    left - srcx, top - srcy,
+-                                    width, height,
+-                                    left - dstx, top - dsty);
++                                  &(dstPixmap->drawable), copyGC,
++                                  left - srcx, top - srcy,
++                                  width, height,
++                                  left - dstx, top - dsty);
+         }
+     }
+     FreeScratchGC(copyGC);
+     pScreen->GetImage(&(dstPixmap->drawable), 0, 0, 1, 1, ZPixmap,
+-                          0xffffffff, pix1);
++                      0xffffffff, pix1);
+ 
+     return TRUE;
+ }
+ 
+ /******************************************************************************/
+ static Bool
+-isShmStatusActive(enum shared_memory_status status) {
+-    switch (status) {
++isShmStatusActive(enum shared_memory_status status)
++{
++    switch (status)
++    {
+         case SHM_ACTIVE:
+         case SHM_RFX_ACTIVE:
+         case SHM_H264_ACTIVE:
+@@ -802,9 +804,9 @@ wyhash_rfx_tile(const uint8_t *src, int src_stride, int x, int y, uint64_t seed)
+     const uint8_t *s8;
+     hash = seed;
+     s8 = src + (y * src_stride) + (x * 4);
+-    for(row = 0; row < 64; row++)
++    for (row = 0; row < 64; row++)
+     {
+-        hash = wyhash((const void*)s8, 64 * 4, hash, _wyp);
++        hash = wyhash((const void *)s8, 64 * 4, hash, _wyp);
+         s8 += src_stride;
+     }
+     return hash;
+@@ -828,7 +830,8 @@ rdpCaptureSimple(rdpClientCon *clientCon, RegionPtr in_reg, BoxPtr *out_rects,
+ 
+     LOG(LOG_LEVEL_TRACE, "rdpCaptureSimple:");
+ 
+-    if (!isShmStatusActive(clientCon->shmemstatus)) {
++    if (!isShmStatusActive(clientCon->shmemstatus))
++    {
+         LOG(LOG_LEVEL_WARNING,
+             "rdpCaptureSimple: WARNING -- Shared memory is not configured."
+             " Aborting capture!");
+@@ -951,7 +954,8 @@ rdpCaptureSufA16(rdpClientCon *clientCon, RegionPtr in_reg, BoxPtr *out_rects,
+ 
+     LOG(LOG_LEVEL_TRACE, "rdpCaptureSufA16:");
+ 
+-    if (!isShmStatusActive(clientCon->shmemstatus)) {
++    if (!isShmStatusActive(clientCon->shmemstatus))
++    {
+         LOG(LOG_LEVEL_WARNING,
+             "rdpCaptureSufA16: WARNING -- Shared memory is not configured."
+             " Aborting capture!");
+@@ -1184,13 +1188,13 @@ rdpCaptureGfxPro(rdpClientCon *clientCon, RegionPtr in_reg, BoxPtr *out_rects,
+                     rdpRegionIntersect(&tile_reg, in_reg, &tile_reg);
+                     rects = REGION_RECTS(&tile_reg);
+                     num_rects = REGION_NUM_RECTS(&tile_reg);
+-                    crc = wyhash((const void*)rects, num_rects * sizeof(BoxRec), crc, _wyp);
++                    crc = wyhash((const void *)rects, num_rects * sizeof(BoxRec), crc, _wyp);
+                     rdpCopyBox_a8r8g8b8_to_yuvalp(clientCon, x, y,
+                                                   src, src_stride,
+                                                   dst, dst_stride,
+                                                   rects, num_rects);
+                     crc_dst = dst + (y << 8) * (dst_stride >> 8) + (x << 8);
+-                    crc = wyhash((const void*)crc_dst, 64 * 64 * 4, crc, _wyp);
++                    crc = wyhash((const void *)crc_dst, 64 * 64 * 4, crc, _wyp);
+                     rdpRegionUninit(&tile_reg);
+                 }
+                 else /* rgnIN */
+@@ -1216,9 +1220,9 @@ rdpCaptureGfxPro(rdpClientCon *clientCon, RegionPtr in_reg, BoxPtr *out_rects,
+                     if (rcode != rgnPART)
+                     {
+                         rdpCopyBox_a8r8g8b8_to_yuvalp(clientCon, x, y,
+-                                src, src_stride,
+-                                dst, dst_stride,
+-                                &rect, 1);
++                                                      src, src_stride,
++                                                      dst, dst_stride,
++                                                      &rect, 1);
+                     }
+                     clientCon->rfx_crcs[mon_index][crc_offset] = crc;
+                     (*out_rects)[out_rect_index] = rect;
+@@ -1490,7 +1494,7 @@ rdpCapture(rdpClientCon *clientCon, RegionPtr in_reg, BoxPtr *out_rects,
+         case CC_SUF_A16:
+             return rdpCaptureSufA16(clientCon, in_reg, out_rects, num_out_rects, id);
+         case CC_SUF_RFX: /* surface command RFX */
+-            /* FALLTHROUGH */
++        /* FALLTHROUGH */
+         case CC_GFX_PRO: /* GFX progressive */
+             return rdpCaptureGfxPro(clientCon, in_reg, out_rects, num_out_rects, id);
+         case CC_SUF_A2: /* surface command h264 */
+diff --git a/module/rdpClientCon.c b/module/rdpClientCon.c
+index 0d35b71..cf19cd7 100644
+--- a/module/rdpClientCon.c
++++ b/module/rdpClientCon.c
+@@ -370,7 +370,8 @@ rdpDeferredIdleDisconnectCallback(OsTimerPtr timer, CARD32 now, pointer arg)
+ 
+ /*****************************************************************************/
+ static int
+-rdpShutdownAccelAssist(rdpPtr dev, rdpClientCon *clientCon) {
++rdpShutdownAccelAssist(rdpPtr dev, rdpClientCon *clientCon)
++{
+     ScreenPtr pScreen;
+     PixmapPtr pPixmap;
+     int index;
+@@ -829,7 +830,7 @@ convertSharedMemoryStatusToActive(enum shared_memory_status status)
+     switch (status)
+     {
+         case SHM_ACTIVE_PENDING:
+-            return SHM_ACTIVE;
++                    return SHM_ACTIVE;
+         case SHM_RFX_ACTIVE_PENDING:
+             return SHM_RFX_ACTIVE;
+         case SHM_H264_ACTIVE_PENDING:
+@@ -870,7 +871,7 @@ rdpClientConResizeAllMemoryAreas(rdpPtr dev, rdpClientCon *clientCon)
+     memset(clientCon->cap_offsets, 0, sizeof(clientCon->cap_offsets));
+ 
+     /* Set the capture parameters */
+-    switch(clientCon->client_info.capture_code)
++    switch (clientCon->client_info.capture_code)
+     {
+         case CC_SUF_RFX: /* RFX */
+         case CC_GFX_PRO:
+@@ -1003,7 +1004,7 @@ rdpClientConResizeAllMemoryAreas(rdpPtr dev, rdpClientCon *clientCon)
+     rdpCaptureResetState(clientCon);
+ 
+     if (clientCon->shmemstatus == SHM_UNINITIALIZED
+-       || clientCon->shmemstatus == SHM_RESIZING)
++            || clientCon->shmemstatus == SHM_RESIZING)
+     {
+         clientCon->shmemstatus
+             = convertSharedMemoryStatusToActive(shmemstatus);
+@@ -2099,7 +2100,7 @@ rdpClientConPreCheck(rdpPtr dev, rdpClientCon *clientCon, int in_size)
+     }
+ 
+     if ((clientCon->out_s->p - clientCon->out_s->data) >
+-        (clientCon->out_s->size - (in_size + 20)))
++            (clientCon->out_s->size - (in_size + 20)))
+     {
+         s_mark_end(clientCon->out_s);
+         if (rdpClientConSendMsg(dev, clientCon) != 0)
+@@ -2797,7 +2798,7 @@ rdpClientConAddOsBitmap(rdpPtr dev, rdpClientCon *clientCon,
+         while (index < clientCon->maxOsBitmaps)
+         {
+             if (clientCon->osBitmaps[index].used &&
+-                (clientCon->osBitmaps[index].stamp < oldest))
++                    (clientCon->osBitmaps[index].stamp < oldest))
+             {
+                 oldest = clientCon->osBitmaps[index].stamp;
+                 oldest_index = index;
+@@ -2945,8 +2946,8 @@ rdpClientConScheduleDeferredUpdate(rdpPtr dev)
+     {
+         dev->sendUpdateScheduled = TRUE;
+         dev->sendUpdateTimer =
+-                TimerSet(dev->sendUpdateTimer, 0, dev->msFrameInterval,
+-                         rdpClientConDeferredUpdateCallback, dev);
++            TimerSet(dev->sendUpdateTimer, 0, dev->msFrameInterval,
++                     rdpClientConDeferredUpdateCallback, dev);
+     }
+ }
+ 
+@@ -3107,8 +3108,8 @@ rdpClientConSendPaintRectShmFd(rdpPtr dev, rdpClientCon *clientCon,
+         clientCon->count++;
+ 
+         out_uint32_le(s, start_frame_bytes +
+-                        wiretosurface2_bytes +
+-                        end_frame_bytes); /* total of cmd_bytes */
++                      wiretosurface2_bytes +
++                      end_frame_bytes); /* total of cmd_bytes */
+ 
+         ++clientCon->rect_id;
+ 
+@@ -3179,8 +3180,8 @@ rdpClientConSendPaintRectShmFd(rdpPtr dev, rdpClientCon *clientCon,
+         clientCon->count++;
+ 
+         out_uint32_le(s, start_frame_bytes +
+-                        wiretosurface1_bytes +
+-                        end_frame_bytes); /* total of cmd_bytes */
++                      wiretosurface1_bytes +
++                      end_frame_bytes); /* total of cmd_bytes */
+ 
+         ++clientCon->rect_id;
+ 
+@@ -3315,7 +3316,8 @@ rdpDeferredUpdateCallback(OsTimerPtr timer, CARD32 now, pointer arg)
+         LOG(LOG_LEVEL_TRACE, "rdpDeferredUpdateCallback: suppress_output set");
+         return 0;
+     }
+-    if (clientCon->shmemstatus == SHM_UNINITIALIZED || clientCon->shmemstatus == SHM_RESIZING) {
++    if (clientCon->shmemstatus == SHM_UNINITIALIZED || clientCon->shmemstatus == SHM_RESIZING)
++    {
+         LOG(LOG_LEVEL_TRACE,
+             "rdpDeferredUpdateCallback: clientCon->shmemstatus "
+             "is not valid for capture operations: %d"
+@@ -3324,8 +3326,8 @@ rdpDeferredUpdateCallback(OsTimerPtr timer, CARD32 now, pointer arg)
+         return 0;
+     }
+     if ((clientCon->rect_id > clientCon->rect_id_ack) ||
+-        /* do not allow captures until we have the client_info */
+-        clientCon->client_info.size == 0)
++            /* do not allow captures until we have the client_info */
++            clientCon->client_info.size == 0)
+     {
+         return 0;
+     }
+@@ -3413,8 +3415,8 @@ rdpScheduleDeferredUpdate(rdpClientCon *clientCon)
+     minNextUpdateTime = clientCon->lastUpdateTime + clientCon->dev->msFrameInterval;
+     /* the first check is to gracefully handle the infrequent case of
+        the time wrapping around */
+-    if(clientCon->lastUpdateTime < curTime &&
+-        minNextUpdateTime > curTime + msToWait)
++    if (clientCon->lastUpdateTime < curTime &&
++            minNextUpdateTime > curTime + msToWait)
+     {
+         msToWait = minNextUpdateTime - curTime;
+     }
+diff --git a/module/rdpClientCon.h b/module/rdpClientCon.h
+index c4c7964..3d556ee 100644
+--- a/module/rdpClientCon.h
++++ b/module/rdpClientCon.h
+@@ -49,7 +49,8 @@ struct rdpup_os_bitmap
+     int stamp;
+ };
+ 
+-enum shared_memory_status {
++enum shared_memory_status
++{
+     SHM_UNINITIALIZED = 0,
+     SHM_RESIZING,
+     SHM_ACTIVE_PENDING,

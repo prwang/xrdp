@@ -1,10 +1,10 @@
 arm:    x042
 mode:   AVC420 (single-view topology)
-image:  localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b
-gfx:    sha256:751c41ac18d7c01d
-key:    localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b|751c41ac18d7c01d
-when:   2026-08-25T06:24:57Z
-window: 3s at 1920x1080, 14855 bytes
+image:  localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+gfx:    sha256:905d1f2c41027a47
+key:    localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0|905d1f2c41027a47
+when:   2026-08-25T07:59:45Z
+window: 3s at 1920x1080, 14479 bytes
 
 === encoder input pipe ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
@@ -20,12 +20,11 @@ SPS: 1920x1088 profile=77 level=51 max_num_ref_frames=1 log2_max_frame_num=4 poc
 PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
 
 first 12 pictures (decode order):
-  main fn=0      IDR none       ltr_flag=0    3801B
-  main fn=1      P   none       [('sliding_window', None)]      27B
-  main fn=2      P   none       [('sliding_window', None)]      98B
+  main fn=0      IDR none       ltr_flag=0    3802B
+  main fn=1      P   none       [('sliding_window', None)]     103B
 
 single view (AVC420): the LTR / cross-view narrative does
-not apply and is not printed. 3 picture(s) parsed.
+not apply and is not printed. 2 picture(s) parsed.
 
 === ASSERT GATE (single view, AVC420) ===
   The AVC444 two-view assertions A1-A7 are NOT run: they
@@ -33,7 +32,7 @@ not apply and is not printed. 3 picture(s) parsed.
   two views, which this configuration does not have. The
   checks below are what a single-view stream can be held
   to. See assert_gate_single_view().
-  S1 pictures parsed from the capture      PASS  3 picture(s) parsed
+  S1 pictures parsed from the capture      PASS  2 picture(s) parsed
   S2 single view, no aux sub-stream        PASS  no aux pictures, as an AVC420 arm must emit
   S3 reset is self-describing in band      PASS  1 SPS NAL(s) in the capture
   S4 frame_num contiguous within each IDR period PASS  one chain per IDR period
@@ -43,8 +42,8 @@ wire audit exit: 0
 
 === black-frame check ===
 cert.bin
-  pictures in capture     : 3
-  frames decoded          : 3
+  pictures in capture     : 2
+  frames decoded          : 2
   black frames (any view) : 0 []
   black MAIN-view frames  : 0 []
   ... mid-stream          : 0 []

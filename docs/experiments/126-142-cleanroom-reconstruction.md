@@ -201,3 +201,74 @@ gates at negotiated 1920x1080. The automatic profile was restored and the
 rendered smoke again passed 8/8 transitions, zero lag, edge fidelity 1.000 and
 zero encoder errors at both 1920x1080 and 1024x768. The remaining real-client
 matrix stated above is unchanged.
+
+## 2026-08-25 exact-slice closure audit and current deployment
+
+The earlier final-tree gates did not prove that every historical commit was
+independently buildable. The exact-commit audit first stopped at #133: its
+default build passed 87/87, but its trace-enabled build did not compile because
+the single-role constructor referred to `force_idr`, a parameter introduced
+only by #137. The red run is retained at
+`PR-demo/mac_bisect_matrix/captures/i142_slice_audit_20260825T070302Z/`.
+
+The correction assigns #133's only child the main trace role. #137 now changes
+that assignment to `!force_idr` when the ordinary-main and forced-IDR
+auxiliary roles first coexist. Pinned astyle 3.4.14 then found a continuation
+indentation defect at #141; it too was corrected in its owning commit before
+#142 was replayed. These history repairs leave the final source tree unchanged
+at `5ceed6c1fb3a52d7daa1343b0da6029a3aa7f2f1`. The current commit tail is:
+
+| slice | current xrdp commit |
+|---|---|
+| 133 | `8cec0977d247538d4b9f837e358461a1338e7a16` |
+| 134 | `d26748ed27daffc74c50b1bbdf7c4c5ed05881b2` |
+| 135 | `59a898028ab1e48bc4622056142c07c39a99c7df` |
+| 136 | `be9a3f71ca3266a98924a9bbabf9f81d49eb8bef` |
+| 137 | `c97dde4923fda88b958b7bece59df209701e401c` |
+| 138 | `f1283729cd83ce7e49b4b451597e8e1676e83034` |
+| 139 | `a0c171caee2b84e68b875d6e10ae7e4684d0c8dd` |
+| 140 | `ed6db7a434c37ac50da46c7fdab0ee8d496aa102` |
+| 141 | `585c9b8e323d5d8ee23ef452fe9112b6489870fe` |
+| 142 | `b38c63473c5297250af325d2770c5219ede69d48` |
+
+The earlier #126--#132 identities remain current. The xorgxrdp identities are
+also unchanged, ending at `3dc52da1321644bda7678fb246d815dc27bd9bef`.
+Both branches retain their pinned ancestors and contain exactly 17 xrdp and
+five paired xorgxrdp commits.
+
+The corrected retained audit is
+`PR-demo/mac_bisect_matrix/captures/i142_slice_audit_20260825T071722Z/`.
+It records 33 green xrdp full-suite rows, 17 green xrdp diff/astyle/cppcheck
+rows, five green paired xorgxrdp build/test rows and five green producer
+diff-review rows. #142 passes 203/203 in both default and trace-enabled builds.
+The audit README identifies the three retained harness/formatter red logs and
+their dispositions instead of hiding them.
+
+Closure review also corrected two inconsistent common-gate sentences in the
+PRD. Performance tracing is private to xrdp and does not create an xorgxrdp
+"trace mode" or a wire mismatch; xorgxrdp is built against the exact checked-
+out header in either case. Likewise, xrdp's pinned astyle/cppcheck scripts are
+xrdp repository gates, not a licence to rewrite xorgxrdp's differently styled
+pinned base. Producer commits retain their own clean build/tests,
+`git diff --check`, matching-header gate and changed-hunk review.
+
+Because the current final source tree is byte-identical to the previously
+certified one, the xrdp package payload was retained byte-for-byte and only its
+package metadata was rebuilt to name commit `b38c63473c52`. Extracted payload
+file contents, modes, ownership and symlinks compare identical. The package is
+`xrdp-dev_0.10.80+git20260825074835.b38c63473c52_amd64.deb`, SHA-256
+`382e50b0adba4ea6cd5fc8d8cb9e0eeaa8b1434c7a73110bef87ff0519625367`.
+The paired xorgxrdp package remains
+`1:0.10.80+git20260825064920.3dc52da13216`.
+
+x042 now runs image
+`localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0`,
+image ID `8f0bf6f3061cd4415c12a8e610ebd877459d456ab305b6fcd59ed48de6e038ae`.
+All five 1920x1080 profile certificates passed again on that identity, and the
+automatic dense profile with SHA-256
+`216aed1fd3b78c26ee3aaa1d922ee53e970f5cece8f8ccb17e5e8a0cff9f3971`
+was restored. The final rendered smoke passed both required geometries with
+8/8 transitions, zero lag, edge fidelity 1.000 and zero encoder errors. The
+handoff state has no tester Xorg/sesexec process, smoke marker, payload
+autostart or performance trace file. The Windows/macOS visual matrix remains
+the only open #142 acceptance work.

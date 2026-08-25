@@ -233,13 +233,23 @@ addition, each commit shall pass these gates from a clean tree:
    headers, `make -j2`, and `make check`.
 4. Paired slices: build both repositories against the same versioned
    `common/xup_client_info.h` contract.
-5. `scripts/run_astyle.sh -v 3.4.14`; it shall produce no diff.
-6. `scripts/run_cppcheck.sh -v 2.20.0`.
+5. Each xrdp commit: `scripts/run_astyle.sh -v 3.4.14`; it shall produce no
+   diff. xorgxrdp does not carry this script or use xrdp's whole-tree formatter;
+   applying it there would rewrite unrelated pinned-base code. Review every
+   changed xorgxrdp hunk against its surrounding repository style instead.
+6. Each xrdp commit: `scripts/run_cppcheck.sh -v 2.20.0`. xorgxrdp has no
+   corresponding repository cppcheck gate; its changed code remains covered
+   by its clean compiler build, tests, `git diff --check` and the diff review
+   in item 8.
 7. From #127 onward, create a second clean xrdp build configured with
    `--enable-perf-trace` and repeat `make -j2` and `make check`. The ordinary
-   build shall also pass #127's disabled-footprint test. From #128 onward,
-   perform the paired xorgxrdp build in both matching trace modes; mixed modes
-   shall fail the version-agreement test.
+   build shall also pass #127's disabled-footprint test. Performance tracing
+   is private to the xrdp process and shall not change
+   `common/xup_client_info.h`, its version, or the xorgxrdp build. From #128
+   onward, paired slices shall verify that xorgxrdp builds against the exact
+   checked-out header independently of whether the paired xrdp binary enables
+   tracing. A genuine xup header-version mismatch remains a hard runtime
+   rejection; a trace-enabled/disabled pairing is not a wire mismatch.
 8. Audit the complete slice diff against the authorship and prose standard
    above. Every new production comment and user-visible string shall have a
    current purpose; internal work labels, development archaeology, dead keys

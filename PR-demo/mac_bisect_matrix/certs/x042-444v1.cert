@@ -1,10 +1,10 @@
 arm:    x042
 mode:   AVC444v1 (auxiliary-leaf topology)
-image:  localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b
-gfx:    sha256:6ab484f5abbcf77c
-key:    localhost/xrdp-bisect:cleanroom-e0ee1961-aa03d860-u2404-xfce-notrace.pf254dc5b|6ab484f5abbcf77c
-when:   2026-08-25T06:32:39Z
-window: 3s at 1920x1080, 31436 bytes
+image:  localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+gfx:    sha256:5d1f6dd27a60957f
+key:    localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0|5d1f6dd27a60957f
+when:   2026-08-25T07:59:10Z
+window: 3s at 1920x1080, 38850 bytes
 
 === encoder input pipe ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
@@ -15,27 +15,27 @@ the handover cost is flat (0.71 ms at 512 KiB against
 whole of the requirement.
 
 === wire audit (--assert) ===
-=== x042 deploy certification ===
-SPS: 1920x1088 profile=77 level=51 max_num_ref_frames=1 log2_max_frame_num=4 poc_type=2 gaps=0  (1 SPS NALs, views: main)
 PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
 
 first 12 pictures (decode order):
-  main fn=0      IDR none       ltr_flag=0    3893B
-  aux  fn=1      I   none       []             889B
+  main fn=0      IDR none       ltr_flag=0    3916B
+  aux  fn=1      I   none       []             873B
   main fn=1      P   none       [('sliding_window', None)]     103B
-  aux  fn=2      I   none       []             767B
+  aux  fn=2      I   none       []             759B
+  main fn=2      P   none       [('sliding_window', None)]      24B
+  aux  fn=3      I   none       []             759B
 
-default auxiliary-leaf topology: 2 main, 2 auxiliary picture(s)
+default auxiliary-leaf topology: 3 main, 3 auxiliary picture(s)
 The auxiliary view is expected to be non-reference intra;
 the main view alone owns the inter-picture reference chain.
 
 === ASSERT GATE (AVC444 auxiliary-leaf topology) ===
   LTR assertions A1-A7 are not run: this configuration
   deliberately uses a non-reference intra auxiliary leaf.
-  L1 both AVC444 views are present         PASS  2 main and 2 auxiliary picture(s)
+  L1 both AVC444 views are present         PASS  3 main and 3 auxiliary picture(s)
   L2 every auxiliary picture is a leaf     PASS  all auxiliary pictures are non-IDR, non-reference intra
   L3 main pictures retain reference ownership PASS  all main pictures are reference-bearing
-  L4 auxiliary cadence cannot exceed main cadence PASS  2 auxiliary against 2 main picture(s)
+  L4 auxiliary cadence cannot exceed main cadence PASS  3 auxiliary against 3 main picture(s)
   L5 main frame numbers are contiguous     PASS  one chain per IDR period
   L6 parameter sets belong to the main view PASS  2 main and 0 auxiliary parameter-set NAL(s)
 
@@ -44,8 +44,8 @@ wire audit exit: 0
 
 === black-frame check ===
 cert.bin
-  pictures in capture     : 4
-  frames decoded          : 4
+  pictures in capture     : 6
+  frames decoded          : 6
   black frames (any view) : 0 []
   black MAIN-view frames  : 0 []
   ... mid-stream          : 0 []
