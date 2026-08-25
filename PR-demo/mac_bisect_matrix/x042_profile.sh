@@ -3,6 +3,7 @@
 set -eu
 
 D=$(cd "$(dirname "$0")" && pwd)
+DRAFT="$D/../../.turn_draft.md"
 NS=bisect-matrix
 ARM=x042
 PORT=40058
@@ -38,6 +39,18 @@ kubectl apply -f "$D/k8s/x042.yaml"
 kubectl -n "$NS" patch deployment xrdp-x042 --type merge \
     -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"interactive-profile-sha\":\"$profile_hash\"}}}}}"
 kubectl -n "$NS" rollout status deployment/xrdp-x042 --timeout=300s
+
+if [ -f "$DRAFT" ]
+then
+    pod=$(kubectl -n "$NS" get pod -l "arm=$ARM" \
+        --field-selector status.phase=Running \
+        -o jsonpath='{.items[0].metadata.name}')
+    draft_name=".turn_draft_$(date -u +%Y%m%dT%H%M%SZ).md"
+    kubectl -n "$NS" cp "$DRAFT" "$pod:/home/tester/$draft_name"
+    kubectl -n "$NS" exec "$pod" -- \
+        chown tester:tester "/home/tester/$draft_name"
+    kubectl -n "$NS" exec "$pod" -- chmod 0644 "/home/tester/$draft_name"
+fi
 
 cert="$D/certs/x042-$MODE.cert"
 E_GFX_FILE="$PROFILE" E_CERTFILE="$cert" CERT_SECS=3 \
