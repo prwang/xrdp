@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:reconciled-8a22cb5-13740e5-u2404-xfce-notrace
+          image: localhost/xrdp-bisect:reconciled-2471098-13740e5-u2404-xfce-notrace
           imagePullPolicy: Never
           securityContext:
             privileged: true
