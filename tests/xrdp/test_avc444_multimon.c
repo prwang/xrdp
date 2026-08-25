@@ -1821,6 +1821,7 @@ START_TEST(test_capture_contract_rejects_a_previous_resize_layout)
     struct display_size_description same_coded_size;
     struct display_size_description grown;
     struct xup_avc444_capture_layout layout;
+    struct xup_avc444_capture_layout retained;
     uint32_t monitor;
     uint32_t slot;
     uint32_t flags;
@@ -1850,13 +1851,20 @@ START_TEST(test_capture_contract_rejects_a_previous_resize_layout)
     ck_assert_int_eq(xup_avc444_layout_matches(
                          &grown, XRDP_yuv444_v2_stream_709fr,
                          32, &layout), 0);
-    ck_assert_int_eq(xup_avc444_layout_build(
+    ck_assert_int_eq(xup_avc444_layout_refresh(
                          &grown, XRDP_yuv444_v2_stream_709fr, 32,
                          &layout), 0);
     ck_assert_uint_eq(layout.total_bytes, 19611648U);
     ck_assert_int_eq(xup_avc444_layout_matches(
                          &grown, XRDP_yuv444_v2_stream_709fr,
                          32, &layout), 1);
+
+    retained = layout;
+    grown.minfo[0].right = -1;
+    ck_assert_int_eq(xup_avc444_layout_refresh(
+                         &grown, XRDP_yuv444_v2_stream_709fr, 32,
+                         &layout), 1);
+    ck_assert_mem_eq(&layout, &retained, sizeof(layout));
 
     flags = xup_avc444_capture_flags(0, 0, 1);
     ck_assert_int_eq(xup_avc444_capture_identity(flags, &monitor, &slot), 0);

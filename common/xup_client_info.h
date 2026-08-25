@@ -332,6 +332,24 @@ xup_avc444_layout_build(const struct display_size_description *displays,
 }
 
 static inline int
+xup_avc444_layout_refresh(const struct display_size_description *displays,
+                           uint32_t capture_format,
+                           uint32_t width_alignment,
+                           struct xup_avc444_capture_layout *layout)
+{
+    struct xup_avc444_capture_layout replacement;
+
+    if (layout == NULL ||
+            xup_avc444_layout_build(displays, capture_format,
+                                    width_alignment, &replacement) != 0)
+    {
+        return 1;
+    }
+    *layout = replacement;
+    return 0;
+}
+
+static inline int
 xup_avc444_layout_valid(const struct xup_avc444_capture_layout *layout)
 {
     uint64_t previous_end;
