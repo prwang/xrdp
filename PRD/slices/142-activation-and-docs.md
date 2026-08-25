@@ -7,14 +7,18 @@ configuration, capability activation and operator documentation for behavior
 already implemented and green.
 
 Target files are `xrdp/xrdp_tconfig.c`, `xrdp/xrdp_tconfig.h`,
-`xrdp/xrdp_types.h`, `xrdp/xrdp_mm.c`, `xrdp/gfx.toml`,
-`docs/man/gfx.toml.5.in`, `tests/xrdp/test_tconfig.c`,
+`xrdp/xrdp_types.h`, `xrdp/xrdp_mm.c`, `xrdp/xrdp_encoder.c`,
+`xrdp/xrdp.h`, `xrdp/xrdp_encoder.h`, `xrdp/xrdp_encoder_ffmpeg.c`,
+`xrdp/xrdp_encoder_ffmpeg.h`, `xrdp/gfx.toml`,
+`docs/man/gfx.toml.5.in`, `tests/xrdp/Makefile.am`,
+`tests/xrdp/test_avc444_ffmpeg.c`, `tests/xrdp/test_tconfig.c`,
 `tests/xrdp/test_xrdp_egfx.c`, `tests/xrdp/check_operator_surface.sh`, and
 these fixtures, all below `tests/xrdp/gfx/`:
 `gfx_avc444_ffmpeg.toml`, `gfx_avc444_empty_args.toml`,
 `gfx_avc444_intra_refresh.toml`, `gfx_avc444_intra_refresh_bad.toml`,
 `gfx_avc444_rekey.toml`, `gfx_avc444_rekey_bad.toml`,
 `gfx_avc444_rekey_churn.toml`, `gfx_avc444_rekey_nochurn.toml`,
+`gfx_avc444_excluded_key.toml`,
 `gfx_avc444_sparse_aux.toml`, `gfx_avc444_sparse_aux_bad.toml`,
 `gfx_avc444_wire_window.toml`, `gfx_avc444_wire_window_bad.toml` and
 `gfx_avc444_removed_emit_thread.toml`. Activation may touch the existing
@@ -32,7 +36,9 @@ capability-response seam but shall not introduce a new mechanism there.
   restored from a simpler default between configuration loading and the probe.
   Advertise/select only a mode supported by the client, configuration and that
   complete probe. The selected mode is immutable afterward. This slice wires
-  the probe to capability selection; it does not add a new probe or transform.
+  the probe to capability selection and connects confirmed raw captures to the
+  already-tested worker batch and wire assembly. It does not add a new probe,
+  transform, scheduler or encoder process model.
 * S142-R3: document and validate executable path, bounded encoder argv,
   `avc_mode` (`auto`, forced AVC444, forced v1, forced AVC420),
   `chroma_align` (16 or 32), `dump_extra`, `strip_sei`, `sanitize_hrd`,

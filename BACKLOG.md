@@ -347,8 +347,10 @@ probe, and map the existing terminal result to connection hangup. Do not carry
 forensic mechanism.
 
 **Development inventory (not source text):** `xrdp/xrdp_tconfig.{c,h}`,
-`xrdp/xrdp_types.h`,
-`xrdp/xrdp_mm.c`, `xrdp/gfx.toml`, `docs/man/gfx.toml.5.in`,
+`xrdp/xrdp_types.h`, `xrdp/xrdp_mm.c`, `xrdp/xrdp_encoder.{c,h}`,
+`xrdp/xrdp.h`, `xrdp/xrdp_encoder_ffmpeg.{c,h}`, `xrdp/gfx.toml`,
+`docs/man/gfx.toml.5.in`, `tests/xrdp/Makefile.am`,
+`tests/xrdp/test_avc444_ffmpeg.c`,
 `tests/xrdp/check_operator_surface.sh`, `tests/xrdp/test_tconfig.c`,
 `tests/xrdp/test_xrdp_egfx.c` and the `tests/xrdp/gfx/*.toml` fixtures.
 
