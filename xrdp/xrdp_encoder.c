@@ -1099,6 +1099,40 @@ gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes)
 }
 
 /*****************************************************************************/
+int
+gfx_egfx_batch_capture_info(const char *cmd, int cmd_bytes,
+                            int *frame_id, uint32_t *flags,
+                            uint32_t *shmem_offset)
+{
+    const unsigned char *wire_to_surface;
+    const unsigned char *destination;
+    int damage_count;
+    int copy_count;
+    int parsed_frame_id;
+
+    if (frame_id == NULL || flags == NULL || shmem_offset == NULL ||
+            gfx_egfx_batch_peek_mon(cmd, cmd_bytes) < 0)
+    {
+        return 1;
+    }
+    parsed_frame_id = gfx_egfx_batch_peek_frame_id(cmd, cmd_bytes);
+    if (parsed_frame_id < 1)
+    {
+        return 1;
+    }
+
+    wire_to_surface = (const unsigned char *)cmd +
+                      GFX_BATCH_STARTFRAME_BYTES;
+    damage_count = gfx_batch_u16(wire_to_surface + 17);
+    copy_count = gfx_batch_u16(wire_to_surface + 19 + damage_count * 8);
+    destination = wire_to_surface + 21 + damage_count * 8 + copy_count * 8;
+    *frame_id = parsed_frame_id;
+    *flags = gfx_batch_u32(wire_to_surface + 13);
+    *shmem_offset = gfx_batch_u32(destination + 8);
+    return 0;
+}
+
+/*****************************************************************************/
 /* #45 step 7 -- see xrdp_encoder.h. PURE apart from reading the items'
  * own blobs. A non-GFX item (a surface-command frame on the same fifo)
  * can never be batched: its union holds u.sc, so u.gfx must not even be

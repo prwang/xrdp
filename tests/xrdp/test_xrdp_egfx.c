@@ -38,6 +38,7 @@
 #include "ms-rdpbcgr.h"
 #include "xrdp_egfx.h"
 #include "xrdp_encoder.h"
+#include "xup_client_info.h"
 #include "test_xrdp.h"
 
 START_TEST(test_xrdp_egfx_send_create_surface__happy_path)
@@ -632,6 +633,39 @@ START_TEST(test_batch_peek_frame_id_rejects_what_it_cannot_read)
 }
 END_TEST
 
+START_TEST(test_batch_capture_info_reads_the_exact_avc444_envelope)
+{
+    unsigned char blob[512];
+    unsigned char *wire_to_surface;
+    unsigned char *destination;
+    uint32_t expected_flags;
+    uint32_t flags;
+    uint32_t shmem_offset;
+    int frame_id;
+    int total;
+
+    total = tb_build(blob, 3, XR_RDPGFX_CODECID_AVC444V2, 2, 3);
+    wire_to_surface = blob + TB_STARTFRAME_BYTES;
+    destination = wire_to_surface + 21 + 2 * 8 + 3 * 8;
+    expected_flags = xup_avc444_capture_flags(KEY_FRAME_REQUESTED, 3, 1);
+    tb_u32(wire_to_surface + 13, expected_flags);
+    tb_u32(destination + 8, 4096U);
+
+    ck_assert_int_eq(0, gfx_egfx_batch_capture_info(
+                         (char *)blob, total, &frame_id, &flags,
+                         &shmem_offset));
+    ck_assert_int_eq(77, frame_id);
+    ck_assert_uint_eq(expected_flags, flags);
+    ck_assert_uint_eq(4096U, shmem_offset);
+
+    ck_assert_int_eq(1, gfx_egfx_batch_capture_info(
+                         (char *)blob, total - 1, &frame_id, &flags,
+                         &shmem_offset));
+    ck_assert_int_eq(1, gfx_egfx_batch_capture_info(
+                         (char *)blob, total, NULL, &flags, &shmem_offset));
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_egfx_base_functions(void)
@@ -670,8 +704,9 @@ make_suite_egfx_base_functions(void)
     tcase_add_test(tc_batch, test_batch_peek_frame_id_reads_the_startframe_id);
     tcase_add_test(tc_batch,
                    test_batch_peek_frame_id_rejects_what_it_cannot_read);
+    tcase_add_test(tc_batch,
+                   test_batch_capture_info_reads_the_exact_avc444_envelope);
     suite_add_tcase(s, tc_batch);
 
     return s;
 }
-

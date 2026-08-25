@@ -5264,6 +5264,30 @@ server_egfx_cmd(struct xrdp_mod *mod,
         }
         return 0;
     }
+    if (wm->client_info->capture_code == CC_GFX_AVC444)
+    {
+        int frame_id;
+        uint32_t flags;
+        uint32_t shmem_offset;
+
+        if (data == NULL || data_bytes < 0 ||
+                gfx_egfx_batch_capture_info(cmd, cmd_bytes, &frame_id,
+                                            &flags, &shmem_offset) != 0 ||
+                shmem_offset > (uint32_t)data_bytes ||
+                !xrdp_mm_avc444_snapshot_valid(
+                    mm, flags, frame_id, data + shmem_offset, data,
+                    data_bytes))
+        {
+            LOG(LOG_LEVEL_ERROR,
+                "Refusing a full-chroma capture with invalid layout or "
+                "slot identity");
+            if (data != NULL && data_bytes > 0)
+            {
+                g_munmap(data, data_bytes);
+            }
+            return 1;
+        }
+    }
     enc = g_new0(struct xrdp_enc_data, 1);
     if (enc == NULL)
     {

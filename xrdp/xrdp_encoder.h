@@ -828,6 +828,13 @@ xrdp_ack_trace_on(void);
 int
 gfx_egfx_batch_peek_frame_id(const char *cmd, int cmd_bytes);
 
+/* Extract the capture identity and shared-memory view offset from the exact
+ * AVC444 command envelope accepted by gfx_egfx_batch_peek_mon(). */
+int
+gfx_egfx_batch_capture_info(const char *cmd, int cmd_bytes,
+                            int *frame_id, uint32_t *flags,
+                            uint32_t *shmem_offset);
+
 /* BACKLOG #91 -- the "would the credit have permitted it" bitmask that
  * rides on the pump record: bit m set = the credit xrdp last granted
  * left monitor m a free capture slot, per
