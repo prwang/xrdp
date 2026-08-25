@@ -539,3 +539,13 @@ surface gate now requires the complete
 `repeat-headers=1:aud=1:cabac=1` token in both files, and the template itself
 states why CABAC must remain. This is a documentation completion of Scope C;
 it does not reopen its runtime result.
+
+The same defect crossed three trust boundaries: a shipped commented example
+could replace the safe built-in arguments with an incompatible block; the
+capability probe certified a simpler topology than production; and the
+post-confirm caller treated the deterministic rejection as permission to
+create children again on later damage. The clean-room requirements now make
+all three defenses independent: copy-safe examples with explained flags, an
+exact-topology production-transform probe, and a latched terminal failure with
+bounded forensics and no damage-driven respawn. A green result at one layer is
+not evidence that either later layer is safe.

@@ -464,12 +464,11 @@ tokens of 255 characters each are accepted; excess tokens are dropped with a
 warning. An omitted key, or an explicitly empty array, selects the built\(hyin
 default block.
 
-The chosen encoder \fBmust\fR emit decodable Annex\(hyB H.264. For \fBlibx264\fR
-this means including \fBrepeat\-headers=1\fR in \fB\-x264\-params\fR so every IDR
-carries SPS/PPS. The auxiliary\(hyleaf AVC444 topology also requires CABAC;
-\fBultrafast\fR otherwise selects Constrained Baseline/CAVLC, so the software
-example includes \fBcabac=1\fR. The pre\(hyconfirmation probe rejects custom
-arguments whose stream does not meet these contracts.
+The chosen encoder \fBmust\fR emit decodable Annex\(hyB H.264. The arguments are
+not accepted merely because ffmpeg starts: before AVC is selected, xrdp starts
+the exact child topology requested for the session and passes its output
+through the selected production transforms. A custom block which cannot
+satisfy that complete path is rejected before AVC is confirmed.
 
 Because \fBgfx.toml\fR is root\(hyowned server configuration (trusted like
 \fBsshd_config\fR), these tokens are not treated as untrusted input.
@@ -488,9 +487,38 @@ encoder_args = [
 ]
 .fi
 
-\fB\-tune zerolatency\fR disables x264 lookahead, B\(hyframe reordering and
-threaded\(hyframe delay so the child emits one encoded picture per input frame
-instead of withholding several until end\(hyof\(hystream.
+Each part of this block has a distinct purpose:
+
+.IP \(bu 2
+\fB\-c:v libx264\fR selects the stock CPU software encoder.
+.IP \(bu 2
+\fB\-bf 0\fR forbids B\(hyframes and their decode/display reordering. Together
+with \fB\-tune zerolatency\fR, which disables lookahead and threaded\(hyframe
+delay, this makes the synchronous xrdp runner receive one encoded picture for
+the picture it just submitted instead of needing future input.
+.IP \(bu 2
+\fB\-preset ultrafast\fR minimizes encoder CPU work at the cost of compression
+efficiency. \fB\-crf 18\fR is the default software quality/bitrate choice; it is
+a quality policy, not a stream\(hycompatibility requirement.
+.IP \(bu 2
+\fB\-g 240\fR bounds the ordinary keyframe interval. With
+\fBrepeat\-headers=1\fR, every resulting IDR repeats SPS/PPS in band so a reset
+picture is independently decodable; relying only on global extradata does not
+meet this contract.
+.IP \(bu 2
+\fBaud=1\fR places an Access Unit Delimiter before every access unit, matching
+the qualified RDP H.264 wire shape. It does not replace the in\(hyband headers.
+.IP \(bu 2
+\fBcabac=1\fR is a correctness requirement for AVC444's auxiliary\(hyleaf
+transform. The \fBultrafast\fR preset otherwise selects Constrained
+Baseline/CAVLC; that slice shape cannot be transformed into the required leaf
+and is rejected by the pre\(hyconfirmation probe.
+
+Changing a performance or quality choice can still change the produced stream,
+so the complete replacement block is always behaviorally probed. In particular,
+copying the example but dropping \fBcabac=1\fR is not an equivalent software
+configuration: ffmpeg starts and emits H.264, but the default AVC444 leaf
+topology cannot use it.
 
 Example selecting an NVIDIA hardware encoder (xrdp needs no change to support
 this; tested on a Tesla T4, driver 580.159.03, Ubuntu ffmpeg 8.0.1).
@@ -551,6 +579,10 @@ explicit \fBLIBVA_DRIVER_NAME\fR cannot currently be steered through
 .SH "FFMPEG FAILURE FORENSICS"
 
 An incompatible auxiliary\(hyleaf stream is refused before AVC selection.
+This test uses the configured executable and arguments, the same number and
+roles of children as the selected AVC mode, and the same header and rewrite
+operations as the live session. A simpler one\(hychild encode is not a valid
+certificate for a two\(hychild AVC444 leaf topology.
 If the ffmpeg backend nevertheless fails after AVC confirmation, the
 connection is closed once; xrdp does not respawn the child for later damage
 and does not switch codec.

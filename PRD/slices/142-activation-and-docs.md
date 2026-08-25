@@ -107,17 +107,42 @@ capability-response seam but shall not introduce a new mechanism there.
   installed template, manual source, compiled runtime strings and shipped help,
   require the principal paired-reference, credit and sparse keys in the
   template and manual, and reject any advertised removed key.
+* S142-R10: configuration is an end-to-end contract, with independent defenses
+  at every layer. A commented sample is executable operator surface: restoring
+  it verbatim shall produce an operational configuration, shall agree with the
+  built-in default it replaces, and shall not depend on a hidden correction
+  elsewhere. The manual shall explain the correctness, latency or quality
+  purpose of every non-obvious argument in the default software encoder block
+  rather than present a magic string.
+
+  The pre-confirmation probe shall use the exact loaded executable, argv, mode,
+  child count, child roles, header policy and production syntax transforms that
+  the confirmed session would use. It shall process representative output
+  through every selected transform before reporting success; success from a
+  simpler topology shall never certify a more complex live topology. A
+  configuration which starts ffmpeg but violates a downstream contract is an
+  unavailable backend, not a successful probe.
+
+  After confirmation, child creation, pump, parse, stream-contract and rewrite
+  failures shall all enter the same latched terminal state before teardown.
+  Event or damage re-entry shall observe that latch and shall not lazily create
+  another child. The bounded forensic record and hangup in S142-R7 are required
+  for this path. Passing any one of the sample, probe or terminal-lifecycle
+  defenses does not compensate for omitting either of the other two.
 
 ## Required tests and final gate
 
 The `GfxLoad` suite shall cover absence, defaults, every override, invalid and
 dependency values, removed-key warning, no excluded keys, codec order and the
-complete config-to-encoder transfer. Capability tests shall prove probe before
-confirmation with the exact selected topology, immutable choice, no fallback,
-all client capability versions and legacy codec preservation. A deterministic
-post-confirm leaf rejection fixture shall prove one forensic bundle, one
-teardown, session hangup and zero later respawns under repeated damage. Resize
-tests shall prove terminate/reap/new reset and no old bytes.
+complete config-to-encoder transfer. The operator-surface gate shall require
+the complete copy-safe software argument token in both the installed template
+and manual. Capability tests shall prove probe before confirmation with the
+exact selected topology, including a supported-CABAC positive case and a CAVLC
+leaf-rejection case, immutable choice, no fallback, all client capability
+versions and legacy codec preservation. A deterministic post-confirm leaf
+rejection fixture shall prove one forensic bundle, one teardown, session
+hangup and zero later respawns under repeated damage. Resize tests shall prove
+terminate/reap/new reset and no old bytes.
 
 Run every targeted AVC and PerfTrace suite, full `make check`, astyle and
 cppcheck in default and trace-enabled builds; run the paired xorgxrdp build

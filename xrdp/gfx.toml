@@ -39,8 +39,11 @@ h264_encoder = "x264"
 # # stops, the final surface is restored to full chroma.
 # chroma_refresh_ms = 0
 # chroma_idle_ms = 0
-# # The default software encoder is a one-input/one-output low-latency pipe.
-# # Keep cabac=1: the AVC444 auxiliary-leaf transform rejects CAVLC.
+# # The software block favors low CPU delay over compression: -bf 0 and
+# # zerolatency prevent frame reordering/withholding, while CRF 18 sets quality.
+# # The remaining values are stream contracts, not optional tuning: periodic
+# # IDRs repeat SPS/PPS, AUD marks each access unit, and the AVC444
+# # auxiliary-leaf transform requires CABAC rather than ultrafast's CAVLC.
 # encoder_args = [
 #   "-c:v", "libx264",
 #   "-bf", "0",

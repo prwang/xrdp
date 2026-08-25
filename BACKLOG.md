@@ -429,5 +429,5 @@ The record, not this table, owns conditions, measurements and retractions.
 | #122 | Valid selected-monitor evidence refuted the one-active slowdown hypothesis. | `docs/experiments/122-one-active-monitor.md` |
 | #123 | T4/client compatibility closed with forced-v1 macOS per-pixel fidelity RED; auto prefers v2 and v1 remains a legacy capability tier. | `docs/experiments/123-t4-nvenc-compatibility.md` |
 | #124/#124B | Windows/macOS AVC444v2 visual qualification and both corrected flood payloads passed. | `docs/experiments/124-credit-frontier-client-qualification.md` |
-| #125 | Sparse/T4 qualification retained; unsupported CAVLC is refused by the exact leaf-topology probe, post-confirm failure is terminal, and the copy-paste libx264 template is CABAC-valid and gated. | `docs/experiments/125-sparse-chroma-qualification.md` |
+| #125 | Sparse/T4 qualification retained; the CABAC template is copy-safe and explained, the exact leaf topology is probed, and post-confirm failure is terminal without damage-driven respawn. | `docs/experiments/125-sparse-chroma-qualification.md` |
 | #201 | Paired bases pinned and the monolithic PRD replaced by one normative file per clean-room slice. | `docs/experiments/201-prd-refactor.md` |
