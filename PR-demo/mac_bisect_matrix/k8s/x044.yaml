@@ -1,0 +1,70 @@
+# Development resize-repair arm, built without performance tracing.
+# One monitor at the client-selected size; host endpoint 127.0.0.1:40060.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x044
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x044
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x044
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x044
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:resize-fixed-253efd0-985bc42-u2404-xfce-notrace
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "xfce"
+            - name: ARM_LABEL
+              value: "Development resize repair arm (port 40060)"
+          ports:
+            - containerPort: 3389
+              hostPort: 40060
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: payloads
+              mountPath: /usr/local/bin/codescroll10.sh
+              subPath: codescroll10.sh
+            - name: payloads
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: payloads
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x044
