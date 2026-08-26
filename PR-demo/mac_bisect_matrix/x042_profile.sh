@@ -2,7 +2,18 @@
 # Select and wire-certify one exact x042 interactive compatibility profile.
 set -eu
 
+if ! command -v kubectl >/dev/null 2>&1
+then
+    echo "Run this script on the k3s host; the copy in the RDP desktop is a checked reference." >&2
+    exit 1
+fi
+
 D=$(cd "$(dirname "$0")" && pwd)
+if [ ! -f "$D/gfx/x042.toml" ]
+then
+    D=/work/PR-demo/mac_bisect_matrix
+fi
+test -f "$D/gfx/x042.toml"
 DRAFT="$D/../../.turn_draft.md"
 NS=bisect-matrix
 ARM=x042
@@ -50,7 +61,26 @@ then
     kubectl -n "$NS" exec "$pod" -- \
         chown tester:tester "/home/tester/$draft_name"
     kubectl -n "$NS" exec "$pod" -- chmod 0644 "/home/tester/$draft_name"
+    draft_hash=$(sha256sum "$DRAFT" | cut -d' ' -f1)
+    remote_draft_hash=$(kubectl -n "$NS" exec "$pod" -- \
+        sha256sum "/home/tester/$draft_name" | cut -d' ' -f1)
+    remote_draft_meta=$(kubectl -n "$NS" exec "$pod" -- \
+        stat -c '%U:%G %a' "/home/tester/$draft_name")
+    test "$draft_hash" = "$remote_draft_hash"
+    test "$remote_draft_meta" = "tester:tester 644"
 fi
+
+kubectl -n "$NS" cp "$0" "$pod:/home/tester/x042_profile.sh"
+kubectl -n "$NS" exec "$pod" -- \
+    chown tester:tester /home/tester/x042_profile.sh
+kubectl -n "$NS" exec "$pod" -- chmod 0755 /home/tester/x042_profile.sh
+switch_hash=$(sha256sum "$0" | cut -d' ' -f1)
+remote_switch_hash=$(kubectl -n "$NS" exec "$pod" -- \
+    sha256sum /home/tester/x042_profile.sh | cut -d' ' -f1)
+remote_switch_meta=$(kubectl -n "$NS" exec "$pod" -- \
+    stat -c '%U:%G %a' /home/tester/x042_profile.sh)
+test "$switch_hash" = "$remote_switch_hash"
+test "$remote_switch_meta" = "tester:tester 755"
 
 cert="$D/certs/x042-$MODE.cert"
 E_GFX_FILE="$PROFILE" E_CERTFILE="$cert" CERT_SECS=3 \

@@ -159,15 +159,15 @@ coded height, and independently gated; see
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: IN PROGRESS; real-client dynamic resize is red.** The trace-disabled
-clean-room x042 arm on `127.0.0.1:40058` disconnected after a growth resize:
-xorgxrdp retained the old AVC444 capture layout while xrdp advanced to the new
-geometry, and xrdp correctly rejected the first mismatched slot snapshot. The
-development pair must first reproduce or exclude the defect under the same
-geometry transition; any fix is implemented and validated there before the
-owning clean-room slice is corrected and its descendants replayed. Automated
-gates, the numerical replay and all five local profile certificates preceding
-this live failure remain recorded evidence, not closure. Execution record:
+**Status: IN PROGRESS; corrected automated gates are green, owner visual
+matrix remains.** The resize repair was re-authored in owning slice 136 and
+all descendants through 142 were replayed. The replacement trace-disabled
+x042 arm on `127.0.0.1:40058` stayed connected through the exact growth-resize
+sequence, allocated the current 19,611,648-byte mapping and rendered the final
+2412-by-1344 XFCE frame. The default and trace-enabled suites, paired producer
+tests, automatic-profile certificate and two-size rendered smoke are green.
+Windows/macOS acceptance across `auto`, forced AVC444v2, AVC444v1, AVC420 and
+sparse profiles remains the only open part. Execution record:
 [`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
 
 The fully assembled backend becomes selectable only here. The user-facing
@@ -198,8 +198,9 @@ green. Normative specification:
 
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
-**Status: IN PROGRESS; development reconciliation and the canonical 40059 /
-40060 red-green proof are complete; clean-room correction and replay remain.** The
+**DONE.** Development reconciliation, the canonical 40059/40060 red-green
+proof, the owning-slice clean-room correction, descendant replay and
+replacement 40058 deployment are complete. The
 committed requirement matrix in
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
 classifies every #126–#142 requirement. Reconciliation adds the clean-room-only
@@ -220,21 +221,22 @@ connected and a lossless 2412-by-1344 rendered frame was captured after five
 seconds. Only the xorgxrdp resize repair differs at runtime. Evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md).
 
-Ports `40059` and `40060` remain available for interactive comparison. The
-next action is to re-author the transactional layout refresh in the clean-room
-slice which first owns resize-safe capture allocation, then replay and gate
-every descendant through #142. Do not append the repair after #142.
+The transactional refresh is in rewritten clean-room slice 136 rather than an
+appended fix. Each descendant through 142 passed its independent default,
+trace-enabled and static gates before the next was admitted. The replacement
+40058 arm then passed the same growth-resize sequence and two-size rendered
+smoke. Exact identities and evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md).
 
-The replacement clean-room acceptance image on port `40058` shall retain XFCE,
-LXTerminal, default xterm and every indexed visual/benchmark helper. It shall
-also provide working Glamor acceleration, Thunar and a Chromium launcher whose
+The replacement clean-room acceptance image on port `40058` retains XFCE,
+LXTerminal, default xterm and every indexed visual/benchmark helper. It also
+provides working Glamor acceleration, Thunar and a Chromium launcher whose
 desktop entry states and applies the container sandbox/shared-memory flags.
-The profile switcher and the complete checked visual-matrix draft shall be in
-the tester account's home before handoff.
+The profile switcher and the complete checked visual-matrix draft are copied
+to the tester account's home as the final handoff step.
 
-Only a green development audit, paired CI and red/green arm proof authorizes
-re-authoring the repair into its owning clean-room slice and replaying all
-descendants through #142. Normative plan and complete acceptance:
+The remaining Windows/macOS profile matrix is owned by #142, not this closed
+reconciliation item. Normative plan and complete acceptance:
 [`PRD/gates/142c-dev-cleanroom-equivalence.md`](PRD/gates/142c-dev-cleanroom-equivalence.md).
 
 ## #143 — host pipe setting, comparable baselines and zero-copy decision

@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Version=1.0
+Name=Chromium (acceptance container)
+Comment=Web workload; Chromium sandbox disabled inside the isolated test pod
+TryExec=/opt/chrome-linux/chrome
+Exec=/opt/chrome-linux/chrome --no-sandbox --disable-gpu-sandbox --disable-dev-shm-usage %U
+Icon=chromium-container
+Terminal=false
+Categories=Network;WebBrowser;
+StartupNotify=true

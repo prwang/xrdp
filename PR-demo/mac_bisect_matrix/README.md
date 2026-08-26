@@ -31,6 +31,12 @@ arm the unselected surface is intentionally static and the banner names it.
 
 - `Containerfile` — Debian 13 (= dev box) + distro ffmpeg/Mesa VAAPI +
   pinned debs; parametrized by `XRDP_DEB` build-arg.
+- `Containerfile.ubuntu2404` — FFmpeg 6 compatibility and clean-room
+  acceptance image. Its acceptance option adds XFCE, Thunar and a pinned,
+  hash-verified official Chromium snapshot.
+- `chromium-container` / `chromium-container.desktop` — command-line and XFCE
+  launchers which state and apply the sandbox/shared-memory exceptions required
+  inside the isolated privileged acceptance pod.
 - `entrypoint.sh` / `startwm.sh` / `banner.sh` — pod boot + deterministic
   session content.
 - `gfx/arm-*.toml` — full per-arm gfx.toml (single source of truth; becomes
@@ -38,6 +44,8 @@ arm the unselected surface is intentionally static and the banner names it.
 - `k8s/*.yaml` — namespace + one Deployment per arm (privileged, `/dev/dri`
   hostPath, `hostPort` pinned to `hostIP 127.0.0.1`).
 - `build_and_deploy.sh` — build → import into k3s → apply → roll → wait.
+- `deploy_x042_cleanroom.sh` / `x042_profile.sh` — replace the final
+  clean-room acceptance arm and select one certified compatibility profile.
 - `arm_certify.sh` — run once per deploy, from `build_and_deploy.sh`:
   3 s of real payload through the arm, then the wire audit and the
   black-frame decode on those bytes, plus the **encoder input pipe
@@ -156,6 +164,13 @@ and every timing in them predates the encoder-input-pipe fix (#103).
 | x036 | 40052 | frontier, `wire_window` 2 | every frame | 444 | #122 both-monitors-active control |
 | x037 | 40053 | frontier, `wire_window` 2 | every frame | 444 | #122 monitor-0-active / monitor-1-idle arm |
 | x038 | 40054 | frontier, `wire_window` 2 | sparse 1000/100 ms | 444 | #125 A1 trailing-restoration treatment against x034 |
+
+The current clean-room acceptance arm is x042 on port 40058. It is not a
+performance-comparison arm: it carries the final paired clean-room packages,
+an ordinary XFCE desktop, LXTerminal, package-default xterm, Thunar, working
+Glamor, Chromium and every indexed visual/benchmark helper. Its `auto`, `444`,
+`444v1`, `420` and `sparse` profiles are selected only between whole sessions
+with `x042_profile.sh`.
 
 For #125's interactive A/B, x034 and x038 both use a fresh regular XFCE
 desktop with LXTerminal installed, plus the current `codescroll10.sh` and

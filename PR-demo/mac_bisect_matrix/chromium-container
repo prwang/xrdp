@@ -1,0 +1,8 @@
+#!/bin/sh
+# Chromium cannot create its normal process sandbox inside this privileged,
+# nested acceptance container. The pod itself is the isolation boundary.
+exec /opt/chrome-linux/chrome \
+    --no-sandbox \
+    --disable-gpu-sandbox \
+    --disable-dev-shm-usage \
+    "$@"

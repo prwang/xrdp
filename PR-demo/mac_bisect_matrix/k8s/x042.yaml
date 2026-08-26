@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+          image: localhost/xrdp-bisect:cleanroom-f8d8d06d-aca3c774-u2404-acceptance.p0c38c1c1
           imagePullPolicy: Never
           securityContext:
             privileged: true

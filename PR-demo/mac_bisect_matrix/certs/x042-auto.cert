@@ -1,10 +1,10 @@
 arm:    x042
 mode:   automatic AVC (auxiliary-leaf topology)
-image:  localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0
+image:  localhost/xrdp-bisect:cleanroom-f8d8d06d-aca3c774-u2404-acceptance.p0c38c1c1
 gfx:    sha256:216aed1fd3b78c26
-key:    localhost/xrdp-bisect:cleanroom-b38c6347-3dc52da1-u2404-xfce-notrace.p382e50b0|216aed1fd3b78c26
-when:   2026-08-25T08:00:54Z
-window: 3s at 1920x1080, 33249 bytes
+key:    localhost/xrdp-bisect:cleanroom-f8d8d06d-aca3c774-u2404-acceptance.p0c38c1c1|216aed1fd3b78c26
+when:   2026-08-26T18:21:32Z
+window: 3s at 1920x1080, 33167 bytes
 
 === encoder input pipe ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
@@ -20,10 +20,10 @@ SPS: 1920x1088 profile=77 level=51 max_num_ref_frames=1 log2_max_frame_num=4 poc
 PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
 
 first 12 pictures (decode order):
-  main fn=0      IDR none       ltr_flag=0    3858B
-  aux  fn=1      I   none       []            1089B
-  main fn=1      P   none       [('sliding_window', None)]     103B
-  aux  fn=2      I   none       []             853B
+  main fn=0      IDR none       ltr_flag=0    3889B
+  aux  fn=1      I   none       []             992B
+  main fn=1      P   none       [('sliding_window', None)]      96B
+  aux  fn=2      I   none       []             858B
 
 default auxiliary-leaf topology: 2 main, 2 auxiliary picture(s)
 The auxiliary view is expected to be non-reference intra;

@@ -169,3 +169,25 @@ fallback or tracing change.
 
 Evidence is indexed at
 [`PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_canonical_green_20260825T172113Z/README.md).
+
+## 2026-08-26 corrected clean-room replay
+
+The repair was re-authored in slice 136, the slice which first owns replacement
+capture allocation. It transactionally derives and validates a candidate
+layout before publishing any mapping, geometry or slot-ownership change. A
+failed replacement leaves the previous valid layout byte-identical. The paired
+producer rebuilds that layout from the current display description before
+allocating its two-slot mapping.
+
+Every descendant through slice 142 was replayed from that corrected owner.
+Both default and trace-enabled full suites and the xrdp static gates passed at
+each new commit; the final daemon suite is 204/204 in both modes. Paired
+xorgxrdp build/tests passed at its changed slices. The exact identities, gate
+table, packages and retained runtime proof are in
+[`PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md`](../../PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md).
+
+The replacement 40058 arm then ran the same 2196-by-1250 to 2198-by-1250 to
+2412-by-1344 sequence. Xorg allocated the correct 19,611,648-byte mapping,
+the client stayed connected and the retained lossless frame is a rendered
+2412-by-1344 XFCE desktop. This supersedes the original clean-room red arm;
+the original record remains unchanged as the defect evidence.

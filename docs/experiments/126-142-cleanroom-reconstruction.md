@@ -272,3 +272,22 @@ was restored. The final rendered smoke passed both required geometries with
 handoff state has no tester Xorg/sesexec process, smoke marker, payload
 autostart or performance trace file. The Windows/macOS visual matrix remains
 the only open #142 acceptance work.
+
+## 2026-08-26 slice-136 correction and replay
+
+The preceding final identities and deployment were superseded after the first
+interactive growth resize exposed a stale producer layout. The defect and
+development red/green proof are retained in
+`docs/experiments/142c-dev-cleanroom-equivalence.md`.
+
+The repair now belongs to rewritten slice 136, followed by newly replayed
+slices 137 through 142. The clean-room heads are xrdp `f8d8d06d2ffd` and
+xorgxrdp `aca3c774cb8b`. Each changed-tail xrdp commit passed default and
+trace-enabled full suites plus the static gates before its successor was
+admitted; the final daemon count is 204/204 in both modes. Paired producer
+build/tests are green. The corrected port-40058 resize client stayed connected
+through 2412 by 1344 after Xorg allocated 19,611,648 bytes, and a lossless
+rendered frame was retained.
+
+Exact gate rows, packages, image and runtime evidence are indexed by
+`PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md`.
