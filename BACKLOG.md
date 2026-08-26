@@ -225,6 +225,13 @@ next action is to re-author the transactional layout refresh in the clean-room
 slice which first owns resize-safe capture allocation, then replay and gate
 every descendant through #142. Do not append the repair after #142.
 
+The replacement clean-room acceptance image on port `40058` shall retain XFCE,
+LXTerminal, default xterm and every indexed visual/benchmark helper. It shall
+also provide working Glamor acceleration, Thunar and a Chromium launcher whose
+desktop entry states and applies the container sandbox/shared-memory flags.
+The profile switcher and the complete checked visual-matrix draft shall be in
+the tester account's home before handoff.
+
 Only a green development audit, paired CI and red/green arm proof authorizes
 re-authoring the repair into its owning clean-room slice and replaying all
 descendants through #142. Normative plan and complete acceptance:
