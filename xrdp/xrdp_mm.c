@@ -55,6 +55,9 @@ static void
 xrdp_mm_connect_sm(struct xrdp_mm *self);
 static int
 xrdp_mm_send_unicode_shutdown(struct xrdp_mm *self, struct trans *trans);
+static int
+server_egfx_cmd(struct xrdp_mod *mod, char *cmd, int cmd_bytes,
+                char *data, int data_bytes);
 
 /*****************************************************************************/
 static void
@@ -2362,17 +2365,7 @@ process_display_control_monitor_layout_data(struct xrdp_wm *wm)
             break;
 
         case WMRZ_ENCODER_CREATE:
-            if (mm->egfx_up)
-            {
-                xrdp_mm_egfx_create_surfaces(mm);
-            }
-            mm->encoder = xrdp_encoder_create(mm);
-
-            // Ack all frames to speed up resize.
-            module->mod_frame_ack(module, 0, INT_MAX);
-
-            // Restart module output after resizing and invalidating
-            // the screen. This causes an automatic redraw.
+            // Resize the screen to the target size
             error = xrdp_bitmap_resize(
                         wm->screen, desc_width, desc_height);
             if (error != 0)
@@ -2382,6 +2375,18 @@ process_display_control_monitor_layout_data(struct xrdp_wm *wm)
                           " xrdp_bitmap_resize failed %d", error);
                 return advance_error(error, mm);
             }
+
+            // Create the encoder and surfaces
+            if (mm->egfx_up)
+            {
+                xrdp_mm_egfx_create_surfaces(mm);
+            }
+            mm->encoder = xrdp_encoder_create(mm);
+
+            // Ack all frames to speed up resize.
+            module->mod_frame_ack(module, 0, INT_MAX);
+
+            // Redraw the screen
             xrdp_bitmap_invalidate(wm->screen, 0);
             xrdp_rdp_suppress_output(wm->session->rdp,
                                      0, XSO_REASON_DYNAMIC_RESIZE,
@@ -5056,6 +5061,74 @@ xrdp_mm_avc444_snapshot_valid(struct xrdp_mm *mm, int flags, int frame_id,
 
 /*****************************************************************************/
 static int
+xrdp_mm_queue_avc444_capture(struct xrdp_mod *mod,
+                             int num_drects, short *drects,
+                             int num_crects, short *crects,
+                             char *data, int left, int top,
+                             int width, int height,
+                             int flags, int frame_id,
+                             void *shmem_ptr, int shmem_bytes)
+{
+    struct xrdp_mm *mm;
+    char *cmd;
+    uint32_t monitor;
+    uint32_t slot;
+    uint32_t shmem_offset;
+    uint64_t required_bytes;
+    uintptr_t base;
+    uintptr_t pixels;
+    int codec_id;
+    int cmd_capacity;
+    int cmd_bytes;
+    int rv;
+
+    mm = ((struct xrdp_wm *)mod->wm)->mm;
+    base = (uintptr_t)shmem_ptr;
+    pixels = (uintptr_t)data;
+    if (xup_avc444_capture_identity((uint32_t)flags, &monitor, &slot) != 0 ||
+            num_drects < 1 || num_crects < 1 ||
+            pixels < base || pixels - base > UINT32_MAX)
+    {
+        g_munmap(shmem_ptr, shmem_bytes);
+        return 1;
+    }
+    UNUSED_VAR(slot);
+    shmem_offset = (uint32_t)(pixels - base);
+    codec_id = mm->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2 :
+               XR_RDPGFX_CODECID_AVC444;
+    required_bytes = 61U + (uint64_t)num_drects * 8U +
+                     (uint64_t)num_crects * 8U;
+    if (required_bytes > 32U * 1024U)
+    {
+        g_munmap(shmem_ptr, shmem_bytes);
+        return 1;
+    }
+    cmd_capacity = (int)required_bytes;
+    cmd = g_new(char, cmd_capacity);
+    if (cmd == NULL)
+    {
+        g_munmap(shmem_ptr, shmem_bytes);
+        return 1;
+    }
+    cmd_bytes = gfx_egfx_batch_build_capture(
+                    cmd, cmd_capacity, (int)monitor, codec_id,
+                    (uint32_t)flags, frame_id, drects, num_drects,
+                    crects, num_crects, left, top, width, height,
+                    shmem_offset);
+    if (cmd_bytes == 0)
+    {
+        g_free(cmd);
+        g_munmap(shmem_ptr, shmem_bytes);
+        return 1;
+    }
+    rv = server_egfx_cmd(mod, cmd, cmd_bytes,
+                         (char *)shmem_ptr, shmem_bytes);
+    g_free(cmd);
+    return rv;
+}
+
+/*****************************************************************************/
+static int
 server_paint_rects_ex(struct xrdp_mod *mod,
                       int num_drects, short *drects,
                       int num_crects, short *crects,
@@ -5090,6 +5163,13 @@ server_paint_rects_ex(struct xrdp_mod *mod,
                 g_munmap(shmem_ptr, shmem_bytes);
             }
             return 1;
+        }
+        if (wm->client_info->capture_code == CC_GFX_AVC444)
+        {
+            return xrdp_mm_queue_avc444_capture(
+                       mod, num_drects, drects, num_crects, crects,
+                       data, left, top, width, height, flags, frame_id,
+                       shmem_ptr, shmem_bytes);
         }
         /* copy formal params to XRDP_ENC_DATA */
         enc_data = (XRDP_ENC_DATA *) g_malloc(sizeof(XRDP_ENC_DATA), 1);

@@ -969,6 +969,103 @@ gfx_batch_u32(const unsigned char *p)
 }
 
 /*****************************************************************************/
+static void
+gfx_batch_put_u16(unsigned char *p, unsigned int value)
+{
+    p[0] = (unsigned char)value;
+    p[1] = (unsigned char)(value >> 8);
+}
+
+/*****************************************************************************/
+static void
+gfx_batch_put_u32(unsigned char *p, uint32_t value)
+{
+    p[0] = (unsigned char)value;
+    p[1] = (unsigned char)(value >> 8);
+    p[2] = (unsigned char)(value >> 16);
+    p[3] = (unsigned char)(value >> 24);
+}
+
+/*****************************************************************************/
+int
+gfx_egfx_batch_build_capture(char *cmd, int cmd_capacity,
+                             int surface_id, int codec_id, uint32_t flags,
+                             int frame_id, const short *drects,
+                             int num_drects, const short *crects,
+                             int num_crects, int left, int top,
+                             int width, int height, uint32_t shmem_offset)
+{
+    unsigned char *p;
+    int index;
+    int wire_to_surface_bytes;
+    int total_bytes;
+
+    if (cmd == NULL || drects == NULL || crects == NULL ||
+            frame_id < 1 || surface_id < 0 || surface_id > UINT16_MAX ||
+            (codec_id != XR_RDPGFX_CODECID_AVC444 &&
+             codec_id != XR_RDPGFX_CODECID_AVC444V2) ||
+            num_drects < 1 || num_drects > GFX_BATCH_MAX_RECTS ||
+            num_crects < 1 || num_crects > GFX_BATCH_MAX_RECTS ||
+            left < 0 || left > UINT16_MAX || top < 0 || top > UINT16_MAX ||
+            width < 1 || width > UINT16_MAX ||
+            height < 1 || height > UINT16_MAX)
+    {
+        return 0;
+    }
+    wire_to_surface_bytes = GFX_BATCH_W2S1_FIXED_BYTES +
+                            num_drects * 8 + num_crects * 8;
+    total_bytes = GFX_BATCH_STARTFRAME_BYTES + wire_to_surface_bytes +
+                  GFX_BATCH_ENDFRAME_BYTES;
+    if (total_bytes > GFX_BATCH_MAX_CMD_BYTES ||
+            total_bytes > cmd_capacity)
+    {
+        return 0;
+    }
+
+    p = (unsigned char *)cmd;
+    gfx_batch_put_u16(p, XR_RDPGFX_CMDID_STARTFRAME);
+    gfx_batch_put_u16(p + 2, 0);
+    gfx_batch_put_u32(p + 4, GFX_BATCH_STARTFRAME_BYTES);
+    gfx_batch_put_u32(p + 8, (uint32_t)frame_id);
+    gfx_batch_put_u32(p + 12, 0);
+    p += GFX_BATCH_STARTFRAME_BYTES;
+
+    gfx_batch_put_u16(p, XR_RDPGFX_CMDID_WIRETOSURFACE_1);
+    gfx_batch_put_u16(p + 2, 0);
+    gfx_batch_put_u32(p + 4, (uint32_t)wire_to_surface_bytes);
+    gfx_batch_put_u16(p + 8, (unsigned int)surface_id);
+    gfx_batch_put_u16(p + 10, (unsigned int)codec_id);
+    p[12] = 0x20;
+    gfx_batch_put_u32(p + 13, flags);
+    gfx_batch_put_u16(p + 17, (unsigned int)num_drects);
+    p += 19;
+    for (index = 0; index < num_drects * 4; ++index)
+    {
+        gfx_batch_put_u16(p, (uint16_t)drects[index]);
+        p += 2;
+    }
+    gfx_batch_put_u16(p, (unsigned int)num_crects);
+    p += 2;
+    for (index = 0; index < num_crects * 4; ++index)
+    {
+        gfx_batch_put_u16(p, (uint16_t)crects[index]);
+        p += 2;
+    }
+    gfx_batch_put_u16(p, (unsigned int)left);
+    gfx_batch_put_u16(p + 2, (unsigned int)top);
+    gfx_batch_put_u16(p + 4, (unsigned int)width);
+    gfx_batch_put_u16(p + 6, (unsigned int)height);
+    gfx_batch_put_u32(p + 8, shmem_offset);
+    p += 12;
+
+    gfx_batch_put_u16(p, XR_RDPGFX_CMDID_ENDFRAME);
+    gfx_batch_put_u16(p + 2, 0);
+    gfx_batch_put_u32(p + 4, GFX_BATCH_ENDFRAME_BYTES);
+    gfx_batch_put_u32(p + 8, (uint32_t)frame_id);
+    return total_bytes;
+}
+
+/*****************************************************************************/
 /* #45 step 7 -- see xrdp_encoder.h. PURE: reads the blob and nothing
  * else, so it is the one part of step 7 a unit test can pin. Every field
  * is length-checked BEFORE it is read (the damage-rect counts come from

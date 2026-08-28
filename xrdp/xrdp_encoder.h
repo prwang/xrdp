@@ -835,6 +835,17 @@ gfx_egfx_batch_capture_info(const char *cmd, int cmd_bytes,
                             int *frame_id, uint32_t *flags,
                             uint32_t *shmem_offset);
 
+/* Build the exact AVC444 STARTFRAME/WIRETOSURFACE_1/ENDFRAME envelope from a
+ * dedicated shared-memory capture message. Returns the command byte count, or
+ * zero if any field is outside the accepted envelope bounds. */
+int
+gfx_egfx_batch_build_capture(char *cmd, int cmd_capacity,
+                             int surface_id, int codec_id, uint32_t flags,
+                             int frame_id, const short *drects,
+                             int num_drects, const short *crects,
+                             int num_crects, int left, int top,
+                             int width, int height, uint32_t shmem_offset);
+
 /* BACKLOG #91 -- the "would the credit have permitted it" bitmask that
  * rides on the pump record: bit m set = the credit xrdp last granted
  * left monitor m a free capture slot, per

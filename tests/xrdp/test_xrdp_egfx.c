@@ -191,6 +191,50 @@ START_TEST(test_batch_peek_accepts_the_exact_avc444_shape)
 }
 END_TEST
 
+START_TEST(test_batch_build_capture_round_trips_dedicated_message)
+{
+    char blob[256];
+    short damage[] = {11, 12, 13, 14};
+    short copy[] = {21, 22, 23, 24};
+    int bytes;
+    int frame_id;
+    uint32_t flags;
+    uint32_t offset;
+
+    bytes = gfx_egfx_batch_build_capture(
+                blob, sizeof(blob), 3, XR_RDPGFX_CODECID_AVC444V2,
+                xup_avc444_capture_flags(0, 3, 1), 77,
+                damage, 1, copy, 1, 0, 0, 1024, 768, 4096);
+    ck_assert_int_gt(bytes, 0);
+    ck_assert_int_eq(3, gfx_egfx_batch_peek_mon(blob, bytes));
+    ck_assert_int_eq(0, gfx_egfx_batch_capture_info(
+                         blob, bytes, &frame_id, &flags, &offset));
+    ck_assert_int_eq(77, frame_id);
+    ck_assert_uint_eq(xup_avc444_capture_flags(0, 3, 1), flags);
+    ck_assert_uint_eq(4096, offset);
+}
+END_TEST
+
+START_TEST(test_batch_build_capture_rejects_unrepresentable_input)
+{
+    char blob[256];
+    short rect[] = {0, 0, 64, 64};
+
+    ck_assert_int_eq(0, gfx_egfx_batch_build_capture(
+                         blob, 1, 0, XR_RDPGFX_CODECID_AVC444,
+                         xup_avc444_capture_flags(0, 0, 0), 1,
+                         rect, 1, rect, 1, 0, 0, 64, 64, 0));
+    ck_assert_int_eq(0, gfx_egfx_batch_build_capture(
+                         blob, sizeof(blob), 0, XR_RDPGFX_CODECID_AVC444,
+                         xup_avc444_capture_flags(0, 0, 0), 0,
+                         rect, 1, rect, 1, 0, 0, 64, 64, 0));
+    ck_assert_int_eq(0, gfx_egfx_batch_build_capture(
+                         blob, sizeof(blob), 0, XR_RDPGFX_CODECID_AVC444,
+                         xup_avc444_capture_flags(0, 0, 0), 1,
+                         NULL, 1, rect, 1, 0, 0, 64, 64, 0));
+}
+END_TEST
+
 START_TEST(test_batch_peek_rejects_bad_command_ids)
 {
     unsigned char blob[512];
@@ -684,6 +728,10 @@ make_suite_egfx_base_functions(void)
 
     tc_batch = tcase_create("xrdp_egfx_multimon_batch");
     tcase_add_test(tc_batch, test_batch_peek_accepts_the_exact_avc444_shape);
+    tcase_add_test(tc_batch,
+                   test_batch_build_capture_round_trips_dedicated_message);
+    tcase_add_test(tc_batch,
+                   test_batch_build_capture_rejects_unrepresentable_input);
     tcase_add_test(tc_batch, test_batch_peek_rejects_bad_command_ids);
     tcase_add_test(tc_batch, test_batch_peek_rejects_other_egfx_commands);
     tcase_add_test(tc_batch, test_batch_peek_rejects_wrong_codec_ids);
