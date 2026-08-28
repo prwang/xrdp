@@ -249,6 +249,14 @@ arm remains a RED equivalence gate until the owner reproduces the repeated
 resize precursor there; a green interactive result means more clean-room-only
 behavior remains to be found, not that #142D is fixed.
 
+The trace-disabled reconciled pair is deployed at `127.0.0.1:40060` with a
+configuration-keyed wire/decode certificate. A first certificate with an empty
+profile hash was rejected and retained after exposing that the x044 deploy
+mounted x043's file while the certifier assumed a same-named profile; the
+certifier now fails closed and x044 owns the explicit equivalent profile.
+Deployment evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_x044_manual_reconcile_20260828T123514Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_manual_reconcile_20260828T123514Z/README.md).
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose

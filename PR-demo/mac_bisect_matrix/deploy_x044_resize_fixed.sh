@@ -47,7 +47,7 @@ kubectl -n bisect-matrix create configmap xrdp-banner \
     --dry-run=client -o yaml \
     | kubectl apply --server-side --force-conflicts -f -
 kubectl -n bisect-matrix create configmap xrdp-gfx-x044 \
-    --from-file=gfx.toml="$D/gfx/x043.toml" \
+    --from-file=gfx.toml="$D/gfx/x044.toml" \
     --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$D/k8s/x044.yaml"
 kubectl -n bisect-matrix rollout status deployment/xrdp-x044 --timeout=300s

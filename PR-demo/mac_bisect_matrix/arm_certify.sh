@@ -113,6 +113,7 @@ PORT=${2:-$(sed -n 's/^ *hostPort: *//p' "$D/k8s/$ARM.yaml" | head -1)}
 
 fail() { echo "CERT ABORT: $*" >&2; exit 1; }
 
+[ -r "$GFX_FILE" ] || fail "no readable arm configuration at $GFX_FILE"
 [ -x "$ORACLE_BIN" ] || fail "oracle client missing at $ORACLE_BIN"
 [ -s "$CRED" ] || fail "no RDP credential at $CRED"
 

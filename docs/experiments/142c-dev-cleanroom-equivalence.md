@@ -268,3 +268,13 @@ and the decisive Windows repeated-resize result on the rebuilt development
 arm is pending. If the arm does not reproduce the black-surface precursor and
 subsequent disconnect, this reconciliation is still incomplete and the next
 work is another inventory/classification pass, not a lifecycle fix.
+
+The rebuilt trace-disabled pair is deployed on development port 40060. Its
+package, image, profile and byte-certificate identities are retained in
+[`i142c_x044_manual_reconcile_20260828T123514Z/`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_manual_reconcile_20260828T123514Z/README.md).
+The record also preserves a false first certificate: the deploy script mounted
+the x043 profile while the certifier hashed a nonexistent x044 file and, due to
+a missing readability guard, emitted an empty-key `CERTIFIED` result. That
+certificate was not used. The certifier now fails closed, x044 owns and mounts
+its explicit profile, and the replacement certificate keys the identical pod
+and repository profile hash.
