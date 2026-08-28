@@ -225,3 +225,46 @@ bounded lifecycle finding are recorded in
 [`142d-repeated-resize-transport-teardown.md`](142d-repeated-resize-transport-teardown.md).
 The same-client development control is retained in
 [`i142d_x044_windows_control_20260828T004123Z/`](../../PR-demo/mac_bisect_matrix/captures/i142d_x044_windows_control_20260828T004123Z/README.md).
+
+## 2026-08-28 second audit: pinned base and capture ingress were missed
+
+The superseding result above triggered a fresh file-range inventory. It found
+two omissions which make the earlier “complete divergence audit” invalid
+independently of the Windows result.
+
+First, clean-room xrdp is based on `fe850a22c08a`, but development xrdp
+`83bcb274bd29` diverges from it at `3af31df3fc18`. The pinned side has fourteen
+commits, ten excluding merges, which the prior matrix never classified. They
+replace dynamic-virtual-channel reassembly with a stateful dechunker, harden
+stream and transport bounds, add nine dechunker tests and make individual
+common suites selectable. The affected runtime files are `common/parse.h`,
+`common/trans.c`, `libxrdp/libxrdp.h`, `libxrdp/xrdp_channel.c`,
+`libxrdp/xrdp_mcs.c` and the new `common/dechunker.{c,h}`. The xorgxrdp pinned
+base `49bf2dd3546d` is already an ancestor of development xorgxrdp, so there is
+no corresponding producer-base gap.
+
+Second, development xorgxrdp preassembled each AVC444 GFX
+STARTFRAME/WIRETOSURFACE_1/ENDFRAME envelope and sent it as xup order 62.
+Clean-room xorgxrdp sends the capture rectangles, slot identity, frame identity,
+geometry and shared mapping as dedicated order 64; xrdp owns envelope
+construction after ingress. Both paths had been called equivalent without a
+test which crossed the xup message boundary and reconstructed the exact
+client-visible envelope. The Windows result proves that classification was not
+sufficient.
+
+The manual reconciliation therefore ports the pinned-base safety changes and
+preserves order-64 AVC444 ingress on canonical development. The development
+consumer validates the current shared-memory snapshot, constructs a bounded
+AVC444 or AVC444v2 GFX envelope, parses it back through the existing strict
+batch parser and queues it through the established development encoder. Two
+new tests prove the dedicated-message round trip and reject an undersized
+output, a zero frame identity and missing rectangle storage. The default full
+suite passed with 218 daemon checks; the trace-enabled suite passed with 219
+daemon checks, and the paired xorgxrdp build and tests passed.
+
+This is not yet an equivalence verdict. Producer-specific pack/credit tests
+which exist only in clean-room xorgxrdp remain an explicit test-coverage row,
+and the decisive Windows repeated-resize result on the rebuilt development
+arm is pending. If the arm does not reproduce the black-surface precursor and
+subsequent disconnect, this reconciliation is still incomplete and the next
+work is another inventory/classification pass, not a lifecycle fix.

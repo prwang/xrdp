@@ -146,6 +146,54 @@ Its purpose is to make each commit understandable from the pinned base, its
 normative `PRD/` slice and its tests, without requiring a reviewer to inspect
 the development branch or reconstruct months of experiments.
 
+### Development/clean-room equivalence is a continuous precondition
+
+The development and clean-room trees are two implementations of the same PRD,
+not successive products. **A normative behavior may not exist only in the
+clean-room tree.** Before a clean-room slice is committed or deployed, its
+externally observable behavior, failure policy, bounds, defaults and operator
+contract shall already exist and be validated on the canonical development
+trees in `/work` and `/workUpdateXorgXrdp`. The only exception is an explicitly
+owner-authorized comparison arm whose purpose and temporary discrepancy are
+recorded in `BACKLOG.md`.
+
+Any later observation that development and clean-room behave differently
+immediately makes the existing equivalence audit and any conclusion depending
+on it RED. Stop clean-room correction and acceptance work, reopen the owning
+backlog gate, and reconcile canonical development first. When a defect is
+observed only in clean-room, port every behavior which can make the two paths
+differ into canonical development, reproduce the same precursor there, fix and
+validate it there, and only then re-author the correction in the owning
+clean-room slice and replay its descendants. A handler which is merely
+reachable in both source trees is not behavioral equivalence when only one
+deployed tree reaches it.
+
+An equivalence audit shall be exhaustive and reproducible, not a best-looking
+subset. Build its inventory from the complete Git ranges: pinned-base changes
+relative to the development base, every clean-room slice, both paired
+repositories, and every touched production, test, build, configuration,
+manual, helper and deployment file. Classify each difference and attach the
+test or retained evidence which proves the classification. A missed file,
+unexamined pinned-base change, assumed row or later-discovered discrepancy
+invalidates the complete-audit claim; amend the record rather than continuing
+from it as if it were sound.
+
+Reconciliation does not authorize a history transplant or an accumulated
+unreviewed patch. Do not use a bulk `cherry-pick`, rebase, reset, alternate
+worktree or scratch clone to make development resemble clean-room. Inventory
+the differences first, then make ordinary, reviewable edits only in the
+canonical checkout, one backlog-owned change at a time. Preserve the sole
+linear development ancestry, run the owning tests before the next change, and
+commit only when the owner asks.
+
+If a prohibited history operation is started, stop before resolving or
+committing any of it. Record the canonical branch, `HEAD`, status and active
+sequencer, use the operation's own abort path to restore the exact pre-operation
+state, then verify the branch, ancestry and both canonical worktrees. Do not
+salvage an accumulated conflict resolution as a manual reconciliation; if an
+exact abort is unavailable, discard that unreviewed operation and reconstruct
+each owned edit from the clean canonical state.
+
 ### Re-author behavior; do not transcribe the development diff
 
 - Start every slice from the preceding clean-room commit. Read the slice

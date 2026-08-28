@@ -15,21 +15,28 @@ clean-room consumer independently derives the new layout, rejects the stale
 snapshot and closes the connection. This known discrepancy is the starting
 point, not the permitted scope limit.
 
-The audit starts from development xrdp
-`6f5b90311b1f831b72369a13951d7a2269d4f27f` and xorgxrdp
-`c190343ff28a61e45b8307993f0fdd54fb596b29`, compared with clean-room xrdp
-`b38c63473c5297250af325d2770c5219ede69d48` and xorgxrdp
-`3dc52da1321644bda7678fb246d815dc27bd9bef`. If an owning correction advances
-one of these branches, the matrix records both the starting identity and the
-correction which supersedes it.
+The current audit starts from development xrdp
+`83bcb274bd294f8479422e51e00867f953d46e3e` and xorgxrdp
+`985bc42d335ad5828ac76dd3999d1a8266cac953`, compared with clean-room xrdp
+`f8d8d06d2ffda21cdf49477d3f62518c1323df94` and xorgxrdp
+`aca3c774cb8b828371c555dbed5886f176ddf5ef`. The clean-room xrdp base is pinned
+at `fe850a22c08a624c66bbac07e310251782e6f828`; development diverged from that
+base at `3af31df3fc18cb4f910524bbccfc90ff3189a757`. If reconciliation or an owning
+correction advances one of these branches, the matrix records both the
+starting identity and the correction which supersedes it.
 
 ## Complete divergence audit
 
-Audit every normative requirement and required test in slices #126 through
-#142 against both paired trees. For each requirement, record the responsible
-xrdp and xorgxrdp seams, observable behavior, defaults/failure policy and the
-independent test or retained evidence which proves it. Classify every apparent
-difference as exactly one of:
+Construct the file inventory from three complete ranges before classifying
+requirements: the clean-room pinned base against the development merge base,
+all clean-room xrdp slices through the candidate, and all paired clean-room
+xorgxrdp slices through its candidate. Audit every changed production, test,
+build, configuration and documentation file as well as every normative
+requirement and required test in slices #126 through #142 against both paired
+trees. For each requirement, record the responsible xrdp and xorgxrdp seams,
+observable behavior, defaults/failure policy and the independent test or
+retained evidence which proves it. Classify every apparent difference as
+exactly one of:
 
 1. equivalent behavior implemented differently — retain both implementations;
 2. normative behavior present only in clean-room — implement and validate it
@@ -48,20 +55,23 @@ same protocol bytes, ownership/lifetime, bounds, failure outcome and public
 contract. All wire structures shared by one deployed xrdp/xorgxrdp pair must
 still be version-compatible and interpreted identically.
 
-The audit result is a committed requirement matrix. It shall list every slice
-and may group requirements only when one named test genuinely covers the same
-invariant. Blank, assumed or “covered by the final gate” cells are red. A test
-whose expected result came from either implementation does not qualify the
-other one.
+The audit result is a committed requirement matrix plus its reproducible Git
+range and changed-file inventory. It shall list every slice and may group
+requirements only when one named test genuinely covers the same invariant.
+Blank, assumed, unclassified files or “covered by the final gate” cells are
+red. A test whose expected result came from either implementation does not
+qualify the other one.
 
 ## Development reconciliation
 
-Port every category-2 behavior to branches based on the current development
-frontiers. Category-3 findings update their owning PRD slice and are proven on
-development before clean-room history changes. Each functional correction is
-small and reviewable, with its own deterministic test where the invariant is
-amenable to CI. Both paired repositories build against the same development
-capture-contract header and pass their complete test suites.
+Port every category-2 behavior to the sole development branches in the
+canonical checkouts. Category-3 findings update their owning PRD slice and are
+proven on development before clean-room history changes. Reconciliation is a
+sequence of ordinary, reviewed edits, not a bulk history transplant. Each
+functional correction is small and reviewable, with its own deterministic test
+where the invariant is amenable to CI. Both paired repositories build against
+the same development capture-contract header and pass their complete test
+suites.
 
 The reconciled development branch deliberately retains the currently observed
 stale-resize behavior for the first live arm. This is not a shipped fallback or

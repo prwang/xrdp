@@ -201,15 +201,15 @@ green. Normative specification:
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
 **Status: IN PROGRESS; the allocation repair remains proven, but #142D
-reopens complete behavioral equivalence.** Development reconciliation, the
+invalidated the prior complete-audit claim.** Development reconciliation, the
 canonical 40059/40060 allocation red-green proof, the owning-slice clean-room
 correction, descendant replay and replacement 40058 deployment are complete.
 The committed requirement matrix in
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
-classifies every #126–#142 requirement. Reconciliation added the
-clean-room-only typed capture-layout/slot-identity validation and rejected
-three removed development-only configuration keys. Its conclusion that no
-normative divergence remained is superseded: with the same Windows client,
+classified every #126–#142 requirement but did not inventory the clean-room
+pinned-base delta or preserve the clean-room AVC444 order-64 ingress in
+development. Its conclusion that no normative divergence remained is
+superseded: with the same Windows client,
 capset, dense AVC444v2 profile and resize interaction, development 40060
 survived 64 completed resizes without another GFX capability
 advertisement, while clean-room emitted a post-resize frame which the client
@@ -236,6 +236,18 @@ trace-enabled and static gates before the next was admitted. The replacement
 40058 arm then passed the same growth-resize sequence and two-size rendered
 smoke. Exact identities and evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_cleanroom_resize_green_20260826T182220Z/README.md).
+
+The current manual reconciliation starts from canonical development xrdp
+`83bcb274bd29` and xorgxrdp `985bc42d335a`. It incorporates the ten non-merge
+channel-reassembly and bounds-hardening commits between development's merge
+base and pinned xrdp base `fe850a22c08a`, and changes development AVC444
+capture ingress from preassembled order 62 to the clean-room order-64
+shared-memory message. A bounded adapter constructs and independently parses
+the exact GFX frame envelope before handing it to the existing development
+encoder. Default and trace-enabled complete gates are green. The updated 40060
+arm remains a RED equivalence gate until the owner reproduces the repeated
+resize precursor there; a green interactive result means more clean-room-only
+behavior remains to be found, not that #142D is fixed.
 
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
