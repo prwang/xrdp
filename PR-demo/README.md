@@ -72,8 +72,23 @@ realistic payload rather than a diagnostic pattern.
   trace-disabled production-default build, a regular XFCE desktop and the
   indexed visual payloads. `x042_profile.sh` switches and wire-certifies the
   exact `auto`, `444`, `444v1`, `420` or `sparse` profile, refusing to change
-  a live tester session. x040 on port 40056 is the earlier checkpoint and is
-  not mutated by the numerical replay.
+  a live tester session. Run `/root/xrdp-profile <mode>` on the k3s host; the
+  mounted configuration is deliberately not editable from inside the pod.
+  For a diagnostic root shell in the port-40058 server container, run
+  `kubectl -n bisect-matrix exec -it deployment/xrdp-x042 -- bash` on the
+  k3s host. Ordinary RDP use remains the `tester` desktop account. x040 on
+  port 40056 is the earlier checkpoint and is not mutated by the numerical
+  replay. `deploy_x045_lifecycle_diag.sh` and `k8s/x045.yaml` define the
+  fault-preserving port-40061 copy of the same clean-room candidate. It adds
+  human-rate graphics lifecycle records and arms the existing perf-trace ring
+  for per-frame damage/ack/send ordering; its trace persists at
+  `/var/lib/xrdp-matrix/x045-lifecycle-trace` on the k3s host. The reproduced
+  Windows capture and bounded lifecycle verdict are indexed at
+  `mac_bisect_matrix/captures/i142d_x045_windows_repro_20260828T002619Z/`.
+  Its same-Windows-client development control is retained at
+  `mac_bisect_matrix/captures/i142d_x044_windows_control_20260828T004123Z/`;
+  the pair proves the remaining divergence occurs before clean-room's second
+  capability callback.
 * **`multimon_offline/`** — drives a real two-monitor `xfreerdp /multimon`
   login and asserts the server took the multi-monitor AVC444 path.
   `setup_monitors.sh` verifies each output's **active pixel geometry**, not

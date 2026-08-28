@@ -1,0 +1,648 @@
+schema=1 mono_ns=45487736609551 pid=1056 tid=0 event=clock_base real_ns=1787876779133914112
+schema=1 mono_ns=45488134285352 pid=1056 tid=131322241467776 event=feedend sequence=0 main=1 monitor=-1
+schema=1 mono_ns=45488134588571 pid=1056 tid=131322241467776 event=feedend sequence=0 main=0 monitor=-1
+schema=1 mono_ns=45488140898821 pid=1056 tid=131322241467776 event=outfirst sequence=0 main=0 bytes=18876 monitor=-1
+schema=1 mono_ns=45488141331065 pid=1056 tid=131322241467776 event=outfirst sequence=0 main=1 bytes=15000 monitor=-1
+schema=1 mono_ns=45488142361318 pid=1056 tid=131322241467776 event=feedend sequence=1 main=1 monitor=-1
+schema=1 mono_ns=45488142692355 pid=1056 tid=131322241467776 event=feedend sequence=1 main=0 monitor=-1
+schema=1 mono_ns=45488144451801 pid=1056 tid=131322241467776 event=outfirst sequence=1 main=1 bytes=17642 monitor=-1
+schema=1 mono_ns=45488144879566 pid=1056 tid=131322241467776 event=outfirst sequence=1 main=0 bytes=17646 monitor=-1
+schema=1 mono_ns=45488186139813 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45488303982163 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=1 server=0 ack_offset=1
+schema=1 mono_ns=45489717231005 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=2 server=0 ack_offset=1
+schema=1 mono_ns=45489871208628 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=3 server=0 ack_offset=1
+schema=1 mono_ns=45492441025720 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=12845056
+schema=1 mono_ns=45492441027900 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1756 y2=1206
+schema=1 mono_ns=45492441032960 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45492441057359 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45492441060489 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45492441072998 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45492441074808 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45492441075848 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45492441076818 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45492443657144 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45492443659394 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45492444642058 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45492452677176 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=13845 monitor=0
+schema=1 mono_ns=45492480725465 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45492480677206 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45492480682986 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45492487812196 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45492487868624 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=13905 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45492487890184 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10328 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45492487890934 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45492487893423 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45492487370453 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=10289 monitor=0
+schema=1 mono_ns=45492487383632 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45492487385612 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45492487387362 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45492487388022 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45492487567635 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45492487569275 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45492487571075 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45492487571865 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45492487586445 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45492487595744 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=13863
+schema=1 mono_ns=45492487599644 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=10286
+schema=1 mono_ns=45492487600584 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45492487655202 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45492487657292 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45492570882812 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=4 server=1 ack_offset=0
+schema=1 mono_ns=45492570887322 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=1 region_frontier=1 client=1 egress=1 absorbed=1 window=1
+schema=1 mono_ns=45492815654029 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=12845056
+schema=1 mono_ns=45492815660189 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=2 x1=784 y1=0 x2=1647 y2=1204
+schema=1 mono_ns=45492815664649 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45492815701188 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45492815708037 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45492815713927 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45492815717397 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45492815719037 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=374 since_previous_ms=374 refresh_ms=0
+schema=1 mono_ns=45492815720757 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45492815723237 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45492815724017 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45492817924817 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=1 client=1 egress=1 absorbed=2 window=1
+schema=1 mono_ns=45492820726045 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=1 inflight=2
+schema=1 mono_ns=45492820739734 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=523 last=0 frame_id=0 server=1 client=1 inflight=2
+schema=1 mono_ns=45492820779193 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8591 last=0 frame_id=0 server=1 client=1 inflight=2
+schema=1 mono_ns=45492820780153 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=1 terminal=1 bytes=14
+schema=1 mono_ns=45492820785272 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=1 inflight=2
+schema=1 mono_ns=45492817427725 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45492817900397 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45492817903477 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45492819785089 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=453 monitor=0
+schema=1 mono_ns=45492820493313 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8553 monitor=0
+schema=1 mono_ns=45492820496463 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45492820497463 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45492820498533 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45492820498813 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45492820556671 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45492820557201 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45492820558131 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45492820558491 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45492820574130 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45492820580020 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=481
+schema=1 mono_ns=45492820583330 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8549
+schema=1 mono_ns=45492820583850 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45492820611179 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45492820612649 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45492831052739 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=3 monitor=0 slot=0 bytes=12845056
+schema=1 mono_ns=45492831053828 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=3 num_rects=1 x1=928 y1=1160 x2=972 y2=1204
+schema=1 mono_ns=45492831055098 pid=1056 tid=131322241467776 event=enq frame_id=3 fifo_depth=1
+schema=1 mono_ns=45492834910218 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=2 client=1 inflight=2
+schema=1 mono_ns=45492834921568 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=551 last=0 frame_id=0 server=2 client=1 inflight=2
+schema=1 mono_ns=45492834957006 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8581 last=0 frame_id=0 server=2 client=1 inflight=2
+schema=1 mono_ns=45492834957696 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=3 shown=1 queued_bytes=0 client=1 terminal=1 bytes=14
+schema=1 mono_ns=45492834963926 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=3 server=2 client=1 inflight=2
+schema=1 mono_ns=45492831064868 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45492831066388 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45492831068818 pid=1056 tid=131322211198656 event=take frame_id=3 fifo_depth=0
+schema=1 mono_ns=45492831069548 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45492831070168 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=16 since_previous_ms=16 refresh_ms=0
+schema=1 mono_ns=45492831071098 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=3 monitor=0
+schema=1 mono_ns=45492831072128 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45492831072348 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=0
+schema=1 mono_ns=45492832520875 pid=1056 tid=131322211198656 event=feedend sequence=3 main=1 monitor=0
+schema=1 mono_ns=45492832567803 pid=1056 tid=131322211198656 event=feedend sequence=3 main=0 monitor=0
+schema=1 mono_ns=45492832569783 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=3 monitor=0
+schema=1 mono_ns=45492834675667 pid=1056 tid=131322211198656 event=outfirst sequence=3 main=1 bytes=491 monitor=0
+schema=1 mono_ns=45492834790722 pid=1056 tid=131322211198656 event=outfirst sequence=3 main=0 bytes=8542 monitor=0
+schema=1 mono_ns=45492834791962 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=0
+schema=1 mono_ns=45492834792342 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45492834792772 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45492834792972 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45492834835161 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45492834835401 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=3 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45492834835961 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45492834836141 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45492834840811 pid=1056 tid=131322211198656 event=emit_beg frame_id=3 monitor=0
+schema=1 mono_ns=45492834841711 pid=1056 tid=131322211198656 event=video_cmd frame_id=3 view=1 bytes=509
+schema=1 mono_ns=45492834843951 pid=1056 tid=131322211198656 event=video_cmd frame_id=3 view=2 bytes=8539
+schema=1 mono_ns=45492834844340 pid=1056 tid=131322211198656 event=emit_end frame_id=3 monitor=0
+schema=1 mono_ns=45492834856880 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45492834857440 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45492870108037 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=5 server=3 ack_offset=-1
+schema=1 mono_ns=45492870117706 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=3 slot_frontier=3 region_frontier=1 client=2 egress=3 absorbed=3 window=1
+schema=1 mono_ns=45492870134896 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=3 region_frontier=2 client=2 egress=3 absorbed=3 window=1
+schema=1 mono_ns=45492870165975 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=3 queue_depth=0 decoded=6 server=3 ack_offset=0
+schema=1 mono_ns=45492870167005 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=3 slot_frontier=3 region_frontier=3 client=3 egress=3 absorbed=3 window=1
+schema=1 mono_ns=45493382436602 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45493382443812 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45493387542996 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45493415837726 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45493436225313 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13320192
+schema=1 mono_ns=45493436228433 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1800 y2=1206
+schema=1 mono_ns=45493436230963 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45493436268712 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45493436274322 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45493436279811 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45493436286481 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45493436287851 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45493436289601 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45493438538379 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45493438539719 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45493451186839 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13320192
+schema=1 mono_ns=45493451187929 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1800 y2=1206
+schema=1 mono_ns=45493451189619 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45493457394573 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45493463155333 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=14691 monitor=0
+schema=1 mono_ns=45493477118214 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45493483971095 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45493484023763 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14751 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45493484040032 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=11295 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45493484040862 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45493484043462 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45493477087436 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45493477092095 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45493483602728 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=11257 monitor=0
+schema=1 mono_ns=45493483608808 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45493483610218 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45493483611298 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45493483611798 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45493483772622 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45493483774012 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45493483775512 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45493483776302 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45493483796161 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45493483805291 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=14709
+schema=1 mono_ns=45493483810431 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=11253
+schema=1 mono_ns=45493483811391 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45493483857689 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45493483859419 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45493483860609 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=47 since_previous_ms=47 refresh_ms=0
+schema=1 mono_ns=45493483862009 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45493483863419 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45493483863879 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45493484953129 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45493484977718 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45493484979138 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45493487478007 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45493487486057 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=964 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45493487518456 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8249 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45493487519296 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45493487524456 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45493487056753 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=904 monitor=0
+schema=1 mono_ns=45493487358922 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8222 monitor=0
+schema=1 mono_ns=45493487360312 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45493487361062 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45493487361691 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45493487361921 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45493487412550 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45493487412840 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45493487413440 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45493487413660 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45493487420359 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45493487422249 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=922
+schema=1 mono_ns=45493487424409 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8207
+schema=1 mono_ns=45493487424849 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45493487436339 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45493487438399 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45493487440239 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45493487441119 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45493487443389 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45493487443769 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45493506578322 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=9245 decoded=7 server=2 ack_offset=-1
+schema=1 mono_ns=45493506579672 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45493506589681 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45493568960040 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=8 server=2 ack_offset=0
+schema=1 mono_ns=45493568969860 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45496452983794 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45496452990423 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45496462660502 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45496491121915 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45496511542242 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13074432
+schema=1 mono_ns=45496511545902 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1792 y2=1206
+schema=1 mono_ns=45496511550641 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45496511588510 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45496511594510 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45496511600560 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45496511609399 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45496511610909 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45496511612779 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45496513801240 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45496513803169 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45496534440288 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13074432
+schema=1 mono_ns=45496534444958 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1792 y2=1206
+schema=1 mono_ns=45496534448678 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45496537782596 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45496550647028 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45496544451893 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=13939 monitor=0
+schema=1 mono_ns=45496550592560 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45496550599740 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45496556755736 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45496556874211 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=13999 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45496556938179 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10168 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45496556939259 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45496556949988 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45496560276627 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45496560291577 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=461 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45496560359674 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8592 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45496560360774 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45496560370444 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45496556367410 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=10129 monitor=0
+schema=1 mono_ns=45496556373749 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45496556375079 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45496556376409 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45496556377059 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45496556526714 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45496556527994 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45496556529364 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45496556530064 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45496556546873 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45496556555413 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=13957
+schema=1 mono_ns=45496556559653 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=10126
+schema=1 mono_ns=45496556560643 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45496556608181 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45496556610241 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45496556611211 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=45 since_previous_ms=45 refresh_ms=0
+schema=1 mono_ns=45496556612631 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45496556614151 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45496556614521 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45496557690041 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45496557960902 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45496557962452 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45496560150782 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=401 monitor=0
+schema=1 mono_ns=45496560153632 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8564 monitor=0
+schema=1 mono_ns=45496560154512 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45496560154922 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45496560155232 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45496560155402 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45496560198820 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45496560199050 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45496560199550 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45496560199740 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45496560216930 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45496560217650 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=419
+schema=1 mono_ns=45496560219749 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8550
+schema=1 mono_ns=45496560220139 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45496560232109 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45496560233169 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45496560234739 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45496560235529 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45496560237179 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45496560237529 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45496589255592 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=9085 decoded=9 server=2 ack_offset=-1
+schema=1 mono_ns=45496589260062 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45496589278891 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45496607439440 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=10 server=2 ack_offset=0
+schema=1 mono_ns=45496607441640 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45497470048864 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45497470055833 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45497473983100 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45497499604488 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45497518638435 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13320192
+schema=1 mono_ns=45497518640974 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1814 y2=1206
+schema=1 mono_ns=45497518643684 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45497518656234 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45497518659314 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45497518662384 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45497518666303 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45497518667373 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45497518668313 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45497520790866 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45497520792096 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45497532786289 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13320192
+schema=1 mono_ns=45497532787939 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1814 y2=1206
+schema=1 mono_ns=45497532790589 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45497540256847 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45497546353845 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=14302 monitor=0
+schema=1 mono_ns=45497560049787 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45497559991039 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45497559994969 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45497566310229 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45497566449134 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14362 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45497566523491 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10450 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45497566525081 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45497566535971 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45497569974565 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45497569982825 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=1014 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45497570028913 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8363 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45497570029513 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45497570034353 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45497565947422 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=10412 monitor=0
+schema=1 mono_ns=45497565957292 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45497565958532 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45497565959472 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45497565959842 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45497566047148 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45497566048048 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45497566048988 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45497566049388 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45497566060888 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45497566067508 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=14320
+schema=1 mono_ns=45497566070597 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=10408
+schema=1 mono_ns=45497566071087 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45497566106176 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45497566107316 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45497566108096 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=48 since_previous_ms=48 refresh_ms=0
+schema=1 mono_ns=45497566109016 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45497566109876 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45497566110116 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45497567017533 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45497567404309 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45497567411659 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45497569197044 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=954 monitor=0
+schema=1 mono_ns=45497569871429 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8336 monitor=0
+schema=1 mono_ns=45497569874519 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45497569875079 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45497569875479 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45497569875849 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45497569923327 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45497569923557 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45497569924087 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45497569924257 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45497569929527 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45497569930717 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=972
+schema=1 mono_ns=45497569932867 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8321
+schema=1 mono_ns=45497569933247 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45497569944216 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45497569945226 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45497569947076 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45497569948126 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45497569950186 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45497569950546 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45497613972863 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=9409 decoded=11 server=2 ack_offset=-1
+schema=1 mono_ns=45497613982943 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45497614024852 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45497614081120 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=12 server=2 ack_offset=0
+schema=1 mono_ns=45497614082280 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45498338470365 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45498338474475 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45498342551546 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45498370721601 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45498391916649 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13074432
+schema=1 mono_ns=45498391921179 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1784 y2=1206
+schema=1 mono_ns=45498391925269 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45498391955408 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45498391958618 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45498391962538 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45498391968437 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45498391969567 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45498391970517 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45498394810294 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45498394811514 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45498403229037 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13074432
+schema=1 mono_ns=45498403230887 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1784 y2=1206
+schema=1 mono_ns=45498403233317 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45498410406426 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45498416431457 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=13574 monitor=0
+schema=1 mono_ns=45498434108803 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45498434068454 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45498434076494 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45498441172126 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45498441219724 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=13634 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45498441242433 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=9946 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45498441243213 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45498441245573 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45498445519638 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45498445539167 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=2121 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45498445574046 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8302 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45498445574886 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45498445580855 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45498440882176 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=9907 monitor=0
+schema=1 mono_ns=45498440889186 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45498440890206 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45498440890896 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45498440891266 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45498440971623 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45498440972483 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45498440973423 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45498440973803 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45498440988872 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45498440995232 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=13592
+schema=1 mono_ns=45498440997402 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=9904
+schema=1 mono_ns=45498440997922 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45498441033401 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45498441034901 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45498441035601 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=50 since_previous_ms=50 refresh_ms=0
+schema=1 mono_ns=45498441036351 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45498441037301 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45498441037651 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45498442184239 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45498442243237 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45498442244737 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45498444659629 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=2061 monitor=0
+schema=1 mono_ns=45498445380833 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8274 monitor=0
+schema=1 mono_ns=45498445383012 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45498445384002 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45498445384752 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45498445385212 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45498445433631 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45498445434021 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45498445434581 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45498445434771 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45498445443270 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45498445445560 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=2079
+schema=1 mono_ns=45498445447810 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8260
+schema=1 mono_ns=45498445448190 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45498445459890 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45498445461360 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45498445463360 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45498445464310 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45498445466799 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45498445467149 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45498473409072 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=10455 decoded=13 server=2 ack_offset=-1
+schema=1 mono_ns=45498473419112 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45498473440921 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45498541142186 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=14 server=2 ack_offset=0
+schema=1 mono_ns=45498541150766 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45499087385239 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45499087389269 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45499097385105 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45499123682787 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45499141166951 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13320192
+schema=1 mono_ns=45499141169341 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1820 y2=1206
+schema=1 mono_ns=45499141172190 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45499141186610 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45499141189590 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45499141192350 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45499141196740 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45499141197750 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45499141198729 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45499142568860 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45499142569800 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45499153971935 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13320192
+schema=1 mono_ns=45499153972934 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1820 y2=1206
+schema=1 mono_ns=45499153974804 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45499166684372 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45499174814456 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45499180734660 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45499180787148 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14659 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45499180801148 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=11084 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45499180801968 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45499180804487 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45499172620565 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=14599 monitor=0
+schema=1 mono_ns=45499174790246 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45499174793226 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45499180331025 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=11046 monitor=0
+schema=1 mono_ns=45499180337774 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45499180339174 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45499180340584 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45499180341134 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45499180503518 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45499180504828 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45499180506378 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45499180507138 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45499180523078 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45499180532797 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=14617
+schema=1 mono_ns=45499180538337 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=11042
+schema=1 mono_ns=45499180539257 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45499180586905 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45499180588835 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45499180589925 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=39 since_previous_ms=39 refresh_ms=0
+schema=1 mono_ns=45499180591275 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45499180592745 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45499180593205 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45499184589440 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45499184601169 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=2629 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45499184645558 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8896 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45499184646028 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45499184651557 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45499181552210 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45499181935146 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45499181936816 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45499183592606 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=2569 monitor=0
+schema=1 mono_ns=45499184500133 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8869 monitor=0
+schema=1 mono_ns=45499184501463 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45499184502013 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45499184502313 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45499184502523 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45499184551051 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45499184551291 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45499184551801 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45499184551991 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45499184556221 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45499184556911 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=2587
+schema=1 mono_ns=45499184558641 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8854
+schema=1 mono_ns=45499184559091 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45499184569170 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45499184570740 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45499184572600 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45499184573600 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45499184576070 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45499184576370 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45499212695256 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=11557 decoded=15 server=2 ack_offset=-1
+schema=1 mono_ns=45499212699886 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45499212708226 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45499239753541 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=16 server=2 ack_offset=0
+schema=1 mono_ns=45499239762811 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45501143093921 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501143107190 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45501148196245 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501172793550 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45501192367867 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=13320192
+schema=1 mono_ns=45501192371607 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1820 y2=1202
+schema=1 mono_ns=45501192375117 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45501192389066 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501192391716 pid=1056 tid=131322211198656 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=45501192395106 pid=1056 tid=131322211198656 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=45501192400856 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45501192402126 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=45501192403125 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45501194348555 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45501194349365 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45501206524691 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=13320192
+schema=1 mono_ns=45501206528481 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1820 y2=1202
+schema=1 mono_ns=45501206533631 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45501218316672 pid=1056 tid=131322211198656 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=45501232809024 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45501224243036 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=1 bytes=14068 monitor=0
+schema=1 mono_ns=45501232744327 pid=1056 tid=131322211198656 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=45501232750107 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=45501239348836 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45501239409014 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14128 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45501239422354 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10636 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45501239423094 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45501239425593 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45501242673375 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45501242681325 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=477 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45501242716234 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8892 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45501242717004 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45501242721623 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45501239081586 pid=1056 tid=131322211198656 event=outfirst sequence=1 main=0 bytes=10598 monitor=0
+schema=1 mono_ns=45501239085756 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45501239086886 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45501239087666 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45501239088116 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45501239170563 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45501239171393 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45501239172233 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45501239172563 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45501239183392 pid=1056 tid=131322211198656 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=45501239189882 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=1 bytes=14086
+schema=1 mono_ns=45501239192852 pid=1056 tid=131322211198656 event=video_cmd frame_id=1 view=2 bytes=10594
+schema=1 mono_ns=45501239193422 pid=1056 tid=131322211198656 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=45501239220881 pid=1056 tid=131322211198656 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=45501239222141 pid=1056 tid=131322211198656 event=subm_beg set_n=1
+schema=1 mono_ns=45501239222761 pid=1056 tid=131322211198656 event=auxdue monitor=0 due=1 since_aux_ms=47 since_previous_ms=47 refresh_ms=0
+schema=1 mono_ns=45501239223491 pid=1056 tid=131322211198656 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45501239224431 pid=1056 tid=131322211198656 event=subm_end n_handles=1
+schema=1 mono_ns=45501239224811 pid=1056 tid=131322211198656 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45501240238524 pid=1056 tid=131322211198656 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=45501240630480 pid=1056 tid=131322211198656 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=45501240635279 pid=1056 tid=131322211198656 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=45501241959281 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=1 bytes=417 monitor=0
+schema=1 mono_ns=45501242551610 pid=1056 tid=131322211198656 event=outfirst sequence=2 main=0 bytes=8865 monitor=0
+schema=1 mono_ns=45501242553450 pid=1056 tid=131322211198656 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=45501242554290 pid=1056 tid=131322211198656 event=book_beg n_handles=1
+schema=1 mono_ns=45501242554790 pid=1056 tid=131322211198656 event=book_end n_handles=1
+schema=1 mono_ns=45501242554980 pid=1056 tid=131322211198656 event=coll_beg monitor=0
+schema=1 mono_ns=45501242608068 pid=1056 tid=131322211198656 event=coll_end monitor=0
+schema=1 mono_ns=45501242608358 pid=1056 tid=131322211198656 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=45501242608918 pid=1056 tid=131322211198656 event=rel_beg set_n=1
+schema=1 mono_ns=45501242609138 pid=1056 tid=131322211198656 event=rel_end set_n=1
+schema=1 mono_ns=45501242620487 pid=1056 tid=131322211198656 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=45501242622557 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=1 bytes=435
+schema=1 mono_ns=45501242624907 pid=1056 tid=131322211198656 event=video_cmd frame_id=2 view=2 bytes=8850
+schema=1 mono_ns=45501242625427 pid=1056 tid=131322211198656 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=45501242640706 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45501242642166 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45501242643956 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501242645146 pid=1056 tid=131322211198656 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=45501242647696 pid=1056 tid=131322211198656 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=45501242648276 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45501283442381 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=1 queue_depth=9401 decoded=17 server=2 ack_offset=-1
+schema=1 mono_ns=45501283452071 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45501283473850 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45501283520178 pid=1056 tid=131322241467776 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=18 server=2 ack_offset=0
+schema=1 mono_ns=45501283521218 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=45501937458188 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501937461808 pid=1056 tid=131322211198656 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=45501946925774 pid=1056 tid=131322211198656 event=wait_end
+schema=1 mono_ns=45501991653905 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=12959744
+schema=1 mono_ns=45501991656775 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1820 y2=1171
+schema=1 mono_ns=45501991660355 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45502004875454 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=12959744
+schema=1 mono_ns=45502004876844 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1820 y2=1171
+schema=1 mono_ns=45502004878673 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45502032427021 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45502038665743 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45502038733821 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14149 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45502038764920 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10456 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45502038765520 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45502038771320 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45502104252345 pid=1056 tid=131322241467776 event=feedend sequence=0 main=0 monitor=-1
+schema=1 mono_ns=45502107310364 pid=1056 tid=131322241467776 event=feedend sequence=0 main=1 monitor=-1
+schema=1 mono_ns=45502115386000 pid=1056 tid=131322241467776 event=outfirst sequence=0 main=0 bytes=395887 monitor=-1
+schema=1 mono_ns=45502116570507 pid=1056 tid=131322241467776 event=outfirst sequence=0 main=1 bytes=273155 monitor=-1
+schema=1 mono_ns=45502118905012 pid=1056 tid=131322241467776 event=feedend sequence=1 main=1 monitor=-1
+schema=1 mono_ns=45502119210591 pid=1056 tid=131322241467776 event=feedend sequence=1 main=0 monitor=-1
+schema=1 mono_ns=45502121088572 pid=1056 tid=131322241467776 event=outfirst sequence=1 main=1 bytes=18904 monitor=-1
+schema=1 mono_ns=45502123220385 pid=1056 tid=131322241467776 event=outfirst sequence=1 main=0 bytes=198981 monitor=-1
+schema=1 mono_ns=45508818300359 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=12959744
+schema=1 mono_ns=45508818303339 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1804 y2=1171
+schema=1 mono_ns=45508818306688 pid=1056 tid=131322241467776 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=45508832285589 pid=1056 tid=131322241467776 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=12959744
+schema=1 mono_ns=45508832289409 pid=1056 tid=131322241467776 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1804 y2=1171
+schema=1 mono_ns=45508832292909 pid=1056 tid=131322241467776 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=45508856652622 pid=1056 tid=131322241467776 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=45508863208994 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45508863297110 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14018 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45508863343899 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=10280 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=45508863345449 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45508863354678 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=45508866991366 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45508867000325 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=433 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45508867054113 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=8419 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=45508867054813 pid=1056 tid=131322241467776 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=45508867059973 pid=1056 tid=131322241467776 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=45508945563415 pid=1056 tid=0 event=perfnoring count=3

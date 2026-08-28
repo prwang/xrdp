@@ -159,15 +159,17 @@ coded height, and independently gated; see
 
 ## #142 — configuration, activation, operating docs and final paired gate
 
-**Status: IN PROGRESS; corrected automated gates are green, owner visual
-matrix remains.** The resize repair was re-authored in owning slice 136 and
+**Status: IN PROGRESS; corrected automated gates are green, but the owner
+visual matrix is blocked by #142D.** The resize repair was re-authored in
+owning slice 136 and
 all descendants through 142 were replayed. The replacement trace-disabled
 x042 arm on `127.0.0.1:40058` stayed connected through the exact growth-resize
 sequence, allocated the current 19,611,648-byte mapping and rendered the final
 2412-by-1344 XFCE frame. The default and trace-enabled suites, paired producer
 tests, automatic-profile certificate and two-size rendered smoke are green.
 Windows/macOS acceptance across `auto`, forced AVC444v2, AVC444v1, AVC420 and
-sparse profiles remains the only open part. Execution record:
+sparse profiles remains open after the repeated-resize transport teardown is
+understood and corrected. Execution record:
 [`docs/experiments/126-142-cleanroom-reconstruction.md`](docs/experiments/126-142-cleanroom-reconstruction.md).
 
 The fully assembled backend becomes selectable only here. The user-facing
@@ -198,15 +200,22 @@ green. Normative specification:
 
 ## #142C — reconcile dev/clean-room behavior and prove resize correction
 
-**DONE.** Development reconciliation, the canonical 40059/40060 red-green
-proof, the owning-slice clean-room correction, descendant replay and
-replacement 40058 deployment are complete. The
-committed requirement matrix in
+**Status: IN PROGRESS; the allocation repair remains proven, but #142D
+reopens complete behavioral equivalence.** Development reconciliation, the
+canonical 40059/40060 allocation red-green proof, the owning-slice clean-room
+correction, descendant replay and replacement 40058 deployment are complete.
+The committed requirement matrix in
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md)
-classifies every #126–#142 requirement. Reconciliation adds the clean-room-only
-typed capture-layout/slot-identity validation and rejects three removed
-development-only configuration keys. No normative development-only behavior
-was found.
+classifies every #126–#142 requirement. Reconciliation added the
+clean-room-only typed capture-layout/slot-identity validation and rejected
+three removed development-only configuration keys. Its conclusion that no
+normative divergence remained is superseded: with the same Windows client,
+capset, dense AVC444v2 profile and resize interaction, development 40060
+survived 64 completed resizes without another GFX capability
+advertisement, while clean-room emitted a post-resize frame which the client
+did not acknowledge and received a new advertisement 53 ms later. That
+clean-room-only precursor must be isolated and reconciled before this item can
+close.
 
 The final trace-disabled 40059 packages built from the canonical development
 trees reproduce the intended mechanism:
@@ -235,9 +244,85 @@ desktop entry states and applies the container sandbox/shared-memory flags.
 The profile switcher and the complete checked visual-matrix draft are copied
 to the tester account's home as the final handoff step.
 
-The remaining Windows/macOS profile matrix is owned by #142, not this closed
-reconciliation item. Normative plan and complete acceptance:
+The allocation result remains closed evidence; the missing post-resize
+wire/lifecycle equivalence is owned jointly by #142C and #142D. Normative plan
+and complete acceptance:
 [`PRD/gates/142c-dev-cleanroom-equivalence.md`](PRD/gates/142c-dev-cleanroom-equivalence.md).
+
+## #142D — repeated interactive resize tears down the client transport
+
+**Status: IN PROGRESS; blocks the remaining #142 visual matrix.** Repeated
+Windows `auto` walks establish a two-stage failure: a resize leaves persistent
+black regions, and the following resize completes server-side before the RDP
+transport closes without a TLS shutdown. Every observed geometry has a
+correctly sized producer mapping, so this is not the stale-layout defect
+corrected by #142C. This is not an `auto`-mode difference: the green 40060
+FreeRDP arm also used `auto` and selected dense AVC444v2. Its retained log has
+one GFX capability advertisement before login and none after Xorg attachment;
+the failing Windows connection advertises once for the login screen and again
+after attaching the desktop. Source audit found a reachable lifecycle defect
+in both source trees if that second callback occurs, while
+`xrdp_mm_egfx_caps_advertise()` treats the second advertisement as initial
+setup: it resets and recreates a blank client surface, replaces a live
+`mm->encoder` without deleting it, and then deliberately skips its repaint
+helper because Xorg supplies GFX directly. No complete current Xorg frame is
+requested for the new surface, so later damage alone fills parts of it. This
+explains the persistent black regions. The following reset reaches the TLS EOF
+with orphaned encoder/surface state already present; a controlled correction
+must still prove whether that same defect is the complete reason the Windows
+client closes.
+
+**Open:** the fault-preserving port-40061 arm reproduced the complete Windows
+sequence. It observed a second capability callback with a live direct-Xorg
+encoder, no retirement before the owner pointer was overwritten, and no
+producer frame after the replacement surface was published. The replacement
+still had frame counters 0/0/0 when the next resize began 6.6 seconds later.
+That resize requested and received a complete producer frame and xrdp sent its
+two logical frames successfully; the peer then closed without acknowledging
+either. Ten encoder installations and nine complete deletions prove one
+orphan, but the trace contains no stale PDU sent by it, so do not narrow the
+EOF cause to the leak alone.
+
+The clean-room-specific precursor is now the first open boundary. The same
+Windows client sent no second advertisement to development 40060 through 64
+completed resizes, but on clean-room it withheld the acknowledgement for
+the first frame after the seventh resize and sent a new advertisement 53 ms
+later. Audit the client-visible resize frame, graphics-envelope serialization,
+frame/ack ordering and encoder output until that difference is identified.
+Reproduce the same trigger on canonical development by reconciling all
+normative clean-room-only behavior before correcting it. A handler-only change
+on development would exercise no observed failing transition and therefore
+would not be a causal fix.
+
+Once the red development transition exists, correct it there: completely
+retire the live encoder before state replacement, publish exactly one
+successor and request one current direct-producer frame only after it is ready.
+Then repeat the same Windows sequence. If the peer EOF remains after both the
+precursor and transition are correct, preserve it as a separate red defect
+rather than masking it with a retry, fallback, mode change or timeout. Only a
+green causal gate may be re-authored into the clean-room history. Raw
+reproduced evidence and the bounded verdict are in the linked experiment
+record.
+
+**Acceptance:** an exact development/clean-room wire-transition comparison
+accounts for the last acknowledged frame, first unacknowledged frame and
+subsequent capability advertisement using explicit identities. The same
+reconciled development build first reproduces the clean-room red transition.
+A deterministic lifecycle test then proves repeated capability advertisement
+cannot replace a live encoder without complete teardown and
+requests exactly one current full-screen producer capture after the successor
+is ready. A rendered-frame test proves the reset/resize surface is fully
+repainted rather than merely alive. A fresh login control and a reconnect to an
+existing desktop cover both pre-attach and post-attach capability lifecycles;
+`auto` and forced-444 profiles prove codec selection does not hide the
+lifecycle result. One repeatable client sequence identifies which endpoint
+closes first. The corrected development and clean-room remain connected and
+repaint after both spaced and rapid grow/shrink changes; current layout
+allocation and snapshot validation remain green; no retry, fallback or
+suppressed terminal error masks a failure. The acceptance arm's checked visual
+instructions and profile reference must also survive a container restart and
+be readable by the non-root desktop account. Evidence and current limits:
+[`docs/experiments/142d-repeated-resize-transport-teardown.md`](docs/experiments/142d-repeated-resize-transport-teardown.md).
 
 ## #143 — host pipe setting, comparable baselines and zero-copy decision
 

@@ -97,3 +97,4 @@ PR-demo/mac_bisect_matrix/.build-i125c-u2404/
 PR-demo/mac_bisect_matrix/.build-x*-cleanroom/
 PR-demo/mac_bisect_matrix/.build-x*-reconciled/
 PR-demo/mac_bisect_matrix/.build-x*-resize-fixed/
+PR-demo/mac_bisect_matrix/.build-x*-lifecycle-diag/

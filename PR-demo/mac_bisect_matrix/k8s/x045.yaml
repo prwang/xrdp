@@ -1,0 +1,82 @@
+# Instrumented copy of the clean-room candidate. The fault is preserved.
+# One monitor at the client-selected size; host endpoint 127.0.0.1:40061.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: xrdp-x045
+  namespace: bisect-matrix
+  labels:
+    app: xrdp-bisect
+    arm: x045
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      arm: x045
+  template:
+    metadata:
+      labels:
+        app: xrdp-bisect
+        arm: x045
+    spec:
+      containers:
+        - name: xrdp
+          image: localhost/xrdp-bisect:cleanroom-diag-6e22c7fd-aca3c774-u2404-xfce-trace
+          imagePullPolicy: Never
+          securityContext:
+            privileged: true
+          env:
+            - name: SESSION_KIND
+              value: "xfce"
+            - name: ARM_LABEL
+              value: "Clean-room graphics lifecycle diagnostic (port 40061)"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/xrdp"
+            - name: XRDP_GFX_TRACE
+              value: "1"
+            - name: XRDP_ACK_TRACE
+              value: "1"
+          ports:
+            - containerPort: 3389
+              hostPort: 40061
+              hostIP: 127.0.0.1
+              protocol: TCP
+          volumeMounts:
+            - name: dshm
+              mountPath: /dev/shm
+            - name: matrix-cred
+              mountPath: /run/matrix
+              readOnly: true
+            - name: gfx
+              mountPath: /etc/xrdp/gfx.toml
+              subPath: gfx.toml
+            - name: payloads
+              mountPath: /usr/local/bin/codescroll10.sh
+              subPath: codescroll10.sh
+            - name: payloads
+              mountPath: /usr/local/share/code_corpus.ansi
+              subPath: code_corpus.ansi
+            - name: lifecycle-trace
+              mountPath: /var/log/xrdp-perf
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Gi
+        - name: matrix-cred
+          hostPath:
+            path: /etc/xrdp-matrix
+            type: Directory
+        - name: payloads
+          configMap:
+            name: xrdp-banner
+            defaultMode: 0o755
+        - name: gfx
+          configMap:
+            name: xrdp-gfx-x045
+        - name: lifecycle-trace
+          hostPath:
+            path: /var/lib/xrdp-matrix/x045-lifecycle-trace
+            type: DirectoryOrCreate

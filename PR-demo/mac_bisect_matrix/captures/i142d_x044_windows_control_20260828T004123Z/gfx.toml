@@ -1,0 +1,24 @@
+# Reconciled development resize-reproduction profile. Dense AVC444 is the
+# quality-preserving default; a one-frame client window minimizes latency.
+[codec]
+order = [ "H.264", "RFX" ]
+h264_encoder = "ffmpeg"
+
+[avc444_ffmpeg]
+path = "/usr/bin/ffmpeg"
+avc_mode = "auto"
+chroma_align = 32
+encoder_args = [
+  "-c:v", "libx264", "-bf", "0", "-preset", "ultrafast",
+  "-tune", "zerolatency", "-crf", "18", "-g", "240",
+  "-x264-params", "repeat-headers=1:aud=1:cabac=1",
+]
+dump_extra = false
+strip_sei = false
+sanitize_hrd = false
+strip_pic_struct = false
+aux_ltr_chain = false
+eager_slot_ack = true
+wire_window = 1
+chroma_refresh_ms = 0
+chroma_idle_ms = 0

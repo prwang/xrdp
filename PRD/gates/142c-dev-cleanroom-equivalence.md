@@ -100,6 +100,33 @@ ported or the reproduction did not reach the failing geometry. A repaired arm
 which survives by changing codec, mode, payload, client or session state is
 also red.
 
+## Repeated-resize wire-transition proof
+
+Allocation equivalence alone is insufficient. With the same interactive
+client, capsets, codec profile and sequence of rapid and spaced resizes, the
+development and clean-room pairs shall agree on every client-visible graphics
+transition. Retain explicit identities for the last acknowledged frame, the
+first unacknowledged frame, any subsequent capability advertisement, surface
+reset and replacement encoder. If either pair elicits a new capability
+advertisement while a direct producer is live, the other pair must first
+reproduce the same precursor after all normative behavior is reconciled.
+
+A repeated capability advertisement is a state replacement, not initial
+setup. Before publishing a replacement surface or encoder, xrdp shall
+completely retire the current encoder and its children, queues, borrowed
+captures and acknowledgement ownership. After the successor is ready, it
+shall request exactly one current full-screen update from the direct producer.
+The replacement must render a complete current desktop; connection liveness
+alone does not satisfy this gate.
+
+Do not correct only a source-reachable handler on a development build which
+does not exhibit the client-visible precursor. That would prove a unit branch,
+not the observed failure. First reproduce and identify the behavioral
+divergence, then demonstrate that the correction changes the same mechanism.
+If a later peer EOF remains after the precursor and replacement transition are
+correct, keep it red as a separate defect rather than masking it with retry,
+fallback, codec selection or timeout changes.
+
 ## Clean-room correction and closure
 
 Only after the development audit, paired CI and two-arm red/green proof pass may

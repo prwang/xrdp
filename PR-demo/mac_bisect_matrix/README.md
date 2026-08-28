@@ -144,6 +144,23 @@ Edit/add `gfx/arm-X.toml` + `k8s/arm-X.yaml` (next port), map the arm in
 the yaml/toml with the bisect log entry in `BACKLOG.md` — the matrix in git
 must always describe what is actually listening.
 
+The one temporary exception is x045 on port 40061. It is the exact x042
+clean-room candidate plus fault-preserving graphics lifecycle instrumentation,
+with the unchanged x042 `auto` profile. Human-rate transitions go to
+`xrdp.log`; the compile-time perf-trace ring records per-frame damage, ack and
+send ordering under `/var/lib/xrdp-matrix/x045-lifecycle-trace`. It exists only
+to capture the repeated-capability/resize teardown before any correction. The
+owner reproduced that sequence; the raw logs, complete perf trace and ownership
+accounting are retained in
+`captures/i142d_x045_windows_repro_20260828T002619Z/`. They prove the
+reset-without-producer-repaint and one unmatched encoder, while deliberately
+leaving the peer EOF separate from the narrower unproven claim that the orphan
+alone caused it. The same-client development control is retained in
+`captures/i142d_x044_windows_control_20260828T004123Z/`: 64 completed resizes,
+one pre-login capability advertisement and no observed black/disconnect
+transition. Together the captures reopen the development/clean-room
+equivalence verdict at the preceding client-visible wire transition.
+
 ## The arm set (#104 baseline, #122 selected-monitor pair)
 
 The baseline is **five arms on one image**, `x031`–`x035`, differing only in

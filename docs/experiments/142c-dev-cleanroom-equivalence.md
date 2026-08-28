@@ -191,3 +191,37 @@ The replacement 40058 arm then ran the same 2196-by-1250 to 2198-by-1250 to
 the client stayed connected and the retained lossless frame is a rendered
 2412-by-1344 XFCE desktop. This supersedes the original clean-room red arm;
 the original record remains unchanged as the defect evidence.
+
+## 2026-08-28 behavioral-equivalence verdict superseded
+
+The allocation correction and its red/green evidence above remain valid. The
+broader conclusion that no category-3 or category-5 behavioral divergence
+remained does not.
+
+The same Windows client exercised development 40060 and the instrumented
+clean-room candidate with the same nine GFX capsets, v10.7 confirmation,
+dense AVC444v2 software profile and interactive resizing. Development survived
+64 completed resizes without another capability advertisement, black
+regions or disconnect. Clean-room completed six resize cycles, then sent the
+first frame after the seventh resize; the client did not acknowledge that
+frame and sent a new capability advertisement 53 ms later. The callback then
+orphaned the live encoder and published a surface which remained at frame
+counters 0/0/0 until the next resize.
+
+The original audit compared normative requirements, source ownership and
+deterministic gates. It classified clean-room's dedicated capture/encode path
+and development's message-62 GFX path as equivalent implementations without
+an exact client-visible post-resize transition gate. The Windows result
+falsifies that unqualified classification. Shared unsafe callback code proves
+only what either tree would do *if* it received a second advertisement; it
+does not reconcile why only clean-room reached that state.
+
+#142C is therefore reopened for the missing wire/lifecycle equivalence. The
+current boundary is after clean-room's final ResetGraphics and first
+post-resize frame, and before the replacement advertisement. The exact frame
+payload, graphics-envelope serialization, frame/ack ordering and capture
+ingress remain candidates; none is yet the root cause. The complete trace and
+bounded lifecycle finding are recorded in
+[`142d-repeated-resize-transport-teardown.md`](142d-repeated-resize-transport-teardown.md).
+The same-client development control is retained in
+[`i142d_x044_windows_control_20260828T004123Z/`](../../PR-demo/mac_bisect_matrix/captures/i142d_x044_windows_control_20260828T004123Z/README.md).
