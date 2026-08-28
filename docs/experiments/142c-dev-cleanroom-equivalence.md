@@ -324,3 +324,10 @@ no-symbol/no-string/no-side-effect footprint gate. The next trace-disabled
 40060 deployment is the red equivalence arm: a green owner result reopens the
 implementation inventory again, while reproduction of the replacement
 capability advertisement permits #142D's callback correction to proceed.
+
+The trace-disabled package built from canonical xrdp `b11655aa0b02` and paired
+xorgxrdp `baf9658c397d` is deployed on port 40060. Its three-second certificate
+passes the pipe, six auxiliary-leaf wire assertions and four-picture decode
+gate with no black frame. Exact image, package and profile identities are
+retained in
+[`i142c_x044_worker_reconcile_20260828T153822Z/`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md).

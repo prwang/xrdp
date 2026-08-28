@@ -275,6 +275,11 @@ restored default binary; deploy it trace-disabled on 40060 and repeat the same
 Windows resize gate. Do not repair the replacement-capability callback unless
 this arm first reproduces that callback's client-side precursor.
 
+The trace-disabled worker-boundary pair is now deployed at
+`127.0.0.1:40060`; its package/profile certificate is green and the pod has
+zero restarts. Await the owner Windows resize result. Deployment identity:
+[`PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md).
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose
