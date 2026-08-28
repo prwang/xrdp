@@ -278,3 +278,49 @@ a missing readability guard, emitted an empty-key `CERTIFIED` result. That
 certificate was not used. The certifier now fails closed, x044 owns and mounts
 its explicit profile, and the replacement certificate keys the identical pod
 and repository profile hash.
+
+## 2026-08-28 order-64 adapter control remains green
+
+The owner exercised the rebuilt development arm for twenty resize interactions
+without observing clean-room's black-surface precursor or following teardown.
+The retained server log contains 44 completed reset transitions on the first
+Windows connection and another 26 on the reconnected preserved session. Each
+connection received one initial capability advertisement and no replacement.
+This exceeds clean-room's seven-resize failure depth and is a red equivalence
+result, not evidence that the shared lifecycle defect is absent.
+
+Review of the deployed change explains the result. Development xorgxrdp sends
+the dedicated order-64 capture, but development xrdp immediately reconstructs
+the old order-62 graphics envelope and calls the unchanged GFX-command queue.
+Clean-room instead retains the capture fields as a surface-capture item through
+its dedicated ffmpeg worker. The adapter altered the xup boundary while making
+the post-boundary execution intentionally identical to old development; it
+therefore did not instantiate the behavior it was supposed to compare.
+
+The control and exact logs are retained in
+[`i142c_x044_windows_green_20260828T152300Z/`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_windows_green_20260828T152300Z/README.md).
+The owning gate stays open. Development must preserve or independently prove
+the raw-capture execution semantics before the Windows comparison can be
+repeated; the later capability callback repair remains out of sequence.
+
+## 2026-08-28 raw capture retained through the worker boundary
+
+The next manual reconciliation removes the immediate main-thread conversion.
+`server_paint_rects_ex()` now validates and queues the dedicated capture as a
+surface-capture item which owns copied rectangle metadata and borrows the
+mapped capture pages. The encoder worker is the first code which constructs
+the bounded STARTFRAME/WIRETOSURFACE_1/ENDFRAME envelope, and it immediately
+passes that envelope through development's existing strict parser, ffmpeg
+runner and serializer. Construction failure is terminal and returns the
+capture identity so producer ownership cannot remain wedged.
+
+This changes the actual scheduling and ownership boundary while retaining the
+independently gated development encoder. It is still not an equivalence
+verdict: clean-room's ffmpeg worker was independently re-authored, and only the
+same-client Windows result can establish whether this was the remaining
+precursor. The default complete suite passes 218/218 daemon tests. The next
+trace-enabled suite passes 219/219, and the restored default build passes the
+no-symbol/no-string/no-side-effect footprint gate. The next trace-disabled
+40060 deployment is the red equivalence arm: a green owner result reopens the
+implementation inventory again, while reproduction of the replacement
+capability advertisement permits #142D's callback correction to proceed.

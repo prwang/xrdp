@@ -257,6 +257,24 @@ certifier now fails closed and x044 owns the explicit equivalent profile.
 Deployment evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_x044_manual_reconcile_20260828T123514Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_manual_reconcile_20260828T123514Z/README.md).
 
+**RED 2026-08-28:** the owner completed twenty resize interactions without the
+clean-room symptom; server evidence contains 44 resets on the first Windows
+connection and 26 on the reconnected preserved session, with exactly one
+capability advertisement per connection. The order-64 adapter immediately
+reconstructed the old order-62 blob and re-entered the old development encoder,
+so it did not reconcile clean-room's raw-capture ffmpeg execution path. Resume
+that reconciliation before any capability-lifecycle correction. Evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_x044_windows_green_20260828T152300Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_windows_green_20260828T152300Z/README.md).
+
+The next development revision retains the validated order-64 capture as a raw
+borrowed item through the encoder FIFO and constructs the legacy-compatible
+GFX envelope only on the encoder worker. This removes the proven main-thread
+queue divergence without transplanting clean-room source. Its complete
+default and trace-enabled suites are green, and tracing is absent from the
+restored default binary; deploy it trace-disabled on 40060 and repeat the same
+Windows resize gate. Do not repair the replacement-capability callback unless
+this arm first reproduces that callback's client-side precursor.
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose
