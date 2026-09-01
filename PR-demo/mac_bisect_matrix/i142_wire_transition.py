@@ -29,7 +29,9 @@ def trace_files(path):
     result = []
     for root, _, names in os.walk(path):
         for name in sorted(names):
-            if name.startswith("enc.") or name.startswith("xrdp-perf."):
+            if (name.startswith("enc.") or
+                    name.startswith("xrdp-perf.") or
+                    name.startswith("xrdp.")):
                 result.append(os.path.join(root, name))
     if not result:
         raise ValueError("%s contains no perf-trace files" % path)

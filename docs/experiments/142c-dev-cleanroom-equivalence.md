@@ -387,3 +387,14 @@ dropped records and reports the exact frame transaction, cumulative client
 acknowledgement and capability sets surrounding each replacement
 advertisement. This establishes correlations; it does not claim that the
 bounded payload words prove byte equality.
+
+The first deploy certificate exposed two defects in the diagnostic itself.
+The analyzer did not recognize the sink's deployed `xrdp.<pid>` filename, and
+the wire inspector omitted the reserved two bytes in MapSurfaceToOutput. The
+latter made the map following CreateSurface appear as an unidentified send.
+Both defects were corrected before interactive use. A test now constructs the
+map through the production builder, verifies its surface and coordinates, and
+rejects every truncation. The retained three-second traces from both old
+diagnostic images contain 525 sends, four inbound commands, one initial
+capability advertisement and no sink drops; the analyzer reads both and
+correctly reports no replacement advertisement in that short certificate.

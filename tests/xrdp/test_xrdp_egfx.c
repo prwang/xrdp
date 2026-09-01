@@ -730,6 +730,17 @@ START_TEST(test_wire_inspect_reads_frame_and_avc444_metadata)
     ck_assert_int_eq(77, info.frame_id);
     free_stream(s);
 
+    s = xrdp_egfx_map_surface(bulk, 3, 123, 456);
+    ck_assert_ptr_ne(s, NULL);
+    ck_assert_int_eq(0, xrdp_egfx_wire_inspect(
+                         s->data, (int)(s->end - s->data), &info));
+    ck_assert_int_eq(XR_RDPGFX_CMDID_MAPSURFACETOOUTPUT,
+                     info.command_id);
+    ck_assert_int_eq(3, info.surface_id);
+    ck_assert_int_eq(123, info.x1);
+    ck_assert_int_eq(456, info.y1);
+    free_stream(s);
+
     tb_u32(payload, 0x40000008U);
     tb_u32(payload + 4, 1U);
     tb_u32(payload + 8, 0xA1B2C3D4U);
@@ -792,6 +803,17 @@ START_TEST(test_wire_inspect_rejects_every_truncated_wire_message)
     ck_assert_int_eq(0, xrdp_egfx_wire_inspect(s->data, bytes, &info));
     ck_assert_int_ne(0, xrdp_egfx_wire_inspect(NULL, bytes, &info));
     ck_assert_int_ne(0, xrdp_egfx_wire_inspect(s->data, bytes, NULL));
+    free_stream(s);
+
+    s = xrdp_egfx_map_surface(bulk, 3, 123, 456);
+    ck_assert_ptr_ne(s, NULL);
+    bytes = (int)(s->end - s->data);
+    for (length = 0; length < bytes; ++length)
+    {
+        ck_assert_int_ne(0, xrdp_egfx_wire_inspect(
+                             s->data, length, &info));
+    }
+    ck_assert_int_eq(0, xrdp_egfx_wire_inspect(s->data, bytes, &info));
     free_stream(s);
     g_free(bulk);
 }

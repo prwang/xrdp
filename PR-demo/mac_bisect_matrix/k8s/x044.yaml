@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:dev-wire-6d3f0d99-baf9658-u2404-xfce
+          image: localhost/xrdp-bisect:dev-wire-85b66377-baf9658-u2404-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -76,5 +76,5 @@ spec:
             name: xrdp-gfx-x044
         - name: wire-trace
           hostPath:
-            path: /var/lib/xrdp-matrix/x044-wire-6d3f0d99
+            path: /var/lib/xrdp-matrix/x044-wire-85b66377
             type: DirectoryOrCreate

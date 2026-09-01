@@ -245,13 +245,13 @@ xrdp_egfx_wire_inspect(const char *data, int bytes,
             info->surface_id = (int)wire_u16(data + body_offset);
             break;
         case XR_RDPGFX_CMDID_MAPSURFACETOOUTPUT:
-            if (info->pdu_bytes != 18)
+            if (info->pdu_bytes != 20)
             {
                 return 1;
             }
             info->surface_id = (int)wire_u16(data + body_offset);
-            info->x1 = (int)wire_u32(data + body_offset + 2);
-            info->y1 = (int)wire_u32(data + body_offset + 6);
+            info->x1 = (int)wire_u32(data + body_offset + 4);
+            info->y1 = (int)wire_u32(data + body_offset + 8);
             break;
         case XR_RDPGFX_CMDID_RESETGRAPHICS:
             if (info->pdu_bytes != 340)
