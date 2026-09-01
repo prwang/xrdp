@@ -33,6 +33,7 @@ missing
 mkinstalldirs
 NEWS
 *.o
+*.Po
 README
 sesman/chansrv/xrdp-chansrv
 sesman/sesexec/xrdp-sesexec
