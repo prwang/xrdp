@@ -359,3 +359,31 @@ capability sets through `common/perf_trace`; it does not hash or synchronously
 dump whole encoded payloads. A new implementation port requires a concrete
 trace difference and a prediction connecting that difference to the client
 advertisement.
+
+## Comparable logical-wire instrument
+
+Both implementations now inspect the already-serialized logical RDPGFX stream
+at `xrdp_egfx_send_data()`, after construction and immediately before dynamic
+channel fragmentation. One asynchronous perf record names each command's
+monotonic send sequence and result. Frame commands carry frame identity;
+surface writes carry the enclosing frame, surface, codec, LC view, destination
+rectangle, region count, logical payload length, segmented transport length
+and three fixed 32-bit words from the payload edges. Surface lifecycle,
+ResetGraphics and capability confirmation have command-specific fields. The
+receive side records every frame acknowledgement and every capability version,
+flags and ordinal together with the last outbound sequence.
+
+The instrument deliberately does not hash or dump the encoded body. It parses
+a bounded header and reads three fixed words, formats into the calling thread's
+existing byte ring and leaves all I/O to the sink. The same parser and schema
+are compiled into the two diagnostic arms. Complete and every-truncation unit
+tests pass in both trees. Development passes 221 trace-enabled daemon checks
+and 218 default checks; clean-room passes 206 trace-enabled and 204 default
+checks. Both default builds pass the no-code/no-data/no-argument-evaluation
+footprint test.
+
+`PR-demo/mac_bisect_matrix/i142_wire_transition.py` rejects malformed or
+dropped records and reports the exact frame transaction, cumulative client
+acknowledgement and capability sets surrounding each replacement
+advertisement. This establishes correlations; it does not claim that the
+bounded payload words prove byte equality.

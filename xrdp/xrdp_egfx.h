@@ -121,6 +121,36 @@ struct xrdp_egfx_point
     short y;
 };
 
+#if defined(XRDP_PERF_TRACE)
+struct xrdp_egfx_wire_info
+{
+    int descriptor;
+    int segment_count;
+    int command_id;
+    int flags;
+    int frame_id;
+    int surface_id;
+    int codec_id;
+    int pixel_format;
+    int x1;
+    int y1;
+    int x2;
+    int y2;
+    int width;
+    int height;
+    int monitor_count;
+    int lc;
+    int version;
+    int caps_flags;
+    unsigned int pdu_bytes;
+    unsigned int bitmap_bytes;
+    unsigned int region_count;
+    unsigned int payload_head;
+    unsigned int payload_next;
+    unsigned int payload_tail;
+};
+#endif
+
 struct xrdp_egfx
 {
     struct xrdp_session *session;
@@ -133,6 +163,12 @@ struct xrdp_egfx
     int (*caps_advertise)(void *user, int num_caps, int *version, int *flags);
     int (*frame_ack)(void *user, uint32_t queue_depth,
                      int frame_id, int frames_decoded);
+#if defined(XRDP_PERF_TRACE)
+    unsigned int wire_tx_sequence;
+    unsigned int wire_rx_sequence;
+    unsigned int wire_caps_sequence;
+    int wire_frame_id;
+#endif
 };
 
 struct xrdp_egfx_bulk
@@ -142,6 +178,11 @@ struct xrdp_egfx_bulk
 
 int
 xrdp_egfx_send_data(struct xrdp_egfx *egfx, const char *data, int bytes);
+#if defined(XRDP_PERF_TRACE)
+int
+xrdp_egfx_wire_inspect(const char *data, int bytes,
+                       struct xrdp_egfx_wire_info *info);
+#endif
 int
 xrdp_egfx_send_s(struct xrdp_egfx *egfx, struct stream *s);
 int

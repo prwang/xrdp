@@ -41,10 +41,331 @@
 #include "libxrdp.h"
 #include "xrdp_channel.h"
 #include "xrdp_mm.h"
+#include "perf_trace.h"
 #include <limits.h>
 
 #define MAX_PART_SIZE 0xFFFF
 #define PACKET_COMPR_TYPE_RDP8 0x04 /* MS-RDPEGFX 2.2.5.3 */
+
+#if defined(XRDP_PERF_TRACE)
+/*****************************************************************************/
+static unsigned int
+wire_u16(const char *data)
+{
+    const unsigned char *p;
+
+    p = (const unsigned char *)data;
+    return p[0] | (unsigned int)p[1] << 8;
+}
+
+/*****************************************************************************/
+static unsigned int
+wire_u32(const char *data)
+{
+    const unsigned char *p;
+
+    p = (const unsigned char *)data;
+    return p[0] | (unsigned int)p[1] << 8 |
+           (unsigned int)p[2] << 16 | (unsigned int)p[3] << 24;
+}
+
+/*****************************************************************************/
+static int
+wire_trace_on(void)
+{
+    static int enabled = -1;
+
+    if (enabled < 0)
+    {
+        const char *value;
+
+        value = g_getenv("XRDP_WIRE_TRACE");
+        enabled = value != NULL && value[0] == '1';
+        if (enabled && !perf_trace_on())
+        {
+            LOG(LOG_LEVEL_WARNING, "XRDP_WIRE_TRACE=1 but XRDP_PERF_TRACE "
+                "is not set; no graphics wire records will be written");
+            enabled = 0;
+        }
+    }
+    return enabled;
+}
+
+/*****************************************************************************/
+int
+xrdp_egfx_wire_inspect(const char *data, int bytes,
+                       struct xrdp_egfx_wire_info *info)
+{
+    unsigned long long expected_bytes;
+    unsigned int bitmap_chunks;
+    unsigned int body_offset;
+    unsigned int command_offset;
+    unsigned int first_segment_bytes;
+    unsigned int uncompressed_bytes;
+
+    if (data == NULL || info == NULL || bytes < 10)
+    {
+        return 1;
+    }
+    g_memset(info, 0, sizeof(*info));
+    info->frame_id = -1;
+    info->surface_id = -1;
+    info->codec_id = -1;
+    info->pixel_format = -1;
+    info->x1 = -1;
+    info->y1 = -1;
+    info->x2 = -1;
+    info->y2 = -1;
+    info->width = -1;
+    info->height = -1;
+    info->monitor_count = -1;
+    info->lc = -1;
+    info->version = -1;
+    info->caps_flags = -1;
+    info->descriptor = (unsigned char)data[0];
+    if (info->descriptor == 0xE0)
+    {
+        info->segment_count = 1;
+        command_offset = 2;
+        body_offset = 10;
+    }
+    else if (info->descriptor == 0xE1 && bytes >= 20)
+    {
+        info->segment_count = (int)wire_u16(data + 1);
+        uncompressed_bytes = wire_u32(data + 3);
+        first_segment_bytes = wire_u32(data + 7);
+        command_offset = 12;
+        body_offset = 20;
+        if (info->segment_count < 1 || first_segment_bytes != 26)
+        {
+            return 1;
+        }
+    }
+    else
+    {
+        return 1;
+    }
+    info->command_id = (int)wire_u16(data + command_offset);
+    info->flags = (int)wire_u16(data + command_offset + 2);
+    info->pdu_bytes = wire_u32(data + command_offset + 4);
+    if (info->pdu_bytes < 8)
+    {
+        return 1;
+    }
+    if (info->descriptor == 0xE0)
+    {
+        if ((unsigned long long)info->pdu_bytes + 2U !=
+                (unsigned int)bytes)
+        {
+            return 1;
+        }
+    }
+    else if (uncompressed_bytes != info->pdu_bytes ||
+             info->command_id != XR_RDPGFX_CMDID_WIRETOSURFACE_1 ||
+             info->pdu_bytes < 25 || bytes < 37)
+    {
+        return 1;
+    }
+
+    switch (info->command_id)
+    {
+        case XR_RDPGFX_CMDID_STARTFRAME:
+            if (info->pdu_bytes != 16)
+            {
+                return 1;
+            }
+            info->frame_id = (int)wire_u32(data + body_offset + 4);
+            break;
+        case XR_RDPGFX_CMDID_ENDFRAME:
+            if (info->pdu_bytes != 12)
+            {
+                return 1;
+            }
+            info->frame_id = (int)wire_u32(data + body_offset);
+            break;
+        case XR_RDPGFX_CMDID_WIRETOSURFACE_1:
+            if (info->descriptor != 0xE1 || info->pdu_bytes < 25)
+            {
+                return 1;
+            }
+            info->surface_id = (int)wire_u16(data + body_offset);
+            info->codec_id = (int)wire_u16(data + body_offset + 2);
+            info->pixel_format = (unsigned char)data[body_offset + 4];
+            info->x1 = (int)wire_u16(data + body_offset + 5);
+            info->y1 = (int)wire_u16(data + body_offset + 7);
+            info->x2 = (int)wire_u16(data + body_offset + 9);
+            info->y2 = (int)wire_u16(data + body_offset + 11);
+            info->bitmap_bytes = wire_u32(data + body_offset + 13);
+            if (info->pdu_bytes != info->bitmap_bytes + 25U)
+            {
+                return 1;
+            }
+            bitmap_chunks = (unsigned int)(
+                                ((unsigned long long)info->bitmap_bytes +
+                                 MAX_PART_SIZE - 1U) / MAX_PART_SIZE);
+            expected_bytes = 37ULL + info->bitmap_bytes +
+                             (unsigned long long)bitmap_chunks * 5ULL;
+            if (expected_bytes != (unsigned int)bytes ||
+                    info->segment_count != (int)bitmap_chunks + 1)
+            {
+                return 1;
+            }
+            if (info->bitmap_bytes >= 4)
+            {
+                info->payload_head = wire_u32(data + 42);
+                info->payload_tail = wire_u32(data + bytes - 4);
+            }
+            if (info->bitmap_bytes >= 8)
+            {
+                info->payload_next = wire_u32(data + 46);
+            }
+            if ((info->codec_id == XR_RDPGFX_CODECID_AVC444 ||
+                    info->codec_id == XR_RDPGFX_CODECID_AVC444V2) &&
+                    info->bitmap_bytes >= 8)
+            {
+                info->lc = (int)(info->payload_head >> 30);
+                info->region_count = info->payload_next;
+            }
+            break;
+        case XR_RDPGFX_CMDID_CREATESURFACE:
+            if (info->pdu_bytes != 15)
+            {
+                return 1;
+            }
+            info->surface_id = (int)wire_u16(data + body_offset);
+            info->width = (int)wire_u16(data + body_offset + 2);
+            info->height = (int)wire_u16(data + body_offset + 4);
+            info->pixel_format = (unsigned char)data[body_offset + 6];
+            break;
+        case XR_RDPGFX_CMDID_DELETESURFACE:
+            if (info->pdu_bytes != 10)
+            {
+                return 1;
+            }
+            info->surface_id = (int)wire_u16(data + body_offset);
+            break;
+        case XR_RDPGFX_CMDID_MAPSURFACETOOUTPUT:
+            if (info->pdu_bytes != 18)
+            {
+                return 1;
+            }
+            info->surface_id = (int)wire_u16(data + body_offset);
+            info->x1 = (int)wire_u32(data + body_offset + 2);
+            info->y1 = (int)wire_u32(data + body_offset + 6);
+            break;
+        case XR_RDPGFX_CMDID_RESETGRAPHICS:
+            if (info->pdu_bytes != 340)
+            {
+                return 1;
+            }
+            info->width = (int)wire_u32(data + body_offset);
+            info->height = (int)wire_u32(data + body_offset + 4);
+            info->monitor_count = (int)wire_u32(data + body_offset + 8);
+            break;
+        case XR_RDPGFX_CMDID_CAPSCONFIRM:
+            if (info->pdu_bytes != 20 ||
+                    wire_u32(data + body_offset + 4) != 4)
+            {
+                return 1;
+            }
+            info->version = (int)wire_u32(data + body_offset);
+            info->caps_flags = (int)wire_u32(data + body_offset + 8);
+            break;
+        default:
+            break;
+    }
+    return 0;
+}
+
+/*****************************************************************************/
+static void
+wire_trace_tx(struct xrdp_egfx *egfx, const char *data, int bytes, int result)
+{
+    struct xrdp_egfx_wire_info info;
+    unsigned int sequence;
+    int frame_id;
+
+    if (!wire_trace_on())
+    {
+        return;
+    }
+    sequence = ++egfx->wire_tx_sequence;
+    if (xrdp_egfx_wire_inspect(data, bytes, &info) != 0)
+    {
+        PERF_TRACE("event=wire_tx seq=%u valid=0 wire_bytes=%d result=%d",
+                   sequence, bytes, result);
+        return;
+    }
+    if (info.command_id == XR_RDPGFX_CMDID_STARTFRAME)
+    {
+        egfx->wire_frame_id = info.frame_id;
+    }
+    frame_id = info.frame_id >= 0 ? info.frame_id : egfx->wire_frame_id;
+    if (info.command_id == XR_RDPGFX_CMDID_WIRETOSURFACE_1)
+    {
+        PERF_TRACE("event=wire_tx seq=%u cmd=%d frame=%d surface=%d "
+                   "codec=%d lc=%d x1=%d y1=%d x2=%d y2=%d "
+                   "regions=%u payload_bytes=%u pdu_bytes=%u "
+                   "wire_bytes=%d segments=%d head=%u next=%u tail=%u "
+                   "result=%d", sequence, info.command_id, frame_id,
+                   info.surface_id, info.codec_id, info.lc, info.x1,
+                   info.y1, info.x2, info.y2, info.region_count,
+                   info.bitmap_bytes, info.pdu_bytes, bytes,
+                   info.segment_count, info.payload_head,
+                   info.payload_next, info.payload_tail, result);
+    }
+    else if (info.command_id == XR_RDPGFX_CMDID_CREATESURFACE)
+    {
+        PERF_TRACE("event=wire_tx seq=%u cmd=%d frame=%d surface=%d "
+                   "width=%d height=%d pixel=%d pdu_bytes=%u "
+                   "wire_bytes=%d result=%d", sequence, info.command_id,
+                   frame_id, info.surface_id, info.width, info.height,
+                   info.pixel_format, info.pdu_bytes, bytes, result);
+    }
+    else if (info.command_id == XR_RDPGFX_CMDID_RESETGRAPHICS)
+    {
+        PERF_TRACE("event=wire_tx seq=%u cmd=%d width=%d height=%d "
+                   "monitors=%d pdu_bytes=%u wire_bytes=%d result=%d",
+                   sequence, info.command_id, info.width, info.height,
+                   info.monitor_count, info.pdu_bytes, bytes, result);
+    }
+    else if (info.command_id == XR_RDPGFX_CMDID_CAPSCONFIRM)
+    {
+        PERF_TRACE("event=wire_tx seq=%u cmd=%d version=%u flags=%u "
+                   "pdu_bytes=%u wire_bytes=%d result=%d", sequence,
+                   info.command_id, (unsigned int)info.version,
+                   (unsigned int)info.caps_flags,
+                   info.pdu_bytes, bytes, result);
+    }
+    else
+    {
+        PERF_TRACE("event=wire_tx seq=%u cmd=%d frame=%d surface=%d "
+                   "x=%d y=%d pdu_bytes=%u wire_bytes=%d result=%d",
+                   sequence, info.command_id, frame_id, info.surface_id,
+                   info.x1, info.y1, info.pdu_bytes, bytes, result);
+    }
+    if (info.command_id == XR_RDPGFX_CMDID_ENDFRAME)
+    {
+        egfx->wire_frame_id = 0;
+    }
+}
+
+/*****************************************************************************/
+static void
+wire_trace_rx(struct xrdp_egfx *egfx, int command_id, int flags,
+              int pdu_bytes)
+{
+    if (wire_trace_on())
+    {
+        ++egfx->wire_rx_sequence;
+        PERF_TRACE("event=wire_rx seq=%u cmd=%d flags=%u pdu_bytes=%d "
+                   "last_tx=%u frame_context=%d",
+                   egfx->wire_rx_sequence, command_id,
+                   (unsigned int)flags, pdu_bytes,
+                   egfx->wire_tx_sequence, egfx->wire_frame_id);
+    }
+}
+#endif
 
 /******************************************************************************/
 int
@@ -52,6 +373,13 @@ xrdp_egfx_send_data(struct xrdp_egfx *egfx, const char *data, int bytes)
 {
     int error;
     int to_send;
+#if defined(XRDP_PERF_TRACE)
+    const char *trace_data;
+    int trace_bytes;
+
+    trace_data = data;
+    trace_bytes = bytes;
+#endif
 
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_send_data:");
 
@@ -79,6 +407,9 @@ xrdp_egfx_send_data(struct xrdp_egfx *egfx, const char *data, int bytes)
             bytes -= to_send;
         }
     }
+#if defined(XRDP_PERF_TRACE)
+    wire_trace_tx(egfx, trace_data, trace_bytes, error);
+#endif
     return error;
 }
 
@@ -776,6 +1107,15 @@ xrdp_egfx_process_frame_ack(struct xrdp_egfx *egfx, struct stream *s)
     in_uint32_le(s, queueDepth);
     in_uint32_le(s, intframeId);
     in_uint32_le(s, totalFramesDecoded);
+#if defined(XRDP_PERF_TRACE)
+    if (wire_trace_on())
+    {
+        PERF_TRACE("event=wire_ack rx_seq=%u frame=%u queue_depth=%u "
+                   "decoded=%u last_tx=%u", egfx->wire_rx_sequence,
+                   intframeId, queueDepth, totalFramesDecoded,
+                   egfx->wire_tx_sequence);
+    }
+#endif
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_process_frame_ack: queueDepth %d"
         " intframeId %d totalFramesDecoded %d",
         queueDepth, intframeId, totalFramesDecoded);
@@ -801,6 +1141,11 @@ xrdp_egfx_process_capsadvertise(struct xrdp_egfx *egfx, struct stream *s)
     int *versions;
     int *flagss;
     int rv = 0;
+#if defined(XRDP_PERF_TRACE)
+    unsigned int caps_sequence;
+
+    caps_sequence = 0;
+#endif
 
     LOG(LOG_LEVEL_TRACE, "xrdp_egfx_process_capsadvertise:");
     if (egfx->caps_advertise == NULL)
@@ -812,6 +1157,15 @@ xrdp_egfx_process_capsadvertise(struct xrdp_egfx *egfx, struct stream *s)
     {
         return 1;
     }
+#if defined(XRDP_PERF_TRACE)
+    if (wire_trace_on())
+    {
+        caps_sequence = ++egfx->wire_caps_sequence;
+        PERF_TRACE("event=wire_caps_begin caps_seq=%u rx_seq=%u sets=%d "
+                   "last_tx=%u", caps_sequence, egfx->wire_rx_sequence,
+                   capsSetCount, egfx->wire_tx_sequence);
+    }
+#endif
     caps_count = 0;
     versions = g_new(int, capsSetCount);
     flagss = g_new(int, capsSetCount);
@@ -836,6 +1190,20 @@ xrdp_egfx_process_capsadvertise(struct xrdp_egfx *egfx, struct stream *s)
                 break;
             }
             holdp = s->p;
+#if defined(XRDP_PERF_TRACE)
+            if (wire_trace_on())
+            {
+                int trace_flags;
+
+                trace_flags = capsDataLength == 4 ?
+                              (int)wire_u32(holdp) : -1;
+                PERF_TRACE("event=wire_cap caps_seq=%u rx_seq=%u index=%d "
+                           "version=%u data_bytes=%d flags=%d last_tx=%u",
+                           caps_sequence, egfx->wire_rx_sequence, index,
+                           (unsigned int)version, capsDataLength, trace_flags,
+                           egfx->wire_tx_sequence);
+            }
+#endif
             // This implicity excludes caps version 101.
             if (capsDataLength == 4)
             {
@@ -887,6 +1255,9 @@ xrdp_egfx_process(struct xrdp_egfx *egfx, struct stream *s)
         {
             return 1;
         }
+#if defined(XRDP_PERF_TRACE)
+        wire_trace_rx(egfx, cmdId, flags, pduLength);
+#endif
         switch (cmdId)
         {
             case XR_RDPGFX_CMDID_FRAMEACKNOWLEDGE:

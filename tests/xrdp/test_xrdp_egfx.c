@@ -710,6 +710,94 @@ START_TEST(test_batch_capture_info_reads_the_exact_avc444_envelope)
 }
 END_TEST
 
+#if defined(XRDP_PERF_TRACE)
+/*****************************************************************************/
+START_TEST(test_wire_inspect_reads_frame_and_avc444_metadata)
+{
+    struct xrdp_egfx_bulk *bulk;
+    struct xrdp_egfx_rect rect;
+    struct xrdp_egfx_wire_info info;
+    struct stream *s;
+    unsigned char payload[12];
+
+    bulk = g_new0(struct xrdp_egfx_bulk, 1);
+    ck_assert_ptr_ne(bulk, NULL);
+    s = xrdp_egfx_frame_start(bulk, 77, 1234);
+    ck_assert_ptr_ne(s, NULL);
+    ck_assert_int_eq(0, xrdp_egfx_wire_inspect(
+                         s->data, (int)(s->end - s->data), &info));
+    ck_assert_int_eq(XR_RDPGFX_CMDID_STARTFRAME, info.command_id);
+    ck_assert_int_eq(77, info.frame_id);
+    free_stream(s);
+
+    tb_u32(payload, 0x40000008U);
+    tb_u32(payload + 4, 1U);
+    tb_u32(payload + 8, 0xA1B2C3D4U);
+    rect.x1 = 11;
+    rect.y1 = 12;
+    rect.x2 = 1011;
+    rect.y2 = 712;
+    s = xrdp_egfx_wire_to_surface1(
+            bulk, 3, XR_RDPGFX_CODECID_AVC444V2, 0x20,
+            &rect, payload, sizeof(payload));
+    ck_assert_ptr_ne(s, NULL);
+    ck_assert_int_eq(0, xrdp_egfx_wire_inspect(
+                         s->data, (int)(s->end - s->data), &info));
+    ck_assert_int_eq(XR_RDPGFX_CMDID_WIRETOSURFACE_1, info.command_id);
+    ck_assert_int_eq(3, info.surface_id);
+    ck_assert_int_eq(XR_RDPGFX_CODECID_AVC444V2, info.codec_id);
+    ck_assert_int_eq(1, info.lc);
+    ck_assert_int_eq(1, info.region_count);
+    ck_assert_int_eq(11, info.x1);
+    ck_assert_int_eq(12, info.y1);
+    ck_assert_int_eq(1011, info.x2);
+    ck_assert_int_eq(712, info.y2);
+    ck_assert_uint_eq(sizeof(payload), info.bitmap_bytes);
+    ck_assert_uint_eq(0x40000008U, info.payload_head);
+    ck_assert_uint_eq(1U, info.payload_next);
+    ck_assert_uint_eq(0xA1B2C3D4U, info.payload_tail);
+    free_stream(s);
+    g_free(bulk);
+}
+END_TEST
+
+/*****************************************************************************/
+START_TEST(test_wire_inspect_rejects_every_truncated_wire_message)
+{
+    struct xrdp_egfx_bulk *bulk;
+    struct xrdp_egfx_rect rect;
+    struct xrdp_egfx_wire_info info;
+    struct stream *s;
+    unsigned char payload[12];
+    int bytes;
+    int length;
+
+    bulk = g_new0(struct xrdp_egfx_bulk, 1);
+    ck_assert_ptr_ne(bulk, NULL);
+    g_memset(payload, 0x5A, sizeof(payload));
+    rect.x1 = 0;
+    rect.y1 = 0;
+    rect.x2 = 640;
+    rect.y2 = 480;
+    s = xrdp_egfx_wire_to_surface1(
+            bulk, 0, XR_RDPGFX_CODECID_AVC444V2, 0x20,
+            &rect, payload, sizeof(payload));
+    ck_assert_ptr_ne(s, NULL);
+    bytes = (int)(s->end - s->data);
+    for (length = 0; length < bytes; ++length)
+    {
+        ck_assert_int_ne(0, xrdp_egfx_wire_inspect(
+                             s->data, length, &info));
+    }
+    ck_assert_int_eq(0, xrdp_egfx_wire_inspect(s->data, bytes, &info));
+    ck_assert_int_ne(0, xrdp_egfx_wire_inspect(NULL, bytes, &info));
+    ck_assert_int_ne(0, xrdp_egfx_wire_inspect(s->data, bytes, NULL));
+    free_stream(s);
+    g_free(bulk);
+}
+END_TEST
+#endif
+
 /******************************************************************************/
 Suite *
 make_suite_egfx_base_functions(void)
@@ -754,6 +842,12 @@ make_suite_egfx_base_functions(void)
                    test_batch_peek_frame_id_rejects_what_it_cannot_read);
     tcase_add_test(tc_batch,
                    test_batch_capture_info_reads_the_exact_avc444_envelope);
+#if defined(XRDP_PERF_TRACE)
+    tcase_add_test(tc_batch,
+                   test_wire_inspect_reads_frame_and_avc444_metadata);
+    tcase_add_test(tc_batch,
+                   test_wire_inspect_rejects_every_truncated_wire_message);
+#endif
     suite_add_tcase(s, tc_batch);
 
     return s;

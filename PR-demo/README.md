@@ -88,7 +88,11 @@ realistic payload rather than a diagnostic pattern.
   Its same-Windows-client development control is retained at
   `mac_bisect_matrix/captures/i142d_x044_windows_control_20260828T004123Z/`;
   the pair proves the remaining divergence occurs before clean-room's second
-  capability callback.
+  capability callback. `mac_bisect_matrix/i142_wire_transition.py` reads the
+  two arms' asynchronous perf traces and reports, in protocol terms, the exact
+  frame transaction and latest client acknowledgement preceding every
+  replacement capability advertisement; it refuses dropped, malformed or
+  identity-incomplete traces.
 * **`multimon_offline/`** — drives a real two-monitor `xfreerdp /multimon`
   login and asserts the server took the multi-monitor AVC444 path.
   `setup_monitors.sh` verifies each output's **active pixel geometry**, not
