@@ -293,13 +293,16 @@ The comparable logical-wire instrument is implemented in both xrdp trees and
 unit-tested against complete and every-truncation multipart messages. It emits
 one bounded record per logical PDU, one per acknowledgement and one per
 advertised capability set; whole H.264 payloads are neither scanned nor copied.
-Development's trace-enabled daemon suite passes 221/221 and clean-room's passes
-206/206; restored default suites pass 218/218 and 204/204 respectively, and the
-disabled tracer retains no code, data or argument evaluation. Build two fresh
-trace arms with `XRDP_WIRE_TRACE=1`, preserve their traces through the same
-Windows resize sequence, and run
+The final trace-enabled inspector suites pass 220/220 on development and
+193/193 on clean-room; restored default suites pass 218/218 and 204/204
+respectively, and the disabled tracer retains no code, data or argument
+evaluation. Fresh trace arms are deployed on ports 40060 and 40061 with
+`XRDP_WIRE_TRACE=1`. Both pass the two-resolution rendered smoke and their
+short deploy certificates contain no unidentified send or sink drop. Preserve
+their traces through the same Windows resize sequence, and run
 `PR-demo/mac_bisect_matrix/i142_wire_transition.py` before proposing another
-reconciliation port.
+reconciliation port. Deployment evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_wire_two_arm_preinteractive_20260901T121113Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_wire_two_arm_preinteractive_20260901T121113Z/README.md).
 
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also

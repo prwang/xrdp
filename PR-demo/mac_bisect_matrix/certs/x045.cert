@@ -1,10 +1,10 @@
-arm:    x044
+arm:    x045
 mode:   automatic AVC (auxiliary-leaf topology)
-image:  localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce
-gfx:    sha256:5372197d3246b5da
-key:    localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce|5372197d3246b5da
-when:   2026-09-01T12:06:47Z
-window: 3s at 1920x1080, 31863 bytes
+image:  localhost/xrdp-bisect:cleanroom-wire-50a974b6-aca3c774-u2404-xfce
+gfx:    sha256:216aed1fd3b78c26
+key:    localhost/xrdp-bisect:cleanroom-wire-50a974b6-aca3c774-u2404-xfce|216aed1fd3b78c26
+when:   2026-09-01T12:06:57Z
+window: 3s at 1920x1080, 33117 bytes
 
 === encoder input pipe ===
 PIPE VERDICT: OK — no PIPE_TOO_SMALL in this pod's xrdp log
@@ -15,7 +15,7 @@ the handover cost is flat (0.71 ms at 512 KiB against
 whole of the requirement.
 
 === wire audit (--assert) ===
-=== x044 deploy certification ===
+=== x045 deploy certification ===
 SPS: 1920x1088 profile=77 level=51 max_num_ref_frames=1 log2_max_frame_num=4 poc_type=2 gaps=0  (1 SPS NALs, views: main)
 PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
 
