@@ -1,4 +1,4 @@
-# Development resize-repair arm, built without performance tracing.
+# Canonical development arm with bounded logical-wire diagnostics.
 # One monitor at the client-selected size; host endpoint 127.0.0.1:40060.
 apiVersion: apps/v1
 kind: Deployment
@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:reconciled-worker-b11655a-baf9658-u2404-xfce-notrace
+          image: localhost/xrdp-bisect:dev-wire-6d3f0d99-baf9658-u2404-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -31,7 +31,11 @@ spec:
             - name: SESSION_KIND
               value: "xfce"
             - name: ARM_LABEL
-              value: "Worker-reconciled development arm (port 40060)"
+              value: "Canonical development wire diagnostic (port 40060)"
+            - name: XRDP_PERF_TRACE
+              value: "/var/log/xrdp-perf/xrdp"
+            - name: XRDP_WIRE_TRACE
+              value: "1"
           ports:
             - containerPort: 3389
               hostPort: 40060
@@ -52,6 +56,8 @@ spec:
             - name: payloads
               mountPath: /usr/local/share/code_corpus.ansi
               subPath: code_corpus.ansi
+            - name: wire-trace
+              mountPath: /var/log/xrdp-perf
       volumes:
         - name: dshm
           emptyDir:
@@ -68,3 +74,7 @@ spec:
         - name: gfx
           configMap:
             name: xrdp-gfx-x044
+        - name: wire-trace
+          hostPath:
+            path: /var/lib/xrdp-matrix/x044-wire-6d3f0d99
+            type: DirectoryOrCreate

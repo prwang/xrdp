@@ -1,12 +1,12 @@
 #!/bin/bash
-# Build and deploy the trace-disabled development resize-repair arm.
+# Build and deploy the canonical development wire-diagnostic arm.
 set -eu
 
 D=$(cd "$(dirname "$0")" && pwd)
-DIST=${DIST:-/work/dist/reconciled-142c}
-XRDP_DEB=${XRDP_DEB:-xrdp-dev_0.10.80+git20260828153626.b11655aa0b02_amd64.deb}
+DIST=${DIST:-/work/dist/wire-142c}
+XRDP_DEB=${XRDP_DEB:-xrdp-dev_0.10.80+git20260901115405.6d3f0d99232a_amd64.deb}
 XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb}
-IMAGE=${IMAGE:-localhost/xrdp-bisect:reconciled-worker-b11655a-baf9658-u2404-xfce-notrace}
+IMAGE=${IMAGE:-localhost/xrdp-bisect:dev-wire-6d3f0d99-baf9658-u2404-xfce}
 BUILD="$D/.build-x044-resize-fixed"
 
 test -f "$DIST/$XRDP_DEB"
@@ -36,6 +36,7 @@ podman build --pull \
     --build-arg "XRDP_DEB=${XRDP_DEB##*/}" \
     --build-arg "XORGXRDP_DEB=${XORGXRDP_DEB##*/}" \
     --build-arg INSTALL_XFCE=1 \
+    --build-arg INSTALL_ACCEPTANCE_DESKTOP=1 \
     -t "$IMAGE" -f "$D/Containerfile.ubuntu2404" "$BUILD"
 podman save "$IMAGE" | k3s ctr images import -
 
@@ -50,4 +51,19 @@ kubectl -n bisect-matrix create configmap xrdp-gfx-x044 \
     --from-file=gfx.toml="$D/gfx/x044.toml" \
     --dry-run=client -o yaml | kubectl apply -f -
 kubectl apply -f "$D/k8s/x044.yaml"
+image_id=$(podman image inspect --format '{{.Id}}' "$IMAGE")
+kubectl -n bisect-matrix patch deployment xrdp-x044 --type merge \
+    -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"diagnostic-image-id\":\"$image_id\"}}}}}"
 kubectl -n bisect-matrix rollout status deployment/xrdp-x044 --timeout=300s
+
+pod=$(kubectl -n bisect-matrix get pod -l arm=x044 \
+    --field-selector status.phase=Running \
+    -o jsonpath='{.items[0].metadata.name}')
+kubectl -n bisect-matrix exec "$pod" -- \
+    test -x /usr/sbin/xrdp
+kubectl -n bisect-matrix exec "$pod" -- \
+    grep -q 'avc_mode = "auto"' /etc/xrdp/gfx.toml
+kubectl -n bisect-matrix exec "$pod" -- \
+    sh -c 'grep -aq "event=wire_tx" /usr/sbin/xrdp'
+
+echo "x044 canonical development wire diagnostic is ready on 127.0.0.1:40060"

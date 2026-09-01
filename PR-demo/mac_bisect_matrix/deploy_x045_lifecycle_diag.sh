@@ -1,12 +1,12 @@
 #!/bin/bash
-# Deploy a fault-preserving, lifecycle-instrumented clean-room comparison arm.
+# Deploy a fault-preserving clean-room wire-diagnostic comparison arm.
 set -eu
 
 D=$(cd "$(dirname "$0")" && pwd)
 DIST=${DIST:-/work/dist}
-XRDP_DEB=${XRDP_DEB:-diag-142d/xrdp-dev_0.10.80+git20260827233349.6e22c7fdac7f_amd64.deb}
+XRDP_DEB=${XRDP_DEB:-wire-142c/xrdp-dev_0.10.80+git20260901115405.a9bd3587574b_amd64.deb}
 XORGXRDP_DEB=${XORGXRDP_DEB:-xorgxrdp-dev_1%3a0.10.80+git20260826181120.aca3c774cb8b_amd64.deb}
-IMAGE=${IMAGE:-localhost/xrdp-bisect:cleanroom-diag-6e22c7fd-aca3c774-u2404-xfce-trace}
+IMAGE=${IMAGE:-localhost/xrdp-bisect:cleanroom-wire-a9bd3587-aca3c774-u2404-xfce}
 BUILD="$D/.build-x045-lifecycle-diag"
 
 test -f "$DIST/$XRDP_DEB"
@@ -64,6 +64,6 @@ kubectl -n bisect-matrix exec "$pod" -- \
 kubectl -n bisect-matrix exec "$pod" -- \
     grep -q 'avc_mode = "auto"' /etc/xrdp/gfx.toml
 kubectl -n bisect-matrix exec "$pod" -- \
-    sh -c 'grep -aq "GFX lifecycle: caps begin" /usr/sbin/xrdp'
+    sh -c 'grep -aq "event=wire_tx" /usr/sbin/xrdp'
 
-echo "x045 lifecycle diagnostic is ready on 127.0.0.1:40061"
+echo "x045 clean-room wire diagnostic is ready on 127.0.0.1:40061"

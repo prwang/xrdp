@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:cleanroom-diag-6e22c7fd-aca3c774-u2404-xfce-trace
+          image: localhost/xrdp-bisect:cleanroom-wire-a9bd3587-aca3c774-u2404-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -31,12 +31,14 @@ spec:
             - name: SESSION_KIND
               value: "xfce"
             - name: ARM_LABEL
-              value: "Clean-room graphics lifecycle diagnostic (port 40061)"
+              value: "Clean-room wire diagnostic (port 40061)"
             - name: XRDP_PERF_TRACE
               value: "/var/log/xrdp-perf/xrdp"
             - name: XRDP_GFX_TRACE
               value: "1"
             - name: XRDP_ACK_TRACE
+              value: "1"
+            - name: XRDP_WIRE_TRACE
               value: "1"
           ports:
             - containerPort: 3389
@@ -58,7 +60,7 @@ spec:
             - name: payloads
               mountPath: /usr/local/share/code_corpus.ansi
               subPath: code_corpus.ansi
-            - name: lifecycle-trace
+            - name: wire-trace
               mountPath: /var/log/xrdp-perf
       volumes:
         - name: dshm
@@ -76,7 +78,7 @@ spec:
         - name: gfx
           configMap:
             name: xrdp-gfx-x045
-        - name: lifecycle-trace
+        - name: wire-trace
           hostPath:
-            path: /var/lib/xrdp-matrix/x045-lifecycle-trace
+            path: /var/lib/xrdp-matrix/x045-wire-a9bd3587
             type: DirectoryOrCreate
