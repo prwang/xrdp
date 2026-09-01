@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: xrdp
-          image: localhost/xrdp-bisect:cleanroom-wire-a9bd3587-aca3c774-u2404-xfce
+          image: localhost/xrdp-bisect:cleanroom-wire-50a974b6-aca3c774-u2404-xfce
           imagePullPolicy: Never
           securityContext:
             privileged: true
@@ -80,5 +80,5 @@ spec:
             name: xrdp-gfx-x045
         - name: wire-trace
           hostPath:
-            path: /var/lib/xrdp-matrix/x045-wire-a9bd3587
+            path: /var/lib/xrdp-matrix/x045-wire-50a974b6
             type: DirectoryOrCreate
