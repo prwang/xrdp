@@ -121,6 +121,26 @@ reset and replacement encoder. If either pair elicits a new capability
 advertisement while a direct producer is live, the other pair must first
 reproduce the same precursor after all normative behavior is reconciled.
 
+The first comparison is observational, not a behavior port. Compile both arms
+with the repository's trace sink and record the same bounded schema at the
+logical RDPGFX send/receive boundary. Each outbound record identifies command
+order, surface and frame when present, coded and visible geometry, logical
+payload and segmented transport lengths, a bounded sample from the payload
+edges and the send result. Each inbound acknowledgement records its frame and
+decode frontier; each capability advertisement records every advertised
+version and flags together with the immediately preceding outbound sequence.
+The measured path shall not synchronously write, allocate a second trace ring,
+or scan an encoded payload solely to fingerprint it. Exact identities, rather
+than nearest timestamps, pair the events.
+
+The working hypothesis is that the first clean-room frame which Windows does
+not acknowledge differs from development in one of those client-observable
+properties, and that the difference precedes the new capability advertisement.
+The hypothesis is falsified if the two transaction sequences are equivalent at
+this boundary. No implementation branch may be ported merely because its
+source shape differs; a port must name the differing observation it predicts
+and the trace result which would falsify that mechanism.
+
 A repeated capability advertisement is a state replacement, not initial
 setup. Before publishing a replacement surface or encoder, xrdp shall
 completely retire the current encoder and its children, queues, borrowed

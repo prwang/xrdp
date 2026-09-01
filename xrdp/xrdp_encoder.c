@@ -110,8 +110,6 @@ process_enc_h264(struct xrdp_encoder *self, XRDP_ENC_DATA *enc);
 #endif
 static int
 process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc);
-static int
-process_enc_avc444_capture(struct xrdp_encoder *self, XRDP_ENC_DATA *enc);
 
 /*****************************************************************************/
 /* Item destructor for self->fifo_to_proc */
@@ -250,7 +248,6 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
         self->gfx = 1;
         self->avc444_ffmpeg = 1;
-        self->process_enc = process_enc_avc444_capture;
         self->avc444_v2 = mm->avc444_v2;
         self->avc444_dump_extra = mm->avc444_dump_extra;
         self->avc444_strip_sei = mm->avc444_strip_sei;
@@ -349,7 +346,6 @@ xrdp_encoder_create(struct xrdp_mm *mm)
             mm->wm->gfx_config->avc444_ffmpeg_chroma_align;
         self->gfx = 1;
         self->avc420_ffmpeg = 1;
-        self->process_enc = process_enc_avc444_capture;
         self->avc444_dump_extra = mm->avc444_dump_extra;
         self->avc444_strip_sei = mm->avc444_strip_sei;
         self->avc444_sanitize_hrd = mm->avc444_sanitize_hrd;
@@ -4040,88 +4036,6 @@ process_enc_egfx(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
         }
     }
     return gfx_close_egfx_msg(self, enc, term_frame_id, owe_ack, displayed);
-}
-
-/*****************************************************************************/
-/* Keep the dedicated xup capture in its raw, borrowed form until the encoder
- * worker owns it. Command construction and consumption then occur on one
- * thread, after the capture has left the transport callback. */
-static int
-process_enc_avc444_capture(struct xrdp_encoder *self, XRDP_ENC_DATA *enc)
-{
-    struct xrdp_enc_surface_command capture;
-    char *cmd;
-    uintptr_t base;
-    uintptr_t pixels;
-    uint64_t required_bytes;
-    uint32_t monitor;
-    uint32_t slot;
-    uint32_t shmem_offset;
-    int codec_id;
-    int cmd_capacity;
-    int cmd_bytes;
-    int error;
-
-    capture = enc->u.sc;
-    base = (uintptr_t)enc->shmem_ptr;
-    pixels = (uintptr_t)capture.data;
-    if (xup_avc444_capture_identity((uint32_t)capture.flags, &monitor,
-                                    &slot) != 0 ||
-            capture.num_drects < 1 || capture.num_crects < 1 ||
-            pixels < base || pixels - base > UINT32_MAX)
-    {
-        error = 1;
-        goto fail;
-    }
-    UNUSED_VAR(slot);
-    shmem_offset = (uint32_t)(pixels - base);
-    codec_id = self->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2 :
-               XR_RDPGFX_CODECID_AVC444;
-    required_bytes = 61U + (uint64_t)capture.num_drects * 8U +
-                     (uint64_t)capture.num_crects * 8U;
-    if (required_bytes > 32U * 1024U)
-    {
-        error = 1;
-        goto fail;
-    }
-    cmd_capacity = (int)required_bytes;
-    cmd = g_new(char, cmd_capacity);
-    if (cmd == NULL)
-    {
-        error = 1;
-        goto fail;
-    }
-    cmd_bytes = gfx_egfx_batch_build_capture(
-                    cmd, cmd_capacity, (int)monitor, codec_id,
-                    (uint32_t)capture.flags, capture.frame_id,
-                    capture.drects, capture.num_drects,
-                    capture.crects, capture.num_crects,
-                    capture.left, capture.top, capture.width,
-                    capture.height, shmem_offset);
-    if (cmd_bytes == 0)
-    {
-        g_free(cmd);
-        error = 1;
-        goto fail;
-    }
-
-    g_free(capture.drects);
-    g_free(capture.crects);
-    enc->u.gfx.cmd = cmd;
-    enc->u.gfx.cmd_bytes = cmd_bytes;
-    enc->u.gfx.data = (char *)enc->shmem_ptr;
-    enc->u.gfx.data_bytes = enc->shmem_bytes;
-    ENC_SET_BIT(enc->flags, ENC_FLAGS_GFX_BIT);
-    return process_enc_egfx(self, enc);
-
-fail:
-    xrdp_encoder_ffmpeg_set_fatal(
-        self, "constructing the graphics command for a capture", -1);
-    if (gfx_send_terminal_ack(self, enc, capture.frame_id, 0) != 0)
-    {
-        error = 1;
-    }
-    return error;
 }
 
 /*****************************************************************************/

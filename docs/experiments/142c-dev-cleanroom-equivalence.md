@@ -331,3 +331,31 @@ passes the pipe, six auxiliary-leaf wire assertions and four-picture decode
 gate with no black frame. Exact image, package and profile identities are
 retained in
 [`i142c_x044_worker_reconcile_20260828T153822Z/`](../../PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md).
+
+## 2026-09-01 worker-boundary hypothesis withdrawn
+
+The owner exercised that arm twenty times without reproducing the clean-room
+precursor. More importantly, re-reading the intervention found no causal
+mechanism which predicted that it should reproduce it. The main thread and
+worker variants call the same graphics-envelope builder with the same fields,
+then use the same parser, ffmpeg runner and RDPGFX serializer. They differ in
+where the small envelope and rectangle copies are allocated. The arm therefore
+tested unspecified scheduling, not a named client-visible behavior.
+
+The clean-room failure also does not support a simple server-send deadline:
+Xorg delivered the full resized capture at `00:26:33.386`, xrdp completed the
+four logical frame sends by approximately `00:26:33.436`, and the replacement
+capability advertisement arrived at `00:26:33.439`. The missing acknowledgement
+still makes the transmitted frame the relevant boundary, but the evidence does
+not distinguish a rejected payload, an invalid surrounding graphics state or
+an independently initiated client transition.
+
+Canonical development consequently restores the pre-worker adapter. This is a
+manual two-file inverse on the linear branch; the experiment record remains
+verbatim. The next experiment instruments the same logical RDPGFX boundary in
+both implementations. It records bounded command metadata, frame/surface
+identities, geometry and payload-edge words plus inbound acknowledgements and
+capability sets through `common/perf_trace`; it does not hash or synchronously
+dump whole encoded payloads. A new implementation port requires a concrete
+trace difference and a prediction connecting that difference to the client
+advertisement.

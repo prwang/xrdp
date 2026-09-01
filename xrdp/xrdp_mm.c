@@ -5070,82 +5070,61 @@ xrdp_mm_queue_avc444_capture(struct xrdp_mod *mod,
                              void *shmem_ptr, int shmem_bytes)
 {
     struct xrdp_mm *mm;
-    XRDP_ENC_DATA *enc;
-#if defined(XRDP_PERF_TRACE)
-    int enq_depth;
-#endif
+    char *cmd;
+    uint32_t monitor;
+    uint32_t slot;
+    uint32_t shmem_offset;
+    uint64_t required_bytes;
+    uintptr_t base;
+    uintptr_t pixels;
+    int codec_id;
+    int cmd_capacity;
+    int cmd_bytes;
+    int rv;
 
     mm = ((struct xrdp_wm *)mod->wm)->mm;
-    if (num_drects < 1 ||
-            (uint32_t)num_drects > XUP_AVC444_MAX_DIRTY_RECTS ||
-            num_crects < 1 ||
-            (uint32_t)num_crects > XUP_AVC444_MAX_DIRTY_RECTS)
+    base = (uintptr_t)shmem_ptr;
+    pixels = (uintptr_t)data;
+    if (xup_avc444_capture_identity((uint32_t)flags, &monitor, &slot) != 0 ||
+            num_drects < 1 || num_crects < 1 ||
+            pixels < base || pixels - base > UINT32_MAX)
     {
         g_munmap(shmem_ptr, shmem_bytes);
         return 1;
     }
-    enc = g_new0(XRDP_ENC_DATA, 1);
-    if (enc == NULL)
+    UNUSED_VAR(slot);
+    shmem_offset = (uint32_t)(pixels - base);
+    codec_id = mm->avc444_v2 ? XR_RDPGFX_CODECID_AVC444V2 :
+               XR_RDPGFX_CODECID_AVC444;
+    required_bytes = 61U + (uint64_t)num_drects * 8U +
+                     (uint64_t)num_crects * 8U;
+    if (required_bytes > 32U * 1024U)
     {
         g_munmap(shmem_ptr, shmem_bytes);
         return 1;
     }
-    enc->u.sc.drects = g_new(short, num_drects * 4);
-    enc->u.sc.crects = g_new(short, num_crects * 4);
-    if (enc->u.sc.drects == NULL || enc->u.sc.crects == NULL)
+    cmd_capacity = (int)required_bytes;
+    cmd = g_new(char, cmd_capacity);
+    if (cmd == NULL)
     {
-        g_free(enc->u.sc.drects);
-        g_free(enc->u.sc.crects);
-        g_free(enc);
         g_munmap(shmem_ptr, shmem_bytes);
         return 1;
     }
-    g_memcpy(enc->u.sc.drects, drects,
-             sizeof(short) * num_drects * 4);
-    g_memcpy(enc->u.sc.crects, crects,
-             sizeof(short) * num_crects * 4);
-    enc->mod = mod;
-    enc->u.sc.num_drects = num_drects;
-    enc->u.sc.num_crects = num_crects;
-    enc->u.sc.data = data;
-    enc->u.sc.left = left;
-    enc->u.sc.top = top;
-    enc->u.sc.width = width;
-    enc->u.sc.height = height;
-    enc->u.sc.flags = flags;
-    enc->u.sc.frame_id = frame_id;
-    enc->shmem_ptr = shmem_ptr;
-    enc->shmem_bytes = shmem_bytes;
-
-    if (xrdp_ack_trace_on())
+    cmd_bytes = gfx_egfx_batch_build_capture(
+                    cmd, cmd_capacity, (int)monitor, codec_id,
+                    (uint32_t)flags, frame_id, drects, num_drects,
+                    crects, num_crects, left, top, width, height,
+                    shmem_offset);
+    if (cmd_bytes == 0)
     {
-        PERF_TRACE("event=msgin class=ACK_TRACE id=%d bytes=%d",
-                   frame_id, shmem_bytes);
+        g_free(cmd);
+        g_munmap(shmem_ptr, shmem_bytes);
+        return 1;
     }
-    tc_mutex_lock(mm->encoder->mutex);
-    fifo_add_item(mm->encoder->fifo_to_proc, enc);
-    mm->encoder->fifo_to_proc_depth++;
-#if defined(XRDP_PERF_TRACE)
-    enq_depth = mm->encoder->fifo_to_proc_depth;
-#endif
-    {
-        int monitor_count;
-
-        monitor_count = (int)mm->wm->client_info->display_sizes.monitorCount;
-        monitor_count = MAX(1, monitor_count);
-        monitor_count = MIN(CLIENT_MONITOR_DATA_MAXIMUM_MONITORS,
-                            monitor_count);
-        if (mm->encoder->fifo_to_proc_depth > 2 * monitor_count)
-        {
-            LOG(LOG_LEVEL_ERROR, "Full-chroma encoder input depth %d "
-                "exceeds two capture slots across %d monitors",
-                mm->encoder->fifo_to_proc_depth, monitor_count);
-        }
-    }
-    tc_mutex_unlock(mm->encoder->mutex);
-    PERF_TRACE("event=enq frame_id=%d fifo_depth=%d", frame_id, enq_depth);
-    g_set_wait_obj(mm->encoder->xrdp_encoder_event_to_proc);
-    return 0;
+    rv = server_egfx_cmd(mod, cmd, cmd_bytes,
+                         (char *)shmem_ptr, shmem_bytes);
+    g_free(cmd);
+    return rv;
 }
 
 /*****************************************************************************/

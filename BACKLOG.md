@@ -266,19 +266,28 @@ so it did not reconcile clean-room's raw-capture ffmpeg execution path. Resume
 that reconciliation before any capability-lifecycle correction. Evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_x044_windows_green_20260828T152300Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_windows_green_20260828T152300Z/README.md).
 
-The next development revision retains the validated order-64 capture as a raw
-borrowed item through the encoder FIFO and constructs the legacy-compatible
-GFX envelope only on the encoder worker. This removes the proven main-thread
-queue divergence without transplanting clean-room source. Its complete
-default and trace-enabled suites are green, and tracing is absent from the
-restored default binary; deploy it trace-disabled on 40060 and repeat the same
-Windows resize gate. Do not repair the replacement-capability callback unless
-this arm first reproduces that callback's client-side precursor.
+**RED 2026-09-01:** retaining the raw capture until the encoder worker did not
+instantiate a causal difference. It moved envelope allocation across a queue
+but used the same builder, parser, ffmpeg runner and client serializer, so its
+only possible intervention was unquantified scheduling. The clean-room failure
+completed the post-resize frame about 3 ms before the replacement capability
+advertisement, which does not support a missed server-send deadline. Restore
+the bounded main-thread adapter and withdraw that arm as evidence. Its green
+gates remain implementation checks, not #142C progress. Superseding analysis:
+[`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md).
 
-The trace-disabled worker-boundary pair is now deployed at
-`127.0.0.1:40060`; its package/profile certificate is green and the pod has
-zero restarts. Await the owner Windows resize result. Deployment identity:
-[`PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_x044_worker_reconcile_20260828T153822Z/README.md).
+**Current hypothesis:** a client-observable property of clean-room's first
+post-resize graphics transaction causes or exposes the missing acknowledgement
+and replacement capability advertisement. Compare a trace-enabled clean-room
+arm against trace-enabled canonical development with the same Windows client,
+profile and resize sequence. Both sides shall record the same low-overhead
+`common/perf_trace` schema at the logical RDPGFX boundary: outbound command
+order, transport sequence, surface/frame identity, coded and visible geometry,
+payload and segmented-wire lengths, bounded payload edge words, send result,
+inbound frame acknowledgements and every advertised capability set. The trace
+must not scan or synchronously write H.264 payloads. First identify a concrete
+wire/state correlation which distinguishes the clean-room trigger; only then
+port the source branch responsible for that difference to development.
 
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
