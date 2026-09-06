@@ -398,6 +398,15 @@ and complete acceptance:
 
 ## #142D — repeated interactive resize tears down the client transport
 
+**IN PROGRESS — docs-first correction, 2026-09-06.** The owner requests the
+reviewed `.turn_draft.md` lifecycle guarantees as normative requirements before
+implementation. S134-R8–R10 now own independent capture ownership, safe bounded
+retirement and exact disposal; S142-R11–R12 own repeated-capability activation,
+failure handling and full producer repaint. Implement and test on canonical
+development, then repeat the same rendered condition with a failing/passing
+harness verdict. The reproduction is retained in `23c48529`. Clean-room stays
+paused; no GREEN claim until the ownership tests and corrected capture pass.
+
 **IN PROGRESS — controlled FreeRDP reset reproduced, 2026-09-06.** The
 rendering client now sends one deliberate repeat on the existing connection.
 The authorized fixed-geometry run on corrected development port 40062 reached

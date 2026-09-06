@@ -26,7 +26,9 @@ Target files are `xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder.h`,
   invoke x264/OpenH264 as fallback. The integration remains unselectable here;
   #142 connects this already-tested terminal result to connection hangup.
 * S134-R4: the existing x264 and OpenH264 dispatch, queue ownership, surface
-  creation and completion behavior shall remain unchanged.
+  creation and completion behavior shall remain unchanged during normal
+  operation. The shared retirement safety requirements below apply to all
+  encoders using the worker and its queues.
 * S134-R5: there shall be no parser/config key, codec-order value, capability
   response or runtime branch by which a session can select this integration.
 * S134-R6: lifecycle calls shall be safe for a never-started, partially
@@ -42,6 +44,31 @@ Target files are `xrdp/xrdp_encoder.c`, `xrdp/xrdp_encoder.h`,
   `take`: `frame_id`, `fifo_depth`; wait/drain begin: `n_items`, `drain_full`;
   drain end: `n_items`, `drain_full`. `dmg` and `enc` carry static
   `class=GFX_TRACE`; `wait_end` has no dynamic field.
+* S134-R8: accepted input shall have an explicit owner independent of queue
+  membership. Ownership shall persist while input is queued, held by the
+  worker, or referenced by completion fragments, including failure to allocate
+  the final completion. Normal terminal completion or retirement shall release
+  each input, command, compressed output and capture mapping exactly once.
+  Queue removal alone shall not transfer or destroy the last ownership record.
+* S134-R9: retirement shall prevent new submissions, request worker shutdown
+  and confirm that the worker can no longer access shared state before
+  destroying children, buffers, queues, events or synchronization objects.
+  Child shutdown shall close descriptors and terminate/reap every child before
+  releasing its context. A bounded worker-stop failure shall be terminal:
+  retain an explicit owner for the encoder and every enclosing object it can
+  still access, prohibit replacement and report failure. Neither session
+  cleanup nor module unloading may bypass that ownership. Retained state may
+  be reclaimed only after confirmed quiescence or process exit; a timeout is
+  never evidence of quiescence. Partial initialization shall use the same
+  ownership rules without waiting for a worker which was never started.
+* S134-R10: retirement shall discard queued encoded output without sending it.
+  Every accepted capture shall receive one terminal ownership disposition.
+  Capture-slot reuse and visible-region disposition remain separate: an early
+  slot release does not mean the pixels were displayed. Discarded captures
+  shall restore their damage under the producer contract, without releasing
+  memory before its last reader stops or duplicating terminal disposition.
+  Disposition shall preserve capture order where acknowledgements are
+  cumulative. Normal completion and retirement shall share input cleanup.
 
 ## Required tests and gate
 
@@ -51,6 +78,14 @@ unchanged legacy dispatch. Inject one child failure, then repeat work and
 damage entries; assert one terminal notification, one teardown, zero later
 child creations and no codec substitution. The test shall call the internal
 seam directly; it shall also prove live capability selection cannot reach it.
+Exercise the production retirement path with queued inputs, worker-held input,
+multiple completion fragments, a missing final completion, an already released
+slot, and partial initialization. Assert exact input/output frees, capture
+unmaps and terminal dispositions by identity, with no old output sent.
+Hold the worker at a deterministic barrier: a failed bounded stop shall leave
+its full ownership graph intact, signal terminal failure and permit no new
+encoder. Release the barrier and prove eventual cleanup exactly once. Include
+enclosing session destruction in that test, not only the encoder destructor.
 Run
 `CK_RUN_SUITE=test_xrdp_egfx_base_functions tests/xrdp/test_xrdp`, the legacy
 H.264 suites, and the README gate.

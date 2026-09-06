@@ -130,6 +130,25 @@ capability-response seam but shall not introduce a new mechanism there.
   reach the earlier probe unchanged. The post-confirm test shall prove the
   earlier terminal latch and forensic path remain effective after activation.
   Passing any one check does not compensate for omitting either of the others.
+* S142-R11: repeated graphics capability advertisement on an existing
+  connection is a protocol-state replacement, including at unchanged geometry.
+  Apply MS-RDPEGFX 3.2.5.18 and 3.3.5.19: for a previously confirmed version
+  10.3 or later, confirm the supported capabilities again and reset protocol
+  state, assuming earlier graphics messages were disregarded. Stop admission
+  to the current encoder and complete S134-R8 through S134-R10 retirement
+  before publishing replacement state or sending the new confirmation.
+  No old queued completion may enter the new channel state; old frame
+  acknowledgements shall not grant credit for replacement frames.
+* S142-R12: replacement allocation, worker creation, confirmation, surface
+  creation and mapping shall be checked for failure. Any failure shall end
+  the connection with retained ownership sufficient for safe cleanup, without
+  retry, partial activation or codec fallback. Only a ready successor may
+  resume capture. For an attached direct graphics producer, request exactly
+  one complete current desktop update, covering all monitors, after successor
+  readiness. Reset shall settle obsolete producer credit without treating
+  discarded pixels as displayed; the complete repaint must not depend on new
+  application damage. Initial login and the existing WM-backed path shall
+  retain their normal behavior.
 
 ## Required tests and final gate
 
@@ -148,6 +167,22 @@ fixture shall prove one bounded forensic bundle, one teardown, session hangup
 and zero later respawns under repeated damage. Resize tests shall prove
 terminate/reap/new reset, no old encoder bytes and no capture snapshot whose
 layout or mapping length belongs to the preceding geometry.
+Drive the actual capability callback with a live encoder, pending inputs and
+completions, valid visible rectangles and unchanged geometry. Assert retirement
+before confirmation/replacement, no stale completion or acknowledgement crossing
+the reset, one ready successor and one full producer invalidation. Inject stop,
+allocation, worker-start and wire-send failures; assert terminal handling and
+no successor publication on failure. Retain fresh-login and resize controls.
+
+The rendering reset harness shall run the same one-connection, fixed 1024x768,
+AVC444v2 colour-key condition before and after the correction. It shall require
+one deliberate repeat, its matching confirmation, newly decoded post-reset
+frames, complete current desktop pixels and retirement of the previous worker
+and production children. Surface creation, connection liveness, screenshot
+equality and successful apparatus exit are individually insufficient. Preserve
+the original RED capture; record the corrected build, configuration and result
+separately. This controlled reset does not replace Windows/macOS interoperability
+or establish the cause of a later peer disconnect.
 
 Run every targeted AVC and PerfTrace suite, full `make check`, astyle and
 cppcheck in default and trace-enabled builds; run the paired xorgxrdp build

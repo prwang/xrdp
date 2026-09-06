@@ -151,6 +151,10 @@ Base files that overlap a slice shall retain these changes and their tests.
 * Resize or geometry change shall stop submission, close pipes, terminate and
   reap all old children, discard partial state, allocate the new layout, and
   require a new validated reset before output resumes.
+* Repeated graphics capabilities require the same ownership discipline even
+  without a geometry change. The encoder retirement contract is S134-R8 through
+  S134-R10; live reset and complete producer repaint are S142-R11 and S142-R12.
+  Worker-stop failure shall never authorize freeing worker-accessible state.
 
 ### Scheduling and backpressure
 
