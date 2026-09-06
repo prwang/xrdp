@@ -120,8 +120,11 @@ Base files that overlap a slice shall retain these changes and their tests.
 * The source is full-chroma XRGB8888. The normative conversion is full-range
   BT.709 and the two Microsoft AVC444 views reconstruct the visible source.
 * Visible rectangles may have odd coordinates and sizes. Wire metablock
-  rectangles shall have an even origin and even extent and remain clipped to
-  the coded surface.
+  origins shall round down to even coordinates and right/bottom edges round
+  up to even coordinates, then clip to the visible destination bounds.
+  An extent may remain odd only where clipping meets an odd visible edge.
+  Coded-video padding shall not enlarge the visible destination or authorize
+  metadata outside it.
 * Coded dimensions shall cover visible dimensions and satisfy the selected
   width alignment of 16 or 32 pixels. Padding shall replicate the nearest
   visible edge; unwritten or uninitialized padding is forbidden.

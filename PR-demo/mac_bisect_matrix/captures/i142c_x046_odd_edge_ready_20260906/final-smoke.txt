@@ -1,0 +1,3 @@
+smoke[1920x1080]: target=pod ok=8 lag=0 edge=1.000 encoder_errors=0
+smoke[1024x768]: target=pod ok=8 lag=0 edge=1.000 encoder_errors=0
+SMOKE PASS — safe to hand over

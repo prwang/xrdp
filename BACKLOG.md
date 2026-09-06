@@ -343,13 +343,39 @@ exact image and replaces only xrdp, retaining the current paired producer.
 Build/deploy and interactive evidence are tracked in
 [`i142c_x046_odd_edge_preinteractive_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_odd_edge_preinteractive_20260906/README.md).
 
-Port 40062 is installed from committed `c729a50889a2`, but initial
-certification is RED on the host pipe quota (8 KiB input pipes). The wire
-and decode checks pass; they do not waive the pipe guard or establish the
-Windows hypothesis. The host soft quota is back to 16384 pages; the owner
-has been given the physical-host command to restore and persist the documented
-262144-page setting. Preserve the failed capture, then re-certify the identical
-image after that external precondition is corrected. Controls remain untouched.
+**RED reproduced on canonical development, 2026-09-06:** port 40062's
+first resize (1800x944) was acknowledged; its second (1800x1085) serialized
+inner bottom 1086 outside visible bottom 1085, then lost frame ACKs and
+received replacement capabilities. The owner saw black, then disconnected on
+the third resize. The named reproduction gate is satisfied; forward visible-
+bound restoration and normative S135-R4 correction are next. Corrected-build
+Windows acceptance and clean-room reconciliation remain open. The initial
+pipe failure and subsequent passing readiness gates are retained; the faulty
+reference and both controls are unchanged. Evidence:
+[`i142c_x046_windows_20260906T152500Z`](PR-demo/mac_bisect_matrix/captures/i142c_x046_windows_20260906T152500Z/README.md).
+Readiness:
+[`i142c_x046_odd_edge_ready_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_odd_edge_ready_20260906/README.md).
+
+**IN PROGRESS — forward correction authorized, 2026-09-06.** Preserve the
+red injection `c729a50889a2` and its Windows capture in the linear ancestry;
+retire only its diagnostic overflow assertion, independently pin visible-edge
+expectations, then manually restore unconditional visible clipping. Update
+PRD/README.md and S135-R4. Commit the correction and replace only port 40062
+with the committed build; require the ordinary three-second certificate and
+final two-size rendered smoke before Windows handoff. The same Windows resize
+sequence remains the interactive acceptance gate, not a unit-test claim.
+
+**DEFERRED — clean-room slice 135 owns this correction.** When authorized,
+re-author `PRD/slices/135-avc-wire-serialization.md` in its owning clean-room
+commit: give the region builder the visible destination bounds, clip after
+outward even alignment, allow odd extents only at the visible right/bottom
+edge, and independently test both LC views at odd dimensions. Review its
+`avc_build_region()`/`ffmpeg_emit_frame()` argument seam and owning serializer
+header/tests; replay later consumers only after development acceptance. This
+is an xrdp serializer correction, not a producer or repeated-capability-handler
+patch. Do not start either clean-room tree: the owner has a separate development
+clipboard file-transfer bug to address first. Its behavior is outside this
+correction's scope.
 
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
@@ -364,6 +390,12 @@ and complete acceptance:
 [`PRD/gates/142c-dev-cleanroom-equivalence.md`](PRD/gates/142c-dev-cleanroom-equivalence.md).
 
 ## #142D — repeated interactive resize tears down the client transport
+
+**Canonical precursor reproduced, 2026-09-06:** the deliberately overflowing
+port-40062 development arm now shows the same missing-ACK/repeated-capability
+transition at its first odd-height resize, followed by black screen and EOF.
+The #142C capture above owns the wire evidence. The correction and complete
+post-resize lifecycle acceptance remain unvalidated.
 
 **Latest evidence, 2026-09-06:** the same two-stage failure now begins at
 odd-height login, without a preceding resize. The current boundary is the

@@ -1,0 +1,27 @@
+Running suite(s): Avc444Metablock
+ok 1 - test_avc444_metablock.c:avc444_metablock:test_metablock_even_x1_origin_even: Passed
+ok 2 - test_avc444_metablock.c:avc444_metablock:test_metablock_odd_x1_origin_even: Passed
+ok 3 - test_avc444_metablock.c:avc444_metablock:test_metablock_mixed_and_edges_origin_even: Passed
+ok 4 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_luma_lc1: Passed
+ok 5 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_chroma_lc2: Passed
+ok 6 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_single_rect: Passed
+ok 7 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 8 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+not ok 9 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'width == coordinate' failed: width == 1801, coordinate == 1802
+not ok 10 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'width == coordinate' failed: width == 1801, coordinate == 1802
+not ok 11 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+not ok 12 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+not ok 13 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+not ok 14 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+not ok 15 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'width == coordinate' failed: width == 2361, coordinate == 2362
+not ok 16 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Assertion 'width == coordinate' failed: width == 2361, coordinate == 2362
+50%: Checks: 16, Failures: 8, Errors: 0
+test_avc444_metablock.c:339:F:avc444_wire:test_avc444_views_clip_to_visible_edges:2: Assertion 'width == coordinate' failed: width == 1801, coordinate == 1802
+test_avc444_metablock.c:339:F:avc444_wire:test_avc444_views_clip_to_visible_edges:3: Assertion 'width == coordinate' failed: width == 1801, coordinate == 1802
+test_avc444_metablock.c:341:F:avc444_wire:test_avc444_views_clip_to_visible_edges:4: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+test_avc444_metablock.c:341:F:avc444_wire:test_avc444_views_clip_to_visible_edges:5: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+test_avc444_metablock.c:341:F:avc444_wire:test_avc444_views_clip_to_visible_edges:6: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+test_avc444_metablock.c:341:F:avc444_wire:test_avc444_views_clip_to_visible_edges:7: Assertion 'height == coordinate' failed: height == 1085, coordinate == 1086
+test_avc444_metablock.c:339:F:avc444_wire:test_avc444_views_clip_to_visible_edges:8: Assertion 'width == coordinate' failed: width == 2361, coordinate == 2362
+test_avc444_metablock.c:339:F:avc444_wire:test_avc444_views_clip_to_visible_edges:9: Assertion 'width == coordinate' failed: width == 2361, coordinate == 2362
+1..16

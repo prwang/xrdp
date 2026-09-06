@@ -1,0 +1,47 @@
+wire_tx continuous records: 625
+wire_rx continuous records: 35
+Overflowing AVC444 surface writes: [605, 606, 618, 619, 622, 623]
+Frame ACKs after first overflowing write: []
+Initial and replacement capability sets identical: True
+Transaction tail, including both completed frame and next STARTFRAME:
+  tx 588 delete surface frame=0 surface=0 pdu_bytes=10 wire_bytes=12 result=0
+  tx 589 reset graphics pdu_bytes=340 wire_bytes=342 width=1800 height=944 monitors=1 result=0
+  tx 590 create surface frame=0 surface=0 pdu_bytes=15 wire_bytes=17 width=1800 height=944 result=0
+  tx 591 map surface to output frame=0 surface=0 pdu_bytes=20 wire_bytes=22 result=0
+  tx 592 start frame frame=13 pdu_bytes=16 wire_bytes=18 result=0
+  tx 593 write pixels to surface frame=13 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1800 y2=944 regions=1 payload_bytes=13982 pdu_bytes=14007 wire_bytes=14024 segments=2 head=1073755802 next=1 tail=3244032003 region_x1=0 region_y1=0 region_x2=1800 region_y2=944 result=0
+  tx 594 write pixels to surface frame=13 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1800 y2=944 regions=1 payload_bytes=8312 pdu_bytes=8337 wire_bytes=8354 segments=2 head=2147483648 next=1 tail=4178313280 region_x1=0 region_y1=0 region_x2=1800 region_y2=944 result=0
+  tx 595 end frame frame=13 pdu_bytes=12 wire_bytes=14 result=0
+  tx 596 start frame frame=14 pdu_bytes=16 wire_bytes=18 result=0
+{'schema': 1, 'mono_ns': 876905707678719, 'pid': 1557, 'tid': 128216128677248, 'event': 'wire_ack', 'rx_seq': 23, 'frame': 13, 'queue_depth': 18, 'decoded': 15, 'last_tx': 596}
+  tx 597 write pixels to surface frame=14 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1800 y2=944 regions=1 payload_bytes=335 pdu_bytes=360 wire_bytes=377 segments=2 head=1073742155 next=1 tail=1945817885 region_x1=0 region_y1=0 region_x2=1800 region_y2=944 result=0
+  tx 598 write pixels to surface frame=14 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1800 y2=944 regions=1 payload_bytes=7796 pdu_bytes=7821 wire_bytes=7838 segments=2 head=2147483648 next=1 tail=2667643016 region_x1=0 region_y1=0 region_x2=1800 region_y2=944 result=0
+  tx 599 end frame frame=14 pdu_bytes=12 wire_bytes=14 result=0
+{'schema': 1, 'mono_ns': 876905724255148, 'pid': 1557, 'tid': 128216128677248, 'event': 'wire_ack', 'rx_seq': 33, 'frame': 14, 'queue_depth': 0, 'decoded': 16, 'last_tx': 599}
+  tx 600 delete surface frame=0 surface=0 pdu_bytes=10 wire_bytes=12 result=0
+  tx 601 reset graphics pdu_bytes=340 wire_bytes=342 width=1800 height=1085 monitors=1 result=0
+  tx 602 create surface frame=0 surface=0 pdu_bytes=15 wire_bytes=17 width=1800 height=1085 result=0
+  tx 603 map surface to output frame=0 surface=0 pdu_bytes=20 wire_bytes=22 result=0
+  tx 604 start frame frame=15 pdu_bytes=16 wire_bytes=18 result=0
+  tx 605 write pixels to surface frame=15 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1800 y2=1085 regions=1 payload_bytes=14229 pdu_bytes=14254 wire_bytes=14271 segments=2 head=1073756049 next=1 tail=2172780547 region_x1=0 region_y1=0 region_x2=1800 region_y2=1086 result=0
+  tx 606 write pixels to surface frame=15 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1800 y2=1085 regions=1 payload_bytes=8210 pdu_bytes=8235 wire_bytes=8252 segments=2 head=2147483648 next=1 tail=3778871296 region_x1=0 region_y1=0 region_x2=1800 region_y2=1086 result=0
+  tx 607 end frame frame=15 pdu_bytes=12 wire_bytes=14 result=0
+  tx 608 start frame frame=16 pdu_bytes=16 wire_bytes=18 result=0
+{'schema': 1, 'mono_ns': 876907133100992, 'pid': 1557, 'tid': 128216128677248, 'event': 'wire_caps_begin', 'caps_seq': 2, 'rx_seq': 34, 'sets': 9, 'last_tx': 608}
+  tx 609 confirm capabilities pdu_bytes=20 wire_bytes=22 result=0
+  tx 610 reset graphics pdu_bytes=340 wire_bytes=342 width=1800 height=1085 monitors=1 result=0
+  tx 611 create surface frame=16 surface=0 pdu_bytes=15 wire_bytes=17 width=1800 height=1085 result=0
+  tx 612 map surface to output frame=16 surface=0 pdu_bytes=20 wire_bytes=22 result=0
+  tx 613 delete surface frame=16 surface=0 pdu_bytes=10 wire_bytes=12 result=0
+  tx 614 reset graphics pdu_bytes=340 wire_bytes=342 width=1892 height=1085 monitors=1 result=0
+  tx 615 create surface frame=16 surface=0 pdu_bytes=15 wire_bytes=17 width=1892 height=1085 result=0
+  tx 616 map surface to output frame=16 surface=0 pdu_bytes=20 wire_bytes=22 result=0
+  tx 617 start frame frame=17 pdu_bytes=16 wire_bytes=18 result=0
+  tx 618 write pixels to surface frame=17 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1892 y2=1085 regions=1 payload_bytes=14491 pdu_bytes=14516 wire_bytes=14533 segments=2 head=1073756311 next=1 tail=903813243 region_x1=0 region_y1=0 region_x2=1892 region_y2=1086 result=0
+  tx 619 write pixels to surface frame=17 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1892 y2=1085 regions=1 payload_bytes=9753 pdu_bytes=9778 wire_bytes=9795 segments=2 head=2147483648 next=1 tail=2314598481 region_x1=0 region_y1=0 region_x2=1892 region_y2=1086 result=0
+  tx 620 end frame frame=17 pdu_bytes=12 wire_bytes=14 result=0
+  tx 621 start frame frame=18 pdu_bytes=16 wire_bytes=18 result=0
+  tx 622 write pixels to surface frame=18 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1892 y2=1085 regions=1 payload_bytes=374 pdu_bytes=399 wire_bytes=416 segments=2 head=1073742194 next=1 tail=2051914474 region_x1=0 region_y1=0 region_x2=1892 region_y2=1086 result=0
+  tx 623 write pixels to surface frame=18 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1892 y2=1085 regions=1 payload_bytes=9342 pdu_bytes=9367 wire_bytes=9384 segments=2 head=2147483648 next=1 tail=3893356212 region_x1=0 region_y1=0 region_x2=1892 region_y2=1086 result=0
+  tx 624 end frame frame=18 pdu_bytes=12 wire_bytes=14 result=0
+  tx 625 delete surface frame=0 surface=0 pdu_bytes=10 wire_bytes=12 result=1

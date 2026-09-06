@@ -1,0 +1,4 @@
+make: Entering directory '/work/tests/xrdp'
+  CC       test_xrdp-test_avc444_metablock.o
+  CCLD     test_xrdp
+make: Leaving directory '/work/tests/xrdp'

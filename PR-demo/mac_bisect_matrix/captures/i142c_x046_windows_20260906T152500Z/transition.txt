@@ -1,0 +1,5 @@
+overflow: process 1557 sent 625 graphics commands, received 16 frame acknowledgements and 2 capability advertisements.
+  Replacement advertisement 2 followed tx 608 by 3.774 ms; that transaction names frame 16.
+  Latest acknowledgement: frame 14, received after tx 599. Frame IDs may be reused; this is not an acknowledgement of a later transaction with the same ID.
+  tx 608 start frame frame=16 pdu_bytes=16 wire_bytes=18 result=0
+  Client advertised 9 sets: version=524292 flags=0, version=524549 flags=0, version=655362 flags=0, version=655872 flags=0, version=656129 flags=0, version=656384 flags=0, version=656642 flags=0, version=656896 flags=0, version=657153 flags=0
