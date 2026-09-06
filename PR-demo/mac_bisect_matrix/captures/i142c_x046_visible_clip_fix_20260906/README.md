@@ -81,3 +81,55 @@ and changes only the x046 image, descriptive label and trace directory. Its
 new trace directory prevents new pod PIDs from overwriting red trace files.
 The codec profile and paired producer are unchanged. Deployment and Windows
 acceptance remain pending at the source correction commit.
+
+## Committed package and replacement
+
+The manual correction is 1cd9b55136374bc109d8057e078e11b360c0facd, descended
+from the deliberately red regression checkpoint d477399f and reproduced red
+injection c729a50889a2. No reset, revert command, rebase, branch switch or
+history rewrite was used. Packaging ran from literal /work with dirty=no:
+xrdp-dev_0.10.80+git20260906153241.1cd9b5513637_amd64.deb. The package remains
+under /work/dist/visible-clip-142c; package.txt records its construction.
+
+Port 40062 now uses localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637,
+image ID cf91e8b8f624e3710cceb09242b6003345b6062d78478a15a457de658a706c9e,
+pod xrdp-x046-86f75765b-gfpwd at 10.42.0.27. The new trace host directory is
+/var/lib/xrdp-matrix/x046-visible-clip. The preserved red image/tag and its old
+trace directory remain intact. red-final-logs.tar and red-pod.json archive the
+old pod immediately before replacement; deployment-patch.json is the exact
+atomic image/label/trace-path mutation.
+
+The installed daemon SHA256 equals the daemon extracted from the fixed deb;
+package-binary.sha256 and installed-identity.txt record it. The producer remains
+baf9658c397d, FFmpeg 7:6.1.1-3ubuntu5, libx264 2:0.164.3108+git31e19f9-1,
+and gfx.toml SHA256 remains
+565ad975e8a0d5b2ae4f445a37d6c0f667aae466ea14a21b38761b1c0613f585.
+The active pipe settings remain soft=262144, hard=0 and max=1048576.
+Control deployment specifications and generations compare equal in
+controls-before.json and controls-after.json.
+
+The new three-second deploy certificate at 15:33:37 UTC passes the pipe guard,
+six auxiliary-leaf checks and decoding all six captured pictures with zero
+black frames. The oracle client's deliberate end-of-capture termination is
+retained in certification-output.txt; it is not a Windows disconnect verdict.
+Final rendered smoke and Windows acceptance are reported separately below.
+
+## Final handoff
+
+Final rendered smoke passes at 1920x1080 and 1024x768. Each size has eight
+correct key transitions, no lag, edge fidelity 1.000 and no encoder restart or
+sequence errors. Per-size output and final-smoke-logs.tar retain the checks.
+The probe session has logged off, its autostart marker is removed, and the
+post-smoke log contains no pipe-guard failure. ready-check.txt records this.
+No package, image, profile or pod restart occurs after these final smoke gates.
+
+Port 40062 is ready for the owner to repeat the same Windows sequence.
+The Windows correction verdict remains pending: require in-bounds metadata,
+continued frame acknowledgements, no replacement capabilities, and no black
+screen/disconnect. The source fix and automated readiness are complete; the
+clean-room equivalence gate remains open. Clean-room work is explicitly paused
+for the owner's separate development clipboard file-transfer work.
+
+The checked handoff is delivered verbatim to
+/home/tester/.turn_draft_20260906-153538.md in the corrected pod, readable by
+tester. This final file copy does not change the runtime build or profile.

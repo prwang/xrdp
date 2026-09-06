@@ -1,0 +1,232 @@
+[
+     {
+          "Id": "cf91e8b8f624e3710cceb09242b6003345b6062d78478a15a457de658a706c9e",
+          "Digest": "sha256:fc581e3a322108d901480bc27fc3e68115d917b1e7f68b78d8a9fcbdd72f88bc",
+          "RepoTags": [
+               "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637"
+          ],
+          "RepoDigests": [
+               "localhost/xrdp-bisect@sha256:fc581e3a322108d901480bc27fc3e68115d917b1e7f68b78d8a9fcbdd72f88bc"
+          ],
+          "Parent": "c7333d83047767851b38aaccb9f9c77457172bc10837565c17e66cfa04b8a92b",
+          "Comment": "",
+          "Created": "2026-09-06T15:33:08.176213638Z",
+          "Config": {
+               "ExposedPorts": {
+                    "3389/tcp": {}
+               },
+               "Env": [
+                    "PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
+                    "DEBIAN_FRONTEND=noninteractive"
+               ],
+               "Entrypoint": [
+                    "/usr/local/bin/entrypoint.sh"
+               ],
+               "Labels": {
+                    "io.buildah.version": "1.39.3",
+                    "org.opencontainers.image.version": "24.04"
+               }
+          },
+          "Version": "",
+          "Author": "",
+          "Architecture": "amd64",
+          "Os": "linux",
+          "Size": 1574745512,
+          "VirtualSize": 1574745512,
+          "GraphDriver": {
+               "Name": "overlay",
+               "Data": {
+                    "LowerDir": "/var/lib/containers/storage/overlay/282d460e613c5514db55f09564e44f7b11308fdbfb8dae9bde1c94da8dff71df/diff:/var/lib/containers/storage/overlay/7a0fcd63ac8f0b02bc93c48216eb67d8cf8b4de95d4ba42dd260adeb0905fe5b/diff:/var/lib/containers/storage/overlay/4d19353ef8ba2b1e5fd86f93f46612e7870b22e123eeb42b48d555008242b0ce/diff:/var/lib/containers/storage/overlay/036bac8f76ac692db665127303ae357da66e405352d61df20dd70f99af163938/diff:/var/lib/containers/storage/overlay/9caaed5424a48691e6bba797c8b7868abcf87408b6f1d79c3a2eade1ad48f16b/diff:/var/lib/containers/storage/overlay/ce0b1e84c71b2f07a51c577d3012c4e06513ddf128f8c8235e71355969db6023/diff:/var/lib/containers/storage/overlay/e9c890ffc1a8d0563144249fab1df373f376a10fccd88c5cc8948a0c3c2665d5/diff:/var/lib/containers/storage/overlay/fd356f273216f9d2054d1e20c88e13f85571edff7a79b3652c11cb79ff30926d/diff:/var/lib/containers/storage/overlay/801b5b5e1e324bccbeaec26f8c681404b05a134a4d80398180d9968ea8728d9e/diff:/var/lib/containers/storage/overlay/a7e6876bad088b8ca1ad9b82f09f870cc500383d978793ec3e356c7634bce684/diff:/var/lib/containers/storage/overlay/79678fabebc6aaaf7153bd3ce8494bad15b08e5f5b67c3ca0cfcea05b2623427/diff:/var/lib/containers/storage/overlay/eaf20b4f45d01b8ab6c1d41eb374c9c1f9ffa0f228a8c3120742d1ffbe8c4a46/diff:/var/lib/containers/storage/overlay/7bd1d42383ed78f9fea87cbc538f6c5e48153829aaef5416be32c40267961df6/diff:/var/lib/containers/storage/overlay/3c8881e90df8f3860b4216974889499aec9cb948d43d8c96ea1b89908098d9fe/diff:/var/lib/containers/storage/overlay/183b4bfbf5b09c7c907193a62f0495c3c9974f4bd5a05c3279b40c54cc72effb/diff:/var/lib/containers/storage/overlay/4af2d0a6bd3c40a3e243cf81858e14d0657587ae5d3c591f2538bc2cb9b0fee6/diff:/var/lib/containers/storage/overlay/a322ded0576b9591aead387c8d2ea55709cece218b924314caea08df6db46422/diff:/var/lib/containers/storage/overlay/b9a65b3c65ab22d490085bd0bf5490e2409da8748b406870f2463bdc41cd6795/diff",
+                    "UpperDir": "/var/lib/containers/storage/overlay/79052b0a7aa276181c6c4b8b5661424fe2d867bf45564f811dbb1317ce5f3bab/diff",
+                    "WorkDir": "/var/lib/containers/storage/overlay/79052b0a7aa276181c6c4b8b5661424fe2d867bf45564f811dbb1317ce5f3bab/work"
+               }
+          },
+          "RootFS": {
+               "Type": "layers",
+               "Layers": [
+                    "sha256:b9a65b3c65ab22d490085bd0bf5490e2409da8748b406870f2463bdc41cd6795",
+                    "sha256:d57f9cc429dc81610ee088f8a39e406d0c420b504b6238ae7f6165b1203cf0f6",
+                    "sha256:1944080ed3a5b7aab5be008054a237042b51e5f5eb4641fb1df198321f2e2db6",
+                    "sha256:ffc96eac3feb1c726253dc258fd387c767bb71975a1a2fc5bd160e5cdbba4ca0",
+                    "sha256:676af7765668b7458ad7cc340322424d74a916175430b3b8a0797830b029484e",
+                    "sha256:4063d2b3056b691ea1b1409aade84ea9a0d6849c6587b339ed277d7f29e7cf2b",
+                    "sha256:07ea21e97e58762a5ff3406aa227f6df6fd187c941623493e61c947b5a294f81",
+                    "sha256:6c670f815b6c745adcfe00c997e1ad874a7407f5ab6bbb6080492d9fe703ed1a",
+                    "sha256:1e4ea9d70c0c3e1e7e85e689a119e3be4f2144f42f3e888f30652d1cbfc144a8",
+                    "sha256:00606e61b7454513e93d15b004e7e69fac8e899897c37c1c3168b7be6dea6c42",
+                    "sha256:1adf45a96bed1d44c9247225f71e246bc905b61781b115d5763f16ff6fcc1bf5",
+                    "sha256:96113ac463d82b6bb884eae03c2441d5f35f691a0ece93d17d962558c8110c9f",
+                    "sha256:904934afe014d7c1215eadfb8398508f57c59265aa304c5e96ae51de545cf75b",
+                    "sha256:93d51ff101a59fe79b4002b6af6c6593a98f2e0f236f7b5a3ece33bc6ad74fc6",
+                    "sha256:ca7b6df130ca363d75113ede1917be7f7956d58f955b5be6d23866cf7ddbecf3",
+                    "sha256:4620936aae0ec18a6614d88af8d945fc15cb14aed49b5bdbf65e2dadd7f74b61",
+                    "sha256:6f7ceae3ccd289c74a9e218dde6c66cf91d3c3442c32671dc75764611e2d0645",
+                    "sha256:e3e22d08d8f2d87f053eb466ac411b3f456439f8db89e768a1bd99cc807317db",
+                    "sha256:f2e517faf115028e5c161d39f46e9b3e15a33799f140fb450ca7d43adea3939b"
+               ]
+          },
+          "Labels": {
+               "io.buildah.version": "1.39.3",
+               "org.opencontainers.image.version": "24.04"
+          },
+          "Annotations": {
+               "org.opencontainers.image.base.digest": "sha256:9234c8c1973f364883f94c982d0fa10c417df9bb478407be1fe622fbab55f42f",
+               "org.opencontainers.image.base.name": "localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce"
+          },
+          "ManifestType": "application/vnd.oci.image.manifest.v1+json",
+          "User": "",
+          "History": [
+               {
+                    "created": "2026-08-17T13:09:48.224837029Z",
+                    "created_by": "/bin/sh -c #(nop)  ARG RELEASE",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-17T13:09:48.268328897Z",
+                    "created_by": "/bin/sh -c #(nop)  ARG LAUNCHPAD_BUILD_ARCH",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-17T13:09:48.295714843Z",
+                    "created_by": "/bin/sh -c #(nop)  LABEL org.opencontainers.image.version=24.04",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-17T13:09:50.627114619Z",
+                    "created_by": "/bin/sh -c #(nop) ADD file:cb9335ce6f27399c2b17787739d6675502767c53e0335ded2a5f0d003d996650 in / "
+               },
+               {
+                    "created": "2026-08-17T13:09:51.011020914Z",
+                    "created_by": "/bin/sh -c #(nop)  CMD [\"/bin/bash\"]",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-24T22:38:14.825350444Z",
+                    "created_by": "/bin/sh -c #(nop) ARG XRDP_DEB",
+                    "comment": "FROM docker.io/library/ubuntu:24.04",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-24T22:38:14.86722476Z",
+                    "created_by": "/bin/sh -c #(nop) ARG XORGXRDP_DEB XRDP_DEB",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-26T18:18:20.310490262Z",
+                    "created_by": "/bin/sh -c #(nop) ARG INSTALL_ACCEPTANCE_DESKTOP XORGXRDP_DEB XRDP_DEB",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-26T18:18:20.368122042Z",
+                    "created_by": "/bin/sh -c #(nop) ARG CHROMIUM_REVISION INSTALL_ACCEPTANCE_DESKTOP XORGXRDP_DEB XRDP_DEB",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-26T18:18:20.43266726Z",
+                    "created_by": "/bin/sh -c #(nop) ARG CHROMIUM_REVISION CHROMIUM_SHA256 INSTALL_ACCEPTANCE_DESKTOP XORGXRDP_DEB XRDP_DEB",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-08-26T18:18:20.483127882Z",
+                    "created_by": "/bin/sh -c #(nop) ENV DEBIAN_FRONTEND=noninteractive",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-01T12:04:36.942923574Z",
+                    "created_by": "|5 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c apt-get update && apt-get install -y --no-install-recommends         ffmpeg         xserver-xorg-core xserver-xorg-legacy         x11-xserver-utils xterm xfonts-base fonts-dejavu-core         dbus procps openssl ca-certificates xdotool         libcairo2 libx11-6 libxext6 libxfixes3 libxrandr2 python3-tk     && rm -rf /var/lib/apt/lists/*"
+               },
+               {
+                    "created": "2026-09-01T12:04:38.422642272Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:c991b3da286d3ae42d64da749086b535614324451b5e1998f0309b4c163ad86c in /usr/local/bin/textflood "
+               },
+               {
+                    "created": "2026-09-01T12:04:38.573601012Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:fdf4163b034f93441173b8123f33b01be477724aa0fc5afb87c1603028ffe613 in /usr/local/bin/colorkey_x11 "
+               },
+               {
+                    "created": "2026-09-01T12:04:38.71633764Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:06c62bdacf7cbf6f88a5bcfec6016887a7313e9f3c3da00e5c50c82a7c396220 in /usr/local/bin/chroma_strip_anim "
+               },
+               {
+                    "created": "2026-09-01T12:04:38.857845723Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:6f21dea769d864472f74fe74b5da9dbeed995b277e075f46cebf6494645d825f in /usr/local/bin/chroma-probe "
+               },
+               {
+                    "created": "2026-09-01T12:04:39.070554137Z",
+                    "created_by": "|5 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c chmod 755 /usr/local/bin/textflood /usr/local/bin/colorkey_x11               /usr/local/bin/chroma_strip_anim /usr/local/bin/chroma-probe"
+               },
+               {
+                    "created": "2026-09-01T12:04:39.161521241Z",
+                    "created_by": "/bin/sh -c #(nop) ARG CHROMIUM_REVISION CHROMIUM_SHA256 INSTALL_ACCEPTANCE_DESKTOP INSTALL_XFCE XORGXRDP_DEB XRDP_DEB",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-01T12:04:46.58620647Z",
+                    "created_by": "|6 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 INSTALL_XFCE=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c if [ \"$INSTALL_XFCE\" = \"1\" ]; then         apt-get update         && apt-get install -y --no-install-recommends             xfce4-session xfwm4 xfdesktop4 xfce4-panel xfce4-settings             xfce4-terminal lxterminal dbus-x11         && rm -rf /var/lib/apt/lists/*;     fi"
+               },
+               {
+                    "created": "2026-09-01T12:04:47.342956872Z",
+                    "created_by": "/bin/sh -c #(nop) COPY multi:43d6566f5361eab83dcc80f892ec06f153709f7a57131c1ac747def5b35bc88e in /tmp/acceptance/ "
+               },
+               {
+                    "created": "2026-09-01T12:05:00.449256344Z",
+                    "created_by": "|6 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 INSTALL_XFCE=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c if [ \"$INSTALL_ACCEPTANCE_DESKTOP\" = \"1\" ]; then         apt-get update         && apt-get install -y --no-install-recommends             curl unzip desktop-file-utils thunar fonts-liberation             libasound2t64 libatspi2.0-0t64 libcups2t64 libgbm1             libgtk-3-0t64 libnss3 libxcomposite1 libxdamage1             libxkbcommon0         && curl -fsSL --retry 3             -o /tmp/chrome-linux.zip             \"https://storage.googleapis.com/chromium-browser-snapshots/Linux_x64/${CHROMIUM_REVISION}/chrome-linux.zip\"         && printf '%s  %s\\n' \"$CHROMIUM_SHA256\" /tmp/chrome-linux.zip             | sha256sum -c -         && unzip -q /tmp/chrome-linux.zip -d /opt         && install -m 0755 /tmp/acceptance/chromium-container             /usr/local/bin/chromium-container         && install -m 0644 /tmp/acceptance/chromium-container.desktop             /usr/share/applications/chromium-container.desktop         && install -m 0644 /opt/chrome-linux/product_logo_48.png             /usr/share/pixmaps/chromium-container.png         && desktop-file-validate             /usr/share/applications/chromium-container.desktop         && rm -f /tmp/chrome-linux.zip         && rm -rf /var/lib/apt/lists/*;     fi"
+               },
+               {
+                    "created": "2026-09-01T12:05:01.891017857Z",
+                    "created_by": "/bin/sh -c #(nop) COPY multi:edff2b035b971b18c1321af680ecbe6f36211401e073f476dd4e3c3e87a72d8b in /tmp/debs/ "
+               },
+               {
+                    "created": "2026-09-01T12:05:05.963829299Z",
+                    "created_by": "|6 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 INSTALL_XFCE=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c apt-get update     && apt-get install -y --no-install-recommends /tmp/debs/*.deb     && rm -rf /tmp/debs /var/lib/apt/lists/*"
+               },
+               {
+                    "created": "2026-09-01T12:05:06.252169692Z",
+                    "created_by": "|6 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 INSTALL_XFCE=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c printf 'allowed_users=anybody\\nneeds_root_rights=no\\n'         > /etc/X11/Xwrapper.config     && sed -i -e 's|^port=3389|port=tcp://:3389|'               -e 's|^autorun=$|autorun=Xorg|' /etc/xrdp/xrdp.ini     && groupadd -f render     && useradd -m -u 1100 -s /bin/bash tester     && usermod -aG video,render tester     && useradd -m -u 1101 -s /bin/bash probe444     && usermod -aG video,render probe444     && if [ \"$INSTALL_ACCEPTANCE_DESKTOP\" = \"1\" ]; then         usermod -aG root tester         && usermod -aG root probe444;     fi"
+               },
+               {
+                    "created": "2026-09-01T12:05:06.407765954Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:de8ef4d8f79de4293c157a0bcbe9dc353775ee8a1b18e393f1a35e2e72211178 in /etc/xrdp/startwm.sh "
+               },
+               {
+                    "created": "2026-09-01T12:05:06.562880574Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:628b0eee1c022e257ef0006ee5142033526b6b25943223b1f2644f049101d2fa in /usr/local/bin/banner.sh "
+               },
+               {
+                    "created": "2026-09-01T12:05:06.708882434Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:4c843511f9a8d848908b9f53d1d5711efd056299758d9eb24a21fc2fcd6c955c in /usr/local/bin/entrypoint.sh "
+               },
+               {
+                    "created": "2026-09-01T12:05:06.922150107Z",
+                    "created_by": "|6 CHROMIUM_REVISION=1686537 CHROMIUM_SHA256=cb945d510c518e2a93a8b885bbba65b83dd7837e8b9eb8a3a6f835199726cad6 INSTALL_ACCEPTANCE_DESKTOP=1 INSTALL_XFCE=1 XORGXRDP_DEB=xorgxrdp-dev_1%3a0.10.80+git20260828123216.baf9658c397d_amd64.deb XRDP_DEB=xrdp-dev_0.10.80+git20260901120335.655639d8270c_amd64.deb /bin/sh -c chmod 755 /etc/xrdp/startwm.sh /usr/local/bin/banner.sh               /usr/local/bin/entrypoint.sh"
+               },
+               {
+                    "created": "2026-09-01T12:05:07.004210234Z",
+                    "created_by": "/bin/sh -c #(nop) EXPOSE 3389",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-01T12:05:07.052261283Z",
+                    "created_by": "/bin/sh -c #(nop) ENTRYPOINT [\"/usr/local/bin/entrypoint.sh\"]",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-06T15:12:37.230243795Z",
+                    "created_by": "/bin/sh -c #(nop) ARG XRDP_DEB",
+                    "comment": "FROM localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce",
+                    "empty_layer": true
+               },
+               {
+                    "created": "2026-09-06T15:33:07.760129799Z",
+                    "created_by": "/bin/sh -c #(nop) COPY file:219b4eacd95fa05df10ca7c80809684a34d230808bbf10f27e6955830bc408c5 in /tmp/odd-edge-xrdp.deb "
+               },
+               {
+                    "created": "2026-09-06T15:33:08.190657995Z",
+                    "created_by": "|1 XRDP_DEB=xrdp-dev_0.10.80+git20260906153241.1cd9b5513637_amd64.deb /bin/sh -c dpkg -i /tmp/odd-edge-xrdp.deb && rm /tmp/odd-edge-xrdp.deb"
+               }
+          ],
+          "NamesHistory": [
+               "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637"
+          ]
+     }
+]

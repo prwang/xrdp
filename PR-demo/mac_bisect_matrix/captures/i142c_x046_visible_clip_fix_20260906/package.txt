@@ -1,0 +1,72 @@
+==> base=0.10.80 commit=1cd9b5513637 dirty=no
+==> package version: 0.10.80+git20260906153241.1cd9b5513637
+libtool: warning: remember to run 'libtool --finish /usr/lib/x86_64-linux-gnu/xrdp'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: relinking 'libvnc.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: relinking 'libxup.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: relinking 'libmc.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: relinking 'libipm.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: relinking 'libxrdp.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: remember to run 'libtool --finish /usr/lib/x86_64-linux-gnu'
+libtool: warning: remember to run 'libtool --finish /usr/lib/x86_64-linux-gnu'
+libtool: warning: relinking 'libsesman.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: '../../sesman/libsesman/libsesman.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../sesman/libsesman/libsesman.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../sesman/libsesman/libsesman.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../sesman/libsesman/libsesman.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../sesman/libsesman/libsesman.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../libipm/libipm.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../libxrdp/libxrdp.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+..+.....+....+.................+....+.........+..+.+.....+.........+...+...+....+..............+.+++++++++++++++++++++++++++++++++++++++*.+.....+...+......+................+...+..+....+...........+.+.....+............+.+..+.............+.....+...............+......+...+...+....+...+...........+......+....+.........+...+.....+....+...+......+..+...+....+...........+.+........+.+++++++++++++++++++++++++++++++++++++++*......+....+......+.....+...+...+.......+.....+.+..+...+....+.....+..................+...+.+...+..+.........+....+...........++++++
+.........+...+.......+........+.+.....+......+.......+..+.............+......+.....+++++++++++++++++++++++++++++++++++++++*.......+...+....+..+......+++++++++++++++++++++++++++++++++++++++*.+.......+......+.....+....+...+........+....+...+.........+........+.......+.....+......+...+....+......+..............+.......+...........++++++
+-----
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: '../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+libtool: warning: relinking 'libxrdpapi.la'
+libtool: warning: remember to run 'libtool --finish /usr/lib/xrdp'
+libtool: warning: '../../common/libcommon.la' has not been installed in '/usr/lib/xrdp'
+==> staged 134 files to /tmp/tmp.40aExAylFK
+==> built /work/dist/visible-clip-142c/xrdp-dev_0.10.80+git20260906153241.1cd9b5513637_amd64.deb
+
+     new Debian package, version 2.0.
+     size 2011180 bytes: control archive=836 bytes.
+        1061 bytes,    42 lines      conffiles
+         673 bytes,    17 lines      control
+     Package: xrdp-dev
+     Version: 0.10.80+git20260906153241.1cd9b5513637
+     Architecture: amd64
+     Maintainer: xrdp dev build <xrdp-devel@googlegroups.com>
+     Installed-Size: 11120
+     Depends: libc6, libssl3 | libssl1.1, libpam0g, libx11-6, libxfixes3, libxrandr2
+     Recommends: xorgxrdp (>= 1:0.10.80~), xserver-xorg-core
+     Conflicts: xrdp
+     Replaces: xrdp
+     Provides: xrdp
+     Breaks: xorgxrdp (<< 1:0.10.80~)
+     Section: net
+     Priority: optional
+     Description: xrdp RDP server (developer build from git 1cd9b5513637)
+      Self-built xrdp from the source tree at commit 1cd9b5513637.
+      Supersedes the distribution xrdp package for development / BEFORE-AFTER
+      testing of in-progress changes. NOT for production use.
+==> install with:  sudo apt-get install -y /work/dist/visible-clip-142c/xrdp-dev_0.10.80+git20260906153241.1cd9b5513637_amd64.deb

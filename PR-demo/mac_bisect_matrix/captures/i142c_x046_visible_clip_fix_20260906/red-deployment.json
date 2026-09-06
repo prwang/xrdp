@@ -1,0 +1,180 @@
+{
+    "apiVersion": "apps/v1",
+    "kind": "Deployment",
+    "metadata": {
+        "annotations": {
+            "deployment.kubernetes.io/revision": "1",
+            "kubectl.kubernetes.io/last-applied-configuration": "{\"apiVersion\":\"apps/v1\",\"kind\":\"Deployment\",\"metadata\":{\"annotations\":{},\"labels\":{\"app\":\"xrdp-bisect\",\"arm\":\"x046\"},\"name\":\"xrdp-x046\",\"namespace\":\"bisect-matrix\"},\"spec\":{\"replicas\":1,\"selector\":{\"matchLabels\":{\"arm\":\"x046\"}},\"strategy\":{\"type\":\"Recreate\"},\"template\":{\"metadata\":{\"labels\":{\"app\":\"xrdp-bisect\",\"arm\":\"x046\"}},\"spec\":{\"containers\":[{\"env\":[{\"name\":\"SESSION_KIND\",\"value\":\"xfce\"},{\"name\":\"ARM_LABEL\",\"value\":\"Intentional odd-edge overflow comparison (port 40062)\"},{\"name\":\"XRDP_PERF_TRACE\",\"value\":\"/var/log/xrdp-perf/xrdp\"},{\"name\":\"XRDP_WIRE_TRACE\",\"value\":\"1\"}],\"image\":\"localhost/xrdp-bisect:dev-odd-edge-40062\",\"imagePullPolicy\":\"Never\",\"name\":\"xrdp\",\"ports\":[{\"containerPort\":3389,\"hostIP\":\"127.0.0.1\",\"hostPort\":40062,\"protocol\":\"TCP\"}],\"securityContext\":{\"privileged\":true},\"volumeMounts\":[{\"mountPath\":\"/dev/shm\",\"name\":\"dshm\"},{\"mountPath\":\"/run/matrix\",\"name\":\"matrix-cred\",\"readOnly\":true},{\"mountPath\":\"/etc/xrdp/gfx.toml\",\"name\":\"gfx\",\"subPath\":\"gfx.toml\"},{\"mountPath\":\"/usr/local/bin/codescroll10.sh\",\"name\":\"payloads\",\"subPath\":\"codescroll10.sh\"},{\"mountPath\":\"/usr/local/share/code_corpus.ansi\",\"name\":\"payloads\",\"subPath\":\"code_corpus.ansi\"},{\"mountPath\":\"/var/log/xrdp-perf\",\"name\":\"wire-trace\"}]}],\"volumes\":[{\"emptyDir\":{\"medium\":\"Memory\",\"sizeLimit\":\"1Gi\"},\"name\":\"dshm\"},{\"hostPath\":{\"path\":\"/etc/xrdp-matrix\",\"type\":\"Directory\"},\"name\":\"matrix-cred\"},{\"configMap\":{\"defaultMode\":493,\"name\":\"xrdp-banner\"},\"name\":\"payloads\"},{\"configMap\":{\"name\":\"xrdp-gfx-x046\"},\"name\":\"gfx\"},{\"hostPath\":{\"path\":\"/var/lib/xrdp-matrix/x046-odd-edge\",\"type\":\"DirectoryOrCreate\"},\"name\":\"wire-trace\"}]}}}}\n"
+        },
+        "creationTimestamp": "2026-09-06T15:12:47Z",
+        "generation": 1,
+        "labels": {
+            "app": "xrdp-bisect",
+            "arm": "x046"
+        },
+        "name": "xrdp-x046",
+        "namespace": "bisect-matrix",
+        "resourceVersion": "1470635",
+        "uid": "07710f2b-97d6-4cae-bf45-c760ce9e1f0d"
+    },
+    "spec": {
+        "progressDeadlineSeconds": 600,
+        "replicas": 1,
+        "revisionHistoryLimit": 10,
+        "selector": {
+            "matchLabels": {
+                "arm": "x046"
+            }
+        },
+        "strategy": {
+            "type": "Recreate"
+        },
+        "template": {
+            "metadata": {
+                "labels": {
+                    "app": "xrdp-bisect",
+                    "arm": "x046"
+                }
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "SESSION_KIND",
+                                "value": "xfce"
+                            },
+                            {
+                                "name": "ARM_LABEL",
+                                "value": "Intentional odd-edge overflow comparison (port 40062)"
+                            },
+                            {
+                                "name": "XRDP_PERF_TRACE",
+                                "value": "/var/log/xrdp-perf/xrdp"
+                            },
+                            {
+                                "name": "XRDP_WIRE_TRACE",
+                                "value": "1"
+                            }
+                        ],
+                        "image": "localhost/xrdp-bisect:dev-odd-edge-40062",
+                        "imagePullPolicy": "Never",
+                        "name": "xrdp",
+                        "ports": [
+                            {
+                                "containerPort": 3389,
+                                "hostIP": "127.0.0.1",
+                                "hostPort": 40062,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "securityContext": {
+                            "privileged": true
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dev/shm",
+                                "name": "dshm"
+                            },
+                            {
+                                "mountPath": "/run/matrix",
+                                "name": "matrix-cred",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/etc/xrdp/gfx.toml",
+                                "name": "gfx",
+                                "subPath": "gfx.toml"
+                            },
+                            {
+                                "mountPath": "/usr/local/bin/codescroll10.sh",
+                                "name": "payloads",
+                                "subPath": "codescroll10.sh"
+                            },
+                            {
+                                "mountPath": "/usr/local/share/code_corpus.ansi",
+                                "name": "payloads",
+                                "subPath": "code_corpus.ansi"
+                            },
+                            {
+                                "mountPath": "/var/log/xrdp-perf",
+                                "name": "wire-trace"
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "terminationGracePeriodSeconds": 30,
+                "volumes": [
+                    {
+                        "emptyDir": {
+                            "medium": "Memory",
+                            "sizeLimit": "1Gi"
+                        },
+                        "name": "dshm"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/etc/xrdp-matrix",
+                            "type": "Directory"
+                        },
+                        "name": "matrix-cred"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 493,
+                            "name": "xrdp-banner"
+                        },
+                        "name": "payloads"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "xrdp-gfx-x046"
+                        },
+                        "name": "gfx"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/var/lib/xrdp-matrix/x046-odd-edge",
+                            "type": "DirectoryOrCreate"
+                        },
+                        "name": "wire-trace"
+                    }
+                ]
+            }
+        }
+    },
+    "status": {
+        "availableReplicas": 1,
+        "conditions": [
+            {
+                "lastTransitionTime": "2026-09-06T15:12:47Z",
+                "lastUpdateTime": "2026-09-06T15:12:49Z",
+                "message": "ReplicaSet \"xrdp-x046-88845dc4d\" has successfully progressed.",
+                "reason": "NewReplicaSetAvailable",
+                "status": "True",
+                "type": "Progressing"
+            },
+            {
+                "lastTransitionTime": "2026-09-06T15:18:52Z",
+                "lastUpdateTime": "2026-09-06T15:18:52Z",
+                "message": "Deployment has minimum availability.",
+                "reason": "MinimumReplicasAvailable",
+                "status": "True",
+                "type": "Available"
+            }
+        ],
+        "observedGeneration": 1,
+        "readyReplicas": 1,
+        "replicas": 1,
+        "terminatingReplicas": 0,
+        "updatedReplicas": 1
+    }
+}

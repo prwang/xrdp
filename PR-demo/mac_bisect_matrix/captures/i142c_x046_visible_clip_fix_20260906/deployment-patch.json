@@ -1,0 +1,1 @@
+{"spec": {"template": {"spec": {"containers": [{"name": "xrdp", "image": "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637", "env": [{"name": "ARM_LABEL", "value": "Visible-edge correction (port 40062)"}]}], "volumes": [{"name": "wire-trace", "hostPath": {"path": "/var/lib/xrdp-matrix/x046-visible-clip", "type": "DirectoryOrCreate"}}]}}}}

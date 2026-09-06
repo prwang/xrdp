@@ -1,0 +1,330 @@
+{
+    "apiVersion": "v1",
+    "items": [
+        {
+            "apiVersion": "v1",
+            "kind": "Pod",
+            "metadata": {
+                "creationTimestamp": "2026-09-06T15:33:16Z",
+                "generateName": "xrdp-x046-86f75765b-",
+                "generation": 1,
+                "labels": {
+                    "app": "xrdp-bisect",
+                    "arm": "x046",
+                    "pod-template-hash": "86f75765b"
+                },
+                "name": "xrdp-x046-86f75765b-gfpwd",
+                "namespace": "bisect-matrix",
+                "ownerReferences": [
+                    {
+                        "apiVersion": "apps/v1",
+                        "blockOwnerDeletion": true,
+                        "controller": true,
+                        "kind": "ReplicaSet",
+                        "name": "xrdp-x046-86f75765b",
+                        "uid": "4aea52a3-3955-4b62-8e05-293083b77035"
+                    }
+                ],
+                "resourceVersion": "1471017",
+                "uid": "2c29b8a4-71b3-4a67-b254-528c3a7bc019"
+            },
+            "spec": {
+                "containers": [
+                    {
+                        "env": [
+                            {
+                                "name": "SESSION_KIND",
+                                "value": "xfce"
+                            },
+                            {
+                                "name": "ARM_LABEL",
+                                "value": "Visible-edge correction (port 40062)"
+                            },
+                            {
+                                "name": "XRDP_PERF_TRACE",
+                                "value": "/var/log/xrdp-perf/xrdp"
+                            },
+                            {
+                                "name": "XRDP_WIRE_TRACE",
+                                "value": "1"
+                            }
+                        ],
+                        "image": "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637",
+                        "imagePullPolicy": "Never",
+                        "name": "xrdp",
+                        "ports": [
+                            {
+                                "containerPort": 3389,
+                                "hostIP": "127.0.0.1",
+                                "hostPort": 40062,
+                                "protocol": "TCP"
+                            }
+                        ],
+                        "resources": {},
+                        "securityContext": {
+                            "privileged": true
+                        },
+                        "terminationMessagePath": "/dev/termination-log",
+                        "terminationMessagePolicy": "File",
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dev/shm",
+                                "name": "dshm"
+                            },
+                            {
+                                "mountPath": "/run/matrix",
+                                "name": "matrix-cred",
+                                "readOnly": true
+                            },
+                            {
+                                "mountPath": "/etc/xrdp/gfx.toml",
+                                "name": "gfx",
+                                "subPath": "gfx.toml"
+                            },
+                            {
+                                "mountPath": "/usr/local/bin/codescroll10.sh",
+                                "name": "payloads",
+                                "subPath": "codescroll10.sh"
+                            },
+                            {
+                                "mountPath": "/usr/local/share/code_corpus.ansi",
+                                "name": "payloads",
+                                "subPath": "code_corpus.ansi"
+                            },
+                            {
+                                "mountPath": "/var/log/xrdp-perf",
+                                "name": "wire-trace"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-nxftq",
+                                "readOnly": true
+                            }
+                        ]
+                    }
+                ],
+                "dnsPolicy": "ClusterFirst",
+                "enableServiceLinks": true,
+                "nodeName": "xrdp-fixdpi",
+                "preemptionPolicy": "PreemptLowerPriority",
+                "priority": 0,
+                "restartPolicy": "Always",
+                "schedulerName": "default-scheduler",
+                "securityContext": {},
+                "serviceAccount": "default",
+                "serviceAccountName": "default",
+                "terminationGracePeriodSeconds": 30,
+                "tolerations": [
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/not-ready",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    },
+                    {
+                        "effect": "NoExecute",
+                        "key": "node.kubernetes.io/unreachable",
+                        "operator": "Exists",
+                        "tolerationSeconds": 300
+                    }
+                ],
+                "volumes": [
+                    {
+                        "emptyDir": {
+                            "medium": "Memory",
+                            "sizeLimit": "1Gi"
+                        },
+                        "name": "dshm"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/etc/xrdp-matrix",
+                            "type": "Directory"
+                        },
+                        "name": "matrix-cred"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 493,
+                            "name": "xrdp-banner"
+                        },
+                        "name": "payloads"
+                    },
+                    {
+                        "configMap": {
+                            "defaultMode": 420,
+                            "name": "xrdp-gfx-x046"
+                        },
+                        "name": "gfx"
+                    },
+                    {
+                        "hostPath": {
+                            "path": "/var/lib/xrdp-matrix/x046-visible-clip",
+                            "type": "DirectoryOrCreate"
+                        },
+                        "name": "wire-trace"
+                    },
+                    {
+                        "name": "kube-api-access-nxftq",
+                        "projected": {
+                            "defaultMode": 420,
+                            "sources": [
+                                {
+                                    "serviceAccountToken": {
+                                        "expirationSeconds": 3607,
+                                        "path": "token"
+                                    }
+                                },
+                                {
+                                    "configMap": {
+                                        "items": [
+                                            {
+                                                "key": "ca.crt",
+                                                "path": "ca.crt"
+                                            }
+                                        ],
+                                        "name": "kube-root-ca.crt"
+                                    }
+                                },
+                                {
+                                    "downwardAPI": {
+                                        "items": [
+                                            {
+                                                "fieldRef": {
+                                                    "apiVersion": "v1",
+                                                    "fieldPath": "metadata.namespace"
+                                                },
+                                                "path": "namespace"
+                                            }
+                                        ]
+                                    }
+                                }
+                            ]
+                        }
+                    }
+                ]
+            },
+            "status": {
+                "conditions": [
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-06T15:33:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodReadyToStartContainers"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-06T15:33:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Initialized"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-06T15:33:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "Ready"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-06T15:33:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "ContainersReady"
+                    },
+                    {
+                        "lastProbeTime": null,
+                        "lastTransitionTime": "2026-09-06T15:33:16Z",
+                        "observedGeneration": 1,
+                        "status": "True",
+                        "type": "PodScheduled"
+                    }
+                ],
+                "containerStatuses": [
+                    {
+                        "containerID": "containerd://dccda73ad197a0833e94980e0f263d2bf9523e9b17bc60ce16774fff7cc7bafa",
+                        "image": "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637",
+                        "imageID": "sha256:cf91e8b8f624e3710cceb09242b6003345b6062d78478a15a457de658a706c9e",
+                        "lastState": {},
+                        "name": "xrdp",
+                        "ready": true,
+                        "resources": {},
+                        "restartCount": 0,
+                        "started": true,
+                        "state": {
+                            "running": {
+                                "startedAt": "2026-09-06T15:33:16Z"
+                            }
+                        },
+                        "user": {
+                            "linux": {
+                                "gid": 0,
+                                "supplementalGroups": [
+                                    0
+                                ],
+                                "uid": 0
+                            }
+                        },
+                        "volumeMounts": [
+                            {
+                                "mountPath": "/dev/shm",
+                                "name": "dshm"
+                            },
+                            {
+                                "mountPath": "/run/matrix",
+                                "name": "matrix-cred",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            },
+                            {
+                                "mountPath": "/etc/xrdp/gfx.toml",
+                                "name": "gfx"
+                            },
+                            {
+                                "mountPath": "/usr/local/bin/codescroll10.sh",
+                                "name": "payloads"
+                            },
+                            {
+                                "mountPath": "/usr/local/share/code_corpus.ansi",
+                                "name": "payloads"
+                            },
+                            {
+                                "mountPath": "/var/log/xrdp-perf",
+                                "name": "wire-trace"
+                            },
+                            {
+                                "mountPath": "/var/run/secrets/kubernetes.io/serviceaccount",
+                                "name": "kube-api-access-nxftq",
+                                "readOnly": true,
+                                "recursiveReadOnly": "Disabled"
+                            }
+                        ]
+                    }
+                ],
+                "hostIP": "10.177.0.113",
+                "hostIPs": [
+                    {
+                        "ip": "10.177.0.113"
+                    }
+                ],
+                "observedGeneration": 1,
+                "phase": "Running",
+                "podIP": "10.42.0.27",
+                "podIPs": [
+                    {
+                        "ip": "10.42.0.27"
+                    }
+                ],
+                "qosClass": "BestEffort",
+                "resources": {},
+                "startTime": "2026-09-06T15:33:16Z"
+            }
+        }
+    ],
+    "kind": "List",
+    "metadata": {
+        "resourceVersion": ""
+    }
+}

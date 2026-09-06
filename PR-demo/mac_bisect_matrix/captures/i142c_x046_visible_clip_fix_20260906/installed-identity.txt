@@ -1,0 +1,11 @@
+ffmpeg	7:6.1.1-3ubuntu5
+libx264-164:amd64	2:0.164.3108+git31e19f9-1
+xorgxrdp-dev	1:0.10.80+git20260828123216.baf9658c397d
+xrdp-dev	0.10.80+git20260906153241.1cd9b5513637
+565ad975e8a0d5b2ae4f445a37d6c0f667aae466ea14a21b38761b1c0613f585  /etc/xrdp/gfx.toml
+5134c62eea9fa2f58e605e229a8ec9a9acb195e37b1a8e46fa3966a6d98e99da  /usr/sbin/xrdp
+fs.pipe-user-pages-soft = 262144
+fs.pipe-user-pages-hard = 0
+fs.pipe-max-size = 1048576
+/var/log/xrdp-perf/xrdp
+1

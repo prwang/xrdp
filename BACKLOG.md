@@ -310,8 +310,8 @@ on the first resize; development completed twenty resizes without replacement
 capabilities. Actual serializer calls now prove a specific missed difference:
 clean-room aligns region extents against padded coded bounds and can exceed
 the visible surface; development clips to visible bounds. The prior failure
-also starts at the first odd-height resize. S135-R4 currently specifies the
-clean-room behavior, so the normative contract itself needs reconciliation.
+also starts at the first odd-height resize. S135-R4 specified the
+clean-room behavior; the forward correction below repairs that contract.
 Next: capture actual region bounds with the existing bounded wire inspector,
 pin an odd-visible/even-coded serializer case, then reproduce this named
 transition on canonical development before correcting it. Neither the Windows
@@ -356,20 +356,20 @@ reference and both controls are unchanged. Evidence:
 Readiness:
 [`i142c_x046_odd_edge_ready_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_odd_edge_ready_20260906/README.md).
 
-**IN PROGRESS — forward correction authorized, 2026-09-06.** Preserve the
-red injection `c729a50889a2` and its Windows capture in the linear ancestry;
-retire only its diagnostic overflow assertion, independently pin visible-edge
-expectations, then manually restore unconditional visible clipping. Update
-PRD/README.md and S135-R4. Commit the correction and replace only port 40062
-with the committed build; require the ordinary three-second certificate and
-final two-size rendered smoke before Windows handoff. The same Windows resize
-sequence remains the interactive acceptance gate, not a unit-test claim.
+**DONE — development correction and replacement, 2026-09-06.** Manual
+forward fix `1cd9b5513637` restores visible-bound clipping and is installed on
+40062. The red injection `c729a50889a2`, Windows failure capture, original red
+image and independently failing regression/spec checkpoint `d477399f` remain
+on the same linear ancestry or in the retained evidence. Both full build/test
+configurations, deployment certification and final two-resolution rendered
+smoke pass. The shared PRD and S135-R4 now specify visible bounds. Controls
+40060/40061 and the paired producer are unchanged. No history rollback.
 
-The manual source correction now passes the unchanged new regression and
-complete trace-enabled/default build gates. The independently failing regression
-is committed as `d477399f`; the original reproduced injection remains
-`c729a50889a2`. Packaging and replacing 40062 are next; Windows acceptance
-remains open. Source/deployment record:
+**IN PROGRESS — corrected-build Windows acceptance.** Repeat the same
+three-resize sequence, including 1800x1085 and 1892x1085. Require bounded inner
+regions, continued frame ACKs, no replacement capability advertisement and no
+black/disconnect transition. Automated gates do not close this interactive
+requirement. Source/deployment record:
 [`i142c_x046_visible_clip_fix_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_visible_clip_fix_20260906/README.md).
 
 **DEFERRED — clean-room slice 135 owns this correction.** When authorized,
