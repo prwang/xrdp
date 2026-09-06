@@ -1,5 +1,38 @@
 # #142C development and clean-room equivalence audit
 
+## 2026-09-06 superseding result: odd visible edge exceeds surface
+
+The historical audit below remains verbatim and RED. The new two-arm Windows
+capture establishes a previously missed serializer difference, not another
+scheduling conjecture: clean-room clips aligned video update rectangles to
+padded coded dimensions; development clips to visible surface dimensions.
+Calling the actual serializers with full damage for 2360x1033 produces bottom
+1034 on clean-room and 1033 on development. For the earlier failing 1820x1171
+resize the corresponding values are 1172 and 1171. All six preceding resizes
+in that older Windows record had even dimensions; the first odd-height resize
+was the first replacement-capability event. Today's clean-room session starts
+at an odd height and re-advertises immediately after the first desktop frame,
+while development survives twenty resizes. This supports a specific rejection
+hypothesis but is not yet a controlled Windows proof.
+
+S135-R4 explicitly says coded bounds. The clean-room test asserts that rule;
+neither has a separate odd visible-surface boundary. Thus the prior claim
+that both trees instantiate the same normative geometry behavior was false,
+and the specification needs a deliberate correction as part of the causal
+development-first workflow. Do not quietly edit the golden test to agree with
+a proposed fix. The existing wire instrument lacks the actual metablock
+coordinates; those are the next bounded fields to capture. No production
+changes, clean-room history edits or redeployments were made for this result.
+
+Full transaction timeline, source seams, offline compiled probe, live-trace
+buffer recovery and limitations:
+[`i142c_wire_windows_20260906T145500Z`](../../PR-demo/mac_bisect_matrix/captures/i142c_wire_windows_20260906T145500Z/README.md).
+
+A reporting correction also applies to the instrument section below: the
+final deployment record retains trace-enabled suite totals 220 development
+and 193 clean-room, not the 221/206 stated in that historical paragraph.
+Those earlier counts are not the final deployment's gate evidence.
+
 ## Scope and identities
 
 This audit compares the development xrdp functional frontier

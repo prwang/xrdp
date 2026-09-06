@@ -1,0 +1,332 @@
+[2026-09-01T12:06:31.373+0000] [INFO ] address [0.0.0.0] port [3389] mode 4
+[2026-09-01T12:06:31.373+0000] [INFO ] listening to port 3389 on 0.0.0.0
+[2026-09-01T12:06:31.374+0000] [INFO ] xrdp_listen_pp done
+[2026-09-01T12:06:31.375+0000] [CORE ] You are running xrdp as uid=0 gid=0. This is not recommended.
+[2026-09-01T12:06:31.376+0000] [INFO ] starting xrdp with pid 1
+[2026-09-01T12:06:50.179+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:52472
+[2026-09-01T12:06:50.185+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:06:50.186+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:06:50.187+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:06:50.188+0000] [INFO ] Selected TLS security
+[2026-09-01T12:06:50.193+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:06:50.194+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:06:50.195+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:06:50.196+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:06:50.197+0000] [INFO ] TLS connection established from 10.42.0.1:52472 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:06:50.198+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:06:50.198+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:06:50.199+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:06:50.200+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:06:50.204+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:06:50.206+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:06:50.207+0000] [INFO ] Login screen monitor height is 1080 pixels over 1000 mm (27 DPI)
+[2026-09-01T12:06:50.209+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:06:50.230+0000] [INFO ] GFX lifecycle: caps begin generation=1 encoder=(nil) egfx_up=0 module=0x0 direct_xorg=0 first_update_pending=0 screen=1920x1080 monitors=0
+[2026-09-01T12:06:50.231+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:06:50.232+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:06:50.232+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:06:50.323+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:06:50.325+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:06:50.326+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:06:50.326+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:06:50.327+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:06:50.328+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:06:50.329+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:06:50.330+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:06:50.330+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:06:50.331+0000] [INFO ] Matched external H.264 mode
+[2026-09-01T12:06:50.332+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:06:50.334+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:06:50.334+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:06:50.335+0000] [INFO ] xrdp_egfx_reset_graphics: width 1920 height 1080 monitorcount 1
+[2026-09-01T12:06:50.336+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:06:50.337+0000] [INFO ] GFX lifecycle: caps reset generation=1 encoder_before=(nil) reset_error=0 repaint_route=wm-screen
+[2026-09-01T12:06:50.338+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1920 height 1080
+[2026-09-01T12:06:50.339+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-01T12:06:50.340+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:06:50.342+0000] [INFO ] GFX lifecycle: caps encoder installed generation=1 encoder_after=0x56a583325800 first_update_pending=0
+[2026-09-01T12:06:50.343+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:06:50.344+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:06:50.345+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:06:50.346+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:06:50.347+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:06:50.363+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:06:52.888+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:06:52.890+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:06:52.892+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:06:52.894+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:06:52.896+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10544, version 4
+[2026-09-01T12:06:52.897+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:06:52.898+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:06:52.899+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:06:52.900+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:06:52.901+0000] [INFO ] lib_mod_log_peer: xrdp_pid=62 connected to Xorg_pid=171 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:52472
+[2026-09-01T12:06:52.902+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:06:52.903+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:06:52.906+0000] [INFO ] Received memory_allocation_complete command. width: 1920, height: 1080
+[2026-09-01T12:06:56.131+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-09-01T12:06:56.135+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-09-01T12:06:56.136+0000] [INFO ] GFX lifecycle: encoder delete begin generation=1 encoder=0x56a583325800 server=2 client=2 consumed=2
+[2026-09-01T12:06:56.152+0000] [INFO ] GFX lifecycle: encoder delete complete generation=1 encoder=0x56a583325800
+[2026-09-01T12:06:56.153+0000] [ERROR] xrdp_iso_send: trans_write_copy_s failed
+[2026-09-01T12:06:56.154+0000] [ERROR] xrdp_mcs_send: xrdp_iso_send failed
+[2026-09-01T12:06:56.155+0000] [ERROR] xrdp_sec_send: xrdp_mcs_send failed
+[2026-09-01T12:06:56.157+0000] [ERROR] xrdp_channel_send: xrdp_sec_send failed
+[2026-09-01T12:06:56.158+0000] [ERROR] xrdp_channel_drdynvc_data: xrdp_channel_send failed
+[2026-09-01T12:09:26.686+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:45758
+[2026-09-01T12:09:26.692+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:09:26.693+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:09:26.694+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:09:26.695+0000] [INFO ] Selected TLS security
+[2026-09-01T12:09:26.701+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:09:26.702+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:09:26.702+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:09:26.703+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:09:26.704+0000] [INFO ] TLS connection established from 10.42.0.1:45758 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:09:26.705+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:09:26.706+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:09:26.707+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:09:26.708+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:09:26.712+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:09:26.713+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:09:26.714+0000] [INFO ] Login screen monitor height is 1080 pixels over 1000 mm (27 DPI)
+[2026-09-01T12:09:26.716+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:09:26.729+0000] [INFO ] GFX lifecycle: caps begin generation=1 encoder=(nil) egfx_up=0 module=0x0 direct_xorg=0 first_update_pending=0 screen=1920x1080 monitors=0
+[2026-09-01T12:09:26.730+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:09:26.730+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:09:26.731+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:09:26.803+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:09:26.804+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:09:26.805+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:09:26.806+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:09:26.807+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:09:26.807+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:09:26.808+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:09:26.809+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:09:26.810+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:09:26.810+0000] [INFO ] Matched external H.264 mode
+[2026-09-01T12:09:26.811+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:09:26.812+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:09:26.813+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:09:26.814+0000] [INFO ] xrdp_egfx_reset_graphics: width 1920 height 1080 monitorcount 1
+[2026-09-01T12:09:26.815+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:09:26.816+0000] [INFO ] GFX lifecycle: caps reset generation=1 encoder_before=(nil) reset_error=0 repaint_route=wm-screen
+[2026-09-01T12:09:26.817+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1920 height 1080
+[2026-09-01T12:09:26.817+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-01T12:09:26.818+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:09:26.822+0000] [INFO ] GFX lifecycle: caps encoder installed generation=1 encoder_after=0x56a5833257e0 first_update_pending=0
+[2026-09-01T12:09:26.823+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:09:26.823+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:09:26.824+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:09:26.825+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:09:26.826+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:09:26.842+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:09:29.364+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:09:29.366+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:09:29.368+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:09:29.371+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:09:29.372+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10544, version 4
+[2026-09-01T12:09:29.373+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:09:29.374+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:09:29.375+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:09:29.376+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:09:29.377+0000] [INFO ] lib_mod_log_peer: xrdp_pid=552 connected to Xorg_pid=661 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:45758
+[2026-09-01T12:09:29.378+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:09:29.379+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:09:29.382+0000] [INFO ] Received memory_allocation_complete command. width: 1920, height: 1080
+[2026-09-01T12:10:14.280+0000] [ERROR] Child 764 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:10:14.315+0000] [ERROR] Xorg server closed connection
+[2026-09-01T12:10:14.316+0000] [INFO ] GFX lifecycle: encoder delete begin generation=1 encoder=0x56a5833257e0 server=17 client=16 consumed=18
+[2026-09-01T12:10:14.335+0000] [INFO ] GFX lifecycle: encoder delete complete generation=1 encoder=0x56a5833257e0
+[2026-09-01T12:10:16.998+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:49454
+[2026-09-01T12:10:17.423+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:10:17.520+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:10:17.589+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:10:17.675+0000] [INFO ] Selected TLS security
+[2026-09-01T12:10:17.123+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:10:17.132+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:10:17.138+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:10:17.147+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:10:17.156+0000] [INFO ] TLS connection established from 10.42.0.1:49454 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:10:17.166+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:10:17.175+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:10:17.183+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:10:17.192+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:10:17.225+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:10:17.239+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:10:17.247+0000] [INFO ] Login screen monitor height is 768 pixels over 1000 mm (19 DPI)
+[2026-09-01T12:10:17.267+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:10:17.358+0000] [INFO ] GFX lifecycle: caps begin generation=1 encoder=(nil) egfx_up=0 module=0x0 direct_xorg=0 first_update_pending=0 screen=1024x768 monitors=0
+[2026-09-01T12:10:17.389+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:10:17.398+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:10:17.407+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:10:17.993+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:10:17.102+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:10:17.103+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:10:17.103+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:10:17.104+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:10:17.105+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:10:17.106+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:10:17.107+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:10:17.107+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:10:17.108+0000] [INFO ] Matched external H.264 mode
+[2026-09-01T12:10:17.109+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:10:17.110+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:10:17.111+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:10:17.111+0000] [INFO ] xrdp_egfx_reset_graphics: width 1024 height 768 monitorcount 1
+[2026-09-01T12:10:17.112+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:10:17.113+0000] [INFO ] GFX lifecycle: caps reset generation=1 encoder_before=(nil) reset_error=0 repaint_route=wm-screen
+[2026-09-01T12:10:17.114+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1024 height 768
+[2026-09-01T12:10:17.115+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-01T12:10:17.115+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:10:17.118+0000] [INFO ] GFX lifecycle: caps encoder installed generation=1 encoder_after=0x56a582848990 first_update_pending=0
+[2026-09-01T12:10:17.119+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:10:17.119+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:10:17.120+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:10:17.121+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:10:17.122+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:10:17.134+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:10:19.658+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:10:19.659+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:10:19.661+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:10:19.663+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:10:19.665+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10544, version 4
+[2026-09-01T12:10:19.666+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:10:19.667+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:10:19.668+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:10:19.669+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:10:19.670+0000] [INFO ] lib_mod_log_peer: xrdp_pid=1004 connected to Xorg_pid=1095 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:49454
+[2026-09-01T12:10:19.670+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:10:19.671+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:10:19.674+0000] [INFO ] Received memory_allocation_complete command. width: 1024, height: 768
+[2026-09-01T12:11:04.645+0000] [ERROR] Child 1197 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:11:04.646+0000] [ERROR] Child 1204 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:11:04.665+0000] [ERROR] Xorg server closed connection
+[2026-09-01T12:11:04.666+0000] [INFO ] GFX lifecycle: encoder delete begin generation=1 encoder=0x56a582848990 server=17 client=16 consumed=17
+[2026-09-01T12:11:04.677+0000] [INFO ] GFX lifecycle: encoder delete complete generation=1 encoder=0x56a582848990
+[2026-09-06T14:44:45.835+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:49868
+[2026-09-06T14:44:45.844+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-06T14:44:45.846+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-06T14:44:45.866+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID|HYBRID_EX
+[2026-09-06T14:44:45.868+0000] [INFO ] Selected TLS security
+[2026-09-06T14:44:45.944+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-09-06T14:44:45.948+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-09-06T14:44:45.950+0000] [ERROR] libxrdp_force_read: header read error
+[2026-09-06T14:44:45.952+0000] [ERROR] Processing [ITU-T T.125] Connect-Initial failed
+[2026-09-06T14:44:45.953+0000] [ERROR] [MCS Connection Sequence] receive connection request failed
+[2026-09-06T14:44:45.956+0000] [ERROR] xrdp_sec_incoming: xrdp_mcs_incoming failed
+[2026-09-06T14:44:45.957+0000] [ERROR] xrdp_rdp_incoming: xrdp_sec_incoming failed
+[2026-09-06T14:44:45.959+0000] [ERROR] xrdp_process_main_loop: libxrdp_process_incoming failed
+[2026-09-06T14:44:47.580+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:49872
+[2026-09-06T14:44:47.587+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-06T14:44:47.589+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-06T14:44:47.642+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID|HYBRID_EX
+[2026-09-06T14:44:47.645+0000] [INFO ] Selected TLS security
+[2026-09-06T14:44:47.654+0000] [INFO ] Connected client computer name: 5Q77
+[2026-09-06T14:44:47.657+0000] [INFO ] client supports gfx protocol
+[2026-09-06T14:44:47.659+0000] [WARN ] Physical desktop dimensions (0x0) are invalid
+[2026-09-06T14:44:47.661+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-06T14:44:47.662+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-06T14:44:47.719+0000] [INFO ] TLS connection established from 10.42.0.1:49872 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-06T14:44:47.726+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-06T14:44:47.729+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-06T14:44:47.731+0000] [INFO ] Client supports Unicode input
+[2026-09-06T14:44:47.733+0000] [INFO ] xrdp_process_offscreen_bmpcache: support level 1 cache size 10485760 bytes cache entries 100
+[2026-09-06T14:44:47.734+0000] [INFO ] xrdp_caps_process_codecs: NSCodec(CA8D1BB9-000F-154F-589F-AE2D1A87E2D6), codec id [1], properties len [3]
+[2026-09-06T14:44:47.736+0000] [INFO ] xrdp_caps_process_codecs: Image RemoteFX(2744CCD4-9D8A-4E74-803C-0ECBEEA19C54), codec id [5], properties len [49]
+[2026-09-06T14:44:47.738+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-06T14:44:47.756+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-06T14:44:47.759+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-06T14:44:47.761+0000] [WARN ] No information is available to determine login screen DPI
+[2026-09-06T14:44:47.763+0000] [WARN ] No DPI value is available to find login font
+[2026-09-06T14:44:47.764+0000] [WARN ] Using the default_dpi of 96
+[2026-09-06T14:44:47.773+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-06T14:44:47.878+0000] [INFO ] GFX lifecycle: caps begin generation=1 encoder=(nil) egfx_up=0 module=0x0 direct_xorg=0 first_update_pending=0 screen=2360x1033 monitors=0
+[2026-09-06T14:44:47.880+0000] [INFO ]   version 0x00080004 flags 0x00000000 (index: 0)
+[2026-09-06T14:44:47.882+0000] [INFO ]   version 0x00080105 flags 0x00000000 (index: 1)
+[2026-09-06T14:44:47.883+0000] [INFO ]   version 0x000a0002 flags 0x00000000 (index: 2)
+[2026-09-06T14:44:48.199+0000] [INFO ]   version 0x000a0200 flags 0x00000000 (index: 3)
+[2026-09-06T14:44:48.223+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-06T14:44:48.242+0000] [INFO ]   version 0x000a0400 flags 0x00000000 (index: 5)
+[2026-09-06T14:44:48.260+0000] [INFO ]   version 0x000a0502 flags 0x00000000 (index: 6)
+[2026-09-06T14:44:48.283+0000] [INFO ]   version 0x000a0600 flags 0x00000000 (index: 7)
+[2026-09-06T14:44:48.302+0000] [INFO ]   version 0x000a0701 flags 0x00000000 (index: 8)
+[2026-09-06T14:44:48.323+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-06T14:44:48.342+0000] [INFO ] Matched external H.264 mode
+[2026-09-06T14:44:48.360+0000] [INFO ]   replying version 0x000a0701 flags 0x00000000
+[2026-09-06T14:44:48.379+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 8
+[2026-09-06T14:44:48.398+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:44:48.416+0000] [INFO ] xrdp_egfx_reset_graphics: width 2360 height 1033 monitorcount 1
+[2026-09-06T14:44:48.436+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-06T14:44:48.454+0000] [INFO ] GFX lifecycle: caps reset generation=1 encoder_before=(nil) reset_error=0 repaint_route=wm-screen
+[2026-09-06T14:44:48.472+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2360 height 1033
+[2026-09-06T14:44:48.491+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-06T14:44:48.509+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:44:48.556+0000] [INFO ] GFX lifecycle: caps encoder installed generation=1 encoder_after=0x56a58348a0a0 first_update_pending=0
+[2026-09-06T14:44:48.574+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-06T14:44:48.592+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-06T14:44:49.344+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-06T14:44:49.347+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-06T14:44:49.349+0000] [INFO ] xrdp_wm_log_msg: Performing login request for tester
+[2026-09-06T14:44:49.367+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-06T14:44:51.901+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user tester
+[2026-09-06T14:44:51.906+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-06T14:44:51.910+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-06T14:44:51.913+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-06T14:44:51.919+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10544, version 4
+[2026-09-06T14:44:51.921+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x07], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-06T14:44:51.924+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-06T14:44:51.926+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-06T14:44:51.928+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-06T14:44:51.930+0000] [INFO ] lib_mod_log_peer: xrdp_pid=1488 connected to Xorg_pid=1595 Xorg_uid=1100 Xorg_gid=1100 client=10.42.0.1:49872
+[2026-09-06T14:44:51.932+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-06T14:44:51.934+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-06T14:44:51.940+0000] [INFO ] Received memory_allocation_complete command. width: 2360, height: 1033
+[2026-09-06T14:44:51.944+0000] [INFO ] Chansrv does not support Unicode input
+[2026-09-06T14:44:52.568+0000] [INFO ] GFX lifecycle: caps begin generation=2 encoder=0x56a58348a0a0 egfx_up=1 module=0x56a583490750 direct_xorg=1 first_update_pending=0 screen=2360x1033 monitors=0
+[2026-09-06T14:44:52.591+0000] [INFO ]   version 0x00080004 flags 0x00000000 (index: 0)
+[2026-09-06T14:44:52.612+0000] [INFO ]   version 0x00080105 flags 0x00000000 (index: 1)
+[2026-09-06T14:44:52.630+0000] [INFO ]   version 0x000a0002 flags 0x00000000 (index: 2)
+[2026-09-06T14:44:52.141+0000] [INFO ]   version 0x000a0200 flags 0x00000000 (index: 3)
+[2026-09-06T14:44:52.143+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-06T14:44:52.145+0000] [INFO ]   version 0x000a0400 flags 0x00000000 (index: 5)
+[2026-09-06T14:44:52.147+0000] [INFO ]   version 0x000a0502 flags 0x00000000 (index: 6)
+[2026-09-06T14:44:52.149+0000] [INFO ]   version 0x000a0600 flags 0x00000000 (index: 7)
+[2026-09-06T14:44:52.151+0000] [INFO ]   version 0x000a0701 flags 0x00000000 (index: 8)
+[2026-09-06T14:44:52.153+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-06T14:44:52.155+0000] [INFO ] Matched external H.264 mode
+[2026-09-06T14:44:52.157+0000] [INFO ]   replying version 0x000a0701 flags 0x00000000
+[2026-09-06T14:44:52.159+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 8
+[2026-09-06T14:44:52.161+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:44:52.163+0000] [INFO ] xrdp_egfx_reset_graphics: width 2360 height 1033 monitorcount 1
+[2026-09-06T14:44:52.165+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-06T14:44:52.167+0000] [INFO ] GFX lifecycle: caps reset generation=2 encoder_before=0x56a58348a0a0 reset_error=0 repaint_route=direct-xorg-none
+[2026-09-06T14:44:52.169+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2360 height 1033
+[2026-09-06T14:44:52.171+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-06T14:44:52.173+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:44:52.178+0000] [INFO ] GFX lifecycle: caps encoder installed generation=2 encoder_after=0x56a5834892b0 first_update_pending=1
+[2026-09-06T14:44:52.180+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-06T14:44:52.182+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-06T14:44:52.793+0000] [INFO ] GFX lifecycle: first direct producer update generation=2 encoder=0x56a5834892b0 frame=2 flags=0xc000000 rects=1 damage=1086,0-2251,1031 capture=2360x1033 shmem=14778368
+[2026-09-06T14:44:55.376+0000] [INFO ] GFX lifecycle: resize begin generation=2 encoder=0x56a5834892b0 first_update_pending=0 target=2290x1033
+[2026-09-06T14:44:55.382+0000] [INFO ] GFX lifecycle: encoder delete begin generation=2 encoder=0x56a5834892b0 server=2 client=2 consumed=0
+[2026-09-06T14:44:55.399+0000] [INFO ] GFX lifecycle: encoder delete complete generation=2 encoder=0x56a5834892b0
+[2026-09-06T14:44:55.401+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:44:55.403+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2289 bottom 1032 is_primary 1
+[2026-09-06T14:44:55.405+0000] [INFO ] xrdp_egfx_reset_graphics: width 2290 height 1033 monitorcount 1
+[2026-09-06T14:44:55.407+0000] [INFO ] GFX lifecycle: resize reset generation=2 encoder=(nil) target=2290x1033
+[2026-09-06T14:44:55.414+0000] [INFO ] Received memory_allocation_complete command. width: 2290, height: 1033
+[2026-09-06T14:44:55.416+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:44:55.418+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2290 height 1033
+[2026-09-06T14:44:55.421+0000] [INFO ] Starting the external H.264 graphics backend
+[2026-09-06T14:44:55.422+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:44:55.427+0000] [INFO ] GFX lifecycle: resize encoder installed generation=2 encoder=0x56a5834892b0 target=2290x1033
+[2026-09-06T14:44:55.429+0000] [INFO ] GFX lifecycle: resize requested direct producer repaint generation=2 target=2290x1033
+[2026-09-06T14:44:55.431+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2290 x h: 1033). It took 55 milliseconds.
+[2026-09-06T14:44:55.453+0000] [INFO ] GFX lifecycle: first direct producer update generation=2 encoder=0x56a5834892b0 frame=1 flags=0x8000000 rects=1 damage=0,0-2290,1033 capture=2290x1033 shmem=14385152
+[2026-09-06T14:44:55.562+0000] [INFO ] GFX lifecycle: channel close response channel=1 generation=2 encoder=0x56a5834892b0
+[2026-09-06T14:44:55.564+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-09-06T14:44:55.567+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-09-06T14:44:55.569+0000] [INFO ] GFX lifecycle: encoder delete begin generation=2 encoder=0x56a5834892b0 server=2 client=0 consumed=2
+[2026-09-06T14:44:55.586+0000] [INFO ] GFX lifecycle: encoder delete complete generation=2 encoder=0x56a5834892b0
+[2026-09-06T14:44:55.588+0000] [ERROR] Attempting to send data to a channel that is not open. channel id 1, channel status CLOSED

@@ -277,7 +277,7 @@ gates remain implementation checks, not #142C progress. Superseding analysis:
 [`docs/experiments/142c-dev-cleanroom-equivalence.md`](docs/experiments/142c-dev-cleanroom-equivalence.md).
 
 **Current hypothesis:** a client-observable property of clean-room's first
-post-resize graphics transaction causes or exposes the missing acknowledgement
+desktop or post-resize graphics transaction causes or exposes the missing acknowledgement
 and replacement capability advertisement. Compare a trace-enabled clean-room
 arm against trace-enabled canonical development with the same Windows client,
 profile and resize sequence. Both sides shall record the same low-overhead
@@ -304,6 +304,38 @@ their traces through the same Windows resize sequence, and run
 reconciliation port. Deployment evidence:
 [`PR-demo/mac_bisect_matrix/captures/i142c_wire_two_arm_preinteractive_20260901T121113Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_wire_two_arm_preinteractive_20260901T121113Z/README.md).
 
+**RED 2026-09-06:** clean-room re-advertised capabilities after its first
+desktop frame at an odd-height login, then showed partial repaint and closed
+on the first resize; development completed twenty resizes without replacement
+capabilities. Actual serializer calls now prove a specific missed difference:
+clean-room aligns region extents against padded coded bounds and can exceed
+the visible surface; development clips to visible bounds. The prior failure
+also starts at the first odd-height resize. S135-R4 currently specifies the
+clean-room behavior, so the normative contract itself needs reconciliation.
+Next: capture actual region bounds with the existing bounded wire inspector,
+pin an odd-visible/even-coded serializer case, then reproduce this named
+transition on canonical development before correcting it. Neither the Windows
+rejection reason nor complete EOF causality is yet proven. Evidence:
+[`PR-demo/mac_bisect_matrix/captures/i142c_wire_windows_20260906T145500Z/README.md`](PR-demo/mac_bisect_matrix/captures/i142c_wire_windows_20260906T145500Z/README.md).
+
+**Authorized next arm, 2026-09-06: port 40062.** Continue the canonical
+development ancestry and deploy one additional immutable diagnostic arm with
+clean-room's odd-edge overflow in external AVC444 metadata. Preserve 40060
+and 40061 unchanged. Only the final even-alignment clipping bound changes;
+frame ownership, codec selection, payload encoder, callback and transport
+remain development's current implementation. Extend the existing bounded
+wire record with the first inner region rectangle to prove that the bytes
+actually overflow the unchanged visible destination. Keep the existing
+visible-bounds serializer tests intact; add independent diagnostic coverage
+and retain the even-size control gates. Deployment includes the ordinary
+three-second certificate, two-size rendered smoke and timestamped tester
+instructions. The Windows odd-height login/resize must reproduce the missing
+ACK and replacement capability transition, not merely any unrelated failure.
+If RED as predicted, preserve the injection commit, then make an explicit
+forward undo plus a normative visible-surface correction, prove green on
+development, and re-author the owning clean-room slice. Until that observation,
+do not advance the conditional undo or claim the hypothesis confirmed.
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose
@@ -317,6 +349,14 @@ and complete acceptance:
 [`PRD/gates/142c-dev-cleanroom-equivalence.md`](PRD/gates/142c-dev-cleanroom-equivalence.md).
 
 ## #142D — repeated interactive resize tears down the client transport
+
+**Latest evidence, 2026-09-06:** the same two-stage failure now begins at
+odd-height login, without a preceding resize. The current boundary is the
+visible-versus-coded rectangle discrepancy tracked in #142C. Partial repaint
+after the repeated capability callback was observed and acknowledged in this
+run; do not generalize the earlier 0/0/0 observation to every failure. The
+client-trigger hypothesis and remaining causal gate are recorded in the
+[new capture](PR-demo/mac_bisect_matrix/captures/i142c_wire_windows_20260906T145500Z/README.md).
 
 **Status: IN PROGRESS; blocks the remaining #142 visual matrix.** Repeated
 Windows `auto` walks establish a two-stage failure: a resize leaves persistent

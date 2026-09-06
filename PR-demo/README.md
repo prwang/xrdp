@@ -50,6 +50,14 @@ realistic payload rather than a diagnostic pattern.
 
 ## Harnesses — they drive a client and assert something
 
+Offline resize diagnosis: `lib/i142_metablock_bounds_probe.sh` compiles the
+real development and clean-room serializers and prints their rectangle bounds
+for retained failing and preceding-good desktop geometries. Its companion C
+driver uses a dummy payload only to exercise metadata serialization; it proves
+neither H.264 validity nor client behavior. `mac_bisect_matrix/i142_wire_transition.py`
+reports the corresponding captured client acknowledgements and capability
+advertisements by send sequence, including reused frame IDs.
+
 * **`smoke_gate/`** — the mandatory pre-handoff gate. `smoke.sh` runs the
   colour-key test at **two** session sizes (1920×1080 and 1024×768, both
   required: the ffmpeg probesize hold passed every 1080p run and froze

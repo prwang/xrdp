@@ -1,0 +1,9 @@
+Build artifacts: /tmp/i142-bounds.DfXFZX
+dev serializer:
+visible=2360x1033 region=0,0-2360,1033 exceeds_visible=0
+visible=1820x1171 region=0,0-1820,1171 exceeds_visible=0
+visible=1820x1202 region=0,0-1820,1202 exceeds_visible=0
+clean serializer:
+visible=2360x1033 region=0,0-2360,1034 exceeds_visible=1
+visible=1820x1171 region=0,0-1820,1172 exceeds_visible=1
+visible=1820x1202 region=0,0-1820,1202 exceeds_visible=0

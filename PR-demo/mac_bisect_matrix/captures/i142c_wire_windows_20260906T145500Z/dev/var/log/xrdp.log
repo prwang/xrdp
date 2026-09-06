@@ -1,0 +1,587 @@
+[2026-09-01T12:05:23.449+0000] [INFO ] address [0.0.0.0] port [3389] mode 4
+[2026-09-01T12:05:23.451+0000] [INFO ] listening to port 3389 on 0.0.0.0
+[2026-09-01T12:05:23.454+0000] [INFO ] xrdp_listen_pp done
+[2026-09-01T12:05:23.455+0000] [CORE ] You are running xrdp as uid=0 gid=0. This is not recommended.
+[2026-09-01T12:05:23.457+0000] [INFO ] starting xrdp with pid 1
+[2026-09-01T12:06:40.420+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:42180
+[2026-09-01T12:06:40.423+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:06:40.424+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:06:40.425+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:06:40.426+0000] [INFO ] Selected TLS security
+[2026-09-01T12:06:40.432+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:06:40.433+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:06:40.434+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:06:40.435+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:06:40.436+0000] [INFO ] TLS connection established from 10.42.0.1:42180 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:06:40.437+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:06:40.438+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:06:40.438+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:06:40.439+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:06:40.443+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:06:40.444+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:06:40.445+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-01T12:06:40.446+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-01T12:06:40.447+0000] [INFO ] Login screen monitor height is 1080 pixels over 1000 mm (27 DPI)
+[2026-09-01T12:06:40.449+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:06:40.469+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-09-01T12:06:40.471+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:06:40.471+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:06:40.472+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:06:40.473+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:06:40.474+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:06:40.475+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:06:40.475+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:06:40.476+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:06:40.477+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:06:40.478+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:06:40.478+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:06:40.479+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 1920x1088 (gfx.toml dump_extra=0)
+[2026-09-01T12:06:40.562+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 114 coded 1920x1088 generation 1
+[2026-09-01T12:06:40.563+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 115 coded 1920x1088 generation 1
+[2026-09-01T12:06:40.564+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 115)
+[2026-09-01T12:06:40.644+0000] [INFO ] xrdp_ffmpeg: production-topology probe OK (main plus forced-IDR auxiliary leaf child)
+[2026-09-01T12:06:40.645+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=0) at 1920x1088 in 160 ms
+[2026-09-01T12:06:40.646+0000] [WARN ] gfx.toml eager_slot_ack is set but aux_ltr_chain is off: there is no absorb marker on this path, so the shipped egress-paced ack stays
+[2026-09-01T12:06:40.646+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=0)
+[2026-09-01T12:06:40.647+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:06:40.648+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 9 (0x000a0701)
+[2026-09-01T12:06:40.649+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:06:40.650+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:06:40.651+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:06:40.651+0000] [INFO ] xrdp_egfx_reset_graphics: width 1920 height 1080 monitorcount 1
+[2026-09-01T12:06:40.652+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:06:40.653+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1920 height 1080
+[2026-09-01T12:06:40.654+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-01T12:06:40.655+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-01T12:06:40.656+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:06:40.656+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:06:40.657+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:06:40.658+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:06:40.659+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:06:40.660+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:06:40.676+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:06:43.200+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:06:43.201+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:06:43.203+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:06:43.205+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:06:43.208+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-09-01T12:06:43.208+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:06:43.209+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:06:43.211+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:06:43.211+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:06:43.212+0000] [INFO ] lib_mod_log_peer: xrdp_pid=60 connected to Xorg_pid=220 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:42180
+[2026-09-01T12:06:43.213+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:06:43.214+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:06:43.218+0000] [INFO ] Received memory_allocation_complete command. width: 1920, height: 1088
+[2026-09-01T12:06:43.231+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 332 coded 1920x1088 generation 1
+[2026-09-01T12:06:43.233+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 333 coded 1920x1088 generation 1
+[2026-09-01T12:06:43.235+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 333)
+[2026-09-01T12:06:46.371+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-09-01T12:06:46.375+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-09-01T12:06:46.386+0000] [ERROR] xrdp_iso_send: trans_write_copy_s failed
+[2026-09-01T12:06:46.387+0000] [ERROR] xrdp_mcs_send: xrdp_iso_send failed
+[2026-09-01T12:06:46.388+0000] [ERROR] xrdp_sec_send: xrdp_mcs_send failed
+[2026-09-01T12:06:46.390+0000] [ERROR] xrdp_channel_send: xrdp_sec_send failed
+[2026-09-01T12:06:46.391+0000] [ERROR] xrdp_channel_drdynvc_data: xrdp_channel_send failed
+[2026-09-01T12:07:42.038+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:57202
+[2026-09-01T12:07:42.041+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:07:42.042+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:07:42.043+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:07:42.044+0000] [INFO ] Selected TLS security
+[2026-09-01T12:07:42.049+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:07:42.050+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:07:42.051+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:07:42.051+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:07:42.052+0000] [INFO ] TLS connection established from 10.42.0.1:57202 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:07:42.053+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:07:42.054+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:07:42.055+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:07:42.056+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:07:42.059+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:07:42.061+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:07:42.061+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-01T12:07:42.062+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-01T12:07:42.063+0000] [INFO ] Login screen monitor height is 1080 pixels over 1000 mm (27 DPI)
+[2026-09-01T12:07:42.065+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:07:42.077+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-09-01T12:07:42.078+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:07:42.079+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:07:42.080+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:07:42.081+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:07:42.082+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:07:42.082+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:07:42.083+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:07:42.084+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:07:42.085+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:07:42.085+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:07:42.086+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:07:42.087+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 1920x1088 (gfx.toml dump_extra=0)
+[2026-09-01T12:07:42.149+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 658 coded 1920x1088 generation 1
+[2026-09-01T12:07:42.150+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 659 coded 1920x1088 generation 1
+[2026-09-01T12:07:42.151+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 659)
+[2026-09-01T12:07:42.230+0000] [INFO ] xrdp_ffmpeg: production-topology probe OK (main plus forced-IDR auxiliary leaf child)
+[2026-09-01T12:07:42.231+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=0) at 1920x1088 in 138 ms
+[2026-09-01T12:07:42.232+0000] [WARN ] gfx.toml eager_slot_ack is set but aux_ltr_chain is off: there is no absorb marker on this path, so the shipped egress-paced ack stays
+[2026-09-01T12:07:42.233+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=0)
+[2026-09-01T12:07:42.234+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:07:42.234+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 9 (0x000a0701)
+[2026-09-01T12:07:42.235+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:07:42.236+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:07:42.237+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:07:42.238+0000] [INFO ] xrdp_egfx_reset_graphics: width 1920 height 1080 monitorcount 1
+[2026-09-01T12:07:42.239+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:07:42.240+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1920 height 1080
+[2026-09-01T12:07:42.240+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-01T12:07:42.241+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-01T12:07:42.242+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:07:42.243+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:07:42.244+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:07:42.245+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:07:42.245+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:07:42.247+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:07:42.262+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:07:44.783+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:07:44.785+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:07:44.786+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:07:44.788+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:07:44.791+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-09-01T12:07:44.792+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:07:44.793+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:07:44.794+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:07:44.795+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:07:44.796+0000] [INFO ] lib_mod_log_peer: xrdp_pid=604 connected to Xorg_pid=764 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:57202
+[2026-09-01T12:07:44.797+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:07:44.798+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:07:44.801+0000] [INFO ] Received memory_allocation_complete command. width: 1920, height: 1088
+[2026-09-01T12:07:44.815+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 896 coded 1920x1088 generation 1
+[2026-09-01T12:07:44.817+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 897 coded 1920x1088 generation 1
+[2026-09-01T12:07:44.819+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 897)
+[2026-09-01T12:08:29.646+0000] [ERROR] Child 873 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:08:29.664+0000] [ERROR] Xorg server closed connection
+[2026-09-01T12:08:32.424+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:41264
+[2026-09-01T12:08:32.430+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-01T12:08:32.431+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-01T12:08:32.432+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID
+[2026-09-01T12:08:32.433+0000] [INFO ] Selected TLS security
+[2026-09-01T12:08:32.439+0000] [INFO ] Connected client computer name: xrdp-fixdpi
+[2026-09-01T12:08:32.440+0000] [INFO ] client supports gfx protocol
+[2026-09-01T12:08:32.441+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-01T12:08:32.441+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-01T12:08:32.442+0000] [INFO ] TLS connection established from 10.42.0.1:41264 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-01T12:08:32.444+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-01T12:08:32.444+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-01T12:08:32.445+0000] [INFO ] Client does not support Unicode input
+[2026-09-01T12:08:32.446+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-01T12:08:32.449+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-01T12:08:32.451+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-01T12:08:32.452+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-01T12:08:32.453+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-01T12:08:32.453+0000] [INFO ] Login screen monitor height is 768 pixels over 1000 mm (19 DPI)
+[2026-09-01T12:08:32.455+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-01T12:08:32.463+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-09-01T12:08:32.464+0000] [INFO ]   version 0x00080004 flags 0x00000002 (index: 0)
+[2026-09-01T12:08:32.465+0000] [INFO ]   version 0x00080105 flags 0x00000002 (index: 1)
+[2026-09-01T12:08:32.466+0000] [INFO ]   version 0x000a0002 flags 0x00000002 (index: 2)
+[2026-09-01T12:08:32.467+0000] [INFO ]   version 0x000a0200 flags 0x00000002 (index: 3)
+[2026-09-01T12:08:32.467+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-01T12:08:32.468+0000] [INFO ]   version 0x000a0400 flags 0x00000002 (index: 5)
+[2026-09-01T12:08:32.469+0000] [INFO ]   version 0x000a0502 flags 0x00000002 (index: 6)
+[2026-09-01T12:08:32.470+0000] [INFO ]   version 0x000a0600 flags 0x00000002 (index: 7)
+[2026-09-01T12:08:32.471+0000] [INFO ]   version 0x000a0601 flags 0x00000002 (index: 8)
+[2026-09-01T12:08:32.471+0000] [INFO ] unknown version 0x000a0601
+[2026-09-01T12:08:32.472+0000] [INFO ]   version 0x000a0701 flags 0x00000002 (index: 9)
+[2026-09-01T12:08:32.473+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 1024x768 (gfx.toml dump_extra=0)
+[2026-09-01T12:08:32.525+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1155 coded 1024x768 generation 1
+[2026-09-01T12:08:32.527+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1156 coded 1024x768 generation 1
+[2026-09-01T12:08:32.528+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 1156)
+[2026-09-01T12:08:32.599+0000] [INFO ] xrdp_ffmpeg: production-topology probe OK (main plus forced-IDR auxiliary leaf child)
+[2026-09-01T12:08:32.601+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=0) at 1024x768 in 125 ms
+[2026-09-01T12:08:32.601+0000] [WARN ] gfx.toml eager_slot_ack is set but aux_ltr_chain is off: there is no absorb marker on this path, so the shipped egress-paced ack stays
+[2026-09-01T12:08:32.602+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=0)
+[2026-09-01T12:08:32.603+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-01T12:08:32.604+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 9 (0x000a0701)
+[2026-09-01T12:08:32.605+0000] [INFO ]   replying version 0x000a0701 flags 0x00000002
+[2026-09-01T12:08:32.606+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 9
+[2026-09-01T12:08:32.606+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-01T12:08:32.607+0000] [INFO ] xrdp_egfx_reset_graphics: width 1024 height 768 monitorcount 1
+[2026-09-01T12:08:32.608+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-01T12:08:32.609+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 1024 height 768
+[2026-09-01T12:08:32.610+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-01T12:08:32.610+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-01T12:08:32.611+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-01T12:08:32.612+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-01T12:08:32.613+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-01T12:08:32.614+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-01T12:08:32.615+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-01T12:08:32.616+0000] [INFO ] xrdp_wm_log_msg: Performing login request for probe444
+[2026-09-01T12:08:32.628+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-01T12:08:35.148+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user probe444
+[2026-09-01T12:08:35.150+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-01T12:08:35.152+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-01T12:08:35.153+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-01T12:08:35.156+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-09-01T12:08:35.157+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x04], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-01T12:08:35.158+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-01T12:08:35.159+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-01T12:08:35.160+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-01T12:08:35.160+0000] [INFO ] lib_mod_log_peer: xrdp_pid=1110 connected to Xorg_pid=1243 Xorg_uid=1101 Xorg_gid=1101 client=10.42.0.1:41264
+[2026-09-01T12:08:35.161+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-01T12:08:35.162+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-01T12:08:35.165+0000] [INFO ] Received memory_allocation_complete command. width: 1024, height: 768
+[2026-09-01T12:08:35.173+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1378 coded 1024x768 generation 1
+[2026-09-01T12:08:35.175+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1379 coded 1024x768 generation 1
+[2026-09-01T12:08:35.176+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 1379)
+[2026-09-01T12:09:20.074+0000] [ERROR] Child 1346 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:09:20.075+0000] [ERROR] Child 1352 terminated unexpectedly with signal SIGHUP
+[2026-09-01T12:09:20.088+0000] [ERROR] Xorg server closed connection
+[2026-09-06T14:45:26.374+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:55846
+[2026-09-06T14:45:26.385+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-06T14:45:26.387+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-06T14:45:26.405+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID|HYBRID_EX
+[2026-09-06T14:45:26.408+0000] [INFO ] Selected TLS security
+[2026-09-06T14:45:26.437+0000] [ERROR] SSL_read: Failure in SSL library (protocol error?)
+[2026-09-06T14:45:26.439+0000] [ERROR] SSL: error:0A000126:SSL routines::unexpected eof while reading
+[2026-09-06T14:45:26.441+0000] [ERROR] libxrdp_force_read: header read error
+[2026-09-06T14:45:26.443+0000] [ERROR] Processing [ITU-T T.125] Connect-Initial failed
+[2026-09-06T14:45:26.445+0000] [ERROR] [MCS Connection Sequence] receive connection request failed
+[2026-09-06T14:45:26.447+0000] [ERROR] xrdp_sec_incoming: xrdp_mcs_incoming failed
+[2026-09-06T14:45:26.449+0000] [ERROR] xrdp_rdp_incoming: xrdp_sec_incoming failed
+[2026-09-06T14:45:26.451+0000] [ERROR] xrdp_process_main_loop: libxrdp_process_incoming failed
+[2026-09-06T14:45:28.452+0000] [INFO ] Socket 13: connection accepted from 10.42.0.1:55862
+[2026-09-06T14:45:28.461+0000] [INFO ] Using default X.509 certificate: /etc/xrdp/cert.pem
+[2026-09-06T14:45:28.463+0000] [INFO ] Using default X.509 key file: /etc/xrdp/key.pem
+[2026-09-06T14:45:28.576+0000] [INFO ] Client requested security types (RDP assumed) : SSL|HYBRID|HYBRID_EX
+[2026-09-06T14:45:28.581+0000] [INFO ] Selected TLS security
+[2026-09-06T14:45:28.590+0000] [INFO ] Connected client computer name: 5Q77
+[2026-09-06T14:45:28.592+0000] [INFO ] client supports gfx protocol
+[2026-09-06T14:45:28.594+0000] [WARN ] Physical desktop dimensions (0x0) are invalid
+[2026-09-06T14:45:28.596+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc006 is unknown (ignored)
+[2026-09-06T14:45:28.598+0000] [WARN ] Received [MS-RDPBCGR] TS_UD_HEADER type 0xc00a is unknown (ignored)
+[2026-09-06T14:45:28.669+0000] [INFO ] TLS connection established from 10.42.0.1:55862 TLSv1.3 with cipher TLS_AES_256_GCM_SHA384
+[2026-09-06T14:45:28.677+0000] [INFO ] Client supports single-screen resizes by xrdp
+[2026-09-06T14:45:28.680+0000] [INFO ] xrdp_caps_process_pointer: client supports new(color) cursor
+[2026-09-06T14:45:28.682+0000] [INFO ] Client supports Unicode input
+[2026-09-06T14:45:28.684+0000] [INFO ] xrdp_process_offscreen_bmpcache: support level 1 cache size 10485760 bytes cache entries 100
+[2026-09-06T14:45:28.686+0000] [INFO ] xrdp_caps_process_codecs: NSCodec(CA8D1BB9-000F-154F-589F-AE2D1A87E2D6), codec id [1], properties len [3]
+[2026-09-06T14:45:28.688+0000] [INFO ] xrdp_caps_process_codecs: Image RemoteFX(2744CCD4-9D8A-4E74-803C-0ECBEEA19C54), codec id [5], properties len [49]
+[2026-09-06T14:45:28.690+0000] [INFO ] Client Capability: LARGE_POINTER_FLAG_96x96 supported
+[2026-09-06T14:45:28.721+0000] [INFO ] Loading keymap file /etc/xrdp/km-00000409.toml
+[2026-09-06T14:45:28.724+0000] [INFO ] TConfig: Loading GFX config file /etc/xrdp/gfx.toml
+[2026-09-06T14:45:28.727+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T14:45:28.729+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T14:45:28.730+0000] [WARN ] No information is available to determine login screen DPI
+[2026-09-06T14:45:28.732+0000] [WARN ] No DPI value is available to find login font
+[2026-09-06T14:45:28.734+0000] [WARN ] Using the default_dpi of 96
+[2026-09-06T14:45:28.745+0000] [INFO ] xrdp_egfx_create: error 0 channel_id 1
+[2026-09-06T14:45:28.860+0000] [INFO ] xrdp_mm_egfx_caps_advertise:
+[2026-09-06T14:45:28.863+0000] [INFO ]   version 0x00080004 flags 0x00000000 (index: 0)
+[2026-09-06T14:45:28.865+0000] [INFO ]   version 0x00080105 flags 0x00000000 (index: 1)
+[2026-09-06T14:45:28.867+0000] [INFO ]   version 0x000a0002 flags 0x00000000 (index: 2)
+[2026-09-06T14:45:28.869+0000] [INFO ]   version 0x000a0200 flags 0x00000000 (index: 3)
+[2026-09-06T14:45:28.871+0000] [INFO ]   version 0x000a0301 flags 0x00000000 (index: 4)
+[2026-09-06T14:45:28.873+0000] [INFO ]   version 0x000a0400 flags 0x00000000 (index: 5)
+[2026-09-06T14:45:28.875+0000] [INFO ]   version 0x000a0502 flags 0x00000000 (index: 6)
+[2026-09-06T14:45:28.877+0000] [INFO ]   version 0x000a0600 flags 0x00000000 (index: 7)
+[2026-09-06T14:45:28.878+0000] [INFO ]   version 0x000a0701 flags 0x00000000 (index: 8)
+[2026-09-06T14:45:28.880+0000] [INFO ] xrdp_mm_egfx_caps_advertise: verifying ffmpeg AVC444 /usr/bin/ffmpeg at 2288x1040 (gfx.toml dump_extra=0)
+[2026-09-06T14:45:28.999+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1690 coded 2304x1040 generation 1
+[2026-09-06T14:45:29.003+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1691 coded 2304x1040 generation 1
+[2026-09-06T14:45:29.004+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 1691)
+[2026-09-06T14:45:29.089+0000] [INFO ] xrdp_ffmpeg: production-topology probe OK (main plus forced-IDR auxiliary leaf child)
+[2026-09-06T14:45:29.091+0000] [INFO ] xrdp_ffmpeg: probe OK (dump_extra=0) at 2288x1040 in 203 ms
+[2026-09-06T14:45:29.093+0000] [WARN ] gfx.toml eager_slot_ack is set but aux_ltr_chain is off: there is no absorb marker on this path, so the shipped egress-paced ack stays
+[2026-09-06T14:45:29.095+0000] [INFO ]   ffmpeg AVC444 verified OK (dump_extra=0)
+[2026-09-06T14:45:29.097+0000] [INFO ] Codec search order is H264, RFX
+[2026-09-06T14:45:29.099+0000] [INFO ] Matched H264/AVC444 (ffmpeg) mode, AVC444 v2 (0x000F), confirming capset index 8 (0x000a0701)
+[2026-09-06T14:45:29.101+0000] [INFO ]   replying version 0x000a0701 flags 0x00000000
+[2026-09-06T14:45:29.103+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_capsconfirm error 0 best_index 8
+[2026-09-06T14:45:29.104+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:29.106+0000] [INFO ] xrdp_egfx_reset_graphics: width 2288 height 1033 monitorcount 1
+[2026-09-06T14:45:29.108+0000] [INFO ] xrdp_mm_egfx_caps_advertise: xrdp_egfx_send_reset_graphics error 0 monitorCount 0
+[2026-09-06T14:45:29.110+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2288 height 1033
+[2026-09-06T14:45:29.112+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:29.114+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:29.116+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:29.118+0000] [INFO ] xrdp_mm_egfx_invalidate_wm_screen:
+[2026-09-06T14:45:29.119+0000] [INFO ] xrdp_mm_egfx_caps_advertise: egfx created.
+[2026-09-06T14:45:30.631+0000] [WARN ] Ignoring obsolete SCP port value '3350'
+[2026-09-06T14:45:30.640+0000] [INFO ] xrdp_wm_log_msg: sesman connect ok
+[2026-09-06T14:45:30.642+0000] [INFO ] xrdp_wm_log_msg: Performing login request for tester
+[2026-09-06T14:45:30.659+0000] [INFO ] xrdp_wm_log_msg: login was successful - creating session
+[2026-09-06T14:45:33.195+0000] [INFO ] xrdp_wm_log_msg: session is available on display X11-10 for user tester
+[2026-09-06T14:45:33.200+0000] [INFO ] xrdp_wm_log_msg: Getting session connections from sesman
+[2026-09-06T14:45:33.204+0000] [INFO ] xrdp_wm_log_msg: Got connection details for session
+[2026-09-06T14:45:33.208+0000] [INFO ] xrdp_wm_log_msg: Connecting to display server
+[2026-09-06T14:45:33.214+0000] [INFO ] loaded module 'libxup.so' ok, interface size 10536, version 4
+[2026-09-06T14:45:33.216+0000] [INFO ] xrdp_init_xkb_layout: Keyboard information sent by the RDP client, keyboard_type:[0x07], keyboard_subtype:[0x00], keylayout:[0x00000409]
+[2026-09-06T14:45:33.218+0000] [INFO ] xrdp_init_xkb_layout: model [] variant [] layout [us] options []
+[2026-09-06T14:45:33.221+0000] [INFO ] XKB rules 'evdev' will be used by the module
+[2026-09-06T14:45:33.223+0000] [INFO ] lib_mod_connect: connecting via UNIX socket
+[2026-09-06T14:45:33.225+0000] [INFO ] lib_mod_log_peer: xrdp_pid=1637 connected to Xorg_pid=1794 Xorg_uid=1100 Xorg_gid=1100 client=10.42.0.1:55862
+[2026-09-06T14:45:33.227+0000] [INFO ] xrdp can now process resize requests (1 outstanding)
+[2026-09-06T14:45:33.229+0000] [INFO ] xrdp_wm_log_msg: Connecting to chansrv via sesman
+[2026-09-06T14:45:33.234+0000] [INFO ] Received memory_allocation_complete command. width: 2288, height: 1040
+[2026-09-06T14:45:33.237+0000] [INFO ] Chansrv does not support Unicode input
+[2026-09-06T14:45:33.245+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1908 coded 2304x1040 generation 1
+[2026-09-06T14:45:33.247+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 1909 coded 2304x1040 generation 1
+[2026-09-06T14:45:33.249+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 1909)
+[2026-09-06T14:45:35.873+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:35.879+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2289 bottom 1098 is_primary 1
+[2026-09-06T14:45:35.881+0000] [INFO ] xrdp_egfx_reset_graphics: width 2290 height 1099 monitorcount 1
+[2026-09-06T14:45:35.888+0000] [INFO ] Received memory_allocation_complete command. width: 2304, height: 1104
+[2026-09-06T14:45:35.890+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:35.894+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2290 height 1099
+[2026-09-06T14:45:35.896+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:35.898+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:35.900+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:35.902+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2290 x h: 1099). It took 43 milliseconds.
+[2026-09-06T14:45:35.915+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2011 coded 2304x1104 generation 1
+[2026-09-06T14:45:35.917+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2012 coded 2304x1104 generation 1
+[2026-09-06T14:45:35.919+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2012)
+[2026-09-06T14:45:37.321+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:37.326+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2211 bottom 1098 is_primary 1
+[2026-09-06T14:45:37.328+0000] [INFO ] xrdp_egfx_reset_graphics: width 2212 height 1099 monitorcount 1
+[2026-09-06T14:45:37.335+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1104
+[2026-09-06T14:45:37.337+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:37.339+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2212 height 1099
+[2026-09-06T14:45:37.341+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:37.343+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:37.345+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:37.347+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2212 x h: 1099). It took 40 milliseconds.
+[2026-09-06T14:45:37.357+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2117 coded 2240x1104 generation 1
+[2026-09-06T14:45:37.359+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2118 coded 2240x1104 generation 1
+[2026-09-06T14:45:37.361+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2118)
+[2026-09-06T14:45:38.645+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:38.650+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2211 bottom 1023 is_primary 1
+[2026-09-06T14:45:38.652+0000] [INFO ] xrdp_egfx_reset_graphics: width 2212 height 1024 monitorcount 1
+[2026-09-06T14:45:38.659+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1024
+[2026-09-06T14:45:38.661+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:38.666+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2212 height 1024
+[2026-09-06T14:45:38.668+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:38.670+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:38.672+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:38.674+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2212 x h: 1024). It took 42 milliseconds.
+[2026-09-06T14:45:38.682+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2222 coded 2240x1024 generation 1
+[2026-09-06T14:45:38.686+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2223 coded 2240x1024 generation 1
+[2026-09-06T14:45:38.688+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2223)
+[2026-09-06T14:45:39.878+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:39.883+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2127 bottom 1023 is_primary 1
+[2026-09-06T14:45:39.885+0000] [INFO ] xrdp_egfx_reset_graphics: width 2128 height 1024 monitorcount 1
+[2026-09-06T14:45:39.892+0000] [INFO ] Received memory_allocation_complete command. width: 2128, height: 1024
+[2026-09-06T14:45:39.894+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:39.896+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2128 height 1024
+[2026-09-06T14:45:39.898+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:39.899+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:39.901+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:39.903+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2128 x h: 1024). It took 36 milliseconds.
+[2026-09-06T14:45:39.911+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2325 coded 2144x1024 generation 1
+[2026-09-06T14:45:39.914+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2326 coded 2144x1024 generation 1
+[2026-09-06T14:45:39.916+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2326)
+[2026-09-06T14:45:41.460+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:41.465+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2127 bottom 1066 is_primary 1
+[2026-09-06T14:45:41.467+0000] [INFO ] xrdp_egfx_reset_graphics: width 2128 height 1067 monitorcount 1
+[2026-09-06T14:45:41.473+0000] [INFO ] Received memory_allocation_complete command. width: 2128, height: 1072
+[2026-09-06T14:45:41.475+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:41.477+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2128 height 1067
+[2026-09-06T14:45:41.479+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:41.481+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:41.483+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:41.485+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2128 x h: 1067). It took 36 milliseconds.
+[2026-09-06T14:45:41.494+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2429 coded 2144x1072 generation 1
+[2026-09-06T14:45:41.496+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2430 coded 2144x1072 generation 1
+[2026-09-06T14:45:41.498+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2430)
+[2026-09-06T14:45:42.715+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:42.717+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2211 bottom 1066 is_primary 1
+[2026-09-06T14:45:42.719+0000] [INFO ] xrdp_egfx_reset_graphics: width 2212 height 1067 monitorcount 1
+[2026-09-06T14:45:42.726+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1072
+[2026-09-06T14:45:42.728+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:42.730+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2212 height 1067
+[2026-09-06T14:45:42.732+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:42.734+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:42.736+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:42.738+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2212 x h: 1067). It took 35 milliseconds.
+[2026-09-06T14:45:42.747+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2532 coded 2240x1072 generation 1
+[2026-09-06T14:45:42.749+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2533 coded 2240x1072 generation 1
+[2026-09-06T14:45:42.751+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2533)
+[2026-09-06T14:45:43.922+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:43.927+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2211 bottom 1128 is_primary 1
+[2026-09-06T14:45:43.929+0000] [INFO ] xrdp_egfx_reset_graphics: width 2212 height 1129 monitorcount 1
+[2026-09-06T14:45:43.935+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1136
+[2026-09-06T14:45:43.937+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:43.940+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2212 height 1129
+[2026-09-06T14:45:43.943+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:43.945+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:43.947+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:43.949+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2212 x h: 1129). It took 39 milliseconds.
+[2026-09-06T14:45:43.959+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2635 coded 2240x1136 generation 1
+[2026-09-06T14:45:43.961+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2636 coded 2240x1136 generation 1
+[2026-09-06T14:45:43.963+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2636)
+[2026-09-06T14:45:45.027+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:45.032+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2291 bottom 1128 is_primary 1
+[2026-09-06T14:45:45.034+0000] [INFO ] xrdp_egfx_reset_graphics: width 2292 height 1129 monitorcount 1
+[2026-09-06T14:45:45.041+0000] [INFO ] Received memory_allocation_complete command. width: 2304, height: 1136
+[2026-09-06T14:45:45.043+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:45.045+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2292 height 1129
+[2026-09-06T14:45:45.047+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:45.048+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:45.050+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:45.052+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2292 x h: 1129). It took 36 milliseconds.
+[2026-09-06T14:45:45.066+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2741 coded 2304x1136 generation 1
+[2026-09-06T14:45:45.069+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2742 coded 2304x1136 generation 1
+[2026-09-06T14:45:45.072+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2742)
+[2026-09-06T14:45:46.009+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:46.015+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2291 bottom 1163 is_primary 1
+[2026-09-06T14:45:46.017+0000] [INFO ] xrdp_egfx_reset_graphics: width 2292 height 1164 monitorcount 1
+[2026-09-06T14:45:46.024+0000] [INFO ] Received memory_allocation_complete command. width: 2304, height: 1168
+[2026-09-06T14:45:46.026+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:46.028+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2292 height 1164
+[2026-09-06T14:45:46.030+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:46.032+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:46.034+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:46.036+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2292 x h: 1164). It took 39 milliseconds.
+[2026-09-06T14:45:46.046+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2847 coded 2304x1168 generation 1
+[2026-09-06T14:45:46.048+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2848 coded 2304x1168 generation 1
+[2026-09-06T14:45:46.050+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2848)
+[2026-09-06T14:45:47.401+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:47.406+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2257 bottom 1163 is_primary 1
+[2026-09-06T14:45:47.408+0000] [INFO ] xrdp_egfx_reset_graphics: width 2258 height 1164 monitorcount 1
+[2026-09-06T14:45:47.415+0000] [INFO ] Received memory_allocation_complete command. width: 2272, height: 1168
+[2026-09-06T14:45:47.417+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:47.419+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2258 height 1164
+[2026-09-06T14:45:47.421+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:47.422+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:47.424+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:47.426+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2258 x h: 1164). It took 38 milliseconds.
+[2026-09-06T14:45:47.434+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2955 coded 2272x1168 generation 1
+[2026-09-06T14:45:47.436+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 2956 coded 2272x1168 generation 1
+[2026-09-06T14:45:47.438+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 2956)
+[2026-09-06T14:45:48.723+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:48.732+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2257 bottom 1102 is_primary 1
+[2026-09-06T14:45:48.734+0000] [INFO ] xrdp_egfx_reset_graphics: width 2258 height 1103 monitorcount 1
+[2026-09-06T14:45:48.741+0000] [INFO ] Received memory_allocation_complete command. width: 2272, height: 1104
+[2026-09-06T14:45:48.743+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:48.745+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2258 height 1103
+[2026-09-06T14:45:48.746+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:48.748+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:48.750+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:48.752+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2258 x h: 1103). It took 43 milliseconds.
+[2026-09-06T14:45:48.760+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3063 coded 2272x1104 generation 1
+[2026-09-06T14:45:48.763+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3064 coded 2272x1104 generation 1
+[2026-09-06T14:45:48.765+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3064)
+[2026-09-06T14:45:51.743+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:51.748+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2215 bottom 1102 is_primary 1
+[2026-09-06T14:45:51.750+0000] [INFO ] xrdp_egfx_reset_graphics: width 2216 height 1103 monitorcount 1
+[2026-09-06T14:45:51.757+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1104
+[2026-09-06T14:45:51.759+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:51.761+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2216 height 1103
+[2026-09-06T14:45:51.763+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:51.765+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:51.766+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:51.768+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2216 x h: 1103). It took 38 milliseconds.
+[2026-09-06T14:45:51.776+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3169 coded 2240x1104 generation 1
+[2026-09-06T14:45:51.778+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3170 coded 2240x1104 generation 1
+[2026-09-06T14:45:51.780+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3170)
+[2026-09-06T14:45:53.114+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:53.119+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2215 bottom 1128 is_primary 1
+[2026-09-06T14:45:53.121+0000] [INFO ] xrdp_egfx_reset_graphics: width 2216 height 1129 monitorcount 1
+[2026-09-06T14:45:53.128+0000] [INFO ] Received memory_allocation_complete command. width: 2224, height: 1136
+[2026-09-06T14:45:53.130+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:53.132+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2216 height 1129
+[2026-09-06T14:45:53.134+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:53.136+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:53.138+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:53.140+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2216 x h: 1129). It took 37 milliseconds.
+[2026-09-06T14:45:53.149+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3275 coded 2240x1136 generation 1
+[2026-09-06T14:45:53.153+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3276 coded 2240x1136 generation 1
+[2026-09-06T14:45:53.155+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3276)
+[2026-09-06T14:45:54.362+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:54.366+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2271 bottom 1128 is_primary 1
+[2026-09-06T14:45:54.368+0000] [INFO ] xrdp_egfx_reset_graphics: width 2272 height 1129 monitorcount 1
+[2026-09-06T14:45:54.375+0000] [INFO ] Received memory_allocation_complete command. width: 2272, height: 1136
+[2026-09-06T14:45:54.378+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:54.380+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2272 height 1129
+[2026-09-06T14:45:54.382+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:54.383+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:54.385+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:54.387+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2272 x h: 1129). It took 36 milliseconds.
+[2026-09-06T14:45:54.395+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3381 coded 2272x1136 generation 1
+[2026-09-06T14:45:54.398+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3382 coded 2272x1136 generation 1
+[2026-09-06T14:45:54.400+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3382)
+[2026-09-06T14:45:55.840+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:55.846+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2271 bottom 1165 is_primary 1
+[2026-09-06T14:45:55.848+0000] [INFO ] xrdp_egfx_reset_graphics: width 2272 height 1166 monitorcount 1
+[2026-09-06T14:45:55.855+0000] [INFO ] Received memory_allocation_complete command. width: 2272, height: 1168
+[2026-09-06T14:45:55.857+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:55.859+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2272 height 1166
+[2026-09-06T14:45:55.861+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:55.863+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:55.865+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:55.867+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2272 x h: 1166). It took 38 milliseconds.
+[2026-09-06T14:45:55.875+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3487 coded 2272x1168 generation 1
+[2026-09-06T14:45:55.877+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3488 coded 2272x1168 generation 1
+[2026-09-06T14:45:55.879+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3488)
+[2026-09-06T14:45:56.721+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:56.727+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2193 bottom 1165 is_primary 1
+[2026-09-06T14:45:56.729+0000] [INFO ] xrdp_egfx_reset_graphics: width 2194 height 1166 monitorcount 1
+[2026-09-06T14:45:56.735+0000] [INFO ] Received memory_allocation_complete command. width: 2208, height: 1168
+[2026-09-06T14:45:56.737+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:56.739+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2194 height 1166
+[2026-09-06T14:45:56.741+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:56.743+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:56.745+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:56.746+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2194 x h: 1166). It took 38 milliseconds.
+[2026-09-06T14:45:56.755+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3594 coded 2208x1168 generation 1
+[2026-09-06T14:45:56.757+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3595 coded 2208x1168 generation 1
+[2026-09-06T14:45:56.759+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3595)
+[2026-09-06T14:45:57.899+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:45:57.904+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2193 bottom 1091 is_primary 1
+[2026-09-06T14:45:57.906+0000] [INFO ] xrdp_egfx_reset_graphics: width 2194 height 1092 monitorcount 1
+[2026-09-06T14:45:57.912+0000] [INFO ] Received memory_allocation_complete command. width: 2208, height: 1104
+[2026-09-06T14:45:57.914+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:45:57.916+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2194 height 1092
+[2026-09-06T14:45:57.918+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:45:57.919+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:45:57.921+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:45:57.923+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2194 x h: 1092). It took 35 milliseconds.
+[2026-09-06T14:45:57.931+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3702 coded 2208x1104 generation 1
+[2026-09-06T14:45:57.933+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3703 coded 2208x1104 generation 1
+[2026-09-06T14:45:57.935+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3703)
+[2026-09-06T14:46:00.474+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:46:00.479+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2125 bottom 1091 is_primary 1
+[2026-09-06T14:46:00.481+0000] [INFO ] xrdp_egfx_reset_graphics: width 2126 height 1092 monitorcount 1
+[2026-09-06T14:46:00.487+0000] [INFO ] Received memory_allocation_complete command. width: 2128, height: 1104
+[2026-09-06T14:46:00.489+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:46:00.491+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2126 height 1092
+[2026-09-06T14:46:00.493+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:46:00.495+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:46:00.496+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:46:00.498+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2126 x h: 1092). It took 37 milliseconds.
+[2026-09-06T14:46:00.506+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3808 coded 2144x1104 generation 1
+[2026-09-06T14:46:00.509+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3809 coded 2144x1104 generation 1
+[2026-09-06T14:46:00.511+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3809)
+[2026-09-06T14:46:01.713+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:46:01.718+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2125 bottom 1152 is_primary 1
+[2026-09-06T14:46:01.720+0000] [INFO ] xrdp_egfx_reset_graphics: width 2126 height 1153 monitorcount 1
+[2026-09-06T14:46:01.727+0000] [INFO ] Received memory_allocation_complete command. width: 2128, height: 1168
+[2026-09-06T14:46:01.729+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:46:01.731+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2126 height 1153
+[2026-09-06T14:46:01.733+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:46:01.735+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:46:01.737+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:46:01.739+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2126 x h: 1153). It took 38 milliseconds.
+[2026-09-06T14:46:01.747+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3914 coded 2144x1168 generation 1
+[2026-09-06T14:46:01.753+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 3915 coded 2144x1168 generation 1
+[2026-09-06T14:46:01.755+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 3915)
+[2026-09-06T14:46:02.533+0000] [INFO ] xrdp_egfx_reset_graphics:
+[2026-09-06T14:46:02.538+0000] [INFO ] xrdp_egfx_reset_graphics: (index 0) monitor left 0 top 0 right 2057 bottom 1152 is_primary 1
+[2026-09-06T14:46:02.540+0000] [INFO ] xrdp_egfx_reset_graphics: width 2058 height 1153 monitorcount 1
+[2026-09-06T14:46:02.547+0000] [INFO ] Received memory_allocation_complete command. width: 2064, height: 1168
+[2026-09-06T14:46:02.549+0000] [INFO ] server_monitor_resize_done: Advancing server monitor resized.
+[2026-09-06T14:46:02.551+0000] [INFO ] xrdp_mm_egfx_create_surfaces: map surface_id 0 left 0 top 0 width 2058 height 1153
+[2026-09-06T14:46:02.553+0000] [INFO ] xrdp_encoder_create: starting ffmpeg AVC444 gfx session
+[2026-09-06T14:46:02.554+0000] [INFO ] xrdp_encoder_create: AVC444 v2 (ChromaV2, 0x000F)
+[2026-09-06T14:46:02.556+0000] [INFO ] xrdp_encoder_create: using x264 for software encoder
+[2026-09-06T14:46:02.558+0000] [INFO ] dynamic_monitor_process_queue: Clearing completed resize (w: 2058 x h: 1153). It took 37 milliseconds.
+[2026-09-06T14:46:02.568+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 4021 coded 2080x1168 generation 1
+[2026-09-06T14:46:02.570+0000] [INFO ] xrdp_ffmpeg: spawned ffmpeg pid 4022 coded 2080x1168 generation 1
+[2026-09-06T14:46:02.572+0000] [INFO ] xrdp_ffmpeg: aux_intra_leaf active (aux child pid 4022)

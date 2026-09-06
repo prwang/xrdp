@@ -1,0 +1,104 @@
+[2026-09-01T12:06:31.367+0000] [INFO ] starting xrdp-sesman with pid 34
+[2026-09-01T12:06:31.369+0000] [INFO ] Sesman now listening on /var/run/xrdp/sesman.socket
+[2026-09-01T12:06:50.346+0000] [INFO ] Socket 12: connection accepted from AF_UNIX
+[2026-09-01T12:06:50.349+0000] [INFO ] Received system login request from xrdp for user: probe444 IP: 10.42.0.1
+[2026-09-01T12:06:50.352+0000] [INFO ] starting xrdp-sesexec with pid 170
+[2026-09-01T12:06:50.359+0000] [INFO ] TerminalServerUsers group tsusers doesn't exist. Access granted for probe444
+[2026-09-01T12:06:50.361+0000] [INFO ] Access permitted for user: probe444
+[2026-09-01T12:06:50.362+0000] [INFO ] Received sys login status for probe444 : logged in
+[2026-09-01T12:06:50.364+0000] [INFO ] Received request from xrdp to create a session for user probe444
+[2026-09-01T12:06:50.365+0000] [INFO ] Passing session creation request to sesexec
+[2026-09-01T12:06:50.369+0000] [INFO ] Starting X server on display X11-10: Xorg :10 -auth /var/run/xrdp/1101/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log 
+[2026-09-01T12:06:51.374+0000] [INFO ] Display X11-10 is working
+[2026-09-01T12:06:51.378+0000] [INFO ] Starting window manager for display X11-10
+[2026-09-01T12:06:51.379+0000] [INFO ] Starting the xrdp channel server for display X11-10
+[2026-09-01T12:06:51.381+0000] [INFO ] Waiting for 1500 ms for session to start
+[2026-09-01T12:06:51.381+0000] [INFO ] Using the default window manager on display X11-10: /etc/xrdp/startwm.sh
+[2026-09-01T12:06:52.882+0000] [INFO ] Session in progress on display X11-10. Waiting until the window manager (pid 195) exits to end the session
+[2026-09-01T12:06:52.888+0000] [INFO ] sesman: Session on display X11-10 is now running
+[2026-09-01T12:06:52.891+0000] [INFO ] Forwarding request from probe444 to connect to a session
+[2026-09-01T12:06:52.892+0000] [INFO ] User probe444 has connected to a session
+[2026-09-01T12:06:52.892+0000] [INFO ] sesman: Session on display X11-10 is connected from client 'xrdp-fixdpi'
+[2026-09-01T12:06:56.153+0000] [INFO ] sesexec_main_loop: xrdp connection has exited (client 'xrdp-fixdpi')
+[2026-09-01T12:06:56.155+0000] [INFO ] sesman: Session on display X11-10 has no client connection
+[2026-09-01T12:06:57.337+0000] [INFO ] Window manager (pid 195, display X11-10) finished normally in 6 secs
+[2026-09-01T12:06:57.341+0000] [WARN ] Window manager (pid 195, display X11-10) exited quickly (6 secs). This could indicate a window manager config problem
+[2026-09-01T12:06:57.342+0000] [INFO ] Terminating X server (pid 171) on display X11-10
+[2026-09-01T12:06:57.343+0000] [INFO ] Terminating the xrdp channel server (pid 196) on display X11-10
+[2026-09-01T12:06:57.345+0000] [INFO ] xrdp channel server pid 196 on display X11-10 finished
+[2026-09-01T12:06:57.360+0000] [INFO ] X server pid 171 on display X11-10 finished
+[2026-09-01T12:06:57.363+0000] [INFO ] sesman: Session on display X11-10 has finished.
+[2026-09-01T12:09:26.825+0000] [INFO ] Socket 12: connection accepted from AF_UNIX
+[2026-09-01T12:09:26.828+0000] [INFO ] Received system login request from xrdp for user: probe444 IP: 10.42.0.1
+[2026-09-01T12:09:26.831+0000] [INFO ] starting xrdp-sesexec with pid 660
+[2026-09-01T12:09:26.838+0000] [INFO ] TerminalServerUsers group tsusers doesn't exist. Access granted for probe444
+[2026-09-01T12:09:26.839+0000] [INFO ] Access permitted for user: probe444
+[2026-09-01T12:09:26.840+0000] [INFO ] Received sys login status for probe444 : logged in
+[2026-09-01T12:09:26.843+0000] [INFO ] Received request from xrdp to create a session for user probe444
+[2026-09-01T12:09:26.844+0000] [INFO ] Passing session creation request to sesexec
+[2026-09-01T12:09:26.847+0000] [INFO ] Starting X server on display X11-10: Xorg :10 -auth /var/run/xrdp/1101/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log 
+[2026-09-01T12:09:27.852+0000] [INFO ] Display X11-10 is working
+[2026-09-01T12:09:27.856+0000] [INFO ] Starting window manager for display X11-10
+[2026-09-01T12:09:27.857+0000] [INFO ] Starting the xrdp channel server for display X11-10
+[2026-09-01T12:09:27.858+0000] [INFO ] Waiting for 1500 ms for session to start
+[2026-09-01T12:09:27.858+0000] [INFO ] Using the default window manager on display X11-10: /etc/xrdp/startwm.sh
+[2026-09-01T12:09:29.359+0000] [INFO ] Session in progress on display X11-10. Waiting until the window manager (pid 679) exits to end the session
+[2026-09-01T12:09:29.364+0000] [INFO ] sesman: Session on display X11-10 is now running
+[2026-09-01T12:09:29.367+0000] [INFO ] Forwarding request from probe444 to connect to a session
+[2026-09-01T12:09:29.368+0000] [INFO ] User probe444 has connected to a session
+[2026-09-01T12:09:29.368+0000] [INFO ] sesman: Session on display X11-10 is connected from client 'xrdp-fixdpi'
+[2026-09-01T12:10:14.304+0000] [INFO ] Window manager (pid 679, display X11-10) finished normally in 47 secs
+[2026-09-01T12:10:14.306+0000] [INFO ] Terminating X server (pid 661) on display X11-10
+[2026-09-01T12:10:14.307+0000] [INFO ] Terminating the xrdp channel server (pid 680) on display X11-10
+[2026-09-01T12:10:14.309+0000] [INFO ] xrdp channel server pid 680 on display X11-10 finished
+[2026-09-01T12:10:14.330+0000] [INFO ] X server pid 661 on display X11-10 finished
+[2026-09-01T12:10:14.331+0000] [INFO ] sesman: Session on display X11-10 has finished.
+[2026-09-01T12:10:14.336+0000] [WARN ] xrdp process exited after 5 ms
+[2026-09-01T12:10:17.121+0000] [INFO ] Socket 12: connection accepted from AF_UNIX
+[2026-09-01T12:10:17.124+0000] [INFO ] Received system login request from xrdp for user: probe444 IP: 10.42.0.1
+[2026-09-01T12:10:17.127+0000] [INFO ] starting xrdp-sesexec with pid 1094
+[2026-09-01T12:10:17.133+0000] [INFO ] TerminalServerUsers group tsusers doesn't exist. Access granted for probe444
+[2026-09-01T12:10:17.134+0000] [INFO ] Access permitted for user: probe444
+[2026-09-01T12:10:17.134+0000] [INFO ] Received sys login status for probe444 : logged in
+[2026-09-01T12:10:17.136+0000] [INFO ] Received request from xrdp to create a session for user probe444
+[2026-09-01T12:10:17.138+0000] [INFO ] Passing session creation request to sesexec
+[2026-09-01T12:10:17.141+0000] [INFO ] Starting X server on display X11-10: Xorg :10 -auth /var/run/xrdp/1101/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log 
+[2026-09-01T12:10:18.145+0000] [INFO ] Display X11-10 is working
+[2026-09-01T12:10:18.149+0000] [INFO ] Starting window manager for display X11-10
+[2026-09-01T12:10:18.150+0000] [INFO ] Starting the xrdp channel server for display X11-10
+[2026-09-01T12:10:18.151+0000] [INFO ] Waiting for 1500 ms for session to start
+[2026-09-01T12:10:18.152+0000] [INFO ] Using the default window manager on display X11-10: /etc/xrdp/startwm.sh
+[2026-09-01T12:10:19.653+0000] [INFO ] Session in progress on display X11-10. Waiting until the window manager (pid 1113) exits to end the session
+[2026-09-01T12:10:19.658+0000] [INFO ] sesman: Session on display X11-10 is now running
+[2026-09-01T12:10:19.660+0000] [INFO ] Forwarding request from probe444 to connect to a session
+[2026-09-01T12:10:19.661+0000] [INFO ] User probe444 has connected to a session
+[2026-09-01T12:10:19.661+0000] [INFO ] sesman: Session on display X11-10 is connected from client 'xrdp-fixdpi'
+[2026-09-01T12:11:04.660+0000] [INFO ] Window manager (pid 1113, display X11-10) finished normally in 46 secs
+[2026-09-01T12:11:04.661+0000] [INFO ] Terminating X server (pid 1095) on display X11-10
+[2026-09-01T12:11:04.662+0000] [INFO ] Terminating the xrdp channel server (pid 1114) on display X11-10
+[2026-09-01T12:11:04.663+0000] [INFO ] xrdp channel server pid 1114 on display X11-10 finished
+[2026-09-01T12:11:04.678+0000] [INFO ] sesexec_main_loop: xrdp connection has exited (client 'xrdp-fixdpi')
+[2026-09-01T12:11:04.680+0000] [INFO ] sesman: Session on display X11-10 has no client connection
+[2026-09-01T12:11:04.680+0000] [INFO ] X server pid 1095 on display X11-10 finished
+[2026-09-01T12:11:04.682+0000] [INFO ] sesman: Session on display X11-10 has finished.
+[2026-09-06T14:44:49.347+0000] [INFO ] Socket 12: connection accepted from AF_UNIX
+[2026-09-06T14:44:49.353+0000] [INFO ] Received system login request from xrdp for user: tester IP: 10.42.0.1
+[2026-09-06T14:44:49.358+0000] [INFO ] starting xrdp-sesexec with pid 1594
+[2026-09-06T14:44:49.363+0000] [INFO ] TerminalServerUsers group tsusers doesn't exist. Access granted for tester
+[2026-09-06T14:44:49.365+0000] [INFO ] Access permitted for user: tester
+[2026-09-06T14:44:49.367+0000] [INFO ] Received sys login status for tester : logged in
+[2026-09-06T14:44:49.370+0000] [INFO ] Received request from xrdp to create a session for user tester
+[2026-09-06T14:44:49.373+0000] [INFO ] Passing session creation request to sesexec
+[2026-09-06T14:44:49.377+0000] [INFO ] Starting X server on display X11-10: Xorg :10 -auth /var/run/xrdp/1100/Xauthority -config xrdp/xorg.conf -noreset -nolisten tcp -logfile .xorgxrdp.%s.log 
+[2026-09-06T14:44:50.383+0000] [INFO ] Display X11-10 is working
+[2026-09-06T14:44:50.388+0000] [INFO ] Starting window manager for display X11-10
+[2026-09-06T14:44:50.390+0000] [INFO ] Starting the xrdp channel server for display X11-10
+[2026-09-06T14:44:50.392+0000] [INFO ] Waiting for 1500 ms for session to start
+[2026-09-06T14:44:50.392+0000] [INFO ] Using the default window manager on display X11-10: /etc/xrdp/startwm.sh
+[2026-09-06T14:44:51.894+0000] [INFO ] Session in progress on display X11-10. Waiting until the window manager (pid 1619) exits to end the session
+[2026-09-06T14:44:51.901+0000] [INFO ] sesman: Session on display X11-10 is now running
+[2026-09-06T14:44:51.908+0000] [INFO ] Forwarding request from tester to connect to a session
+[2026-09-06T14:44:51.910+0000] [INFO ] User tester has connected to a session
+[2026-09-06T14:44:51.910+0000] [INFO ] sesman: Session on display X11-10 is connected from client '5Q77'
+[2026-09-06T14:44:55.588+0000] [INFO ] sesexec_main_loop: xrdp connection has exited (client '5Q77')
+[2026-09-06T14:44:55.592+0000] [INFO ] sesman: Session on display X11-10 has no client connection

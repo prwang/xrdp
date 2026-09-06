@@ -1,0 +1,972 @@
+schema=1 mono_ns=433325606712770 pid=1004 tid=0 event=clock_base real_ns=1788264617004017331
+schema=1 mono_ns=433325638575286 pid=1004 tid=136760483820928 event=wire_rx seq=1 cmd=18 flags=0 pdu_bytes=154 last_tx=0 frame_context=0
+schema=1 mono_ns=433325638577536 pid=1004 tid=136760483820928 event=wire_caps_begin caps_seq=1 rx_seq=1 sets=11 last_tx=0
+schema=1 mono_ns=433325638578426 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=0 version=524292 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638579056 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=1 version=524549 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638579446 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=2 version=655362 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638579806 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=3 version=655616 data_bytes=16 flags=-1 last_tx=0
+schema=1 mono_ns=433325638580316 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=4 version=655872 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638580716 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=5 version=656129 data_bytes=4 flags=0 last_tx=0
+schema=1 mono_ns=433325638581056 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=6 version=656384 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638581356 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=7 version=656642 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638581656 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=8 version=656896 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638581956 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=9 version=656897 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325638582246 pid=1004 tid=136760483820928 event=wire_cap caps_seq=1 rx_seq=1 index=10 version=657153 data_bytes=4 flags=2 last_tx=0
+schema=1 mono_ns=433325689663435 pid=1004 tid=136760483820928 event=feedend sequence=0 main=1 monitor=-1
+schema=1 mono_ns=433325689671905 pid=1004 tid=136760483820928 event=feedend sequence=0 main=0 monitor=-1
+schema=1 mono_ns=433325695550582 pid=1004 tid=136760483820928 event=outfirst sequence=0 main=0 bytes=137742 monitor=-1
+schema=1 mono_ns=433325696127651 pid=1004 tid=136760483820928 event=outfirst sequence=0 main=1 bytes=94716 monitor=-1
+schema=1 mono_ns=433325697024548 pid=1004 tid=136760483820928 event=feedend sequence=1 main=1 monitor=-1
+schema=1 mono_ns=433325697122035 pid=1004 tid=136760483820928 event=feedend sequence=1 main=0 monitor=-1
+schema=1 mono_ns=433325698123168 pid=1004 tid=136760483820928 event=outfirst sequence=1 main=1 bytes=8913 monitor=-1
+schema=1 mono_ns=433325698554973 pid=1004 tid=136760483820928 event=outfirst sequence=1 main=0 bytes=70149 monitor=-1
+schema=1 mono_ns=433325713028878 pid=1004 tid=136760483820928 event=wire_tx seq=1 cmd=19 version=657153 flags=2 pdu_bytes=20 wire_bytes=22 result=0
+schema=1 mono_ns=433325715449991 pid=1004 tid=136760483820928 event=wire_tx seq=2 cmd=14 width=1024 height=768 monitors=1 pdu_bytes=340 wire_bytes=342 result=0
+schema=1 mono_ns=433325717105711 pid=1004 tid=136760483820928 event=wire_tx seq=3 cmd=9 frame=0 surface=0 width=1024 height=768 pixel=32 pdu_bytes=15 wire_bytes=17 result=0
+schema=1 mono_ns=433325717112620 pid=1004 tid=136760483820928 event=wire_tx seq=4 cmd=15 frame=0 surface=0 x=0 y=0 pdu_bytes=20 wire_bytes=22 result=0
+schema=1 mono_ns=433325727191485 pid=1004 tid=136760483820928 event=wire_tx seq=5 cmd=11 frame=1 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433325727249173 pid=1004 tid=136760483820928 event=wire_tx seq=6 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=0 x2=64 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727278152 pid=1004 tid=136760483820928 event=wire_tx seq=7 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=0 x2=128 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727315051 pid=1004 tid=136760483820928 event=wire_tx seq=8 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=0 x2=192 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727342430 pid=1004 tid=136760483820928 event=wire_tx seq=9 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=0 x2=256 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727371939 pid=1004 tid=136760483820928 event=wire_tx seq=10 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=0 x2=320 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727399808 pid=1004 tid=136760483820928 event=wire_tx seq=11 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=0 x2=384 y2=64 regions=0 payload_bytes=531 pdu_bytes=556 wire_bytes=573 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727426267 pid=1004 tid=136760483820928 event=wire_tx seq=12 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=0 x2=448 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727452806 pid=1004 tid=136760483820928 event=wire_tx seq=13 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=0 x2=512 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727479235 pid=1004 tid=136760483820928 event=wire_tx seq=14 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=0 x2=576 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727505854 pid=1004 tid=136760483820928 event=wire_tx seq=15 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=0 x2=640 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727532093 pid=1004 tid=136760483820928 event=wire_tx seq=16 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=0 x2=704 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325721112955 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433325727559082 pid=1004 tid=136760483820928 event=wire_tx seq=17 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=0 x2=768 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727586001 pid=1004 tid=136760483820928 event=wire_tx seq=18 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=0 x2=832 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727613210 pid=1004 tid=136760483820928 event=wire_tx seq=19 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=0 x2=896 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727639789 pid=1004 tid=136760483820928 event=wire_tx seq=20 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=0 x2=960 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727667358 pid=1004 tid=136760483820928 event=wire_tx seq=21 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=0 x2=1024 y2=64 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727712336 pid=1004 tid=136760483820928 event=wire_tx seq=22 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=64 x2=64 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727739475 pid=1004 tid=136760483820928 event=wire_tx seq=23 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=64 x2=128 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727765954 pid=1004 tid=136760483820928 event=wire_tx seq=24 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=64 x2=192 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727792483 pid=1004 tid=136760483820928 event=wire_tx seq=25 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=64 x2=256 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727818972 pid=1004 tid=136760483820928 event=wire_tx seq=26 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=64 x2=320 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727845942 pid=1004 tid=136760483820928 event=wire_tx seq=27 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=64 x2=384 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727872271 pid=1004 tid=136760483820928 event=wire_tx seq=28 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=64 x2=448 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727898900 pid=1004 tid=136760483820928 event=wire_tx seq=29 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=64 x2=512 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727925179 pid=1004 tid=136760483820928 event=wire_tx seq=30 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=64 x2=576 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727951828 pid=1004 tid=136760483820928 event=wire_tx seq=31 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=64 x2=640 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325727978067 pid=1004 tid=136760483820928 event=wire_tx seq=32 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=64 x2=704 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728007726 pid=1004 tid=136760483820928 event=wire_tx seq=33 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=64 x2=768 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728054554 pid=1004 tid=136760483820928 event=wire_tx seq=34 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=64 x2=832 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728081293 pid=1004 tid=136760483820928 event=wire_tx seq=35 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=64 x2=896 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728107532 pid=1004 tid=136760483820928 event=wire_tx seq=36 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=64 x2=960 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728134831 pid=1004 tid=136760483820928 event=wire_tx seq=37 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=64 x2=1024 y2=128 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728179769 pid=1004 tid=136760483820928 event=wire_tx seq=38 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=128 x2=64 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728206608 pid=1004 tid=136760483820928 event=wire_tx seq=39 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=128 x2=128 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728232877 pid=1004 tid=136760483820928 event=wire_tx seq=40 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=128 x2=192 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728259417 pid=1004 tid=136760483820928 event=wire_tx seq=41 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=128 x2=256 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728286086 pid=1004 tid=136760483820928 event=wire_tx seq=42 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=128 x2=320 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728312515 pid=1004 tid=136760483820928 event=wire_tx seq=43 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=128 x2=384 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728338984 pid=1004 tid=136760483820928 event=wire_tx seq=44 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=128 x2=448 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728365883 pid=1004 tid=136760483820928 event=wire_tx seq=45 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=128 x2=512 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728392142 pid=1004 tid=136760483820928 event=wire_tx seq=46 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=128 x2=576 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728419231 pid=1004 tid=136760483820928 event=wire_tx seq=47 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=128 x2=640 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728445570 pid=1004 tid=136760483820928 event=wire_tx seq=48 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=128 x2=704 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728472209 pid=1004 tid=136760483820928 event=wire_tx seq=49 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=128 x2=768 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728498498 pid=1004 tid=136760483820928 event=wire_tx seq=50 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=128 x2=832 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728524917 pid=1004 tid=136760483820928 event=wire_tx seq=51 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=128 x2=896 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728551366 pid=1004 tid=136760483820928 event=wire_tx seq=52 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=128 x2=960 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728578595 pid=1004 tid=136760483820928 event=wire_tx seq=53 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=128 x2=1024 y2=192 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728622883 pid=1004 tid=136760483820928 event=wire_tx seq=54 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=192 x2=64 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728649372 pid=1004 tid=136760483820928 event=wire_tx seq=55 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=192 x2=128 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728675561 pid=1004 tid=136760483820928 event=wire_tx seq=56 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=192 x2=192 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728702080 pid=1004 tid=136760483820928 event=wire_tx seq=57 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=192 x2=256 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728728369 pid=1004 tid=136760483820928 event=wire_tx seq=58 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=192 x2=320 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728754868 pid=1004 tid=136760483820928 event=wire_tx seq=59 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=192 x2=384 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728781148 pid=1004 tid=136760483820928 event=wire_tx seq=60 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=192 x2=448 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728807707 pid=1004 tid=136760483820928 event=wire_tx seq=61 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=192 x2=512 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728834006 pid=1004 tid=136760483820928 event=wire_tx seq=62 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=192 x2=576 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728862815 pid=1004 tid=136760483820928 event=wire_tx seq=63 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=192 x2=640 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728889204 pid=1004 tid=136760483820928 event=wire_tx seq=64 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=192 x2=704 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728915753 pid=1004 tid=136760483820928 event=wire_tx seq=65 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=192 x2=768 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728945292 pid=1004 tid=136760483820928 event=wire_tx seq=66 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=192 x2=832 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325728971641 pid=1004 tid=136760483820928 event=wire_tx seq=67 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=192 x2=896 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729001730 pid=1004 tid=136760483820928 event=wire_tx seq=68 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=192 x2=960 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729039858 pid=1004 tid=136760483820928 event=wire_tx seq=69 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=192 x2=1024 y2=256 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729086846 pid=1004 tid=136760483820928 event=wire_tx seq=70 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=256 x2=64 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729113295 pid=1004 tid=136760483820928 event=wire_tx seq=71 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=256 x2=128 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729141714 pid=1004 tid=136760483820928 event=wire_tx seq=72 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=256 x2=192 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729168034 pid=1004 tid=136760483820928 event=wire_tx seq=73 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=256 x2=256 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729196332 pid=1004 tid=136760483820928 event=wire_tx seq=74 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=256 x2=320 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729222582 pid=1004 tid=136760483820928 event=wire_tx seq=75 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=256 x2=384 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729250761 pid=1004 tid=136760483820928 event=wire_tx seq=76 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=256 x2=448 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729277090 pid=1004 tid=136760483820928 event=wire_tx seq=77 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=256 x2=512 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729305319 pid=1004 tid=136760483820928 event=wire_tx seq=78 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=256 x2=576 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729331618 pid=1004 tid=136760483820928 event=wire_tx seq=79 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=256 x2=640 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729359867 pid=1004 tid=136760483820928 event=wire_tx seq=80 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=256 x2=704 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729386106 pid=1004 tid=136760483820928 event=wire_tx seq=81 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=256 x2=768 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729414215 pid=1004 tid=136760483820928 event=wire_tx seq=82 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=256 x2=832 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729440654 pid=1004 tid=136760483820928 event=wire_tx seq=83 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=256 x2=896 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729468873 pid=1004 tid=136760483820928 event=wire_tx seq=84 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=256 x2=960 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729496002 pid=1004 tid=136760483820928 event=wire_tx seq=85 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=256 x2=1024 y2=320 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729542240 pid=1004 tid=136760483820928 event=wire_tx seq=86 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=320 x2=64 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729568539 pid=1004 tid=136760483820928 event=wire_tx seq=87 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=320 x2=128 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729596768 pid=1004 tid=136760483820928 event=wire_tx seq=88 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=320 x2=192 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729623027 pid=1004 tid=136760483820928 event=wire_tx seq=89 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=320 x2=256 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729651166 pid=1004 tid=136760483820928 event=wire_tx seq=90 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=320 x2=320 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729677435 pid=1004 tid=136760483820928 event=wire_tx seq=91 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=320 x2=384 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729706024 pid=1004 tid=136760483820928 event=wire_tx seq=92 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=320 x2=448 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729732423 pid=1004 tid=136760483820928 event=wire_tx seq=93 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=320 x2=512 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729760652 pid=1004 tid=136760483820928 event=wire_tx seq=94 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=320 x2=576 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729786911 pid=1004 tid=136760483820928 event=wire_tx seq=95 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=320 x2=640 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729815150 pid=1004 tid=136760483820928 event=wire_tx seq=96 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=320 x2=704 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729841569 pid=1004 tid=136760483820928 event=wire_tx seq=97 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=320 x2=768 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729870118 pid=1004 tid=136760483820928 event=wire_tx seq=98 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=320 x2=832 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729896477 pid=1004 tid=136760483820928 event=wire_tx seq=99 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=320 x2=896 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729924636 pid=1004 tid=136760483820928 event=wire_tx seq=100 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=320 x2=960 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729951335 pid=1004 tid=136760483820928 event=wire_tx seq=101 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=320 x2=1024 y2=384 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325729997843 pid=1004 tid=136760483820928 event=wire_tx seq=102 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=384 x2=64 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730038332 pid=1004 tid=136760483820928 event=wire_tx seq=103 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=384 x2=128 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730066631 pid=1004 tid=136760483820928 event=wire_tx seq=104 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=384 x2=192 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730093040 pid=1004 tid=136760483820928 event=wire_tx seq=105 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=384 x2=256 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730121499 pid=1004 tid=136760483820928 event=wire_tx seq=106 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=384 x2=320 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730147928 pid=1004 tid=136760483820928 event=wire_tx seq=107 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=384 x2=384 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730177037 pid=1004 tid=136760483820928 event=wire_tx seq=108 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=384 x2=448 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730203336 pid=1004 tid=136760483820928 event=wire_tx seq=109 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=384 x2=512 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730231745 pid=1004 tid=136760483820928 event=wire_tx seq=110 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=384 x2=576 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730258234 pid=1004 tid=136760483820928 event=wire_tx seq=111 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=384 x2=640 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730286463 pid=1004 tid=136760483820928 event=wire_tx seq=112 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=384 x2=704 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730312742 pid=1004 tid=136760483820928 event=wire_tx seq=113 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=384 x2=768 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730340981 pid=1004 tid=136760483820928 event=wire_tx seq=114 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=384 x2=832 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730367350 pid=1004 tid=136760483820928 event=wire_tx seq=115 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=384 x2=896 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730395599 pid=1004 tid=136760483820928 event=wire_tx seq=116 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=384 x2=960 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730425058 pid=1004 tid=136760483820928 event=wire_tx seq=117 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=384 x2=1024 y2=448 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730471966 pid=1004 tid=136760483820928 event=wire_tx seq=118 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=448 x2=64 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730498345 pid=1004 tid=136760483820928 event=wire_tx seq=119 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=448 x2=128 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730526554 pid=1004 tid=136760483820928 event=wire_tx seq=120 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=448 x2=192 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730552823 pid=1004 tid=136760483820928 event=wire_tx seq=121 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=448 x2=256 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730581062 pid=1004 tid=136760483820928 event=wire_tx seq=122 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=448 x2=320 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730607341 pid=1004 tid=136760483820928 event=wire_tx seq=123 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=448 x2=384 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730635470 pid=1004 tid=136760483820928 event=wire_tx seq=124 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=448 x2=448 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730661769 pid=1004 tid=136760483820928 event=wire_tx seq=125 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=448 x2=512 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730690218 pid=1004 tid=136760483820928 event=wire_tx seq=126 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=448 x2=576 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730716497 pid=1004 tid=136760483820928 event=wire_tx seq=127 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=448 x2=640 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730744926 pid=1004 tid=136760483820928 event=wire_tx seq=128 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=448 x2=704 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730771226 pid=1004 tid=136760483820928 event=wire_tx seq=129 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=448 x2=768 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730799414 pid=1004 tid=136760483820928 event=wire_tx seq=130 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=448 x2=832 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730825744 pid=1004 tid=136760483820928 event=wire_tx seq=131 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=448 x2=896 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730853913 pid=1004 tid=136760483820928 event=wire_tx seq=132 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=448 x2=960 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730880742 pid=1004 tid=136760483820928 event=wire_tx seq=133 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=448 x2=1024 y2=512 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730926890 pid=1004 tid=136760483820928 event=wire_tx seq=134 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=512 x2=64 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730953169 pid=1004 tid=136760483820928 event=wire_tx seq=135 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=512 x2=128 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325730981418 pid=1004 tid=136760483820928 event=wire_tx seq=136 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=512 x2=192 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731016927 pid=1004 tid=136760483820928 event=wire_tx seq=137 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=512 x2=256 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731053575 pid=1004 tid=136760483820928 event=wire_tx seq=138 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=512 x2=320 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731079954 pid=1004 tid=136760483820928 event=wire_tx seq=139 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=512 x2=384 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731108413 pid=1004 tid=136760483820928 event=wire_tx seq=140 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=512 x2=448 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731134712 pid=1004 tid=136760483820928 event=wire_tx seq=141 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=512 x2=512 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731163111 pid=1004 tid=136760483820928 event=wire_tx seq=142 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=512 x2=576 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731189350 pid=1004 tid=136760483820928 event=wire_tx seq=143 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=512 x2=640 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731217489 pid=1004 tid=136760483820928 event=wire_tx seq=144 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=512 x2=704 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731243698 pid=1004 tid=136760483820928 event=wire_tx seq=145 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=512 x2=768 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731271777 pid=1004 tid=136760483820928 event=wire_tx seq=146 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=512 x2=832 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731298016 pid=1004 tid=136760483820928 event=wire_tx seq=147 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=512 x2=896 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731326095 pid=1004 tid=136760483820928 event=wire_tx seq=148 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=512 x2=960 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731352734 pid=1004 tid=136760483820928 event=wire_tx seq=149 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=512 x2=1024 y2=576 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731398813 pid=1004 tid=136760483820928 event=wire_tx seq=150 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=576 x2=64 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731425012 pid=1004 tid=136760483820928 event=wire_tx seq=151 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=576 x2=128 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731453191 pid=1004 tid=136760483820928 event=wire_tx seq=152 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=576 x2=192 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731479370 pid=1004 tid=136760483820928 event=wire_tx seq=153 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=576 x2=256 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731507509 pid=1004 tid=136760483820928 event=wire_tx seq=154 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=576 x2=320 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731533808 pid=1004 tid=136760483820928 event=wire_tx seq=155 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=576 x2=384 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731561967 pid=1004 tid=136760483820928 event=wire_tx seq=156 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=576 x2=448 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731588126 pid=1004 tid=136760483820928 event=wire_tx seq=157 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=576 x2=512 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731616235 pid=1004 tid=136760483820928 event=wire_tx seq=158 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=576 x2=576 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731642354 pid=1004 tid=136760483820928 event=wire_tx seq=159 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=576 x2=640 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731670613 pid=1004 tid=136760483820928 event=wire_tx seq=160 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=576 x2=704 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731696882 pid=1004 tid=136760483820928 event=wire_tx seq=161 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=576 x2=768 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731725111 pid=1004 tid=136760483820928 event=wire_tx seq=162 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=576 x2=832 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731751350 pid=1004 tid=136760483820928 event=wire_tx seq=163 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=576 x2=896 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731779569 pid=1004 tid=136760483820928 event=wire_tx seq=164 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=576 x2=960 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731806168 pid=1004 tid=136760483820928 event=wire_tx seq=165 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=576 x2=1024 y2=640 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731852216 pid=1004 tid=136760483820928 event=wire_tx seq=166 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=640 x2=64 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731878475 pid=1004 tid=136760483820928 event=wire_tx seq=167 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=640 x2=128 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731906664 pid=1004 tid=136760483820928 event=wire_tx seq=168 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=640 x2=192 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731932843 pid=1004 tid=136760483820928 event=wire_tx seq=169 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=640 x2=256 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731960932 pid=1004 tid=136760483820928 event=wire_tx seq=170 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=640 x2=320 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325731987152 pid=1004 tid=136760483820928 event=wire_tx seq=171 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=640 x2=384 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732019440 pid=1004 tid=136760483820928 event=wire_tx seq=172 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=640 x2=448 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732045949 pid=1004 tid=136760483820928 event=wire_tx seq=173 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=640 x2=512 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732074208 pid=1004 tid=136760483820928 event=wire_tx seq=174 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=640 x2=576 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732100617 pid=1004 tid=136760483820928 event=wire_tx seq=175 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=640 x2=640 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732128806 pid=1004 tid=136760483820928 event=wire_tx seq=176 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=640 x2=704 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732155055 pid=1004 tid=136760483820928 event=wire_tx seq=177 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=640 x2=768 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732183264 pid=1004 tid=136760483820928 event=wire_tx seq=178 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=640 x2=832 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732209543 pid=1004 tid=136760483820928 event=wire_tx seq=179 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=640 x2=896 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732237732 pid=1004 tid=136760483820928 event=wire_tx seq=180 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=640 x2=960 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732264441 pid=1004 tid=136760483820928 event=wire_tx seq=181 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=640 x2=1024 y2=704 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732310680 pid=1004 tid=136760483820928 event=wire_tx seq=182 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=0 y1=704 x2=64 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732336919 pid=1004 tid=136760483820928 event=wire_tx seq=183 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=64 y1=704 x2=128 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732365238 pid=1004 tid=136760483820928 event=wire_tx seq=184 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=128 y1=704 x2=192 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732391467 pid=1004 tid=136760483820928 event=wire_tx seq=185 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=192 y1=704 x2=256 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732419586 pid=1004 tid=136760483820928 event=wire_tx seq=186 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=256 y1=704 x2=320 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732445815 pid=1004 tid=136760483820928 event=wire_tx seq=187 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=320 y1=704 x2=384 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732473914 pid=1004 tid=136760483820928 event=wire_tx seq=188 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=384 y1=704 x2=448 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732500223 pid=1004 tid=136760483820928 event=wire_tx seq=189 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=448 y1=704 x2=512 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732528502 pid=1004 tid=136760483820928 event=wire_tx seq=190 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=512 y1=704 x2=576 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732554861 pid=1004 tid=136760483820928 event=wire_tx seq=191 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=576 y1=704 x2=640 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732583040 pid=1004 tid=136760483820928 event=wire_tx seq=192 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=640 y1=704 x2=704 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732609279 pid=1004 tid=136760483820928 event=wire_tx seq=193 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=704 y1=704 x2=768 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732637438 pid=1004 tid=136760483820928 event=wire_tx seq=194 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=768 y1=704 x2=832 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732663757 pid=1004 tid=136760483820928 event=wire_tx seq=195 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=832 y1=704 x2=896 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732691946 pid=1004 tid=136760483820928 event=wire_tx seq=196 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=896 y1=704 x2=960 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732718405 pid=1004 tid=136760483820928 event=wire_tx seq=197 cmd=1 frame=1 surface=0 codec=10 lc=-1 x1=960 y1=704 x2=1024 y2=768 regions=0 payload_bytes=513 pdu_bytes=538 wire_bytes=555 segments=2 head=4061262352 next=4061262353 tail=301076978 result=0
+schema=1 mono_ns=433325732726015 pid=1004 tid=136760483820928 event=wire_tx seq=198 cmd=12 frame=1 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433325733746358 pid=1004 tid=136760483820928 event=wire_rx seq=2 cmd=13 flags=0 pdu_bytes=20 last_tx=198 frame_context=0
+schema=1 mono_ns=433325733747068 pid=1004 tid=136760483820928 event=wire_ack rx_seq=2 frame=1 queue_depth=0 decoded=1 last_tx=198
+schema=1 mono_ns=433325733747918 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=1 server=0 ack_offset=1
+schema=1 mono_ns=433328287849338 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=1 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433328287853128 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=1 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433328287858497 pid=1004 tid=136760483820928 event=enq frame_id=1 fifo_depth=1
+schema=1 mono_ns=433328287873477 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433328287876077 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433328287881846 pid=1004 tid=136760447248064 event=take frame_id=1 fifo_depth=0
+schema=1 mono_ns=433328287883866 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433328287884666 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=-1 since_previous_ms=-1 refresh_ms=0
+schema=1 mono_ns=433328287885726 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=433328290412335 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433328290413605 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328291157288 pid=1004 tid=136760447248064 event=feedend sequence=1 main=1 monitor=0
+schema=1 mono_ns=433328296142777 pid=1004 tid=136760447248064 event=outfirst sequence=1 main=1 bytes=30222 monitor=0
+schema=1 mono_ns=433328307036043 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=2 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433328307039842 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=2 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433328307043222 pid=1004 tid=136760483820928 event=enq frame_id=2 fifo_depth=1
+schema=1 mono_ns=433328333311071 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=1 slot_frontier=1 region_frontier=0 client=0 egress=0 absorbed=1 window=1
+schema=1 mono_ns=433328333242623 pid=1004 tid=136760447248064 event=feedend sequence=1 main=0 monitor=0
+schema=1 mono_ns=433328333249933 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=1 monitor=0
+schema=1 mono_ns=433328337436871 pid=1004 tid=136760483820928 event=wire_tx seq=199 cmd=11 frame=1 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433328337439231 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=433328337584106 pid=1004 tid=136760483820928 event=wire_tx seq=200 cmd=1 frame=1 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=30240 pdu_bytes=30265 wire_bytes=30282 segments=2 head=1073772060 next=1 tail=3254016319 result=0
+schema=1 mono_ns=433328337585796 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=30282 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=433328337604295 pid=1004 tid=136760483820928 event=wire_tx seq=201 cmd=1 frame=1 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=5193 pdu_bytes=5218 wire_bytes=5235 segments=2 head=2147483648 next=1 tail=889454715 result=0
+schema=1 mono_ns=433328337605355 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=5235 last=0 frame_id=0 server=0 client=0 inflight=2
+schema=1 mono_ns=433328337605895 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=1 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=433328337611065 pid=1004 tid=136760483820928 event=wire_tx seq=202 cmd=12 frame=1 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433328337611805 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=1 server=0 client=0 inflight=2
+schema=1 mono_ns=433328339457588 pid=1004 tid=136760483820928 event=wire_tx seq=203 cmd=11 frame=2 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433328339458578 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=433328339464388 pid=1004 tid=136760483820928 event=wire_tx seq=204 cmd=1 frame=2 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=200 pdu_bytes=225 wire_bytes=242 segments=2 head=1073742020 next=1 tail=3760390208 result=0
+schema=1 mono_ns=433328339465608 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=242 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=433328339485087 pid=1004 tid=136760483820928 event=wire_tx seq=205 cmd=1 frame=2 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3971 pdu_bytes=3996 wire_bytes=4013 segments=2 head=2147483648 next=1 tail=872677499 result=0
+schema=1 mono_ns=433328339485937 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4013 last=0 frame_id=0 server=1 client=0 inflight=2
+schema=1 mono_ns=433328339486467 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=2 shown=1 queued_bytes=0 client=0 terminal=1 bytes=14
+schema=1 mono_ns=433328339491137 pid=1004 tid=136760483820928 event=wire_tx seq=206 cmd=12 frame=2 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433328339491677 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=2 server=1 client=0 inflight=2
+schema=1 mono_ns=433328337170051 pid=1004 tid=136760447248064 event=outfirst sequence=1 main=0 bytes=5205 monitor=0
+schema=1 mono_ns=433328337175630 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328337176880 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433328337177650 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433328337178100 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433328337319575 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433328337320225 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=1 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433328337321505 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433328337322105 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433328337330885 pid=1004 tid=136760447248064 event=emit_beg frame_id=1 monitor=0
+schema=1 mono_ns=433328337344934 pid=1004 tid=136760447248064 event=video_cmd frame_id=1 view=1 bytes=30240
+schema=1 mono_ns=433328337347544 pid=1004 tid=136760447248064 event=video_cmd frame_id=1 view=2 bytes=5193
+schema=1 mono_ns=433328337348484 pid=1004 tid=136760447248064 event=emit_end frame_id=1 monitor=0
+schema=1 mono_ns=433328337407242 pid=1004 tid=136760447248064 event=take frame_id=2 fifo_depth=0
+schema=1 mono_ns=433328337408702 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433328337409432 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=50 since_previous_ms=50 refresh_ms=0
+schema=1 mono_ns=433328337410742 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=433328337411782 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433328337412132 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328337944413 pid=1004 tid=136760447248064 event=feedend sequence=2 main=1 monitor=0
+schema=1 mono_ns=433328337995281 pid=1004 tid=136760447248064 event=feedend sequence=2 main=0 monitor=0
+schema=1 mono_ns=433328337997941 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=2 monitor=0
+schema=1 mono_ns=433328339198157 pid=1004 tid=136760447248064 event=outfirst sequence=2 main=1 bytes=182 monitor=0
+schema=1 mono_ns=433328339388530 pid=1004 tid=136760447248064 event=outfirst sequence=2 main=0 bytes=3985 monitor=0
+schema=1 mono_ns=433328339389940 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328339390390 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433328339391040 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433328339391260 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433328339415449 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433328339415689 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=2 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433328339416279 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433328339416489 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433328339421249 pid=1004 tid=136760447248064 event=emit_beg frame_id=2 monitor=0
+schema=1 mono_ns=433328339422079 pid=1004 tid=136760447248064 event=video_cmd frame_id=2 view=1 bytes=200
+schema=1 mono_ns=433328339423689 pid=1004 tid=136760447248064 event=video_cmd frame_id=2 view=2 bytes=3971
+schema=1 mono_ns=433328339424059 pid=1004 tid=136760447248064 event=emit_end frame_id=2 monitor=0
+schema=1 mono_ns=433328339434869 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433328339436039 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433328339437239 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433328339438059 pid=1004 tid=136760447248064 event=drain_beg n_items=0 drain_full=1
+schema=1 mono_ns=433328339439149 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433328339439479 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433328361329405 pid=1004 tid=136760483820928 event=wire_rx seq=3 cmd=13 flags=0 pdu_bytes=20 last_tx=206 frame_context=0
+schema=1 mono_ns=433328361331415 pid=1004 tid=136760483820928 event=wire_ack rx_seq=3 frame=1 queue_depth=0 decoded=2 last_tx=206
+schema=1 mono_ns=433328361332355 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=1 queue_depth=0 decoded=2 server=2 ack_offset=-1
+schema=1 mono_ns=433328361333515 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=2 slot_frontier=2 region_frontier=0 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=433328361340385 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=1 slot_frontier=2 region_frontier=1 client=1 egress=2 absorbed=2 window=1
+schema=1 mono_ns=433328380001059 pid=1004 tid=136760483820928 event=wire_rx seq=4 cmd=13 flags=0 pdu_bytes=20 last_tx=206 frame_context=0
+schema=1 mono_ns=433328380003039 pid=1004 tid=136760483820928 event=wire_ack rx_seq=4 frame=2 queue_depth=0 decoded=3 last_tx=206
+schema=1 mono_ns=433328380004039 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=2 queue_depth=0 decoded=3 server=2 ack_offset=0
+schema=1 mono_ns=433328380004859 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=2 slot_frontier=2 region_frontier=2 client=2 egress=2 absorbed=2 window=1
+schema=1 mono_ns=433328422833957 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=3 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433328422840447 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=3 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433328422844627 pid=1004 tid=136760483820928 event=enq frame_id=3 fifo_depth=1
+schema=1 mono_ns=433328423633898 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=3 slot_frontier=3 region_frontier=2 client=2 egress=2 absorbed=3 window=1
+schema=1 mono_ns=433328425429793 pid=1004 tid=136760483820928 event=wire_tx seq=207 cmd=11 frame=3 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433328425433183 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=2 client=2 inflight=2
+schema=1 mono_ns=433328425450172 pid=1004 tid=136760483820928 event=wire_tx seq=208 cmd=1 frame=3 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=268 pdu_bytes=293 wire_bytes=310 segments=2 head=1073742088 next=1 tail=3439591512 result=0
+schema=1 mono_ns=433328425453102 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=310 last=0 frame_id=0 server=2 client=2 inflight=2
+schema=1 mono_ns=433328425522480 pid=1004 tid=136760483820928 event=wire_tx seq=209 cmd=1 frame=3 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3975 pdu_bytes=4000 wire_bytes=4017 segments=2 head=2147483648 next=1 tail=889454715 result=0
+schema=1 mono_ns=433328425524170 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4017 last=0 frame_id=0 server=2 client=2 inflight=2
+schema=1 mono_ns=433328425525089 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=3 shown=1 queued_bytes=0 client=2 terminal=1 bytes=14
+schema=1 mono_ns=433328425534649 pid=1004 tid=136760483820928 event=wire_tx seq=210 cmd=12 frame=3 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433328425535979 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=3 server=2 client=2 inflight=2
+schema=1 mono_ns=433328422878505 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433328422885675 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433328422890845 pid=1004 tid=136760447248064 event=take frame_id=3 fifo_depth=0
+schema=1 mono_ns=433328422893905 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433328422895415 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=85 since_previous_ms=85 refresh_ms=0
+schema=1 mono_ns=433328422897045 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=3 monitor=0
+schema=1 mono_ns=433328422899375 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433328422900315 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328423312140 pid=1004 tid=136760447248064 event=feedend sequence=3 main=1 monitor=0
+schema=1 mono_ns=433328423594139 pid=1004 tid=136760447248064 event=feedend sequence=3 main=0 monitor=0
+schema=1 mono_ns=433328423597009 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=3 monitor=0
+schema=1 mono_ns=433328424167889 pid=1004 tid=136760447248064 event=outfirst sequence=3 main=1 bytes=250 monitor=0
+schema=1 mono_ns=433328425136984 pid=1004 tid=136760447248064 event=outfirst sequence=3 main=0 bytes=3987 monitor=0
+schema=1 mono_ns=433328425141003 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433328425141953 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433328425142803 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433328425143133 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433328425197401 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433328425197841 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=3 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433328425199001 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433328425199431 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433328425218281 pid=1004 tid=136760447248064 event=emit_beg frame_id=3 monitor=0
+schema=1 mono_ns=433328425221491 pid=1004 tid=136760447248064 event=video_cmd frame_id=3 view=1 bytes=268
+schema=1 mono_ns=433328425224590 pid=1004 tid=136760447248064 event=video_cmd frame_id=3 view=2 bytes=3975
+schema=1 mono_ns=433328425225530 pid=1004 tid=136760447248064 event=emit_end frame_id=3 monitor=0
+schema=1 mono_ns=433328425271039 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433328425272339 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433328443777868 pid=1004 tid=136760483820928 event=wire_rx seq=5 cmd=13 flags=0 pdu_bytes=20 last_tx=210 frame_context=0
+schema=1 mono_ns=433328443779578 pid=1004 tid=136760483820928 event=wire_ack rx_seq=5 frame=3 queue_depth=0 decoded=4 last_tx=210
+schema=1 mono_ns=433328443780258 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=3 queue_depth=0 decoded=4 server=3 ack_offset=0
+schema=1 mono_ns=433328443780988 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=3 slot_frontier=3 region_frontier=3 client=3 egress=3 absorbed=3 window=1
+schema=1 mono_ns=433334009454133 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=4 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433334009463653 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=4 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433334009467923 pid=1004 tid=136760483820928 event=enq frame_id=4 fifo_depth=1
+schema=1 mono_ns=433334009533380 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433334009540720 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433334009548690 pid=1004 tid=136760447248064 event=take frame_id=4 fifo_depth=0
+schema=1 mono_ns=433334009551830 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433334009553279 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=5587 since_previous_ms=5587 refresh_ms=0
+schema=1 mono_ns=433334009554809 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=4 monitor=0
+schema=1 mono_ns=433334009557379 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433334009558209 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433334010032232 pid=1004 tid=136760447248064 event=feedend sequence=4 main=1 monitor=0
+schema=1 mono_ns=433334010366860 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=4 slot_frontier=4 region_frontier=3 client=3 egress=3 absorbed=4 window=1
+schema=1 mono_ns=433334012238882 pid=1004 tid=136760483820928 event=wire_tx seq=211 cmd=11 frame=4 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433334012244272 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=3 client=3 inflight=2
+schema=1 mono_ns=433334012292210 pid=1004 tid=136760483820928 event=wire_tx seq=212 cmd=1 frame=4 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3052 pdu_bytes=3077 wire_bytes=3094 segments=2 head=1073744872 next=1 tail=3422814296 result=0
+schema=1 mono_ns=433334012295940 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3094 last=0 frame_id=0 server=3 client=3 inflight=2
+schema=1 mono_ns=433334012322739 pid=1004 tid=136760483820928 event=wire_tx seq=213 cmd=1 frame=4 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3975 pdu_bytes=4000 wire_bytes=4017 segments=2 head=2147483648 next=1 tail=872677499 result=0
+schema=1 mono_ns=433334012324789 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4017 last=0 frame_id=0 server=3 client=3 inflight=2
+schema=1 mono_ns=433334012325719 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=4 shown=1 queued_bytes=0 client=3 terminal=1 bytes=14
+schema=1 mono_ns=433334012330729 pid=1004 tid=136760483820928 event=wire_tx seq=214 cmd=12 frame=4 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433334012332639 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=4 server=3 client=3 inflight=2
+schema=1 mono_ns=433334010306452 pid=1004 tid=136760447248064 event=feedend sequence=4 main=0 monitor=0
+schema=1 mono_ns=433334010309702 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=4 monitor=0
+schema=1 mono_ns=433334011207849 pid=1004 tid=136760447248064 event=outfirst sequence=4 main=1 bytes=3034 monitor=0
+schema=1 mono_ns=433334011880555 pid=1004 tid=136760447248064 event=outfirst sequence=4 main=0 bytes=3989 monitor=0
+schema=1 mono_ns=433334011892815 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433334011894845 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433334011896085 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433334011896485 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433334011962402 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433334011962972 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=4 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433334011964932 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433334011965792 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433334011990871 pid=1004 tid=136760447248064 event=emit_beg frame_id=4 monitor=0
+schema=1 mono_ns=433334011996511 pid=1004 tid=136760447248064 event=video_cmd frame_id=4 view=1 bytes=3052
+schema=1 mono_ns=433334012006661 pid=1004 tid=136760447248064 event=video_cmd frame_id=4 view=2 bytes=3975
+schema=1 mono_ns=433334012007690 pid=1004 tid=136760447248064 event=emit_end frame_id=4 monitor=0
+schema=1 mono_ns=433334012057179 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433334012059189 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433334031301521 pid=1004 tid=136760483820928 event=wire_rx seq=6 cmd=13 flags=0 pdu_bytes=20 last_tx=214 frame_context=0
+schema=1 mono_ns=433334031303671 pid=1004 tid=136760483820928 event=wire_ack rx_seq=6 frame=4 queue_depth=0 decoded=5 last_tx=214
+schema=1 mono_ns=433334031304551 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=4 queue_depth=0 decoded=5 server=4 ack_offset=0
+schema=1 mono_ns=433334031305581 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=4 slot_frontier=4 region_frontier=4 client=4 egress=4 absorbed=4 window=1
+schema=1 mono_ns=433339421713183 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=5 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433339421720022 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=5 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433339421723992 pid=1004 tid=136760483820928 event=enq frame_id=5 fifo_depth=1
+schema=1 mono_ns=433339422416287 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=5 slot_frontier=5 region_frontier=4 client=4 egress=4 absorbed=5 window=1
+schema=1 mono_ns=433339423980190 pid=1004 tid=136760483820928 event=wire_tx seq=215 cmd=11 frame=5 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433339423983280 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=4 client=4 inflight=2
+schema=1 mono_ns=433339424007799 pid=1004 tid=136760483820928 event=wire_tx seq=216 cmd=1 frame=5 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=2922 pdu_bytes=2947 wire_bytes=2964 segments=2 head=1073744742 next=1 tail=3439591512 result=0
+schema=1 mono_ns=433339424009949 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=2964 last=0 frame_id=0 server=4 client=4 inflight=2
+schema=1 mono_ns=433339424028769 pid=1004 tid=136760483820928 event=wire_tx seq=217 cmd=1 frame=5 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3975 pdu_bytes=4000 wire_bytes=4017 segments=2 head=2147483648 next=1 tail=889454715 result=0
+schema=1 mono_ns=433339424029809 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4017 last=0 frame_id=0 server=4 client=4 inflight=2
+schema=1 mono_ns=433339424030399 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=5 shown=1 queued_bytes=0 client=4 terminal=1 bytes=14
+schema=1 mono_ns=433339424033299 pid=1004 tid=136760483820928 event=wire_tx seq=218 cmd=12 frame=5 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433339424034249 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=5 server=4 client=4 inflight=2
+schema=1 mono_ns=433339421743541 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433339421747241 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433339421750301 pid=1004 tid=136760447248064 event=take frame_id=5 fifo_depth=0
+schema=1 mono_ns=433339421752711 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433339421753651 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=5412 since_previous_ms=5412 refresh_ms=0
+schema=1 mono_ns=433339421754751 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=5 monitor=0
+schema=1 mono_ns=433339421756311 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433339421756821 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433339422382668 pid=1004 tid=136760447248064 event=feedend sequence=5 main=1 monitor=0
+schema=1 mono_ns=433339422394498 pid=1004 tid=136760447248064 event=feedend sequence=5 main=0 monitor=0
+schema=1 mono_ns=433339422396128 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=5 monitor=0
+schema=1 mono_ns=433339423544766 pid=1004 tid=136760447248064 event=outfirst sequence=5 main=1 bytes=2904 monitor=0
+schema=1 mono_ns=433339423654592 pid=1004 tid=136760447248064 event=outfirst sequence=5 main=0 bytes=3987 monitor=0
+schema=1 mono_ns=433339423671172 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433339423673222 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433339423674652 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433339423675272 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433339423740899 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433339423741499 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=5 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433339423743449 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433339423744279 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433339423775068 pid=1004 tid=136760447248064 event=emit_beg frame_id=5 monitor=0
+schema=1 mono_ns=433339423780348 pid=1004 tid=136760447248064 event=video_cmd frame_id=5 view=1 bytes=2922
+schema=1 mono_ns=433339423783998 pid=1004 tid=136760447248064 event=video_cmd frame_id=5 view=2 bytes=3975
+schema=1 mono_ns=433339423785008 pid=1004 tid=136760447248064 event=emit_end frame_id=5 monitor=0
+schema=1 mono_ns=433339423828336 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433339423830556 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433339443195914 pid=1004 tid=136760483820928 event=wire_rx seq=7 cmd=13 flags=0 pdu_bytes=20 last_tx=218 frame_context=0
+schema=1 mono_ns=433339443197614 pid=1004 tid=136760483820928 event=wire_ack rx_seq=7 frame=5 queue_depth=0 decoded=6 last_tx=218
+schema=1 mono_ns=433339443198534 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=5 queue_depth=0 decoded=6 server=5 ack_offset=0
+schema=1 mono_ns=433339443199564 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=5 slot_frontier=5 region_frontier=5 client=5 egress=5 absorbed=5 window=1
+schema=1 mono_ns=433344855517517 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=6 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433344855524267 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=6 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433344855528067 pid=1004 tid=136760483820928 event=enq frame_id=6 fifo_depth=1
+schema=1 mono_ns=433344856353127 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=6 slot_frontier=6 region_frontier=5 client=5 egress=5 absorbed=6 window=1
+schema=1 mono_ns=433344858004337 pid=1004 tid=136760483820928 event=wire_tx seq=219 cmd=11 frame=6 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433344858007187 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=5 client=5 inflight=2
+schema=1 mono_ns=433344858038675 pid=1004 tid=136760483820928 event=wire_tx seq=220 cmd=1 frame=6 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3320 pdu_bytes=3345 wire_bytes=3362 segments=2 head=1073745140 next=1 tail=3439591512 result=0
+schema=1 mono_ns=433344858040655 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3362 last=0 frame_id=0 server=5 client=5 inflight=2
+schema=1 mono_ns=433344858056375 pid=1004 tid=136760483820928 event=wire_tx seq=221 cmd=1 frame=6 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3975 pdu_bytes=4000 wire_bytes=4017 segments=2 head=2147483648 next=1 tail=889454715 result=0
+schema=1 mono_ns=433344858057415 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4017 last=0 frame_id=0 server=5 client=5 inflight=2
+schema=1 mono_ns=433344858058025 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=6 shown=1 queued_bytes=0 client=5 terminal=1 bytes=14
+schema=1 mono_ns=433344858060655 pid=1004 tid=136760483820928 event=wire_tx seq=222 cmd=12 frame=6 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433344858061535 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=6 server=5 client=5 inflight=2
+schema=1 mono_ns=433344855564965 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433344855570935 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433344855576345 pid=1004 tid=136760447248064 event=take frame_id=6 fifo_depth=0
+schema=1 mono_ns=433344855579785 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433344855581415 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=5434 since_previous_ms=5434 refresh_ms=0
+schema=1 mono_ns=433344855582975 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=6 monitor=0
+schema=1 mono_ns=433344855585134 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433344855586094 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433344856245531 pid=1004 tid=136760447248064 event=feedend sequence=6 main=1 monitor=0
+schema=1 mono_ns=433344856308058 pid=1004 tid=136760447248064 event=feedend sequence=6 main=0 monitor=0
+schema=1 mono_ns=433344856311038 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=6 monitor=0
+schema=1 mono_ns=433344857334681 pid=1004 tid=136760447248064 event=outfirst sequence=6 main=1 bytes=3302 monitor=0
+schema=1 mono_ns=433344857792584 pid=1004 tid=136760447248064 event=outfirst sequence=6 main=0 bytes=3989 monitor=0
+schema=1 mono_ns=433344857802334 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433344857803614 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433344857804614 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433344857804994 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433344857840883 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433344857841223 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=6 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433344857842303 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433344857842703 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433344857865862 pid=1004 tid=136760447248064 event=emit_beg frame_id=6 monitor=0
+schema=1 mono_ns=433344857869422 pid=1004 tid=136760447248064 event=video_cmd frame_id=6 view=1 bytes=3320
+schema=1 mono_ns=433344857871582 pid=1004 tid=136760447248064 event=video_cmd frame_id=6 view=2 bytes=3975
+schema=1 mono_ns=433344857872182 pid=1004 tid=136760447248064 event=emit_end frame_id=6 monitor=0
+schema=1 mono_ns=433344857912410 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433344857913890 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433344878405288 pid=1004 tid=136760483820928 event=wire_rx seq=8 cmd=13 flags=0 pdu_bytes=20 last_tx=222 frame_context=0
+schema=1 mono_ns=433344878407738 pid=1004 tid=136760483820928 event=wire_ack rx_seq=8 frame=6 queue_depth=0 decoded=7 last_tx=222
+schema=1 mono_ns=433344878408568 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=6 queue_depth=0 decoded=7 server=6 ack_offset=0
+schema=1 mono_ns=433344878409567 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=6 slot_frontier=6 region_frontier=6 client=6 egress=6 absorbed=6 window=1
+schema=1 mono_ns=433357089385366 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=7 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433357089391006 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=7 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433357089394016 pid=1004 tid=136760483820928 event=enq frame_id=7 fifo_depth=1
+schema=1 mono_ns=433357089731664 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=7 slot_frontier=7 region_frontier=6 client=6 egress=6 absorbed=7 window=1
+schema=1 mono_ns=433357091387584 pid=1004 tid=136760483820928 event=wire_tx seq=223 cmd=11 frame=7 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433357091389244 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=6 client=6 inflight=2
+schema=1 mono_ns=433357091414563 pid=1004 tid=136760483820928 event=wire_tx seq=224 cmd=1 frame=7 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3504 pdu_bytes=3529 wire_bytes=3546 segments=2 head=1073745324 next=1 tail=789421828 result=0
+schema=1 mono_ns=433357091416153 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3546 last=0 frame_id=0 server=6 client=6 inflight=2
+schema=1 mono_ns=433357091433152 pid=1004 tid=136760483820928 event=wire_tx seq=225 cmd=1 frame=7 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=6549 pdu_bytes=6574 wire_bytes=6591 segments=2 head=2147483648 next=1 tail=2173164238 result=0
+schema=1 mono_ns=433357091434082 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=6591 last=0 frame_id=0 server=6 client=6 inflight=2
+schema=1 mono_ns=433357091434602 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=7 shown=1 queued_bytes=0 client=6 terminal=1 bytes=14
+schema=1 mono_ns=433357091437032 pid=1004 tid=136760483820928 event=wire_tx seq=226 cmd=12 frame=7 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433357091437712 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=7 server=6 client=6 inflight=2
+schema=1 mono_ns=433357089412145 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433357089418335 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433357089423485 pid=1004 tid=136760447248064 event=take frame_id=7 fifo_depth=0
+schema=1 mono_ns=433357089427015 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433357089428445 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=12234 since_previous_ms=12234 refresh_ms=0
+schema=1 mono_ns=433357089430115 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=7 monitor=0
+schema=1 mono_ns=433357089432654 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433357089433574 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433357089607058 pid=1004 tid=136760447248064 event=feedend sequence=7 main=1 monitor=0
+schema=1 mono_ns=433357089713314 pid=1004 tid=136760447248064 event=feedend sequence=7 main=0 monitor=0
+schema=1 mono_ns=433357089716584 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=7 monitor=0
+schema=1 mono_ns=433357090686959 pid=1004 tid=136760447248064 event=outfirst sequence=7 main=1 bytes=3486 monitor=0
+schema=1 mono_ns=433357091162232 pid=1004 tid=136760447248064 event=outfirst sequence=7 main=0 bytes=6561 monitor=0
+schema=1 mono_ns=433357091165842 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433357091166412 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433357091166952 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433357091167212 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433357091215090 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433357091215470 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=7 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433357091216090 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433357091216340 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433357091226610 pid=1004 tid=136760447248064 event=emit_beg frame_id=7 monitor=0
+schema=1 mono_ns=433357091229169 pid=1004 tid=136760447248064 event=video_cmd frame_id=7 view=1 bytes=3504
+schema=1 mono_ns=433357091232249 pid=1004 tid=136760447248064 event=video_cmd frame_id=7 view=2 bytes=6549
+schema=1 mono_ns=433357091232909 pid=1004 tid=136760447248064 event=emit_end frame_id=7 monitor=0
+schema=1 mono_ns=433357091264378 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433357091265348 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433357111532434 pid=1004 tid=136760483820928 event=wire_rx seq=9 cmd=13 flags=0 pdu_bytes=20 last_tx=226 frame_context=0
+schema=1 mono_ns=433357111534164 pid=1004 tid=136760483820928 event=wire_ack rx_seq=9 frame=7 queue_depth=0 decoded=8 last_tx=226
+schema=1 mono_ns=433357111535024 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=7 queue_depth=0 decoded=8 server=7 ack_offset=0
+schema=1 mono_ns=433357111535984 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=7 slot_frontier=7 region_frontier=7 client=7 egress=7 absorbed=7 window=1
+schema=1 mono_ns=433358805313424 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=8 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433358805321414 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=8 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433358805325404 pid=1004 tid=136760483820928 event=enq frame_id=8 fifo_depth=1
+schema=1 mono_ns=433358805665371 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=8 slot_frontier=8 region_frontier=7 client=7 egress=7 absorbed=8 window=1
+schema=1 mono_ns=433358807158607 pid=1004 tid=136760483820928 event=wire_tx seq=227 cmd=11 frame=8 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433358807165327 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=7 client=7 inflight=2
+schema=1 mono_ns=433358807211036 pid=1004 tid=136760483820928 event=wire_tx seq=228 cmd=1 frame=8 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3513 pdu_bytes=3538 wire_bytes=3555 segments=2 head=1073745333 next=1 tail=2982404188 result=0
+schema=1 mono_ns=433358807214945 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3555 last=0 frame_id=0 server=7 client=7 inflight=2
+schema=1 mono_ns=433358807269693 pid=1004 tid=136760483820928 event=wire_tx seq=229 cmd=1 frame=8 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=7127 pdu_bytes=7152 wire_bytes=7169 segments=2 head=2147483648 next=1 tail=1093249311 result=0
+schema=1 mono_ns=433358807271733 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=7169 last=0 frame_id=0 server=7 client=7 inflight=2
+schema=1 mono_ns=433358807272903 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=8 shown=1 queued_bytes=0 client=7 terminal=1 bytes=14
+schema=1 mono_ns=433358807283523 pid=1004 tid=136760483820928 event=wire_tx seq=230 cmd=12 frame=8 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433358807285533 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=8 server=7 client=7 inflight=2
+schema=1 mono_ns=433358805358453 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433358805365772 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433358805371832 pid=1004 tid=136760447248064 event=take frame_id=8 fifo_depth=0
+schema=1 mono_ns=433358805374832 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433358805376242 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1716 since_previous_ms=1716 refresh_ms=0
+schema=1 mono_ns=433358805377852 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=8 monitor=0
+schema=1 mono_ns=433358805380022 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433358805381002 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433358805576865 pid=1004 tid=136760447248064 event=feedend sequence=8 main=1 monitor=0
+schema=1 mono_ns=433358805614233 pid=1004 tid=136760447248064 event=feedend sequence=8 main=0 monitor=0
+schema=1 mono_ns=433358805617073 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=8 monitor=0
+schema=1 mono_ns=433358806867408 pid=1004 tid=136760447248064 event=outfirst sequence=8 main=0 bytes=7141 monitor=0
+schema=1 mono_ns=433358806934336 pid=1004 tid=136760447248064 event=outfirst sequence=8 main=1 bytes=3495 monitor=0
+schema=1 mono_ns=433358806943815 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433358806945065 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433358806945995 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433358806946235 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433358806997943 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433358806998283 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=8 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433358807003743 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433358807004263 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433358807020792 pid=1004 tid=136760447248064 event=emit_beg frame_id=8 monitor=0
+schema=1 mono_ns=433358807023852 pid=1004 tid=136760447248064 event=video_cmd frame_id=8 view=1 bytes=3513
+schema=1 mono_ns=433358807037202 pid=1004 tid=136760447248064 event=video_cmd frame_id=8 view=2 bytes=7127
+schema=1 mono_ns=433358807037772 pid=1004 tid=136760447248064 event=emit_end frame_id=8 monitor=0
+schema=1 mono_ns=433358807063721 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433358807065231 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433358825536272 pid=1004 tid=136760483820928 event=wire_rx seq=10 cmd=13 flags=0 pdu_bytes=20 last_tx=230 frame_context=0
+schema=1 mono_ns=433358825537841 pid=1004 tid=136760483820928 event=wire_ack rx_seq=10 frame=8 queue_depth=0 decoded=9 last_tx=230
+schema=1 mono_ns=433358825538641 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=8 queue_depth=0 decoded=9 server=8 ack_offset=0
+schema=1 mono_ns=433358825539581 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=8 slot_frontier=8 region_frontier=8 client=8 egress=8 absorbed=8 window=1
+schema=1 mono_ns=433360522354532 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=9 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433360522360142 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=9 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433360522362571 pid=1004 tid=136760483820928 event=enq frame_id=9 fifo_depth=1
+schema=1 mono_ns=433360522848544 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=9 slot_frontier=9 region_frontier=8 client=8 egress=8 absorbed=9 window=1
+schema=1 mono_ns=433360524090549 pid=1004 tid=136760483820928 event=wire_tx seq=231 cmd=11 frame=9 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433360524093069 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=8 client=8 inflight=2
+schema=1 mono_ns=433360524119498 pid=1004 tid=136760483820928 event=wire_tx seq=232 cmd=1 frame=9 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3691 pdu_bytes=3716 wire_bytes=3733 segments=2 head=1073745511 next=1 tail=1485860767 result=0
+schema=1 mono_ns=433360524121518 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3733 last=0 frame_id=0 server=8 client=8 inflight=2
+schema=1 mono_ns=433360524135787 pid=1004 tid=136760483820928 event=wire_tx seq=233 cmd=1 frame=9 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=6649 pdu_bytes=6674 wire_bytes=6691 segments=2 head=2147483648 next=1 tail=2156645582 result=0
+schema=1 mono_ns=433360524136697 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=6691 last=0 frame_id=0 server=8 client=8 inflight=2
+schema=1 mono_ns=433360524137277 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=9 shown=1 queued_bytes=0 client=8 terminal=1 bytes=14
+schema=1 mono_ns=433360524143197 pid=1004 tid=136760483820928 event=wire_tx seq=234 cmd=12 frame=9 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433360524144117 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=9 server=8 client=8 inflight=2
+schema=1 mono_ns=433360522398770 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433360522404720 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433360522410640 pid=1004 tid=136760447248064 event=take frame_id=9 fifo_depth=0
+schema=1 mono_ns=433360522413680 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433360522415250 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1717 since_previous_ms=1717 refresh_ms=0
+schema=1 mono_ns=433360522416859 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=9 monitor=0
+schema=1 mono_ns=433360522419089 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433360522420029 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433360522607863 pid=1004 tid=136760447248064 event=feedend sequence=9 main=1 monitor=0
+schema=1 mono_ns=433360522763807 pid=1004 tid=136760447248064 event=feedend sequence=9 main=0 monitor=0
+schema=1 mono_ns=433360522783556 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=9 monitor=0
+schema=1 mono_ns=433360523822399 pid=1004 tid=136760447248064 event=outfirst sequence=9 main=0 bytes=6661 monitor=0
+schema=1 mono_ns=433360523834838 pid=1004 tid=136760447248064 event=outfirst sequence=9 main=1 bytes=3673 monitor=0
+schema=1 mono_ns=433360523838068 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433360523839158 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433360523840268 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433360523840698 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433360523900696 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433360523901046 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=9 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433360523901676 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433360523901946 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433360523916185 pid=1004 tid=136760447248064 event=emit_beg frame_id=9 monitor=0
+schema=1 mono_ns=433360523919125 pid=1004 tid=136760447248064 event=video_cmd frame_id=9 view=1 bytes=3691
+schema=1 mono_ns=433360523921835 pid=1004 tid=136760447248064 event=video_cmd frame_id=9 view=2 bytes=6649
+schema=1 mono_ns=433360523922335 pid=1004 tid=136760447248064 event=emit_end frame_id=9 monitor=0
+schema=1 mono_ns=433360523950404 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433360523952134 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433360543769016 pid=1004 tid=136760483820928 event=wire_rx seq=11 cmd=13 flags=0 pdu_bytes=20 last_tx=234 frame_context=0
+schema=1 mono_ns=433360543770536 pid=1004 tid=136760483820928 event=wire_ack rx_seq=11 frame=9 queue_depth=0 decoded=10 last_tx=234
+schema=1 mono_ns=433360543771396 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=9 queue_depth=0 decoded=10 server=9 ack_offset=0
+schema=1 mono_ns=433360543772526 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=9 slot_frontier=9 region_frontier=9 client=9 egress=9 absorbed=9 window=1
+schema=1 mono_ns=433362239169488 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=10 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433362239176928 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=10 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433362239180788 pid=1004 tid=136760483820928 event=enq frame_id=10 fifo_depth=1
+schema=1 mono_ns=433362239857713 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=10 slot_frontier=10 region_frontier=9 client=9 egress=9 absorbed=10 window=1
+schema=1 mono_ns=433362241331710 pid=1004 tid=136760483820928 event=wire_tx seq=235 cmd=11 frame=10 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433362241333770 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=9 client=9 inflight=2
+schema=1 mono_ns=433362241355229 pid=1004 tid=136760483820928 event=wire_tx seq=236 cmd=1 frame=10 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=2431 pdu_bytes=2456 wire_bytes=2473 segments=2 head=1073744251 next=1 tail=2157730893 result=0
+schema=1 mono_ns=433362241356919 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=2473 last=0 frame_id=0 server=9 client=9 inflight=2
+schema=1 mono_ns=433362241372798 pid=1004 tid=136760483820928 event=wire_tx seq=237 cmd=1 frame=10 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3674 pdu_bytes=3699 wire_bytes=3716 segments=2 head=2147483648 next=1 tail=2159280192 result=0
+schema=1 mono_ns=433362241373698 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3716 last=0 frame_id=0 server=9 client=9 inflight=2
+schema=1 mono_ns=433362241374128 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=10 shown=1 queued_bytes=0 client=9 terminal=1 bytes=14
+schema=1 mono_ns=433362241379488 pid=1004 tid=136760483820928 event=wire_tx seq=238 cmd=12 frame=10 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433362241380338 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=10 server=9 client=9 inflight=2
+schema=1 mono_ns=433362239219886 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433362239225536 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433362239230806 pid=1004 tid=136760447248064 event=take frame_id=10 fifo_depth=0
+schema=1 mono_ns=433362239234176 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433362239235626 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1717 since_previous_ms=1717 refresh_ms=0
+schema=1 mono_ns=433362239237276 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=10 monitor=0
+schema=1 mono_ns=433362239239405 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433362239240325 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433362239814285 pid=1004 tid=136760447248064 event=feedend sequence=10 main=1 monitor=0
+schema=1 mono_ns=433362239821814 pid=1004 tid=136760447248064 event=feedend sequence=10 main=0 monitor=0
+schema=1 mono_ns=433362239823364 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=10 monitor=0
+schema=1 mono_ns=433362240692783 pid=1004 tid=136760447248064 event=outfirst sequence=10 main=0 bytes=3688 monitor=0
+schema=1 mono_ns=433362241101848 pid=1004 tid=136760447248064 event=outfirst sequence=10 main=1 bytes=2413 monitor=0
+schema=1 mono_ns=433362241107758 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433362241109108 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433362241110128 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433362241110678 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433362241182065 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433362241182635 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=10 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433362241184125 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433362241184675 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433362241217034 pid=1004 tid=136760447248064 event=emit_beg frame_id=10 monitor=0
+schema=1 mono_ns=433362241220504 pid=1004 tid=136760447248064 event=video_cmd frame_id=10 view=1 bytes=2431
+schema=1 mono_ns=433362241224233 pid=1004 tid=136760447248064 event=video_cmd frame_id=10 view=2 bytes=3674
+schema=1 mono_ns=433362241225293 pid=1004 tid=136760447248064 event=emit_end frame_id=10 monitor=0
+schema=1 mono_ns=433362241268672 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433362241270402 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433362260791185 pid=1004 tid=136760483820928 event=wire_rx seq=12 cmd=13 flags=0 pdu_bytes=20 last_tx=238 frame_context=0
+schema=1 mono_ns=433362260792925 pid=1004 tid=136760483820928 event=wire_ack rx_seq=12 frame=10 queue_depth=0 decoded=11 last_tx=238
+schema=1 mono_ns=433362260793625 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=10 queue_depth=0 decoded=11 server=10 ack_offset=0
+schema=1 mono_ns=433362260794655 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=10 slot_frontier=10 region_frontier=10 client=10 egress=10 absorbed=10 window=1
+schema=1 mono_ns=433363954776668 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=11 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433363954784108 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=11 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433363954787948 pid=1004 tid=136760483820928 event=enq frame_id=11 fifo_depth=1
+schema=1 mono_ns=433363955727384 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=11 slot_frontier=11 region_frontier=10 client=10 egress=10 absorbed=11 window=1
+schema=1 mono_ns=433363957256138 pid=1004 tid=136760483820928 event=wire_tx seq=239 cmd=11 frame=11 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433363957261608 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=10 client=10 inflight=2
+schema=1 mono_ns=433363957305597 pid=1004 tid=136760483820928 event=wire_tx seq=240 cmd=1 frame=11 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3574 pdu_bytes=3599 wire_bytes=3616 segments=2 head=1073745394 next=1 tail=3249355450 result=0
+schema=1 mono_ns=433363957309296 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3616 last=0 frame_id=0 server=10 client=10 inflight=2
+schema=1 mono_ns=433363957353335 pid=1004 tid=136760483820928 event=wire_tx seq=241 cmd=1 frame=11 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=6572 pdu_bytes=6597 wire_bytes=6614 segments=2 head=2147483648 next=1 tail=2173164238 result=0
+schema=1 mono_ns=433363957355435 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=6614 last=0 frame_id=0 server=10 client=10 inflight=2
+schema=1 mono_ns=433363957356485 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=11 shown=1 queued_bytes=0 client=10 terminal=1 bytes=14
+schema=1 mono_ns=433363957381494 pid=1004 tid=136760483820928 event=wire_tx seq=242 cmd=12 frame=11 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433363957383554 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=11 server=10 client=10 inflight=2
+schema=1 mono_ns=433363954804327 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433363954808337 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433363954811667 pid=1004 tid=136760447248064 event=take frame_id=11 fifo_depth=0
+schema=1 mono_ns=433363954814227 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433363954815177 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1715 since_previous_ms=1715 refresh_ms=0
+schema=1 mono_ns=433363954816077 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=11 monitor=0
+schema=1 mono_ns=433363954817427 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433363954817967 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433363954975211 pid=1004 tid=136760447248064 event=feedend sequence=11 main=1 monitor=0
+schema=1 mono_ns=433363955680685 pid=1004 tid=136760447248064 event=feedend sequence=11 main=0 monitor=0
+schema=1 mono_ns=433363955691945 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=11 monitor=0
+schema=1 mono_ns=433363956156558 pid=1004 tid=136760447248064 event=outfirst sequence=11 main=1 bytes=3556 monitor=0
+schema=1 mono_ns=433363956883782 pid=1004 tid=136760447248064 event=outfirst sequence=11 main=0 bytes=6584 monitor=0
+schema=1 mono_ns=433363956889602 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433363956891212 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433363956892512 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433363956893052 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433363956988898 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433363956989488 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=11 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433363956991018 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433363956991748 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433363957041106 pid=1004 tid=136760447248064 event=emit_beg frame_id=11 monitor=0
+schema=1 mono_ns=433363957046426 pid=1004 tid=136760447248064 event=video_cmd frame_id=11 view=1 bytes=3574
+schema=1 mono_ns=433363957051556 pid=1004 tid=136760447248064 event=video_cmd frame_id=11 view=2 bytes=6572
+schema=1 mono_ns=433363957052716 pid=1004 tid=136760447248064 event=emit_end frame_id=11 monitor=0
+schema=1 mono_ns=433363957090544 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433363957092564 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433363977969008 pid=1004 tid=136760483820928 event=wire_rx seq=13 cmd=13 flags=0 pdu_bytes=20 last_tx=242 frame_context=0
+schema=1 mono_ns=433363977971028 pid=1004 tid=136760483820928 event=wire_ack rx_seq=13 frame=11 queue_depth=0 decoded=12 last_tx=242
+schema=1 mono_ns=433363977971898 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=11 queue_depth=0 decoded=12 server=11 ack_offset=0
+schema=1 mono_ns=433363977973158 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=11 slot_frontier=11 region_frontier=11 client=11 egress=11 absorbed=11 window=1
+schema=1 mono_ns=433365671453229 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=12 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433365671460949 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=12 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433365671464809 pid=1004 tid=136760483820928 event=enq frame_id=12 fifo_depth=1
+schema=1 mono_ns=433365671938011 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=12 slot_frontier=12 region_frontier=11 client=11 egress=11 absorbed=12 window=1
+schema=1 mono_ns=433365673257324 pid=1004 tid=136760483820928 event=wire_tx seq=243 cmd=11 frame=12 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433365673259624 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=11 client=11 inflight=2
+schema=1 mono_ns=433365673285843 pid=1004 tid=136760483820928 event=wire_tx seq=244 cmd=1 frame=12 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3870 pdu_bytes=3895 wire_bytes=3912 segments=2 head=1073745690 next=1 tail=4039785078 result=0
+schema=1 mono_ns=433365673287583 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3912 last=0 frame_id=0 server=11 client=11 inflight=2
+schema=1 mono_ns=433365673305042 pid=1004 tid=136760483820928 event=wire_tx seq=245 cmd=1 frame=12 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=7142 pdu_bytes=7167 wire_bytes=7184 segments=2 head=2147483648 next=1 tail=1076472095 result=0
+schema=1 mono_ns=433365673305962 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=7184 last=0 frame_id=0 server=11 client=11 inflight=2
+schema=1 mono_ns=433365673306542 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=12 shown=1 queued_bytes=0 client=11 terminal=1 bytes=14
+schema=1 mono_ns=433365673309012 pid=1004 tid=136760483820928 event=wire_tx seq=246 cmd=12 frame=12 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433365673309932 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=12 server=11 client=11 inflight=2
+schema=1 mono_ns=433365671498787 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433365671504387 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433365671510617 pid=1004 tid=136760447248064 event=take frame_id=12 fifo_depth=0
+schema=1 mono_ns=433365671514307 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433365671515957 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1717 since_previous_ms=1717 refresh_ms=0
+schema=1 mono_ns=433365671517817 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=12 monitor=0
+schema=1 mono_ns=433365671520007 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433365671520967 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433365671706810 pid=1004 tid=136760447248064 event=feedend sequence=12 main=1 monitor=0
+schema=1 mono_ns=433365671865154 pid=1004 tid=136760447248064 event=feedend sequence=12 main=0 monitor=0
+schema=1 mono_ns=433365671884793 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=12 monitor=0
+schema=1 mono_ns=433365672815300 pid=1004 tid=136760447248064 event=outfirst sequence=12 main=1 bytes=3852 monitor=0
+schema=1 mono_ns=433365673018442 pid=1004 tid=136760447248064 event=outfirst sequence=12 main=0 bytes=7156 monitor=0
+schema=1 mono_ns=433365673021372 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433365673022412 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433365673023342 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433365673023882 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433365673088510 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433365673088880 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=12 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433365673089900 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433365673090270 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433365673104249 pid=1004 tid=136760447248064 event=emit_beg frame_id=12 monitor=0
+schema=1 mono_ns=433365673107709 pid=1004 tid=136760447248064 event=video_cmd frame_id=12 view=1 bytes=3870
+schema=1 mono_ns=433365673110799 pid=1004 tid=136760447248064 event=video_cmd frame_id=12 view=2 bytes=7142
+schema=1 mono_ns=433365673111369 pid=1004 tid=136760447248064 event=emit_end frame_id=12 monitor=0
+schema=1 mono_ns=433365673143038 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433365673144478 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433365692108341 pid=1004 tid=136760483820928 event=wire_rx seq=14 cmd=13 flags=0 pdu_bytes=20 last_tx=246 frame_context=0
+schema=1 mono_ns=433365692109691 pid=1004 tid=136760483820928 event=wire_ack rx_seq=14 frame=12 queue_depth=0 decoded=13 last_tx=246
+schema=1 mono_ns=433365692110291 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=12 queue_depth=0 decoded=13 server=12 ack_offset=0
+schema=1 mono_ns=433365692111240 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=12 slot_frontier=12 region_frontier=12 client=12 egress=12 absorbed=12 window=1
+schema=1 mono_ns=433367405284618 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=13 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433367405292237 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=13 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433367405296057 pid=1004 tid=136760483820928 event=enq frame_id=13 fifo_depth=1
+schema=1 mono_ns=433367405584567 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=13 slot_frontier=13 region_frontier=12 client=12 egress=12 absorbed=13 window=1
+schema=1 mono_ns=433367406798773 pid=1004 tid=136760483820928 event=wire_tx seq=247 cmd=11 frame=13 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433367406801093 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=12 client=12 inflight=2
+schema=1 mono_ns=433367406828062 pid=1004 tid=136760483820928 event=wire_tx seq=248 cmd=1 frame=13 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3416 pdu_bytes=3441 wire_bytes=3458 segments=2 head=1073745236 next=1 tail=1086663815 result=0
+schema=1 mono_ns=433367406829712 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3458 last=0 frame_id=0 server=12 client=12 inflight=2
+schema=1 mono_ns=433367406847311 pid=1004 tid=136760483820928 event=wire_tx seq=249 cmd=1 frame=13 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=6658 pdu_bytes=6683 wire_bytes=6700 segments=2 head=2147483648 next=1 tail=2156645582 result=0
+schema=1 mono_ns=433367406848201 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=6700 last=0 frame_id=0 server=12 client=12 inflight=2
+schema=1 mono_ns=433367406848621 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=13 shown=1 queued_bytes=0 client=12 terminal=1 bytes=14
+schema=1 mono_ns=433367406856831 pid=1004 tid=136760483820928 event=wire_tx seq=250 cmd=12 frame=13 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433367406857601 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=13 server=12 client=12 inflight=2
+schema=1 mono_ns=433367405315677 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433367405318986 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433367405322236 pid=1004 tid=136760447248064 event=take frame_id=13 fifo_depth=0
+schema=1 mono_ns=433367405324666 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433367405325596 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1734 since_previous_ms=1734 refresh_ms=0
+schema=1 mono_ns=433367405326406 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=13 monitor=0
+schema=1 mono_ns=433367405328076 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433367405328476 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433367405477751 pid=1004 tid=136760447248064 event=feedend sequence=13 main=1 monitor=0
+schema=1 mono_ns=433367405547088 pid=1004 tid=136760447248064 event=feedend sequence=13 main=0 monitor=0
+schema=1 mono_ns=433367405548448 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=13 monitor=0
+schema=1 mono_ns=433367406615440 pid=1004 tid=136760447248064 event=outfirst sequence=13 main=0 bytes=6670 monitor=0
+schema=1 mono_ns=433367406638139 pid=1004 tid=136760447248064 event=outfirst sequence=13 main=1 bytes=3398 monitor=0
+schema=1 mono_ns=433367406639589 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433367406640079 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433367406640689 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433367406640909 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433367406690657 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433367406690937 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=13 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433367406691577 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433367406691827 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433367406703076 pid=1004 tid=136760447248064 event=emit_beg frame_id=13 monitor=0
+schema=1 mono_ns=433367406705616 pid=1004 tid=136760447248064 event=video_cmd frame_id=13 view=1 bytes=3416
+schema=1 mono_ns=433367406708506 pid=1004 tid=136760447248064 event=video_cmd frame_id=13 view=2 bytes=6658
+schema=1 mono_ns=433367406709066 pid=1004 tid=136760447248064 event=emit_end frame_id=13 monitor=0
+schema=1 mono_ns=433367406739935 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433367406740815 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433367426969282 pid=1004 tid=136760483820928 event=wire_rx seq=15 cmd=13 flags=0 pdu_bytes=20 last_tx=250 frame_context=0
+schema=1 mono_ns=433367426970882 pid=1004 tid=136760483820928 event=wire_ack rx_seq=15 frame=13 queue_depth=0 decoded=14 last_tx=250
+schema=1 mono_ns=433367426971712 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=13 queue_depth=0 decoded=14 server=13 ack_offset=0
+schema=1 mono_ns=433367426972612 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=13 slot_frontier=13 region_frontier=13 client=13 egress=13 absorbed=13 window=1
+schema=1 mono_ns=433369120467470 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=14 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433369120473660 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=14 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433369120476140 pid=1004 tid=136760483820928 event=enq frame_id=14 fifo_depth=1
+schema=1 mono_ns=433369120898305 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=14 slot_frontier=14 region_frontier=13 client=13 egress=13 absorbed=14 window=1
+schema=1 mono_ns=433369120491409 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433369120494779 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433369120498189 pid=1004 tid=136760447248064 event=take frame_id=14 fifo_depth=0
+schema=1 mono_ns=433369120500479 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433369120501419 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1715 since_previous_ms=1715 refresh_ms=0
+schema=1 mono_ns=433369120502319 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=14 monitor=0
+schema=1 mono_ns=433369120503849 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433369120504489 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433369120635734 pid=1004 tid=136760447248064 event=feedend sequence=14 main=1 monitor=0
+schema=1 mono_ns=433369120802658 pid=1004 tid=136760447248064 event=feedend sequence=14 main=0 monitor=0
+schema=1 mono_ns=433369120826797 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=14 monitor=0
+schema=1 mono_ns=433369122241476 pid=1004 tid=136760483820928 event=wire_tx seq=251 cmd=11 frame=14 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433369122243956 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=13 client=13 inflight=2
+schema=1 mono_ns=433369122265965 pid=1004 tid=136760483820928 event=wire_tx seq=252 cmd=1 frame=14 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=2401 pdu_bytes=2426 wire_bytes=2443 segments=2 head=1073744221 next=1 tail=3385447764 result=0
+schema=1 mono_ns=433369122268655 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=2443 last=0 frame_id=0 server=13 client=13 inflight=2
+schema=1 mono_ns=433369122291834 pid=1004 tid=136760483820928 event=wire_tx seq=253 cmd=1 frame=14 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3674 pdu_bytes=3699 wire_bytes=3716 segments=2 head=2147483648 next=1 tail=2176057408 result=0
+schema=1 mono_ns=433369122292854 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3716 last=0 frame_id=0 server=13 client=13 inflight=2
+schema=1 mono_ns=433369122293594 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=14 shown=1 queued_bytes=0 client=13 terminal=1 bytes=14
+schema=1 mono_ns=433369122299254 pid=1004 tid=136760483820928 event=wire_tx seq=254 cmd=12 frame=14 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433369122300194 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=14 server=13 client=13 inflight=2
+schema=1 mono_ns=433369121844110 pid=1004 tid=136760447248064 event=outfirst sequence=14 main=0 bytes=3688 monitor=0
+schema=1 mono_ns=433369121958236 pid=1004 tid=136760447248064 event=outfirst sequence=14 main=1 bytes=2383 monitor=0
+schema=1 mono_ns=433369121962376 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433369121963756 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433369121965136 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433369121965646 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433369122047093 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433369122047673 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=14 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433369122049293 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433369122049993 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433369122070972 pid=1004 tid=136760447248064 event=emit_beg frame_id=14 monitor=0
+schema=1 mono_ns=433369122075172 pid=1004 tid=136760447248064 event=video_cmd frame_id=14 view=1 bytes=2401
+schema=1 mono_ns=433369122078682 pid=1004 tid=136760447248064 event=video_cmd frame_id=14 view=2 bytes=3674
+schema=1 mono_ns=433369122079792 pid=1004 tid=136760447248064 event=emit_end frame_id=14 monitor=0
+schema=1 mono_ns=433369122112171 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433369122114161 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433369140723316 pid=1004 tid=136760483820928 event=wire_rx seq=16 cmd=13 flags=0 pdu_bytes=20 last_tx=254 frame_context=0
+schema=1 mono_ns=433369140725456 pid=1004 tid=136760483820928 event=wire_ack rx_seq=16 frame=14 queue_depth=0 decoded=15 last_tx=254
+schema=1 mono_ns=433369140726236 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=14 queue_depth=0 decoded=15 server=14 ack_offset=0
+schema=1 mono_ns=433369140727336 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=14 slot_frontier=14 region_frontier=14 client=14 egress=14 absorbed=14 window=1
+schema=1 mono_ns=433369271145970 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=15 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433369271151790 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=15 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433369271154480 pid=1004 tid=136760483820928 event=enq frame_id=15 fifo_depth=1
+schema=1 mono_ns=433369271990820 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=15 slot_frontier=15 region_frontier=14 client=14 egress=14 absorbed=15 window=1
+schema=1 mono_ns=433369271203318 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433369271210218 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433369271216078 pid=1004 tid=136760447248064 event=take frame_id=15 fifo_depth=0
+schema=1 mono_ns=433369271219188 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433369271220858 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=151 since_previous_ms=151 refresh_ms=0
+schema=1 mono_ns=433369271222458 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=15 monitor=0
+schema=1 mono_ns=433369271224638 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433369271225567 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433369271947871 pid=1004 tid=136760447248064 event=feedend sequence=15 main=1 monitor=0
+schema=1 mono_ns=433369271953281 pid=1004 tid=136760447248064 event=feedend sequence=15 main=0 monitor=0
+schema=1 mono_ns=433369271955221 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=15 monitor=0
+schema=1 mono_ns=433369273495735 pid=1004 tid=136760483820928 event=wire_tx seq=255 cmd=11 frame=15 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433369273499375 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=14 client=14 inflight=2
+schema=1 mono_ns=433369273517524 pid=1004 tid=136760483820928 event=wire_tx seq=256 cmd=1 frame=15 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=412 pdu_bytes=437 wire_bytes=454 segments=2 head=1073742232 next=1 tail=3784245251 result=0
+schema=1 mono_ns=433369273520614 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=454 last=0 frame_id=0 server=14 client=14 inflight=2
+schema=1 mono_ns=433369273557373 pid=1004 tid=136760483820928 event=wire_tx seq=257 cmd=1 frame=15 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=3671 pdu_bytes=3696 wire_bytes=3713 segments=2 head=2147483648 next=1 tail=2176057408 result=0
+schema=1 mono_ns=433369273559333 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=3713 last=0 frame_id=0 server=14 client=14 inflight=2
+schema=1 mono_ns=433369273560323 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=15 shown=1 queued_bytes=0 client=14 terminal=1 bytes=14
+schema=1 mono_ns=433369273570482 pid=1004 tid=136760483820928 event=wire_tx seq=258 cmd=12 frame=15 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433369273572012 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=15 server=14 client=14 inflight=2
+schema=1 mono_ns=433369273036182 pid=1004 tid=136760447248064 event=outfirst sequence=15 main=1 bytes=394 monitor=0
+schema=1 mono_ns=433369273171537 pid=1004 tid=136760447248064 event=outfirst sequence=15 main=0 bytes=3683 monitor=0
+schema=1 mono_ns=433369273176027 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433369273177267 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433369273178277 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433369273178707 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433369273241804 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433369273242324 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=15 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433369273243544 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433369273244044 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433369273267373 pid=1004 tid=136760447248064 event=emit_beg frame_id=15 monitor=0
+schema=1 mono_ns=433369273270833 pid=1004 tid=136760447248064 event=video_cmd frame_id=15 view=1 bytes=412
+schema=1 mono_ns=433369273273993 pid=1004 tid=136760447248064 event=video_cmd frame_id=15 view=2 bytes=3671
+schema=1 mono_ns=433369273275113 pid=1004 tid=136760447248064 event=emit_end frame_id=15 monitor=0
+schema=1 mono_ns=433369273322931 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433369273324481 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433369293332287 pid=1004 tid=136760483820928 event=wire_rx seq=17 cmd=13 flags=0 pdu_bytes=20 last_tx=258 frame_context=0
+schema=1 mono_ns=433369293334416 pid=1004 tid=136760483820928 event=wire_ack rx_seq=17 frame=15 queue_depth=0 decoded=16 last_tx=258
+schema=1 mono_ns=433369293335346 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=15 queue_depth=0 decoded=16 server=15 ack_offset=0
+schema=1 mono_ns=433369293336336 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=15 slot_frontier=15 region_frontier=15 client=15 egress=15 absorbed=15 window=1
+schema=1 mono_ns=433370853520786 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=16 monitor=0 slot=1 bytes=4718592
+schema=1 mono_ns=433370853525346 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=16 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433370853527936 pid=1004 tid=136760483820928 event=enq frame_id=16 fifo_depth=1
+schema=1 mono_ns=433370853829855 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=16 slot_frontier=16 region_frontier=15 client=15 egress=15 absorbed=16 window=1
+schema=1 mono_ns=433370856706770 pid=1004 tid=136760483820928 event=wire_tx seq=259 cmd=11 frame=16 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433370856708710 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=15 client=15 inflight=2
+schema=1 mono_ns=433370856897914 pid=1004 tid=136760483820928 event=wire_tx seq=260 cmd=1 frame=16 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=56409 pdu_bytes=56434 wire_bytes=56451 segments=2 head=1073798229 next=1 tail=2773558902 result=0
+schema=1 mono_ns=433370856899614 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=56451 last=0 frame_id=0 server=15 client=15 inflight=2
+schema=1 mono_ns=433370857141275 pid=1004 tid=136760483820928 event=wire_tx seq=261 cmd=1 frame=16 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=74845 pdu_bytes=74870 wire_bytes=74892 segments=3 head=2147483648 next=1 tail=2440637161 result=0
+schema=1 mono_ns=433370857142315 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=74892 last=0 frame_id=0 server=15 client=15 inflight=2
+schema=1 mono_ns=433370857143205 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=16 shown=1 queued_bytes=0 client=15 terminal=1 bytes=14
+schema=1 mono_ns=433370857148495 pid=1004 tid=136760483820928 event=wire_tx seq=262 cmd=12 frame=16 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433370857149234 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=16 server=15 client=15 inflight=2
+schema=1 mono_ns=433370853560765 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433370853566754 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433370853572254 pid=1004 tid=136760447248064 event=take frame_id=16 fifo_depth=0
+schema=1 mono_ns=433370853575594 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433370853577204 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=1582 since_previous_ms=1582 refresh_ms=0
+schema=1 mono_ns=433370853578784 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=16 monitor=0
+schema=1 mono_ns=433370853580974 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433370853581954 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433370853805076 pid=1004 tid=136760447248064 event=feedend sequence=16 main=1 monitor=0
+schema=1 mono_ns=433370853814685 pid=1004 tid=136760447248064 event=feedend sequence=16 main=0 monitor=0
+schema=1 mono_ns=433370853817705 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=16 monitor=0
+schema=1 mono_ns=433370855915099 pid=1004 tid=136760447248064 event=outfirst sequence=16 main=0 bytes=74863 monitor=0
+schema=1 mono_ns=433370856303425 pid=1004 tid=136760447248064 event=outfirst sequence=16 main=1 bytes=56391 monitor=0
+schema=1 mono_ns=433370856305195 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433370856305685 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433370856306365 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433370856306715 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433370856578305 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433370856578575 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=16 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433370856579375 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433370856579615 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433370856585275 pid=1004 tid=136760447248064 event=emit_beg frame_id=16 monitor=0
+schema=1 mono_ns=433370856600574 pid=1004 tid=136760447248064 event=video_cmd frame_id=16 view=1 bytes=56409
+schema=1 mono_ns=433370856617064 pid=1004 tid=136760447248064 event=video_cmd frame_id=16 view=2 bytes=74845
+schema=1 mono_ns=433370856617644 pid=1004 tid=136760447248064 event=emit_end frame_id=16 monitor=0
+schema=1 mono_ns=433370856657002 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433370856658022 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433370886881677 pid=1004 tid=136760483820928 event=wire_rx seq=18 cmd=13 flags=0 pdu_bytes=20 last_tx=262 frame_context=0
+schema=1 mono_ns=433370886883377 pid=1004 tid=136760483820928 event=wire_ack rx_seq=18 frame=16 queue_depth=0 decoded=17 last_tx=262
+schema=1 mono_ns=433370886884027 pid=1004 tid=136760483820928 event=ack class=GFX_TRACE frame=16 queue_depth=0 decoded=17 server=16 ack_offset=0
+schema=1 mono_ns=433370886884987 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=region frame=16 slot_frontier=16 region_frontier=16 client=16 egress=16 absorbed=16 window=1
+schema=1 mono_ns=433373256077882 pid=1004 tid=136760483820928 event=msgin class=ACK_TRACE frame=17 monitor=0 slot=0 bytes=4718592
+schema=1 mono_ns=433373256080672 pid=1004 tid=136760483820928 event=dmg class=GFX_TRACE surface=17 num_rects=1 x1=0 y1=0 x2=1024 y2=768
+schema=1 mono_ns=433373256082972 pid=1004 tid=136760483820928 event=enq frame_id=17 fifo_depth=1
+schema=1 mono_ns=433373256328903 pid=1004 tid=136760483820928 event=ack class=ACK_TRACE kind=slot frame=17 slot_frontier=17 region_frontier=16 client=16 egress=16 absorbed=17 window=1
+schema=1 mono_ns=433373258352080 pid=1004 tid=136760483820928 event=wire_tx seq=263 cmd=11 frame=17 surface=-1 x=-1 y=-1 pdu_bytes=16 wire_bytes=18 result=0
+schema=1 mono_ns=433373258354890 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=18 last=0 frame_id=0 server=16 client=16 inflight=2
+schema=1 mono_ns=433373258406468 pid=1004 tid=136760483820928 event=wire_tx seq=264 cmd=1 frame=17 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=4363 pdu_bytes=4388 wire_bytes=4405 segments=2 head=1073746183 next=1 tail=268264383 result=0
+schema=1 mono_ns=433373258408718 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=4405 last=0 frame_id=0 server=16 client=16 inflight=2
+schema=1 mono_ns=433373258540563 pid=1004 tid=136760483820928 event=wire_tx seq=265 cmd=1 frame=17 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=1 payload_bytes=71930 pdu_bytes=71955 wire_bytes=71977 segments=3 head=2147483648 next=1 tail=3292547723 result=0
+schema=1 mono_ns=433373258542053 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=71977 last=0 frame_id=0 server=16 client=16 inflight=2
+schema=1 mono_ns=433373258543203 pid=1004 tid=136760483820928 event=egress class=ACK_TRACE frame=17 shown=1 queued_bytes=0 client=16 terminal=1 bytes=14
+schema=1 mono_ns=433373258546793 pid=1004 tid=136760483820928 event=wire_tx seq=266 cmd=12 frame=17 surface=-1 x=-1 y=-1 pdu_bytes=12 wire_bytes=14 result=0
+schema=1 mono_ns=433373258548073 pid=1004 tid=136760483820928 event=send class=GFX_TRACE bytes=14 last=1 frame_id=17 server=16 client=16 inflight=2
+schema=1 mono_ns=433373256095502 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433373256098431 pid=1004 tid=136760447248064 event=drain_beg n_items=1 drain_full=1
+schema=1 mono_ns=433373256102331 pid=1004 tid=136760447248064 event=take frame_id=17 fifo_depth=0
+schema=1 mono_ns=433373256105021 pid=1004 tid=136760447248064 event=subm_beg set_n=1
+schema=1 mono_ns=433373256106291 pid=1004 tid=136760447248064 event=auxdue monitor=0 due=1 since_aux_ms=2403 since_previous_ms=2403 refresh_ms=0
+schema=1 mono_ns=433373256107511 pid=1004 tid=136760447248064 event=submit class=ACK_TRACE frame=17 monitor=0
+schema=1 mono_ns=433373256109561 pid=1004 tid=136760447248064 event=subm_end n_handles=1
+schema=1 mono_ns=433373256110141 pid=1004 tid=136760447248064 event=pump_beg n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433373256272475 pid=1004 tid=136760447248064 event=feedend sequence=17 main=1 monitor=0
+schema=1 mono_ns=433373256315344 pid=1004 tid=136760447248064 event=feedend sequence=17 main=0 monitor=0
+schema=1 mono_ns=433373256317474 pid=1004 tid=136760447248064 event=absorb class=ACK_TRACE frame=17 monitor=0
+schema=1 mono_ns=433373257887827 pid=1004 tid=136760447248064 event=outfirst sequence=17 main=1 bytes=4345 monitor=0
+schema=1 mono_ns=433373257906986 pid=1004 tid=136760447248064 event=outfirst sequence=17 main=0 bytes=71944 monitor=0
+schema=1 mono_ns=433373257910496 pid=1004 tid=136760447248064 event=pump_end n_handles=1 kids_armed=2 monitor_mask=1 credit_mask=1 credit=1
+schema=1 mono_ns=433373257911736 pid=1004 tid=136760447248064 event=book_beg n_handles=1
+schema=1 mono_ns=433373257912946 pid=1004 tid=136760447248064 event=book_end n_handles=1
+schema=1 mono_ns=433373257913436 pid=1004 tid=136760447248064 event=coll_beg monitor=0
+schema=1 mono_ns=433373258192816 pid=1004 tid=136760447248064 event=coll_end monitor=0
+schema=1 mono_ns=433373258193226 pid=1004 tid=136760447248064 event=batch class=GFX_TRACE cycle=17 set_n=1 monitors_armed=1 kids_armed=2 max_kids=2 rv=0
+schema=1 mono_ns=433373258194105 pid=1004 tid=136760447248064 event=rel_beg set_n=1
+schema=1 mono_ns=433373258194415 pid=1004 tid=136760447248064 event=rel_end set_n=1
+schema=1 mono_ns=433373258200875 pid=1004 tid=136760447248064 event=emit_beg frame_id=17 monitor=0
+schema=1 mono_ns=433373258204795 pid=1004 tid=136760447248064 event=video_cmd frame_id=17 view=1 bytes=4363
+schema=1 mono_ns=433373258231894 pid=1004 tid=136760447248064 event=video_cmd frame_id=17 view=2 bytes=71930
+schema=1 mono_ns=433373258232534 pid=1004 tid=136760447248064 event=emit_end frame_id=17 monitor=0
+schema=1 mono_ns=433373258255413 pid=1004 tid=136760447248064 event=drain_end n_items=0 drain_full=1
+schema=1 mono_ns=433373258257273 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433373275161001 pid=1004 tid=136760447248064 event=wait_end
+schema=1 mono_ns=433373275166651 pid=1004 tid=136760447248064 event=wait_beg n_items=0 drain_full=0
+schema=1 mono_ns=433373281588848 pid=1004 tid=136760483820928 event=wire_tx seq=267 cmd=10 frame=0 surface=0 x=-1 y=-1 pdu_bytes=10 wire_bytes=12 result=0
+schema=1 mono_ns=433373280335003 pid=1004 tid=136760447248064 event=wait_end

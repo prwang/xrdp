@@ -11,15 +11,18 @@ from perf_trace_records import read_records
 
 COMMANDS = {
     1: "write pixels to surface",
+    8: "evict cache entry",
     9: "create surface",
     10: "delete surface",
     11: "start frame",
     12: "end frame",
-    13: "confirm capabilities",
+    13: "client frame acknowledgement",
     14: "reset graphics",
     15: "map surface to output",
-    16: "client frame acknowledgement",
+    16: "client cache import offer",
     18: "client capability advertisement",
+    19: "confirm capabilities",
+    22: "client quality-of-experience acknowledgement",
 }
 
 
@@ -44,7 +47,7 @@ def load(path):
         records.extend(read_records(filename))
     records.sort(key=lambda record: (record["pid"], record["mono_ns"]))
     bad = [record for record in records
-           if record["event"] in ("perfdrop", "perfformat")]
+           if record["event"] in ("perfdrop", "perfformat", "perfnoring")]
     if bad:
         raise ValueError("%s has dropped or malformed trace records: %r" %
                          (path, bad))
@@ -78,24 +81,31 @@ def report_process(label, pid, records):
         return
     for cap in replacements:
         last_tx = cap["last_tx"]
-        preceding = next((record for record in reversed(sends)
+        prior_sends = [record for record in sends
+                       if record["mono_ns"] < cap["mono_ns"]]
+        preceding = next((record for record in reversed(prior_sends)
                           if record["seq"] == last_tx), None)
         if preceding is None:
             raise ValueError("%s pid %d capability %d names missing tx %d" %
                              (label, pid, cap["caps_seq"], last_tx))
         frame = preceding.get("frame", 0)
-        cumulative_ack = max((record["frame"] for record in acks
-                              if record["mono_ns"] < cap["mono_ns"]),
-                             default=-1)
+        latest_ack = next((record for record in reversed(acks)
+                           if record["mono_ns"] < cap["mono_ns"]), None)
         delta_ms = (cap["mono_ns"] - preceding["mono_ns"]) / 1_000_000.0
         print("  Replacement advertisement %d followed tx %d by %.3f ms; "
-              "that transaction names frame %d and the latest client "
-              "acknowledgement was frame %d." %
-              (cap["caps_seq"], last_tx, delta_ms, frame, cumulative_ack))
-        frame_sends = [record for record in sends
-                       if record.get("frame") == frame and
-                       record["seq"] <= last_tx]
-        for record in frame_sends[-8:]:
+              "that transaction names frame %d." %
+              (cap["caps_seq"], last_tx, delta_ms, frame))
+        if latest_ack is not None:
+            print("  Latest acknowledgement: frame %d, received after tx %d. "
+                  "Frame IDs may be reused; this is not an acknowledgement "
+                  "of a later transaction with the same ID." %
+                  (latest_ack["frame"], latest_ack["last_tx"]))
+        start = next((record for record in reversed(prior_sends)
+                      if record["seq"] <= last_tx and record["cmd"] == 11),
+                     preceding)
+        frame_sends = [record for record in prior_sends
+                       if start["seq"] <= record["seq"] <= last_tx]
+        for record in frame_sends:
             print(tx_description(record))
         capsets = [record for record in records
                    if record["event"] == "wire_cap" and

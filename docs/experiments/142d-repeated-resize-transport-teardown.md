@@ -1,5 +1,26 @@
 # #142D repeated-resize transport teardown
 
+## 2026-09-06 superseding observation: partial login before first resize
+
+Clean-room port 40061 received a replacement capability advertisement 10.914
+ms after its first desktop transaction at 2360x1033, before any resize. The
+last preceding ACK names the login frame ID 1, not the later desktop frame
+which reuses that ID. Surface reset and live encoder replacement then occur
+as before, but this time an actual partial producer update arrives and is
+acknowledged. That is consistent with the owner's partial image; it is not
+the older no-update 0/0/0 case. The first resize, to 2290x1033, sends two
+unacknowledged frames and is followed by channel close and TLS EOF.
+
+Development port 40060 has twenty completed resizes and no second capability
+advertisement. Offline calls into both real serializers prove that clean-room
+can round an odd visible bottom edge beyond the client surface, whereas
+development clips it. The older failing capture first re-advertises at its
+first odd-height resize. This is the current precursor hypothesis; it remains
+to be shown causally on development before correcting the callback or
+clean-room slices. Encoded-body equivalence and complete EOF causality remain
+unproven. Evidence and exact reproduction of the serializer comparison:
+[`i142c_wire_windows_20260906T145500Z`](../../PR-demo/mac_bisect_matrix/captures/i142c_wire_windows_20260906T145500Z/README.md).
+
 ## 2026-08-27 owner observation
 
 The owner reported that the corrected clean-room acceptance session on local

@@ -1,0 +1,620 @@
+[874639.282] 
+X.Org X Server 1.21.1.11
+X Protocol Version 11, Revision 0
+[874639.282] Current Operating System: Linux xrdp-x044-77bf89df47-rd44z 7.0.0-30-generic #30-Ubuntu SMP PREEMPT_DYNAMIC Fri Jul 31 18:22:54 UTC 2026 x86_64
+[874639.282] Kernel command line: BOOT_IMAGE=/boot/vmlinuz-7.0.0-30-generic root=UUID=57160d0f-44cc-4743-b564-37a702f24e67 ro crashkernel=2G-4G:320M,4G-32G:512M,32G-64G:1024M,64G-128G:2048M,128G-:4096M
+[874639.282] xorg-server 2:21.1.12-1ubuntu1.6 (For technical support please see http://www.ubuntu.com/support) 
+[874639.282] Current version of pixman: 0.42.2
+[874639.282] 	Before reporting problems, check http://wiki.x.org
+	to make sure that you have the latest version.
+[874639.282] Markers: (--) probed, (**) from config file, (==) default setting,
+	(++) from command line, (!!) notice, (II) informational,
+	(WW) warning, (EE) error, (NI) not implemented, (??) unknown.
+[874639.282] (++) Log file: ".xorgxrdp.10.log", Time: Sun Sep  6 14:45:30 2026
+[874639.283] (++) Using config file: "/etc/X11/xrdp/xorg.conf"
+[874639.283] (==) Using system config directory "/usr/share/X11/xorg.conf.d"
+[874639.283] (**) Option "defaultserverlayout" "X11 Server"
+[874639.283] (**) ServerLayout "X11 Server"
+[874639.283] (**) |-->Screen "Screen (xrdpdev)" (0)
+[874639.283] (**) |   |-->Monitor "Monitor"
+[874639.284] (**) |   |-->Device "Video Card (xrdpdev)"
+[874639.284] (**) |-->Input Device "xrdpMouse"
+[874639.284] (**) |-->Input Device "xrdpKeyboard"
+[874639.284] (**) Option "DontVTSwitch" "on"
+[874639.284] (**) Option "AutoAddDevices" "off"
+[874639.284] (**) Option "AutoAddGPU" "off"
+[874639.284] (**) Allowing byte-swapped clients
+[874639.284] (**) Not automatically adding devices
+[874639.284] (==) Automatically enabling devices
+[874639.284] (**) Not automatically adding GPU devices
+[874639.284] (==) Automatically binding GPU devices
+[874639.284] (==) Max clients allowed: 256, resource mask: 0x1fffff
+[874639.284] (WW) The directory "/usr/share/fonts/X11/cyrillic" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (WW) The directory "/usr/share/fonts/X11/100dpi/" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (WW) The directory "/usr/share/fonts/X11/75dpi/" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (WW) The directory "/usr/share/fonts/X11/Type1" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (WW) The directory "/usr/share/fonts/X11/100dpi" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (WW) The directory "/usr/share/fonts/X11/75dpi" does not exist.
+[874639.284] 	Entry deleted from font path.
+[874639.284] (==) FontPath set to:
+	/usr/share/fonts/X11/misc,
+	built-ins
+[874639.284] (==) ModulePath set to "/usr/lib/xorg/modules"
+[874639.284] (II) Loader magic: 0x645084ded020
+[874639.284] (II) Module ABI versions:
+[874639.284] 	X.Org ANSI C Emulation: 0.4
+[874639.284] 	X.Org Video Driver: 25.2
+[874639.284] 	X.Org XInput driver : 24.4
+[874639.284] 	X.Org Server Extension : 10.0
+[874639.284] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874639.285] (II) xfree86: Adding drm device (/dev/dri/card0)
+[874639.285] (II) Platform probe for /sys/devices/pci0000:00/0000:00:08.1/0000:c5:00.0/drm/card0
+[874639.290] (--) PCI:*(197@0:0:0) 1002:1586:2014:801d rev 193, Mem @ 0x9000000000/8589934592, 0x90000000/268435456, 0xa0200000/1048576, I/O @ 0x0000e000/256
+[874639.290] (II) "glx" will be loaded. This was enabled by default and also specified in the config file.
+[874639.290] (II) LoadModule: "dbe"
+[874639.290] (II) Module "dbe" already built-in
+[874639.290] (II) LoadModule: "ddc"
+[874639.290] (II) Module "ddc" already built-in
+[874639.290] (II) LoadModule: "extmod"
+[874639.290] (II) Module "extmod" already built-in
+[874639.290] (II) LoadModule: "glx"
+[874639.291] (II) Loading /usr/lib/xorg/modules/extensions/libglx.so
+[874639.292] (II) Module glx: vendor="X.Org Foundation"
+[874639.292] 	compiled for 1.21.1.11, module version = 1.0.0
+[874639.292] 	ABI class: X.Org Server Extension, version 10.0
+[874639.292] (II) LoadModule: "int10"
+[874639.292] (II) Loading /usr/lib/xorg/modules/libint10.so
+[874639.293] (II) Module int10: vendor="X.Org Foundation"
+[874639.293] 	compiled for 1.21.1.11, module version = 1.0.0
+[874639.293] 	ABI class: X.Org Video Driver, version 25.2
+[874639.293] (II) LoadModule: "record"
+[874639.293] (II) Module "record" already built-in
+[874639.293] (II) LoadModule: "vbe"
+[874639.293] (II) Loading /usr/lib/xorg/modules/libint10.so
+[874639.293] (II) Module int10: vendor="X.Org Foundation"
+[874639.293] 	compiled for 1.21.1.11, module version = 1.0.0
+[874639.293] 	ABI class: X.Org Video Driver, version 25.2
+[874639.293] (II) LoadModule: "xorgxrdp"
+[874639.293] (II) Loading /usr/lib/xorg/modules/libxorgxrdp.so
+[874639.295] (II) Module XORGXRDP: vendor="X.Org Foundation"
+[874639.296] 	compiled for 1.21.1.16, module version = 0.10.80
+[874639.296] 	ABI class: X.Org Video Driver, version 25.2
+[874639.296] (II) LoadModule: "fb"
+[874639.296] (II) Module "fb" already built-in
+[874639.296] (II) LoadModule: "xrdpdev"
+[874639.296] (II) Loading /usr/lib/xorg/modules/drivers/xrdpdev_drv.so
+[874639.296] (II) Module XRDPDEV: vendor="X.Org Foundation"
+[874639.297] 	compiled for 1.21.1.16, module version = 0.10.80
+[874639.297] 	ABI class: X.Org Video Driver, version 25.2
+[874639.297] (II) LoadModule: "xrdpmouse"
+[874639.297] (II) Loading /usr/lib/xorg/modules/input/xrdpmouse_drv.so
+[874639.297] (II) Module XRDPMOUSE: vendor="X.Org Foundation"
+[874639.297] 	compiled for 1.21.1.16, module version = 0.10.80
+[874639.297] 	Module class: X.Org XInput Driver
+[874639.297] 	ABI class: X.Org XInput driver, version 24.4
+[874639.297] (II) LoadModule: "xrdpkeyb"
+[874639.298] (II) Loading /usr/lib/xorg/modules/input/xrdpkeyb_drv.so
+[874639.298] (II) Module XRDPKEYB: vendor="X.Org Foundation"
+[874639.298] 	compiled for 1.21.1.16, module version = 0.10.80
+[874639.298] 	Module class: X.Org XInput Driver
+[874639.298] 	ABI class: X.Org XInput driver, version 24.4
+[874639.298] (II) XRDPDEV: driver for xrdp: XRDPDEV
+[874639.299] (II) rdpDriverFunc: op 10
+[874639.299] (WW) Falling back to old probe method for XRDPDEV
+[874639.299] (II) Loading sub module "fb"
+[874639.299] (II) LoadModule: "fb"
+[874639.299] (II) Module "fb" already built-in
+[874639.299] (II) rdpProbe: found DRMDevice xorg.conf value [/dev/dri/renderD128]
+[874639.299] (II) rdpProbe: found DRI3 xorg.conf value [1]
+[874639.299] (II) rdpProbe: found DRMAllowList xorg.conf value [amdgpu i915 xe msm radeon]
+[874639.299] (II) XRDPDEV(0): using default device
+[874639.299] (WW) VGA arbiter: cannot open kernel arbiter, no multi-card support
+[874639.299] (II) rdpPreInit: /dev/dri/renderD128 open ok, fd 11
+[874639.299] (II) rdpPreInit: name [amdgpu]
+[874639.299] (II) rdpPreInit: date [0]
+[874639.299] (II) rdpPreInit: desc [AMD GPU]
+[874639.299] (II) rdpPreInit: drm device looks ok, use glamor set
+[874639.299] (**) XRDPDEV(0): Depth 24, (--) framebuffer bpp 32
+[874639.299] (==) XRDPDEV(0): RGB weight 888
+[874639.299] (==) XRDPDEV(0): Using gamma correction (1.0, 1.0, 1.0)
+[874639.299] (==) XRDPDEV(0): Default visual is TrueColor
+[874639.299] (==) XRDPDEV(0): DPI set to (96, 96)
+[874639.299] (II) XRDPDEV(0): 	mode "640x480" ok
+[874639.299] (II) XRDPDEV(0): 	mode "800x600" ok
+[874639.299] (II) XRDPDEV(0): Virtual size is 800x600 (pitch 800)
+[874639.299] (**) XRDPDEV(0):  Default mode "800x600": 36.0 MHz (scaled from 0.0 MHz), 35.2 kHz, 56.2 Hz
+[874639.299] (II) XRDPDEV(0): Modeline "800x600"x0.0   36.00  800 824 896 1024  600 601 603 625 +hsync +vsync (35.2 kHz d)
+[874639.299] (II) Loading sub module "glamoregl"
+[874639.299] (II) LoadModule: "glamoregl"
+[874639.300] (II) Loading /usr/lib/xorg/modules/libglamoregl.so
+[874639.300] (II) Module glamoregl: vendor="X.Org Foundation"
+[874639.300] 	compiled for 1.21.1.11, module version = 1.0.1
+[874639.300] 	ABI class: X.Org ANSI C Emulation, version 0.4
+[874639.300] (II) rdpPreInit: glamor module load ok
+[874639.340] (II) XRDPDEV(0): glamor X acceleration enabled on Radeon 8060S Graphics (radeonsi, gfx1151, LLVM 20.1.2, DRM 3.64, 7.0.0-30-generic)
+[874639.340] (II) rdpPreInit: glamor init ok
+[874639.340] (II) rdpScreenInit: virtualX 800 virtualY 600 rgbBits 8 depth 24
+[874639.340] (II) rdpScreenInit: pfbMemory bytes 1920000
+[874639.340] (II) rdpScreenInit: pfbMemory 0x746420b5a010
+[874639.340] (II) rdpSimdInit: assigning yuv functions
+[874639.340] (II) rdpSimdInit: cpuid ax 1 cx 0 return ax 0x00b70f00 bx 0x10200800 cx 0x7ed8320b dx 0x178bfbff
+[874639.340] (II) rdpSimdInit: sse2 amd64 yuv functions assigned
+[874639.359] (II) rdpScreenInit: glamor_init ok
+[874639.359] (II) rdpDri2Init:
+[874639.359] (II) XRDPDEV(0): [DRI2] Setup complete
+[874639.359] (II) XRDPDEV(0): [DRI2]   DRI driver: radeonsi
+[874639.359] (II) XRDPDEV(0): [DRI2]   VDPAU driver: radeonsi
+[874639.359] (II) rdpScreenInit: rdpDri2Init ok
+[874639.359] (II) rdpDri3Init: rdp_dri3_info.version = 2
+[874639.359] (II) rdpScreenInit: rdpDri3Init ok
+[874639.359] (==) XRDPDEV(0): Backing store enabled
+[874639.360] (II) rdpClientConInit: disconnect idle session after [0] sec
+[874639.360] (II) rdpClientConInit: kill disconnected [0] timeout [0] sec
+[874639.360] (II) rdpEglCreate: vertex_shader compiled 1
+[874639.361] (II) rdpEglCreate: fragment_shader compiled 1
+[874639.361] (II) rdpEglCreate: linked 1
+[874639.361] (II) rdpEglCreate: copy_tex_loc 0 copy_tex_size_loc 1
+[874639.361] (II) rdpEglCreate: vertex_shader compiled 1
+[874639.361] (II) rdpEglCreate: fragment_shader compiled 1
+[874639.362] (II) rdpEglCreate: linked 1
+[874639.362] (II) rdpEglCreate: yuv_tex_loc 0 yuv_tex_size_loc 1
+[874639.362] (II) rdpEglCreate: vertex_shader compiled 1
+[874639.363] (II) rdpEglCreate: fragment_shader compiled 1
+[874639.365] (II) rdpEglCreate: linked 1
+[874639.365] (II) rdpEglCreate: yuvlp_tex_loc 0 yuvlp_tex_size_loc 1
+[874639.365] (II) rdpEglCreate: vertex_shader compiled 1
+[874639.366] (II) rdpEglCreate: fragment_shader compiled 1
+[874639.382] (II) rdpEglCreate: linked 1
+[874639.382] (II) rdpEglCreate: crc_tex_loc 0 crc_tex_size_loc 1
+[874639.382] (II) rdpScreenInit: out
+[874639.383] (II) Initializing extension Generic Event Extension
+[874639.383] (II) Initializing extension SHAPE
+[874639.383] (II) Initializing extension MIT-SHM
+[874639.383] (II) Initializing extension XInputExtension
+[874639.383] (II) Initializing extension XTEST
+[874639.383] (II) Initializing extension BIG-REQUESTS
+[874639.383] (II) Initializing extension SYNC
+[874639.383] (II) Initializing extension XKEYBOARD
+[874639.383] (II) Initializing extension XC-MISC
+[874639.383] (II) Initializing extension SECURITY
+[874639.383] (II) Initializing extension XFIXES
+[874639.384] (II) Initializing extension RENDER
+[874639.384] (II) Initializing extension RANDR
+[874639.384] (II) Initializing extension COMPOSITE
+[874639.384] (II) Initializing extension DAMAGE
+[874639.384] (II) Initializing extension MIT-SCREEN-SAVER
+[874639.384] (II) Initializing extension DOUBLE-BUFFER
+[874639.384] (II) Initializing extension RECORD
+[874639.384] (II) Initializing extension DPMS
+[874639.384] (II) Initializing extension Present
+[874639.384] (II) Initializing extension DRI3
+[874639.384] (II) Initializing extension X-Resource
+[874639.384] (II) Initializing extension XVideo
+[874639.384] (II) Initializing extension XVideo-MotionCompensation
+[874639.384] (II) Initializing extension SELinux
+[874639.384] (II) SELinux: Disabled on system
+[874639.385] (II) Initializing extension GLX
+[874639.389] (II) AIGLX: Loaded and initialized radeonsi
+[874639.389] (II) GLX: Initialized DRI2 GL provider for screen 0
+[874639.389] (II) Initializing extension XFree86-VidModeExtension
+[874639.389] (II) Initializing extension XFree86-DGA
+[874639.389] (II) Initializing extension XFree86-DRI
+[874639.389] (II) Initializing extension DRI2
+[874639.389] (II) rdpCreateScreenResources: create screen pixmap w 800 h 600
+[874639.393] (II) rdpCreateScreenResources: screen_tex 0x00000001
+[874639.415] (II) Using input driver 'XRDPMOUSE' for 'xrdpMouse'
+[874639.415] (**) Option "CorePointer"
+[874639.415] (**) xrdpMouse: always reports core events
+[874639.415] (II) rdpmousePreInit: drv 0x6450b9d88ad0 info 0x6450bac70450, flags 0x0
+[874639.415] (II) XINPUT: Adding extended input device "xrdpMouse" (type: MOUSE, id 6)
+[874639.415] (II) rdpmouseControl: what 0
+[874639.416] (II) rdpRegisterInputCallback: type 1 proc 0x7464404ce820
+[874639.416] (**) xrdpMouse: (accel) keeping acceleration scheme 1
+[874639.416] (**) xrdpMouse: (accel) acceleration profile 0
+[874639.416] (**) xrdpMouse: (accel) acceleration factor: 2.000
+[874639.416] (**) xrdpMouse: (accel) acceleration threshold: 4
+[874639.416] (II) rdpmouseControl: what 1
+[874639.416] (II) Using input driver 'XRDPKEYB' for 'xrdpKeyboard'
+[874639.416] (**) Option "CoreKeyboard"
+[874639.416] (**) xrdpKeyboard: always reports core events
+[874639.416] (II) rdpkeybPreInit: drv 0x6450b9d89580 info 0x6450ba9f5cf0, flags 0x0
+[874639.416] (II) XINPUT: Adding extended input device "xrdpKeyboard" (type: KEYBOARD, id 7)
+[874639.416] (II) rdpkeybControl: what 0
+[874639.416] (II) rdpLoadLayout: rules="evdev" model="pc104" variant=""layout="us" options=""
+[874639.427] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874639.427] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874639.427] (II) rdpRegisterInputCallback: type 0 proc 0x74643ffe6930
+[874639.427] (II) rdpkeybControl: what 1
+[874639.427] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874639.442] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874639.442] (II) rdpResizeSession: width 1024 height 768
+[874639.442] (II)   calling RRScreenSizeSet
+[874639.442] (II) rdpRRScreenSetSize: width 1024 height 768 mmWidth 271 mmHeight 203
+[874639.442] (II) rdpRRScreenSetSize: screen_tex 0x00000003
+[874639.442] (II)   screen resized to 1024x768
+[874639.442] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874639.442] (II)   RRScreenSizeSet ok 1
+[874639.442] (II) rdpResizeSession: width 2288 height 1033
+[874639.442] (II)   calling RRScreenSizeSet
+[874639.442] (II) rdpRRScreenSetSize: width 2288 height 1033 mmWidth 605 mmHeight 273
+[874639.443] (II) rdpRRScreenSetSize: screen_tex 0x00000001
+[874639.443] (II)   screen resized to 2288x1033
+[874639.443] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874639.443] (II)   RRScreenSizeSet ok 1
+[874639.443] (II) rdpRRSetRdpOutputs: numCrtcs 0 numOutputs 0 monitorCount 0
+[874639.443] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2288 height 1033
+[874639.528] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874639.528] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874639.528] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.277] (EE) Failed to open authorization file "/var/run/xrdp/1100/Xauthority": No such file or directory
+[874640.785] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.785] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.785] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.785] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.786] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.786] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874640.885] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.885] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.886] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.886] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.886] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874640.886] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874641.805] (II) rdpClientConGotConnection: g_sck_accept ok new_sck 32
+[874641.808] (II) rdpClientConGotConnection: idle_disconnect_timeout set to non-positive value, idle timer turned off
+[874641.811] (II) rdpAddClientConToDev: adding first clientCon 0x6450bb94d600
+[874641.828] (II) rdpClientConProcessMsgVersion: version 0 0 0 1
+[874641.828] (II)   got client info bytes 2716
+[874641.830] (II)   jpeg support 0
+[874641.832] (II)   offscreen support 1
+[874641.832] (II)   offscreen size 10485760
+[874641.832] (II)   offscreen entries 100
+[874641.832] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874641.833] (II)     msFrameInterval 16
+[874641.835] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3248000 bytes 14385152
+[874641.835] (II)   client can not do multimon
+[874641.835] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 0
+[874641.835] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2288 height 1033
+[874641.835] (II)   client can not do offscreen to offscreen blits
+[874641.835] (II)   client can do new(color) cursor
+[874641.835] (II) rdpLoadLayout: rules="evdev" model="pc104" variant=""layout="us" options=""
+[874641.835] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874641.835] (II) rdpkeybChangeKeyboardControl: autoRepeat on
+[874641.835] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2288 cy 1033
+[874641.936] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874641.936] (II) rdpkeybChangeKeyboardControl: autoRepeat off
+[874644.484] (II) rdpClientConProcessMonitorUpdateMsg: (2290x1099) #1
+[874644.484] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874644.484] (II)     msFrameInterval 16
+[874644.488] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3170000 bytes 15269888
+[874644.488] (II) rdpRRScreenSetSize: width 2290 height 1099 mmWidth 606 mmHeight 291
+[874644.489] (II) rdpRRScreenSetSize: screen_tex 0x000003b4
+[874644.489] (II)   screen resized to 2290x1099
+[874644.489] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874644.489] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874644.489] (II)   client can do multimon
+[874644.489] (II)   client monitor data, monitorCount=1
+[874644.489] (II)     left 0 top 0 right 2289 bottom 1098
+[874644.489] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874644.489] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2290 height 1099
+[874644.503] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2290 cy 1099
+[874645.931] (II) rdpClientConProcessMonitorUpdateMsg: (2212x1099) #1
+[874645.931] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874645.931] (II)     msFrameInterval 16
+[874645.934] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d31d8000 bytes 14843904
+[874645.934] (II) rdpRRScreenSetSize: width 2212 height 1099 mmWidth 585 mmHeight 291
+[874645.935] (II) rdpRRScreenSetSize: screen_tex 0x0000039e
+[874645.935] (II)   screen resized to 2212x1099
+[874645.936] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874645.936] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874645.936] (II)   client can do multimon
+[874645.936] (II)   client monitor data, monitorCount=1
+[874645.936] (II)     left 0 top 0 right 2211 bottom 1098
+[874645.936] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874645.936] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2212 height 1099
+[874645.948] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2212 cy 1099
+[874647.255] (II) rdpClientConProcessMonitorUpdateMsg: (2212x1024) #1
+[874647.255] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874647.255] (II)     msFrameInterval 16
+[874647.259] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d32e0000 bytes 13762560
+[874647.259] (II) rdpRRScreenSetSize: width 2212 height 1024 mmWidth 585 mmHeight 271
+[874647.259] (II) rdpRRScreenSetSize: screen_tex 0x00000399
+[874647.259] (II)   screen resized to 2212x1024
+[874647.260] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874647.260] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874647.260] (II)   client can do multimon
+[874647.260] (II)   client monitor data, monitorCount=1
+[874647.260] (II)     left 0 top 0 right 2211 bottom 1023
+[874647.260] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874647.260] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2212 height 1024
+[874647.275] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2212 cy 1024
+[874648.488] (II) rdpClientConProcessMonitorUpdateMsg: (2128x1024) #1
+[874648.489] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874648.489] (II)     msFrameInterval 16
+[874648.492] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3370000 bytes 13172736
+[874648.492] (II) rdpRRScreenSetSize: width 2128 height 1024 mmWidth 563 mmHeight 271
+[874648.492] (II) rdpRRScreenSetSize: screen_tex 0x00000395
+[874648.492] (II)   screen resized to 2128x1024
+[874648.492] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874648.493] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874648.493] (II)   client can do multimon
+[874648.493] (II)   client monitor data, monitorCount=1
+[874648.493] (II)     left 0 top 0 right 2127 bottom 1023
+[874648.493] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874648.493] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2128 height 1024
+[874648.505] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2128 cy 1024
+[874649.442] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874650.070] (II) rdpClientConProcessMonitorUpdateMsg: (2128x1067) #1
+[874650.070] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874650.070] (II)     msFrameInterval 16
+[874650.074] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d32d8000 bytes 13795328
+[874650.074] (II) rdpRRScreenSetSize: width 2128 height 1067 mmWidth 563 mmHeight 282
+[874650.074] (II) rdpRRScreenSetSize: screen_tex 0x00000398
+[874650.074] (II)   screen resized to 2128x1067
+[874650.074] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874650.074] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874650.074] (II)   client can do multimon
+[874650.074] (II)   client monitor data, monitorCount=1
+[874650.074] (II)     left 0 top 0 right 2127 bottom 1066
+[874650.074] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874650.074] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2128 height 1067
+[874650.086] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2128 cy 1067
+[874651.323] (II) rdpClientConProcessMonitorUpdateMsg: (2212x1067) #1
+[874651.323] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874651.323] (II)     msFrameInterval 16
+[874651.326] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3240000 bytes 14417920
+[874651.326] (II) rdpRRScreenSetSize: width 2212 height 1067 mmWidth 585 mmHeight 282
+[874651.327] (II) rdpRRScreenSetSize: screen_tex 0x0000039e
+[874651.327] (II)   screen resized to 2212x1067
+[874651.327] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874651.327] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874651.327] (II)   client can do multimon
+[874651.327] (II)   client monitor data, monitorCount=1
+[874651.327] (II)     left 0 top 0 right 2211 bottom 1066
+[874651.327] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874651.327] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2212 height 1067
+[874651.340] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2212 cy 1067
+[874652.532] (II) rdpClientConProcessMonitorUpdateMsg: (2212x1129) #1
+[874652.532] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874652.532] (II)     msFrameInterval 16
+[874652.536] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3170000 bytes 15269888
+[874652.536] (II) rdpRRScreenSetSize: width 2212 height 1129 mmWidth 585 mmHeight 299
+[874652.536] (II) rdpRRScreenSetSize: screen_tex 0x000003b3
+[874652.536] (II)   screen resized to 2212x1129
+[874652.536] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874652.536] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874652.536] (II)   client can do multimon
+[874652.536] (II)   client monitor data, monitorCount=1
+[874652.536] (II)     left 0 top 0 right 2211 bottom 1128
+[874652.537] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874652.537] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2212 height 1129
+[874652.552] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2212 cy 1129
+[874653.637] (II) rdpClientConProcessMonitorUpdateMsg: (2292x1129) #1
+[874653.637] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874653.637] (II)     msFrameInterval 16
+[874653.641] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca274000 bytes 15712256
+[874653.641] (II) rdpRRScreenSetSize: width 2292 height 1129 mmWidth 606 mmHeight 299
+[874653.641] (II) rdpRRScreenSetSize: screen_tex 0x00000395
+[874653.642] (II)   screen resized to 2292x1129
+[874653.642] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874653.642] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874653.642] (II)   client can do multimon
+[874653.642] (II)   client monitor data, monitorCount=1
+[874653.642] (II)     left 0 top 0 right 2291 bottom 1128
+[874653.642] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874653.642] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2292 height 1129
+[874653.653] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2292 cy 1129
+[874654.620] (II) rdpClientConProcessMonitorUpdateMsg: (2292x1164) #1
+[874654.620] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874654.620] (II)     msFrameInterval 16
+[874654.624] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca208000 bytes 16154624
+[874654.624] (II) rdpRRScreenSetSize: width 2292 height 1164 mmWidth 606 mmHeight 308
+[874654.625] (II) rdpRRScreenSetSize: screen_tex 0x00000399
+[874654.625] (II)   screen resized to 2292x1164
+[874654.625] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874654.625] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874654.625] (II)   client can do multimon
+[874654.625] (II)   client monitor data, monitorCount=1
+[874654.625] (II)     left 0 top 0 right 2291 bottom 1163
+[874654.625] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874654.625] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2292 height 1164
+[874654.637] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2292 cy 1164
+[874656.011] (II) rdpClientConProcessMonitorUpdateMsg: (2258x1164) #1
+[874656.011] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874656.011] (II)     msFrameInterval 16
+[874656.015] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca240000 bytes 15925248
+[874656.015] (II) rdpRRScreenSetSize: width 2258 height 1164 mmWidth 597 mmHeight 308
+[874656.016] (II) rdpRRScreenSetSize: screen_tex 0x0000039e
+[874656.016] (II)   screen resized to 2258x1164
+[874656.016] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874656.016] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874656.016] (II)   client can do multimon
+[874656.016] (II)   client monitor data, monitorCount=1
+[874656.016] (II)     left 0 top 0 right 2257 bottom 1163
+[874656.016] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874656.016] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2258 height 1164
+[874656.027] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2258 cy 1164
+[874657.337] (II) rdpClientConProcessMonitorUpdateMsg: (2258x1103) #1
+[874657.337] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874657.337] (II)     msFrameInterval 16
+[874657.341] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca314000 bytes 15056896
+[874657.341] (II) rdpRRScreenSetSize: width 2258 height 1103 mmWidth 597 mmHeight 292
+[874657.341] (II) rdpRRScreenSetSize: screen_tex 0x00000398
+[874657.341] (II)   screen resized to 2258x1103
+[874657.341] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874657.341] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874657.342] (II)   client can do multimon
+[874657.342] (II)   client monitor data, monitorCount=1
+[874657.342] (II)     left 0 top 0 right 2257 bottom 1102
+[874657.342] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874657.342] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2258 height 1103
+[874657.353] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2258 cy 1103
+[874659.443] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874660.353] (II) rdpClientConProcessMonitorUpdateMsg: (2216x1103) #1
+[874660.353] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874660.353] (II)     msFrameInterval 16
+[874660.357] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d31d8000 bytes 14843904
+[874660.357] (II) rdpRRScreenSetSize: width 2216 height 1103 mmWidth 586 mmHeight 292
+[874660.357] (II) rdpRRScreenSetSize: screen_tex 0x00000395
+[874660.358] (II)   screen resized to 2216x1103
+[874660.358] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874660.358] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874660.358] (II)   client can do multimon
+[874660.358] (II)   client monitor data, monitorCount=1
+[874660.358] (II)     left 0 top 0 right 2215 bottom 1102
+[874660.358] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874660.358] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2216 height 1103
+[874660.370] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2216 cy 1103
+[874661.724] (II) rdpClientConProcessMonitorUpdateMsg: (2216x1129) #1
+[874661.724] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874661.725] (II)     msFrameInterval 16
+[874661.728] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d3170000 bytes 15269888
+[874661.728] (II) rdpRRScreenSetSize: width 2216 height 1129 mmWidth 586 mmHeight 299
+[874661.728] (II) rdpRRScreenSetSize: screen_tex 0x000003b3
+[874661.728] (II)   screen resized to 2216x1129
+[874661.729] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874661.729] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874661.729] (II)   client can do multimon
+[874661.729] (II)   client monitor data, monitorCount=1
+[874661.729] (II)     left 0 top 0 right 2215 bottom 1128
+[874661.729] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874661.729] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2216 height 1129
+[874661.741] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2216 cy 1129
+[874662.971] (II) rdpClientConProcessMonitorUpdateMsg: (2272x1129) #1
+[874662.971] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874662.971] (II)     msFrameInterval 16
+[874662.975] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca2a8000 bytes 15499264
+[874662.975] (II) rdpRRScreenSetSize: width 2272 height 1129 mmWidth 601 mmHeight 299
+[874662.976] (II) rdpRRScreenSetSize: screen_tex 0x0000039e
+[874662.976] (II)   screen resized to 2272x1129
+[874662.976] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874662.976] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874662.976] (II)   client can do multimon
+[874662.976] (II)   client monitor data, monitorCount=1
+[874662.976] (II)     left 0 top 0 right 2271 bottom 1128
+[874662.976] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874662.976] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2272 height 1129
+[874662.988] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2272 cy 1129
+[874664.451] (II) rdpClientConProcessMonitorUpdateMsg: (2272x1166) #1
+[874664.451] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874664.451] (II)     msFrameInterval 16
+[874664.455] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca240000 bytes 15925248
+[874664.455] (II) rdpRRScreenSetSize: width 2272 height 1166 mmWidth 601 mmHeight 309
+[874664.455] (II) rdpRRScreenSetSize: screen_tex 0x00000399
+[874664.456] (II)   screen resized to 2272x1166
+[874664.456] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874664.456] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874664.456] (II)   client can do multimon
+[874664.456] (II)   client monitor data, monitorCount=1
+[874664.456] (II)     left 0 top 0 right 2271 bottom 1165
+[874664.456] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874664.456] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2272 height 1166
+[874664.468] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2272 cy 1166
+[874665.332] (II) rdpClientConProcessMonitorUpdateMsg: (2194x1166) #1
+[874665.332] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874665.332] (II)     msFrameInterval 16
+[874665.335] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463ca2ac000 bytes 15482880
+[874665.335] (II) rdpRRScreenSetSize: width 2194 height 1166 mmWidth 580 mmHeight 309
+[874665.336] (II) rdpRRScreenSetSize: screen_tex 0x00000395
+[874665.336] (II)   screen resized to 2194x1166
+[874665.336] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874665.336] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874665.336] (II)   client can do multimon
+[874665.336] (II)   client monitor data, monitorCount=1
+[874665.336] (II)     left 0 top 0 right 2193 bottom 1165
+[874665.336] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874665.336] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2194 height 1166
+[874665.348] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2194 cy 1166
+[874666.509] (II) rdpClientConProcessMonitorUpdateMsg: (2194x1092) #1
+[874666.509] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874666.509] (II)     msFrameInterval 16
+[874666.512] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463d320c000 bytes 14630912
+[874666.512] (II) rdpRRScreenSetSize: width 2194 height 1092 mmWidth 580 mmHeight 289
+[874666.512] (II) rdpRRScreenSetSize: screen_tex 0x00000398
+[874666.512] (II)   screen resized to 2194x1092
+[874666.513] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874666.513] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874666.513] (II)   client can do multimon
+[874666.513] (II)   client monitor data, monitorCount=1
+[874666.513] (II)     left 0 top 0 right 2193 bottom 1091
+[874666.513] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874666.513] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2194 height 1092
+[874666.524] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2194 cy 1092
+[874669.084] (II) rdpClientConProcessMonitorUpdateMsg: (2126x1092) #1
+[874669.084] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874669.084] (II)     msFrameInterval 16
+[874669.087] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463e4b6c000 bytes 14204928
+[874669.087] (II) rdpRRScreenSetSize: width 2126 height 1092 mmWidth 563 mmHeight 289
+[874669.087] (II) rdpRRScreenSetSize: screen_tex 0x0000039e
+[874669.087] (II)   screen resized to 2126x1092
+[874669.088] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874669.088] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874669.088] (II)   client can do multimon
+[874669.088] (II)   client monitor data, monitorCount=1
+[874669.088] (II)     left 0 top 0 right 2125 bottom 1091
+[874669.088] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874669.088] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2126 height 1092
+[874669.100] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2126 cy 1092
+[874669.445] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874670.323] (II) rdpClientConProcessMonitorUpdateMsg: (2126x1153) #1
+[874670.323] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874670.323] (II)     msFrameInterval 16
+[874670.327] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463e4aa0000 bytes 15040512
+[874670.327] (II) rdpRRScreenSetSize: width 2126 height 1153 mmWidth 563 mmHeight 305
+[874670.327] (II) rdpRRScreenSetSize: screen_tex 0x00000399
+[874670.327] (II)   screen resized to 2126x1153
+[874670.328] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874670.328] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874670.328] (II)   client can do multimon
+[874670.328] (II)   client monitor data, monitorCount=1
+[874670.328] (II)     left 0 top 0 right 2125 bottom 1152
+[874670.328] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874670.328] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2126 height 1153
+[874670.340] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2126 cy 1153
+[874671.143] (II) rdpClientConProcessMonitorUpdateMsg: (2058x1153) #1
+[874671.143] (II) rdpClientConProcessMsgClientInfo: got AVC444 packed-view capture (format 0x20450000 chroma_align 32)
+[874671.143] (II)     msFrameInterval 16
+[874671.147] (II) rdpClientConAllocateSharedMemory: shmemfd 33 shmemptr 0x7463e4b10000 bytes 14581760
+[874671.147] (II) rdpRRScreenSetSize: width 2058 height 1153 mmWidth 545 mmHeight 305
+[874671.147] (II) rdpRRScreenSetSize: screen_tex 0x00000395
+[874671.147] (II)   screen resized to 2058x1153
+[874671.147] (II) rdpRRScreenSetSize: screenInfo x 0 y 0 width 800 height 600
+[874671.148] (II) rdpClientConResizeAllMemoryAreas: RRScreenSizeSet ok=[1]
+[874671.148] (II)   client can do multimon
+[874671.148] (II)   client monitor data, monitorCount=1
+[874671.148] (II)     left 0 top 0 right 2057 bottom 1152
+[874671.148] (II) rdpRRSetRdpOutputs: numCrtcs 1 numOutputs 1 monitorCount 1
+[874671.148] (II) rdpRRSetRdpOutputs: update output 0 left 0 top 0 width 2058 height 1153
+[874671.161] (II) rdpClientConProcessMsgClientInput: invalidate x 0 y 0 cx 2058 cy 1153
+[874679.447] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874689.449] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874699.451] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874709.457] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874719.468] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874729.476] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874739.486] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874749.497] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874759.508] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874769.516] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874779.526] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874789.528] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874799.531] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874809.531] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874819.541] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874829.543] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874839.550] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874849.551] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874859.552] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874869.555] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874879.565] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874889.567] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874899.569] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874909.575] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874919.586] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874929.596] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874939.607] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
+[874949.608] (EE) dbus-core: error connecting to system bus: org.freedesktop.DBus.Error.FileNotFound (Failed to connect to socket /run/dbus/system_bus_socket: No such file or directory)
