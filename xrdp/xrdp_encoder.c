@@ -1299,14 +1299,13 @@ gfx_egfx_batch_group(XRDP_ENC_DATA **in, int n_in,
 }
 
 /*****************************************************************************/
-/* Emit metadata independently of a linked codec library. clip_visible keeps
- * odd surface edges inside the destination; the diagnostic AVC444 caller
- * deliberately retains the even padded-video edge instead. */
-static int
-out_RFX_AVC420_METABLOCK_bounds(struct xrdp_egfx_rect *dst_rect,
-                                struct stream *s,
-                                struct xrdp_egfx_rect *rects,
-                                int num_rects, int clip_visible)
+/* Shared by the linked AVC420 and external AVC444 encoders. Region bounds
+ * describe visible pixels, independently of the encoder's padded picture. */
+int
+out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
+                         struct stream *s,
+                         struct xrdp_egfx_rect *rects,
+                         int num_rects)
 {
     struct xrdp_region *reg;
     struct xrdp_rect rect;
@@ -1333,26 +1332,16 @@ out_RFX_AVC420_METABLOCK_bounds(struct xrdp_egfx_rect *dst_rect,
     index = 0;
     while (xrdp_region_get_rect(reg, index, &rect) == 0)
     {
-        /* Even-align the WHOLE rect to the chroma sampling grid. The AVC444
-         * decoder reconstructs chroma one region rect at a time, indexing the
-         * odd columns/rows relative to the rect origin (MS-RDPEGFX 3.3.8.3.x);
-         * an odd left/top flips chroma parity and fringes the rect's left/top
-         * edge (magenta/teal burr on high-contrast edges), and an odd width/
-         * height leaves the last column/row's chroma pairing ambiguous —
-         * lenient decoders cover it via (width + 1) / 2, but strict ones
-         * (FreeRDP's SSE 4:4:4 reconstruction) hard-assert even dimensions.
-         * Origins round down and extents round up on the already expanded
-         * rect. With visible clipping enabled, an odd surface edge remains
-         * odd; disabling that last clip is the diagnostic intervention. */
+        /* Chroma reconstruction is relative to an even region origin.
+         * Round outward to preserve damage, then clip to visible bounds:
+         * coded padding is not part of the client surface. An odd visible
+         * right/bottom edge must remain odd rather than address padding. */
         rect.left &= ~1;
         rect.top &= ~1;
         rect.right = (rect.right + 1) & ~1;
         rect.bottom = (rect.bottom + 1) & ~1;
-        if (clip_visible)
-        {
-            rect.right = MIN(dst_rect->x2 - dst_rect->x1, rect.right);
-            rect.bottom = MIN(dst_rect->y2 - dst_rect->y1, rect.bottom);
-        }
+        rect.right = MIN(dst_rect->x2 - dst_rect->x1, rect.right);
+        rect.bottom = MIN(dst_rect->y2 - dst_rect->y1, rect.bottom);
         out_uint16_le(s, rect.left);
         out_uint16_le(s, rect.top);
         out_uint16_le(s, rect.right);
@@ -1372,17 +1361,6 @@ out_RFX_AVC420_METABLOCK_bounds(struct xrdp_egfx_rect *dst_rect,
     out_uint32_le(s, count); /* numRegionRects */
     s_pop_layer(s, mcs_hdr);
     return 0;
-}
-
-/*****************************************************************************/
-int
-out_RFX_AVC420_METABLOCK(struct xrdp_egfx_rect *dst_rect,
-                         struct stream *s,
-                         struct xrdp_egfx_rect *rects,
-                         int num_rects)
-{
-    return out_RFX_AVC420_METABLOCK_bounds(dst_rect, s, rects,
-                                           num_rects, 1);
 }
 
 /*****************************************************************************/
@@ -1415,12 +1393,7 @@ out_RFX_AVC444_BITMAP_STREAM_view(struct xrdp_egfx_rect *dst_rect,
     unsigned int info;
 
     out_uint32_le(s, 0); /* avc420EncodedBitstreamInfo, backfilled below */
-    /* Diagnostic comparison: preserve the coded-grid edge even when it is
-     * one pixel outside the visible surface. The outer destination and
-     * encoded pixels remain unchanged. This intentionally reproduces the
-     * clean-room clipping discrepancy and is not a shipping policy. */
-    if (out_RFX_AVC420_METABLOCK_bounds(dst_rect, s, d_rects,
-                                        num_rects, 0) != 0)
+    if (out_RFX_AVC420_METABLOCK(dst_rect, s, d_rects, num_rects) != 0)
     {
         return 1;
     }

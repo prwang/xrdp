@@ -1,0 +1,602 @@
+[  PASSED  ] 3 test(s).
+Running suite(s): BitmapLoad
+[2026-09-06T15:31:34.695+0000] [ERROR] xrdp_bitmap_load_bmp: error bitmap file [/dev/null] read error
+ok 1 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__with_invalid_image__fail: Passed
+PASS: test_xrdp 1 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__with_invalid_image__fail: Passed
+ok 2 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__4_bit__ok: Passed
+PASS: test_xrdp 2 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__4_bit__ok: Passed
+ok 3 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__8_bit__ok: Passed
+PASS: test_xrdp 3 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__8_bit__ok: Passed
+ok 4 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__24_bit__ok: Passed
+PASS: test_xrdp 4 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__24_bit__ok: Passed
+ok 5 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_width_zoom__ok: Passed
+PASS: test_xrdp 5 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_width_zoom__ok: Passed
+ok 6 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_height_zoom__ok: Passed
+PASS: test_xrdp 6 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_height_zoom__ok: Passed
+ok 7 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__min_zoom__ok: Passed
+PASS: test_xrdp 7 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__min_zoom__ok: Passed
+ok 8 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_width_scale__ok: Passed
+PASS: test_xrdp 8 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_width_scale__ok: Passed
+ok 9 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_height_scale__ok: Passed
+PASS: test_xrdp 9 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_height_scale__ok: Passed
+ok 10 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__min_scale__ok: Passed
+PASS: test_xrdp 10 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__min_scale__ok: Passed
+ok 11 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_4_bit__ok: Passed
+PASS: test_xrdp 11 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_4_bit__ok: Passed
+ok 12 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_8_bit__ok: Passed
+PASS: test_xrdp 12 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_8_bit__ok: Passed
+ok 13 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_24_bit__ok: Passed
+PASS: test_xrdp 13 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_24_bit__ok: Passed
+ KeymapLoad
+[2026-09-06T15:31:34.794+0000] [INFO ] Loading keymap file ../../instfiles/km-00000411.toml
+ok 14 - test_xrdp_keymap.c:xrdp_keymap_load:test_keymap_load__basic_load: Passed
+PASS: test_xrdp 14 - test_xrdp_keymap.c:xrdp_keymap_load:test_keymap_load__basic_load: Passed
+ test_xrdp_egfx_base_functions
+ok 15 - test_xrdp_egfx.c:xrdp_egfx_base_functions:test_xrdp_egfx_send_create_surface__happy_path: Passed
+PASS: test_xrdp 15 - test_xrdp_egfx.c:xrdp_egfx_base_functions:test_xrdp_egfx_send_create_surface__happy_path: Passed
+ok 16 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_accepts_the_exact_avc444_shape: Passed
+PASS: test_xrdp 16 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_accepts_the_exact_avc444_shape: Passed
+ok 17 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_round_trips_dedicated_message: Passed
+PASS: test_xrdp 17 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_round_trips_dedicated_message: Passed
+ok 18 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_rejects_unrepresentable_input: Passed
+PASS: test_xrdp 18 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_rejects_unrepresentable_input: Passed
+ok 19 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_bad_command_ids: Passed
+PASS: test_xrdp 19 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_bad_command_ids: Passed
+ok 20 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_other_egfx_commands: Passed
+PASS: test_xrdp 20 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_other_egfx_commands: Passed
+ok 21 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_wrong_codec_ids: Passed
+PASS: test_xrdp 21 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_wrong_codec_ids: Passed
+ok 22 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_every_truncation: Passed
+PASS: test_xrdp 22 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_every_truncation: Passed
+ok 23 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_lying_lengths: Passed
+PASS: test_xrdp 23 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_lying_lengths: Passed
+ok 24 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_over_the_emit_envelope: Passed
+PASS: test_xrdp 24 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_over_the_emit_envelope: Passed
+ok 25 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_degenerate_input: Passed
+PASS: test_xrdp 25 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_degenerate_input: Passed
+ok 26 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_single_item: Passed
+PASS: test_xrdp 26 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_single_item: Passed
+ok 27 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_two_monitors_batch_together: Passed
+PASS: test_xrdp 27 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_two_monitors_batch_together: Passed
+ok 28 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_same_monitor_ends_the_batch: Passed
+PASS: test_xrdp 28 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_same_monitor_ends_the_batch: Passed
+ok 29 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_first_is_a_set_of_one: Passed
+PASS: test_xrdp 29 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_first_is_a_set_of_one: Passed
+ok 30 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_second_ends_the_batch: Passed
+PASS: test_xrdp 30 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_second_ends_the_batch: Passed
+ok 31 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_sixteen_monitors: Passed
+PASS: test_xrdp 31 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_sixteen_monitors: Passed
+ok 32 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_degenerate_input: Passed
+PASS: test_xrdp 32 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_degenerate_input: Passed
+ok 33 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_reads_the_startframe_id: Passed
+PASS: test_xrdp 33 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_reads_the_startframe_id: Passed
+ok 34 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_rejects_what_it_cannot_read: Passed
+PASS: test_xrdp 34 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_rejects_what_it_cannot_read: Passed
+ok 35 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_capture_info_reads_the_exact_avc444_envelope: Passed
+PASS: test_xrdp 35 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_capture_info_reads_the_exact_avc444_envelope: Passed
+ test_xrdp_region
+[==========] tests: Running 3 test(s).
+[ RUN      ] test_xrdp_region_get_bounds__negligent_path
+[       OK ] test_xrdp_region_get_bounds__negligent_path
+[ RUN      ] test_xrdp_region_get_bounds__happy_path
+[       OK ] test_xrdp_region_get_bounds__happy_path
+[ RUN      ] test_xrdp_region_not_empty__happy_path
+[       OK ] test_xrdp_region_not_empty__happy_path
+[==========] tests: 3 test(s) run.
+ok 36 - test_xrdp_region.c:test_xrdp_region:execute_suite: Passed
+PASS: test_xrdp 36 - test_xrdp_region.c:test_xrdp_region:execute_suite: Passed
+ GfxLoad
+ok 37 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_always_success: Passed
+PASS: test_xrdp 37 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_always_success: Passed
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+ok 38 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_x264_load_basic: Passed
+PASS: test_xrdp 38 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_x264_load_basic: Passed
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_h264_preferred.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_h264_only.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_rfx_preferred.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_rfx_preferred_odd.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_rfx_only.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_codec_order_undefined.toml
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get GFX codec order, using default order H264, RFX
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.805+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 39 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_codec_order: Passed
+PASS: test_xrdp 39 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_codec_order: Passed
+[2026-09-06T15:31:34.806+0000] [ERROR] TConfig: Error loading GFX config file ../../tests/xrdp/gfx//no_such_file.toml (No such file or directory)
+ok 40 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_file: Passed
+PASS: test_xrdp 40 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_file: Passed
+[2026-09-06T15:31:34.806+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_missing_h264.toml
+[2026-09-06T15:31:34.806+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+[2026-09-06T15:31:34.806+0000] [WARN ] TConfig: x264 params for connection type [default] is not defined
+[2026-09-06T15:31:34.806+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.806+0000] [WARN ] TConfig: x264 is selected as H.264 encoder but cannot load default config for x264, disabling H.264
+ok 41 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_h264: Passed
+PASS: test_xrdp 41 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_h264: Passed
+[2026-09-06T15:31:34.806+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.807+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+ok 42 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_oh264_load_basic: Passed
+PASS: test_xrdp 42 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_oh264_load_basic: Passed
+[2026-09-06T15:31:34.807+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_h264_encoder_openh264.toml
+ok 43 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_oh264: Passed
+PASS: test_xrdp 43 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_oh264: Passed
+[2026-09-06T15:31:34.807+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_h264_encoder_x264.toml
+ok 44 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_x264: Passed
+PASS: test_xrdp 44 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_x264: Passed
+[2026-09-06T15:31:34.808+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_h264_encoder_undefined.toml
+[2026-09-06T15:31:34.808+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+ok 45 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_undefined: Passed
+PASS: test_xrdp 45 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_undefined: Passed
+[2026-09-06T15:31:34.808+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_h264_encoder_invalid.toml
+[2026-09-06T15:31:34.808+0000] [WARN ] TConfig: [codec] could not get valid H.264 encoder, using default "x264"
+ok 46 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_invalid: Passed
+PASS: test_xrdp 46 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_invalid: Passed
+[2026-09-06T15:31:34.808+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.809+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+ok 47 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_defaults: Passed
+PASS: test_xrdp 47 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_defaults: Passed
+[2026-09-06T15:31:34.809+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_ffmpeg.toml
+[2026-09-06T15:31:34.809+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.809+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 48 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_override: Passed
+PASS: test_xrdp 48 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_override: Passed
+[2026-09-06T15:31:34.810+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.810+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+[2026-09-06T15:31:34.810+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_rekey.toml
+[2026-09-06T15:31:34.810+0000] [WARN ] TConfig: avc444_ffmpeg ltr_rekey_frame_num lowered to 536: the re-key boundary (surface reset + fresh IDR) will fire far more often than in production -- test arms only
+[2026-09-06T15:31:34.810+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.810+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 49 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_threshold: Passed
+PASS: test_xrdp 49 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_threshold: Passed
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_rekey.toml
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: avc444_ffmpeg ltr_rekey_frame_num lowered to 536: the re-key boundary (surface reset + fresh IDR) will fire far more often than in production -- test arms only
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_rekey_nochurn.toml
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: avc444_ffmpeg ltr_rekey_surface_reset is OFF: the re-key restarts the encoder (fresh IDR, counter reset) without any EGFX surface lifecycle event
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: avc444_ffmpeg ltr_rekey_frame_num lowered to 536: the re-key boundary (surface reset + fresh IDR) will fire far more often than in production -- test arms only
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_rekey_churn.toml
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: avc444_ffmpeg ltr_rekey_frame_num lowered to 536: the re-key boundary (surface reset + fresh IDR) will fire far more often than in production -- test arms only
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 50 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_surface_reset: Passed
+PASS: test_xrdp 50 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_surface_reset: Passed
+[2026-09-06T15:31:34.811+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_rekey_bad.toml
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: avc444_ffmpeg ltr_rekey_frame_num 70000 out of range [64,65024]; keeping the default 65024
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.811+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 51 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_out_of_range_refused: Passed
+PASS: test_xrdp 51 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_out_of_range_refused: Passed
+[2026-09-06T15:31:34.812+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+[2026-09-06T15:31:34.812+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_intra_refresh.toml
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 52 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh: Passed
+PASS: test_xrdp 52 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh: Passed
+[2026-09-06T15:31:34.812+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_intra_refresh_bad.toml
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: avc444_ffmpeg intra_refresh_frames 8 out of range [24,4096]; keeping the default 250
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.812+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 53 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused: Passed
+PASS: test_xrdp 53 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused: Passed
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_intra_refresh.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_sparse_aux.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 54 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux: Passed
+PASS: test_xrdp 54 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux: Passed
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_sparse_aux_bad.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: avc444_ffmpeg chroma_refresh_ms 5 out of range [16,60000] (0 disables); keeping the default 0
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: avc444_ffmpeg chroma_idle_ms 99999 out of range [0,60000]; keeping the default 0
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: avc444_ffmpeg intra_refresh_frames_aux 8 out of range [24,4096]; following intra_refresh_frames (250) instead
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 55 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux_out_of_range_refused: Passed
+PASS: test_xrdp 55 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux_out_of_range_refused: Passed
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264.default] threads is not set, adopting the default value [1]
+[2026-09-06T15:31:34.813+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_wire_window.toml
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.813+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 56 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window: Passed
+PASS: test_xrdp 56 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window: Passed
+[2026-09-06T15:31:34.814+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_wire_window_bad.toml
+[2026-09-06T15:31:34.814+0000] [WARN ] TConfig: avc444_ffmpeg wire_window 0 out of range [1,64]; keeping the default 1
+[2026-09-06T15:31:34.814+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.814+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 57 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window_out_of_range_refused: Passed
+PASS: test_xrdp 57 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window_out_of_range_refused: Passed
+[2026-09-06T15:31:34.814+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_empty_args.toml
+[2026-09-06T15:31:34.814+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.814+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 58 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_empty_args_fallback: Passed
+PASS: test_xrdp 58 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_empty_args_fallback: Passed
+[2026-09-06T15:31:34.815+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_removed_emit_thread.toml
+[2026-09-06T15:31:34.815+0000] [WARN ] TConfig: avc444_ffmpeg emit_thread was removed: the EGFX assembly always runs on the encoder worker. The key is ignored; delete it from gfx.toml
+[2026-09-06T15:31:34.815+0000] [WARN ] TConfig: [x264] x264 params are not defined
+[2026-09-06T15:31:34.815+0000] [WARN ] TConfig: [OpenH264] OpenH264 params are not defined
+ok 59 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_removed_key_still_parses: Passed
+PASS: test_xrdp 59 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_removed_key_still_parses: Passed
+[2026-09-06T15:31:34.815+0000] [INFO ] TConfig: Loading GFX config file ../../tests/xrdp/gfx//gfx_avc444_development_key.toml
+[2026-09-06T15:31:34.815+0000] [WARN ] TConfig: [avc444_ffmpeg] contains an unsupported development-only setting; disabling H.264
+ok 60 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_development_key_disables_h264: Passed
+PASS: test_xrdp 60 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_development_key_disables_h264: Passed
+ Avc444Convert
+ok 61 - test_avc444_convert.c:avc444_convert:test_avc444_color_primaries: Passed
+PASS: test_xrdp 61 - test_avc444_convert.c:avc444_convert:test_avc444_color_primaries: Passed
+ok 62 - test_avc444_convert.c:avc444_convert:test_avc444_roundtrip_exact: Passed
+PASS: test_xrdp 62 - test_avc444_convert.c:avc444_convert:test_avc444_roundtrip_exact: Passed
+ok 63 - test_avc444_convert.c:avc444_convert:test_avc444_v2_packing: Passed
+PASS: test_xrdp 63 - test_avc444_convert.c:avc444_convert:test_avc444_v2_packing: Passed
+ok 64 - test_avc444_convert.c:avc444_convert:test_avc444_v2_default_is_v1: Passed
+PASS: test_xrdp 64 - test_avc444_convert.c:avc444_convert:test_avc444_v2_default_is_v1: Passed
+ok 65 - test_avc444_convert.c:avc444_convert:test_avc444_main_only_420: Passed
+PASS: test_xrdp 65 - test_avc444_convert.c:avc444_convert:test_avc444_main_only_420: Passed
+ok 66 - test_avc444_convert.c:avc444_convert:test_avc420_isoluminant_chroma_loss: Passed
+PASS: test_xrdp 66 - test_avc444_convert.c:avc444_convert:test_avc420_isoluminant_chroma_loss: Passed
+ok 67 - test_avc444_convert.c:avc444_convert:test_sparse_main_only_stalls_at_420_until_restore: Passed
+PASS: test_xrdp 67 - test_avc444_convert.c:avc444_convert:test_sparse_main_only_stalls_at_420_until_restore: Passed
+ok 68 - test_avc444_convert.c:avc444_convert:test_avc444_dims_and_padding: Passed
+PASS: test_xrdp 68 - test_avc444_convert.c:avc444_convert:test_avc444_dims_and_padding: Passed
+ok 69 - test_avc444_convert.c:avc444_convert:test_avc444_odd_dims_alignment: Passed
+PASS: test_xrdp 69 - test_avc444_convert.c:avc444_convert:test_avc444_odd_dims_alignment: Passed
+ok 70 - test_avc444_convert.c:avc444_convert:test_avc444_odd_padding_edge_replicated: Passed
+PASS: test_xrdp 70 - test_avc444_convert.c:avc444_convert:test_avc444_odd_padding_edge_replicated: Passed
+ok 71 - test_avc444_convert.c:avc444_convert:test_avc444_width_align: Passed
+PASS: test_xrdp 71 - test_avc444_convert.c:avc444_convert:test_avc444_width_align: Passed
+ok 72 - test_avc444_convert.c:avc444_convert:test_avc444_resize_nonaligned_stride_contract: Passed
+PASS: test_xrdp 72 - test_avc444_convert.c:avc444_convert:test_avc444_resize_nonaligned_stride_contract: Passed
+ Avc444Caps
+ok 73 - test_avc444_caps.c:avc444_caps:test_caps_v8_none: Passed
+PASS: test_xrdp 73 - test_avc444_caps.c:avc444_caps:test_caps_v8_none: Passed
+ok 74 - test_avc444_caps.c:avc444_caps:test_caps_v81: Passed
+PASS: test_xrdp 74 - test_avc444_caps.c:avc444_caps:test_caps_v81: Passed
+ok 75 - test_avc444_caps.c:avc444_caps:test_caps_v10_avc444: Passed
+PASS: test_xrdp 75 - test_avc444_caps.c:avc444_caps:test_caps_v10_avc444: Passed
+ok 76 - test_avc444_caps.c:avc444_caps:test_caps_v101_excluded: Passed
+PASS: test_xrdp 76 - test_avc444_caps.c:avc444_caps:test_caps_v101_excluded: Passed
+ok 77 - test_avc444_caps.c:avc444_caps:test_caps_v102_to_107: Passed
+PASS: test_xrdp 77 - test_avc444_caps.c:avc444_caps:test_caps_v102_to_107: Passed
+ok 78 - test_avc444_caps.c:avc444_caps:test_caps_unknown_none: Passed
+PASS: test_xrdp 78 - test_avc444_caps.c:avc444_caps:test_caps_unknown_none: Passed
+ok 79 - test_avc444_caps.c:avc444_caps:test_caps_v2_support: Passed
+PASS: test_xrdp 79 - test_avc444_caps.c:avc444_caps:test_caps_v2_support: Passed
+ Avc444Metablock
+ok 80 - test_avc444_metablock.c:avc444_metablock:test_metablock_even_x1_origin_even: Passed
+PASS: test_xrdp 80 - test_avc444_metablock.c:avc444_metablock:test_metablock_even_x1_origin_even: Passed
+ok 81 - test_avc444_metablock.c:avc444_metablock:test_metablock_odd_x1_origin_even: Passed
+PASS: test_xrdp 81 - test_avc444_metablock.c:avc444_metablock:test_metablock_odd_x1_origin_even: Passed
+ok 82 - test_avc444_metablock.c:avc444_metablock:test_metablock_mixed_and_edges_origin_even: Passed
+PASS: test_xrdp 82 - test_avc444_metablock.c:avc444_metablock:test_metablock_mixed_and_edges_origin_even: Passed
+ok 83 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_luma_lc1: Passed
+PASS: test_xrdp 83 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_luma_lc1: Passed
+ok 84 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_chroma_lc2: Passed
+PASS: test_xrdp 84 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_chroma_lc2: Passed
+ok 85 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_single_rect: Passed
+PASS: test_xrdp 85 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_single_rect: Passed
+ok 86 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 86 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 87 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 87 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 88 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 88 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 89 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 89 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 90 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 90 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 91 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 91 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 92 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 92 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 93 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 93 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 94 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 94 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ok 95 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+PASS: test_xrdp 95 - test_avc444_metablock.c:avc444_wire:test_avc444_views_clip_to_visible_edges: Passed
+ Avc444H264
+ok 96 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_sps_pps_idr: Passed
+PASS: test_xrdp 96 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_sps_pps_idr: Passed
+ok 97 - test_avc444_h264.c:avc444_h264:test_h264_duplicate_sps_counted: Passed
+PASS: test_xrdp 97 - test_avc444_h264.c:avc444_h264:test_h264_duplicate_sps_counted: Passed
+ok 98 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_missing_pps: Passed
+PASS: test_xrdp 98 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_missing_pps: Passed
+ok 99 - test_avc444_h264.c:avc444_h264:test_h264_aux_vcl: Passed
+PASS: test_xrdp 99 - test_avc444_h264.c:avc444_h264:test_h264_aux_vcl: Passed
+ok 100 - test_avc444_h264.c:avc444_h264:test_h264_malformed: Passed
+PASS: test_xrdp 100 - test_avc444_h264.c:avc444_h264:test_h264_malformed: Passed
+ok 101 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_rewrites_to_golden: Passed
+PASS: test_xrdp 101 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_rewrites_to_golden: Passed
+ok 102 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_no_hrd_untouched: Passed
+PASS: test_xrdp 102 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_no_hrd_untouched: Passed
+ok 103 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_idempotent: Passed
+PASS: test_xrdp 103 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_idempotent: Passed
+ok 104 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_truncated_sps_fails: Passed
+PASS: test_xrdp 104 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_truncated_sps_fails: Passed
+ok 105 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_clears_flag: Passed
+PASS: test_xrdp 105 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_clears_flag: Passed
+ok 106 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_zero_flag_untouched: Passed
+PASS: test_xrdp 106 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_zero_flag_untouched: Passed
+ok 107 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_truncated_sps_fails: Passed
+PASS: test_xrdp 107 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_truncated_sps_fails: Passed
+ok 108 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_golden: Passed
+PASS: test_xrdp 108 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_golden: Passed
+ok 109 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_rejects_non_idr_aux: Passed
+PASS: test_xrdp 109 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_rejects_non_idr_aux: Passed
+ok 110 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_requires_main_ref_vcl: Passed
+PASS: test_xrdp 110 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_requires_main_ref_vcl: Passed
+ok 111 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_truncated_aux_fails: Passed
+PASS: test_xrdp 111 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_truncated_aux_fails: Passed
+ Avc444Ltr
+ok 112 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_resolution_identical_both_modes: Passed
+PASS: test_xrdp 112 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_resolution_identical_both_modes: Passed
+ok 113 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_pinning_512_frames_across_wrap: Passed
+PASS: test_xrdp 113 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_pinning_512_frames_across_wrap: Passed
+ok 114 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_cadence: Passed
+PASS: test_xrdp 114 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_cadence: Passed
+ok 115 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_slot_reassignment_replaces: Passed
+PASS: test_xrdp 115 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_slot_reassignment_replaces: Passed
+ok 116 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_idr_restart_reseeds: Passed
+PASS: test_xrdp 116 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_idr_restart_reseeds: Passed
+ok 117 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_unseeded_aux_p_is_missing_ref: Passed
+PASS: test_xrdp 117 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_unseeded_aux_p_is_missing_ref: Passed
+ok 118 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sliding_window_exempts_long_term: Passed
+PASS: test_xrdp 118 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sliding_window_exempts_long_term: Passed
+ok 119 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_range_violation_recorded_not_silent: Passed
+PASS: test_xrdp 119 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_range_violation_recorded_not_silent: Passed
+ok 120 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_frame_num_slots_golden: Passed
+PASS: test_xrdp 120 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_frame_num_slots_golden: Passed
+ok 121 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_golden_sequence: Passed
+PASS: test_xrdp 121 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_golden_sequence: Passed
+ok 122 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_field_sequence_cross_check: Passed
+PASS: test_xrdp 122 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_field_sequence_cross_check: Passed
+ok 123 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_existing_list_modification: Passed
+PASS: test_xrdp 123 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_existing_list_modification: Passed
+ok 124 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_unseeded_aux_p: Passed
+PASS: test_xrdp 124 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_unseeded_aux_p: Passed
+ok 125 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_main_start_without_idr: Passed
+PASS: test_xrdp 125 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_main_start_without_idr: Passed
+ok 126 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_truncated_and_small_cap: Passed
+PASS: test_xrdp 126 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_truncated_and_small_cap: Passed
+ok 127 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_high_counter_and_cadence: Passed
+PASS: test_xrdp 127 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_high_counter_and_cadence: Passed
+ok 128 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_epoch_restart_byte_exact: Passed
+PASS: test_xrdp 128 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_epoch_restart_byte_exact: Passed
+ok 129 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_seed_i_pins_leaf_diff: Passed
+PASS: test_xrdp 129 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_seed_i_pins_leaf_diff: Passed
+ok 130 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_main_golden_recipe_fields: Passed
+PASS: test_xrdp 130 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_main_golden_recipe_fields: Passed
+ok 131 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_sps_fields: Passed
+PASS: test_xrdp 131 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_sps_fields: Passed
+ok 132 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_b_slice_and_unknown_level: Passed
+PASS: test_xrdp 132 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_b_slice_and_unknown_level: Passed
+ok 133 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_sequence_byte_exact: Passed
+PASS: test_xrdp 133 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_sequence_byte_exact: Passed
+ok 134 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_nonidr_i_accepted_both_views: Passed
+PASS: test_xrdp 134 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_nonidr_i_accepted_both_views: Passed
+ok 135 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_midstream_idr_keeps_chain: Passed
+PASS: test_xrdp 135 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_midstream_idr_keeps_chain: Passed
+ok 136 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_observed_vs_requested: Passed
+PASS: test_xrdp 136 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_observed_vs_requested: Passed
+ok 137 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_aux_has_its_own_period: Passed
+PASS: test_xrdp 137 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_aux_has_its_own_period: Passed
+ok 138 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_scheduled_paired_cut_both_modes: Passed
+PASS: test_xrdp 138 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_scheduled_paired_cut_both_modes: Passed
+ok 139 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes: Passed
+PASS: test_xrdp 139 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes: Passed
+ Avc444Nut
+ok 140 - test_avc444_nut.c:avc444_nut:test_nut_four_packets: Passed
+PASS: test_xrdp 140 - test_avc444_nut.c:avc444_nut:test_nut_four_packets: Passed
+ok 141 - test_avc444_nut.c:avc444_nut:test_nut_byte_fragmentation: Passed
+PASS: test_xrdp 141 - test_avc444_nut.c:avc444_nut:test_nut_byte_fragmentation: Passed
+ok 142 - test_avc444_nut.c:avc444_nut:test_nut_truncation: Passed
+PASS: test_xrdp 142 - test_avc444_nut.c:avc444_nut:test_nut_truncation: Passed
+ok 143 - test_avc444_nut.c:avc444_nut:test_nut_bad_crc: Passed
+PASS: test_xrdp 143 - test_avc444_nut.c:avc444_nut:test_nut_bad_crc: Passed
+ok 144 - test_avc444_nut.c:avc444_nut:test_nut_bad_file_id: Passed
+PASS: test_xrdp 144 - test_avc444_nut.c:avc444_nut:test_nut_bad_file_id: Passed
+ok 145 - test_avc444_nut.c:avc444_nut:test_nut_total_ceiling: Passed
+PASS: test_xrdp 145 - test_avc444_nut.c:avc444_nut:test_nut_total_ceiling: Passed
+ Avc444Ffmpeg
+[2026-09-06T15:31:34.869+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 146 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe: Passed
+PASS: test_xrdp 146 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe: Passed
+[2026-09-06T15:31:34.870+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 147 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_production_leaf_topology: Passed
+PASS: test_xrdp 147 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_production_leaf_topology: Passed
+[2026-09-06T15:31:34.870+0000] [ERROR] ffmpeg H.264 backend failed after capability confirmation while testing a child failure on monitor 0; closing the connection without retry or codec fallback
+ok 148 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_post_confirm_failure_is_terminal_once: Passed
+PASS: test_xrdp 148 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_post_confirm_failure_is_terminal_once: Passed
+[2026-09-06T15:31:34.870+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 149 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_global_header_encoder: Passed
+PASS: test_xrdp 149 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_global_header_encoder: Passed
+[2026-09-06T15:31:34.870+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 150 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_duplicate_headers_rejected: Passed
+PASS: test_xrdp 150 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_duplicate_headers_rejected: Passed
+[2026-09-06T15:31:35.077+0000] [WARN ] xrdp_ffmpeg: probe TIMEOUT: no verdict within the deadline (cold encoder/device init? child still starting?) (dump_extra=0, 64x64, packets=0, elapsed=206 ms, child killed by signal 15)
+ok 151 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_timeout_classified: Passed
+PASS: test_xrdp 151 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_timeout_classified: Passed
+[2026-09-06T15:31:35.078+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 152 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_single_sps_per_keyframe: Passed
+PASS: test_xrdp 152 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_single_sps_per_keyframe: Passed
+[2026-09-06T15:31:35.079+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 153 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_pair: Passed
+PASS: test_xrdp 153 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_pair: Passed
+[2026-09-06T15:31:35.079+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 154 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_ltr_rekey_cycle: Passed
+PASS: test_xrdp 154 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_ltr_rekey_cycle: Passed
+[2026-09-06T15:31:35.080+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 155 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_scheduled_paired_cut_live: Passed
+PASS: test_xrdp 155 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_scheduled_paired_cut_live: Passed
+[2026-09-06T15:31:35.081+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 156 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_sparse_aux_independent_schedules_live: Passed
+PASS: test_xrdp 156 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_sparse_aux_independent_schedules_live: Passed
+[2026-09-06T15:31:35.082+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 157 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_pump_set_four_views_one_thread: Passed
+PASS: test_xrdp 157 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_pump_set_four_views_one_thread: Passed
+ok 158 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_avc444_cfg_from_encoder_carries_every_field: Passed
+PASS: test_xrdp 158 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_avc444_cfg_from_encoder_carries_every_field: Passed
+[2026-09-06T15:31:35.083+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 159 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_single: Passed
+PASS: test_xrdp 159 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_single: Passed
+[2026-09-06T15:31:35.083+0000] [WARN ] test_avc444_ffmpeg: SKIPPED (reported as PASS, proves nothing) -- set XRDP_TEST_FFMPEG_PATH to an absolute stock ffmpeg to actually run this test
+ok 160 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_resize_recycle: Passed
+PASS: test_xrdp 160 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_resize_recycle: Passed
+ Avc444Multimon
+ok 161 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_no_monitors_uses_screen: Passed
+PASS: test_xrdp 161 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_no_monitors_uses_screen: Passed
+ok 162 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_null_uses_screen: Passed
+PASS: test_xrdp 162 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_null_uses_screen: Passed
+ok 163 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_dual_equal_1024x768: Passed
+PASS: test_xrdp 163 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_dual_equal_1024x768: Passed
+ok 164 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_takes_max_per_axis: Passed
+PASS: test_xrdp 164 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_takes_max_per_axis: Passed
+ok 165 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_alignment_round_up: Passed
+PASS: test_xrdp 165 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_alignment_round_up: Passed
+ok 166 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_no_monitors_session_at_zero: Passed
+PASS: test_xrdp 166 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_no_monitors_session_at_zero: Passed
+ok 167 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_single_monitor_matches_session_formula: Passed
+PASS: test_xrdp 167 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_single_monitor_matches_session_formula: Passed
+ok 168 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_owner_dual_disjoint: Passed
+PASS: test_xrdp 168 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_owner_dual_disjoint: Passed
+ok 169 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_nv12_dual: Passed
+PASS: test_xrdp 169 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_nv12_dual: Passed
+ok 170 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_unaligned_dims_stay_disjoint: Passed
+PASS: test_xrdp 170 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_unaligned_dims_stay_disjoint: Passed
+ok 171 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_degenerate_monitor_zero_bytes: Passed
+PASS: test_xrdp 171 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_degenerate_monitor_zero_bytes: Passed
+ok 172 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_two_slot_strides: Passed
+PASS: test_xrdp 172 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_two_slot_strides: Passed
+ok 173 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_starts_empty: Passed
+PASS: test_xrdp 173 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_starts_empty: Passed
+ok 174 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap1_is_serial: Passed
+PASS: test_xrdp 174 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap1_is_serial: Passed
+ok 175 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap2_reaches_depth_two: Passed
+PASS: test_xrdp 175 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap2_reaches_depth_two: Passed
+ok 176 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_third_capture_is_signalled: Passed
+PASS: test_xrdp 176 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_third_capture_is_signalled: Passed
+ok 177 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_monitors_never_reach_three: Passed
+PASS: test_xrdp 177 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_monitors_never_reach_three: Passed
+ok 178 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_slot_alternates_per_monitor: Passed
+PASS: test_xrdp 178 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_slot_alternates_per_monitor: Passed
+ok 179 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_ack_everything_retires_all: Passed
+PASS: test_xrdp 179 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_ack_everything_retires_all: Passed
+ok 180 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_capture_and_encode_do_overlap: Passed
+PASS: test_xrdp 180 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_capture_and_encode_do_overlap: Passed
+ok 181 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_single_slot_is_serial: Passed
+PASS: test_xrdp 181 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_single_slot_is_serial: Passed
+ok 182 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_closed_ack_window_is_serial: Passed
+PASS: test_xrdp 182 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_closed_ack_window_is_serial: Passed
+ok 183 - test_avc444_multimon.c:avc444_multimon:test_overlap_m2_global_window_pins_each_monitor_to_one: Passed
+PASS: test_xrdp 183 - test_avc444_multimon.c:avc444_multimon:test_overlap_m2_global_window_pins_each_monitor_to_one: Passed
+ok 184 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_never_exceeds_its_own_bounds: Passed
+PASS: test_xrdp 184 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_never_exceeds_its_own_bounds: Passed
+ok 185 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_zero_capacity_yields_no_captures: Passed
+PASS: test_xrdp 185 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_zero_capacity_yields_no_captures: Passed
+ok 186 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_instant_ack_cannot_overlap: Passed
+PASS: test_xrdp 186 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_instant_ack_cannot_overlap: Passed
+ok 187 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_widening_window_never_reduces_depth: Passed
+PASS: test_xrdp 187 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_widening_window_never_reduces_depth: Passed
+ok 188 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_gates_agree: Passed
+PASS: test_xrdp 188 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_gates_agree: Passed
+ok 189 - test_avc444_multimon.c:avc444_multimon:test_overlap_lossy_encode_wedges_without_consume_ack: Passed
+PASS: test_xrdp 189 - test_avc444_multimon.c:avc444_multimon:test_overlap_lossy_encode_wedges_without_consume_ack: Passed
+ok 190 - test_avc444_multimon.c:avc444_multimon:test_overlap_consume_ack_restores_depth: Passed
+PASS: test_xrdp 190 - test_avc444_multimon.c:avc444_multimon:test_overlap_consume_ack_restores_depth: Passed
+ok 191 - test_avc444_multimon.c:avc444_multimon:test_ack_value_is_echoed_identity: Passed
+PASS: test_xrdp 191 - test_avc444_multimon.c:avc444_multimon:test_ack_value_is_echoed_identity: Passed
+ok 192 - test_avc444_multimon.c:avc444_multimon:test_dropped_frame_region_returns_to_dirty: Passed
+PASS: test_xrdp 192 - test_avc444_multimon.c:avc444_multimon:test_dropped_frame_region_returns_to_dirty: Passed
+ok 193 - test_avc444_multimon.c:avc444_multimon:test_xup_ack_displayed_bit_serialization: Passed
+PASS: test_xrdp 193 - test_avc444_multimon.c:avc444_multimon:test_xup_ack_displayed_bit_serialization: Passed
+ok 194 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_slot_only_holds_the_region_frontier: Passed
+PASS: test_xrdp 194 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_slot_only_holds_the_region_frontier: Passed
+ok 195 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_is_cumulative_and_monotonic: Passed
+PASS: test_xrdp 195 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_is_cumulative_and_monotonic: Passed
+ok 196 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_buys_nothing_when_the_budget_already_admits_two: Passed
+PASS: test_xrdp 196 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_buys_nothing_when_the_budget_already_admits_two: Passed
+ok 197 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_restores_the_floor_at_effective_depth_one: Passed
+PASS: test_xrdp 197 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_restores_the_floor_at_effective_depth_one: Passed
+ok 198 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_never_drops_a_region_a_failing_tail_owes_back: Passed
+PASS: test_xrdp 198 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_never_drops_a_region_a_failing_tail_owes_back: Passed
+ok 199 - test_avc444_multimon.c:avc444_multimon:test_absorb_only_ack_bufferbloats_and_the_metric_shows_it: Passed
+PASS: test_xrdp 199 - test_avc444_multimon.c:avc444_multimon:test_absorb_only_ack_bufferbloats_and_the_metric_shows_it: Passed
+ok 200 - test_avc444_multimon.c:avc444_multimon:test_capture_contract_rejects_a_previous_resize_layout: Passed
+PASS: test_xrdp 200 - test_avc444_multimon.c:avc444_multimon:test_capture_contract_rejects_a_previous_resize_layout: Passed
+ Avc444EmitSplit
+ok 201 - test_avc444_emit_split.c:batch_publish:test_publish_arms_sequence_zero: Passed
+PASS: test_xrdp 201 - test_avc444_emit_split.c:batch_publish:test_publish_arms_sequence_zero: Passed
+ok 202 - test_avc444_emit_split.c:batch_publish:test_publish_leaves_untouched_monitor_alone: Passed
+PASS: test_xrdp 202 - test_avc444_emit_split.c:batch_publish:test_publish_leaves_untouched_monitor_alone: Passed
+ok 203 - test_avc444_emit_split.c:batch_publish:test_publish_clears_stale_arm_state: Passed
+PASS: test_xrdp 203 - test_avc444_emit_split.c:batch_publish:test_publish_clears_stale_arm_state: Passed
+ok 204 - test_avc444_emit_split.c:batch_publish:test_publish_marks_submit_failure: Passed
+PASS: test_xrdp 204 - test_avc444_emit_split.c:batch_publish:test_publish_marks_submit_failure: Passed
+ok 205 - test_avc444_emit_split.c:batch_publish:test_publish_arms_surface_reset_after_teardown: Passed
+PASS: test_xrdp 205 - test_avc444_emit_split.c:batch_publish:test_publish_arms_surface_reset_after_teardown: Passed
+ Avc444CreditFrontier
+ok 206 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_each_term_binds: Passed
+PASS: test_xrdp 206 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_each_term_binds: Passed
+ok 207 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_is_monotone: Passed
+PASS: test_xrdp 207 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_is_monotone: Passed
+ok 208 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_obeys_the_same_window: Passed
+PASS: test_xrdp 208 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_obeys_the_same_window: Passed
+ok 209 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_never_lags_the_credit_by_more_than_one: Passed
+PASS: test_xrdp 209 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_never_lags_the_credit_by_more_than_one: Passed
+ok 210 - test_avc444_credit_frontier.c:credit_frontier:test_the_shipped_gate_withholds_what_the_window_permits: Passed
+PASS: test_xrdp 210 - test_avc444_credit_frontier.c:credit_frontier:test_the_shipped_gate_withholds_what_the_window_permits: Passed
+ok 211 - test_avc444_credit_frontier.c:credit_frontier:test_planner_never_withholds_an_earned_credit: Passed
+PASS: test_xrdp 211 - test_avc444_credit_frontier.c:credit_frontier:test_planner_never_withholds_an_earned_credit: Passed
+ok 212 - test_avc444_credit_frontier.c:credit_frontier:test_joint_machine_enumeration: Passed
+PASS: test_xrdp 212 - test_avc444_credit_frontier.c:credit_frontier:test_joint_machine_enumeration: Passed
+ok 213 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c2: Passed
+PASS: test_xrdp 213 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c2: Passed
+ok 214 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c1: Passed
+PASS: test_xrdp 214 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c1: Passed
+ok 215 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_frozen_client_halts_at_client_plus_c: Passed
+PASS: test_xrdp 215 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_frozen_client_halts_at_client_plus_c: Passed
+ok 216 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_from_the_producers_contract: Passed
+PASS: test_xrdp 216 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_from_the_producers_contract: Passed
+ok 217 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_agrees_with_the_producer_budget: Passed
+PASS: test_xrdp 217 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_agrees_with_the_producer_budget: Passed
+ Avc444ChromaDue
+ok 218 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_disabled_sends_aux_every_frame: Passed
+PASS: test_xrdp 218 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_disabled_sends_aux_every_frame: Passed
+ok 219 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_guarantee_holds_under_unbroken_motion: Passed
+PASS: test_xrdp 219 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_guarantee_holds_under_unbroken_motion: Passed
+ok 220 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_gap_never_exceeds_the_bound: Passed
+PASS: test_xrdp 220 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_gap_never_exceeds_the_bound: Passed
+ok 221 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bound_is_refresh_plus_one_frame: Passed
+PASS: test_xrdp 221 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bound_is_refresh_plus_one_frame: Passed
+ok 222 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_settle_clamps_aux_to_the_idle_interval: Passed
+PASS: test_xrdp 222 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_settle_clamps_aux_to_the_idle_interval: Passed
+ok 223 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_aux_rate_is_bounded_by_the_idle_interval: Passed
+PASS: test_xrdp 223 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_aux_rate_is_bounded_by_the_idle_interval: Passed
+ok 224 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_without_idle_only_the_guarantee_fires: Passed
+PASS: test_xrdp 224 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_without_idle_only_the_guarantee_fires: Passed
+ok 225 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bootstrap_and_boundaries: Passed
+PASS: test_xrdp 225 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bootstrap_and_boundaries: Passed
+ok 226 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_trailing_deadline: Passed
+PASS: test_xrdp 226 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_trailing_deadline: Passed
+ok 227 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_deadline_is_overflow_safe: Passed
+PASS: test_xrdp 227 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_deadline_is_overflow_safe: Passed
+100%: Checks: 227, Failures: 0, Errors: 0
+1..227

@@ -1,0 +1,222 @@
+make  all-recursive
+make[1]: Entering directory '/work'
+Making all in third_party
+make[2]: Entering directory '/work/third_party'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/third_party'
+Making all in third_party/tomlc99
+make[2]: Entering directory '/work/third_party/tomlc99'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/third_party/tomlc99'
+Making all in common
+make[2]: Entering directory '/work/common'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/common'
+Making all in vnc
+make[2]: Entering directory '/work/vnc'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/vnc'
+Making all in xup
+make[2]: Entering directory '/work/xup'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/xup'
+Making all in mc
+make[2]: Entering directory '/work/mc'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/mc'
+Making all in libipm
+make[2]: Entering directory '/work/libipm'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/libipm'
+Making all in libxrdp
+make[2]: Entering directory '/work/libxrdp'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/libxrdp'
+Making all in libpainter
+make[2]: Entering directory '/work/libpainter'
+make  all-recursive
+make[3]: Entering directory '/work/libpainter'
+Making all in src
+make[4]: Entering directory '/work/libpainter/src'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/libpainter/src'
+Making all in include
+make[4]: Entering directory '/work/libpainter/include'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/libpainter/include'
+Making all in pkgconfig
+make[4]: Entering directory '/work/libpainter/pkgconfig'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/libpainter/pkgconfig'
+Making all in tests
+make[4]: Entering directory '/work/libpainter/tests'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/libpainter/tests'
+make[4]: Entering directory '/work/libpainter'
+make[4]: Leaving directory '/work/libpainter'
+make[3]: Leaving directory '/work/libpainter'
+make[2]: Leaving directory '/work/libpainter'
+Making all in librfxcodec
+make[2]: Entering directory '/work/librfxcodec'
+make  all-recursive
+make[3]: Entering directory '/work/librfxcodec'
+Making all in include
+make[4]: Entering directory '/work/librfxcodec/include'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/librfxcodec/include'
+Making all in src
+make[4]: Entering directory '/work/librfxcodec/src'
+Making all in amd64
+make[5]: Entering directory '/work/librfxcodec/src/amd64'
+make[5]: Nothing to be done for 'all'.
+make[5]: Leaving directory '/work/librfxcodec/src/amd64'
+Making all in sse2
+make[5]: Entering directory '/work/librfxcodec/src/sse2'
+make[6]: Entering directory '/work/librfxcodec/src/sse2'
+make[6]: Nothing to be done for 'all-am'.
+make[6]: Leaving directory '/work/librfxcodec/src/sse2'
+make[5]: Leaving directory '/work/librfxcodec/src/sse2'
+make[5]: Entering directory '/work/librfxcodec/src'
+make[5]: Nothing to be done for 'all-am'.
+make[5]: Leaving directory '/work/librfxcodec/src'
+make[4]: Leaving directory '/work/librfxcodec/src'
+Making all in tests
+make[4]: Entering directory '/work/librfxcodec/tests'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/librfxcodec/tests'
+make[4]: Entering directory '/work/librfxcodec'
+make[4]: Leaving directory '/work/librfxcodec'
+make[3]: Leaving directory '/work/librfxcodec'
+make[2]: Leaving directory '/work/librfxcodec'
+Making all in sesman
+make[2]: Entering directory '/work/sesman'
+Making all in libsesman
+make[3]: Entering directory '/work/sesman/libsesman'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/sesman/libsesman'
+Making all in sesexec
+make[3]: Entering directory '/work/sesman/sesexec'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/sesman/sesexec'
+Making all in tools
+make[3]: Entering directory '/work/sesman/tools'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/sesman/tools'
+Making all in chansrv
+make[3]: Entering directory '/work/sesman/chansrv'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/sesman/chansrv'
+make[3]: Entering directory '/work/sesman'
+make[3]: Nothing to be done for 'all-am'.
+make[3]: Leaving directory '/work/sesman'
+make[2]: Leaving directory '/work/sesman'
+Making all in xrdp
+make[2]: Entering directory '/work/xrdp'
+  CC       xrdp_encoder.o
+  CCLD     xrdp
+make[2]: Leaving directory '/work/xrdp'
+Making all in fontutils
+make[2]: Entering directory '/work/fontutils'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/fontutils'
+Making all in keygen
+make[2]: Entering directory '/work/keygen'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/keygen'
+Making all in waitforx
+make[2]: Entering directory '/work/waitforx'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/waitforx'
+Making all in docs
+make[2]: Entering directory '/work/docs'
+Making all in man
+make[3]: Entering directory '/work/docs/man'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/docs/man'
+make[3]: Entering directory '/work/docs'
+make[3]: Nothing to be done for 'all-am'.
+make[3]: Leaving directory '/work/docs'
+make[2]: Leaving directory '/work/docs'
+Making all in instfiles
+make[2]: Entering directory '/work/instfiles'
+Making all in pam.d
+make[3]: Entering directory '/work/instfiles/pam.d'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/instfiles/pam.d'
+Making all in pulse
+make[3]: Entering directory '/work/instfiles/pulse'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/instfiles/pulse'
+Making all in default
+make[3]: Entering directory '/work/instfiles/default'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/instfiles/default'
+Making all in init.d
+make[3]: Entering directory '/work/instfiles/init.d'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/instfiles/init.d'
+make[3]: Entering directory '/work/instfiles'
+make[3]: Nothing to be done for 'all-am'.
+make[3]: Leaving directory '/work/instfiles'
+make[2]: Leaving directory '/work/instfiles'
+Making all in genkeymap
+make[2]: Entering directory '/work/genkeymap'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/genkeymap'
+Making all in xrdpapi
+make[2]: Entering directory '/work/xrdpapi'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/xrdpapi'
+Making all in pkgconfig
+make[2]: Entering directory '/work/pkgconfig'
+make[2]: Nothing to be done for 'all'.
+make[2]: Leaving directory '/work/pkgconfig'
+Making all in tests
+make[2]: Entering directory '/work/tests'
+Making all in common
+make[3]: Entering directory '/work/tests/common'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tests/common'
+Making all in libipm
+make[3]: Entering directory '/work/tests/libipm'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tests/libipm'
+Making all in libxrdp
+make[3]: Entering directory '/work/tests/libxrdp'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tests/libxrdp'
+Making all in memtest
+make[3]: Entering directory '/work/tests/memtest'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tests/memtest'
+Making all in xrdp
+make[3]: Entering directory '/work/tests/xrdp'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tests/xrdp'
+make[3]: Entering directory '/work/tests'
+make[3]: Nothing to be done for 'all-am'.
+make[3]: Leaving directory '/work/tests'
+make[2]: Leaving directory '/work/tests'
+Making all in tools
+make[2]: Entering directory '/work/tools'
+Making all in chkpriv
+make[3]: Entering directory '/work/tools/chkpriv'
+make[3]: Nothing to be done for 'all'.
+make[3]: Leaving directory '/work/tools/chkpriv'
+Making all in devel
+make[3]: Entering directory '/work/tools/devel'
+Making all in tcp_proxy
+make[4]: Entering directory '/work/tools/devel/tcp_proxy'
+make[4]: Nothing to be done for 'all'.
+make[4]: Leaving directory '/work/tools/devel/tcp_proxy'
+make[4]: Entering directory '/work/tools/devel'
+make[4]: Nothing to be done for 'all-am'.
+make[4]: Leaving directory '/work/tools/devel'
+make[3]: Leaving directory '/work/tools/devel'
+make[3]: Entering directory '/work/tools'
+make[3]: Nothing to be done for 'all-am'.
+make[3]: Leaving directory '/work/tools'
+make[2]: Leaving directory '/work/tools'
+make[2]: Entering directory '/work'
+make[2]: Leaving directory '/work'
+make[1]: Leaving directory '/work'

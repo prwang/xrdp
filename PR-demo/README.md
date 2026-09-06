@@ -62,6 +62,10 @@ canonical-development comparison on port 40062. It layers only the new xrdp
 package onto the exact 40060 image and refuses to replace an existing arm.
 It preserves visible outer surfaces while allowing the AVC444 inner region
 to round one pixel beyond an odd edge. This arm is not an acceptance build.
+`mac_bisect_matrix/replace_x046_visible_clip.sh` replaces that reproduced red
+arm with the current committed visible-bound correction. It preserves the red
+image and archives its logs, changes only port 40062, and uses a separate trace
+directory. Certification and rendered smoke are still required after replacement.
 
 * **`smoke_gate/`** — the mandatory pre-handoff gate. `smoke.sh` runs the
   colour-key test at **two** session sizes (1920×1080 and 1024×768, both

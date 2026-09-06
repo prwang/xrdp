@@ -365,6 +365,13 @@ with the committed build; require the ordinary three-second certificate and
 final two-size rendered smoke before Windows handoff. The same Windows resize
 sequence remains the interactive acceptance gate, not a unit-test claim.
 
+The manual source correction now passes the unchanged new regression and
+complete trace-enabled/default build gates. The independently failing regression
+is committed as `d477399f`; the original reproduced injection remains
+`c729a50889a2`. Packaging and replacing 40062 are next; Windows acceptance
+remains open. Source/deployment record:
+[`i142c_x046_visible_clip_fix_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_visible_clip_fix_20260906/README.md).
+
 **DEFERRED — clean-room slice 135 owns this correction.** When authorized,
 re-author `PRD/slices/135-avc-wire-serialization.md` in its owning clean-room
 commit: give the region builder the visible destination bounds, clip after
