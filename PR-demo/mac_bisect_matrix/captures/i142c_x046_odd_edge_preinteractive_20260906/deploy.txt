@@ -1,0 +1,28 @@
+STEP 1/4: FROM localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce
+STEP 2/4: ARG XRDP_DEB
+--> edd795792d71
+STEP 3/4: COPY ${XRDP_DEB} /tmp/odd-edge-xrdp.deb
+--> 057479f3c69f
+STEP 4/4: RUN dpkg -i /tmp/odd-edge-xrdp.deb && rm /tmp/odd-edge-xrdp.deb
+(Reading database ... 28642 files and directories currently installed.)
+Preparing to unpack /tmp/odd-edge-xrdp.deb ...
+Unpacking xrdp-dev (0.10.80+git20260906151219.c729a50889a2) over (0.10.80+git20260901120335.655639d8270c) ...
+Setting up xrdp-dev (0.10.80+git20260906151219.c729a50889a2) ...
+Installing new version of config file /etc/xrdp/cert.pem ...
+Installing new version of config file /etc/xrdp/key.pem ...
+Installing new version of config file /etc/xrdp/rsakeys.ini ...
+COMMIT localhost/xrdp-bisect:dev-odd-edge-40062
+--> 78abda788006
+Successfully tagged localhost/xrdp-bisect:dev-odd-edge-40062
+78abda7880067cf8816104077c28512c3dc504e549acf39131a480d1ec45b31d
+localhost/xrdp bisect:dev odd edge 40062	saved	
+application/vnd.docker.distribution.manifest.v2+json sha256:6c0639d0266ac16526b6d43f9dde405e63ab7c40f45eea7c4e1686f396de27b0
+Importing	elapsed: 9.4 s	total:   0.0 B	(0.0 B/s)	
+configmap/xrdp-gfx-x046 created
+deployment.apps/xrdp-x046 created
+Waiting for deployment "xrdp-x046" rollout to finish: 0 out of 1 new replicas have been updated...
+Waiting for deployment "xrdp-x046" rollout to finish: 0 of 1 updated replicas are available...
+deployment "xrdp-x046" successfully rolled out
+xorgxrdp-dev	1:0.10.80+git20260828123216.baf9658c397d
+xrdp-dev	0.10.80+git20260906151219.c729a50889a2
+Port 40062 installed. Certificate and smoke are still required.

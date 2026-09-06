@@ -1,0 +1,73 @@
+arm:    x046
+mode:   automatic AVC (auxiliary-leaf topology)
+image:  localhost/xrdp-bisect:dev-odd-edge-40062
+gfx:    sha256:565ad975e8a0d5b2
+key:    localhost/xrdp-bisect:dev-odd-edge-40062|565ad975e8a0d5b2
+when:   2026-09-06T15:13:10Z
+window: 3s at 1920x1080, 31892 bytes
+
+=== encoder input pipe ===
+PIPE VERDICT: TOO SMALL — this arm is NOT fit to measure.
+The encoder input pipe is below the 64 KiB minimum xrdp
+requires, so it cannot hold enough for xrdp and the encoder
+to run at the same time: they take turns, and each turn
+costs a pair of context switches. On this fleet that alone
+was 5.84 ms per 13.8 MB picture in the standalone pipe
+reproducer. It depresses every rate by an amount that has
+nothing to do with what is under test.
+
+OWNER ACTION REQUIRED: raise fs/pipe-user-pages-soft on the
+HOST, or give the server CAP_SYS_RESOURCE in the initial
+user namespace, then re-certify. xrdp will not change a
+system setting itself (owner directive, 2026-08-09).
+
+[2026-09-06T15:13:02.161+0000] [WARN ] xrdp_ffmpeg: PIPE_TOO_SMALL monitor -1: the encoder input pipe is 8192 bytes; 65536 is the minimum this server needs and 1048576 is what it asked for. One 1920x1088 NV12 picture is 3133440 bytes, so each one now crosses the pipe in 383 turns instead of 48. Below 65536 bytes the pipe cannot hold enough for xrdp and the encoder to run at the same time, so they take turns and each turn costs a pair of context switches.
+[2026-09-06T15:13:02.163+0000] [WARN ] xrdp_ffmpeg: PIPE_TOO_SMALL monitor -1: this is a host limit on this uid, not an xrdp setting. The administrator can raise fs/pipe-user-pages-soft, or give the server CAP_SYS_RESOURCE in the initial user namespace. xrdp will not change a system setting on its own. Any performance measurement taken in this state is not valid.
+[2026-09-06T15:13:02.419+0000] [WARN ] xrdp_ffmpeg: PIPE_TOO_SMALL monitor -1: the encoder input pipe is 8192 bytes; 65536 is the minimum this server needs and 1048576 is what it asked for. One 1920x1088 NV12 picture is 3133440 bytes, so each one now crosses the pipe in 383 turns instead of 48. Below 65536 bytes the pipe cannot hold enough for xrdp and the encoder to run at the same time, so they take turns and each turn costs a pair of context switches.
+[2026-09-06T15:13:02.421+0000] [WARN ] xrdp_ffmpeg: PIPE_TOO_SMALL monitor -1: this is a host limit on this uid, not an xrdp setting. The administrator can raise fs/pipe-user-pages-soft, or give the server CAP_SYS_RESOURCE in the initial user namespace. xrdp will not change a system setting on its own. Any performance measurement taken in this state is not valid.
+
+=== wire audit (--assert) ===
+=== x046 deploy certification ===
+SPS: 1920x1088 profile=77 level=51 max_num_ref_frames=1 log2_max_frame_num=4 poc_type=2 gaps=0  (1 SPS NALs, views: main)
+PPS: cabac=1 num_ref_idx_l0_default=1 weighted_pred=0
+
+first 12 pictures (decode order):
+  main fn=0      IDR none       ltr_flag=0    3865B
+  aux  fn=1      I   none       []             991B
+  main fn=1      P   none       [('sliding_window', None)]      96B
+  aux  fn=2      I   none       []             862B
+
+default auxiliary-leaf topology: 2 main, 2 auxiliary picture(s)
+The auxiliary view is expected to be non-reference intra;
+the main view alone owns the inter-picture reference chain.
+
+=== ASSERT GATE (AVC444 auxiliary-leaf topology) ===
+  LTR assertions A1-A7 are not run: this configuration
+  deliberately uses a non-reference intra auxiliary leaf.
+  L1 both AVC444 views are present         PASS  2 main and 2 auxiliary picture(s)
+  L2 every auxiliary picture is a leaf     PASS  all auxiliary pictures are non-IDR, non-reference intra
+  L3 main pictures retain reference ownership PASS  all main pictures are reference-bearing
+  L4 auxiliary cadence cannot exceed main cadence PASS  2 auxiliary against 2 main picture(s)
+  L5 main frame numbers are contiguous     PASS  one chain per IDR period
+  L6 parameter sets belong to the main view PASS  2 main and 0 auxiliary parameter-set NAL(s)
+
+ASSERT VERDICT: PASS -- 6 checks, all clean
+wire audit exit: 0
+
+=== black-frame check ===
+cert.bin
+  pictures in capture     : 4
+  frames decoded          : 4
+  black frames (any view) : 0 []
+  black MAIN-view frames  : 0 []
+  ... mid-stream          : 0 []
+  VERDICT: PASS
+
+NO MID-STREAM BLACK FRAME: PASS
+
+=== COVERAGE LIMIT OF A 3s WINDOW — read this ===
+This profile uses the default auxiliary-leaf topology, not
+the optional LTR chain. The live gate proves a reference-
+bearing main chain, parameter-set-free non-reference intra
+auxiliary leaves, valid cadence and decode without black
+frames. LTR slot and scheduled-cut assertions do not apply.

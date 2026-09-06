@@ -343,6 +343,14 @@ exact image and replaces only xrdp, retaining the current paired producer.
 Build/deploy and interactive evidence are tracked in
 [`i142c_x046_odd_edge_preinteractive_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_odd_edge_preinteractive_20260906/README.md).
 
+Port 40062 is installed from committed `c729a50889a2`, but initial
+certification is RED on the host pipe quota (8 KiB input pipes). The wire
+and decode checks pass; they do not waive the pipe guard or establish the
+Windows hypothesis. The host soft quota is back to 16384 pages; the owner
+has been given the physical-host command to restore and persist the documented
+262144-page setting. Preserve the failed capture, then re-certify the identical
+image after that external precondition is corrected. Controls remain untouched.
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose

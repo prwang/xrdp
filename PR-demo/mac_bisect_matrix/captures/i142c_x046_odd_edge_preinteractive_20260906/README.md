@@ -83,3 +83,77 @@ missing ACK and replacement-capability sequence. A generic disconnect alone
 is insufficient. Retain the working 40060 and failing clean-room 40061
 unchanged while the owner tests 40062. Final identities, gate results and
 timestamped tester instructions follow after deployment.
+
+## Initial deployment: host pipe precondition RED
+
+The source intervention is committed as `c729a50889a2`. The installed package
+is `xrdp-dev_0.10.80+git20260906151219.c729a50889a2_amd64.deb`, paired with
+unchanged xorgxrdp `baf9658c397d`. Image
+`localhost/xrdp-bisect:dev-odd-edge-40062` has local ID
+`78abda7880067cf8816104077c28512c3dc504e549acf39131a480d1ec45b31d`.
+The pod is `xrdp-x046-88845dc4d-c6vz4`, address 10.42.0.25, port 40062.
+The deployed profile SHA256 is
+`565ad975e8a0d5b2ae4f445a37d6c0f667aae466ea14a21b38761b1c0613f585`.
+FFmpeg remains `7:6.1.1-3ubuntu5`, libx264 remains
+`2:0.164.3108+git31e19f9-1`. Packaging generated fresh TLS certificate/key
+and RSA configuration, as the dpkg log records; a first-connection certificate
+prompt is not the graphics defect. No other installed package was upgraded.
+
+A provisional package carrying `76da657ae221+dirty` was produced after the
+raw test-output EOF-blank-line whitespace check interrupted the first commit
+attempt. It was never installed. The source was then committed and repackaged
+with the exact clean identity above. A mistyped package path failed the
+deployment script's first `test -f` before any deployment action; the corrected
+path is the one in the retained successful install log.
+
+The first three-second certificate is RED solely on its input-pipe guard.
+The encoder probe and production children received 8192-byte pipes, below
+the 65536-byte minimum; wire auxiliary-leaf checks pass 6/6 and all four
+captured pictures decode without black frames. Neither the failed certificate
+nor its intentional oracle-client disconnect proves the Windows hypothesis.
+Raw result: `initial-certification.FAILED`; the even-size smoke result is
+reported independently. No host setting was changed by the agent.
+
+Read-only diagnosis found `fs.pipe-user-pages-soft=16384`, hard=0 and
+per-pipe max=1048576. Container uid 0 maps to host uid 1000, so its quota is
+shared with other pipes charged to that account. A later new-pipe probe got
+65536 bytes and could retain that size, but a 1048576-byte enlargement failed
+with EPERM. The failure is pressure-sensitive, not a proof that every future
+pipe must remain 8192 bytes. A bounded inventory inside this container found
+212 distinct accessible pipes under root-owned processes with 48300032 bytes
+of capacity; that is not a complete host-uid accounting and cannot exclude
+additional host processes. Existing 40060/40061 Windows captures had no
+PIPE_TOO_SMALL warnings. Changing the encoder or accepting this certificate
+as green would therefore conceal a real environment discrepancy.
+
+The existing fleet README records the owner's previous temporary host value
+as 262144 pages. Current kernel documentation describes the soft limit as
+per-user total pipe pages, after which new pipes are capped at two pages and
+enlargement is denied:
+[Linux pipe sysctls](https://docs.kernel.org/admin-guide/sysctl/fs.html#pipe-user-pages-soft).
+The host instruction is to restore that documented setting and persist it:
+
+```sh
+printf '%s\n' 'fs.pipe-user-pages-soft = 262144' |
+  sudo tee /etc/sysctl.d/90-xrdp-pipe-budget.conf
+sudo sysctl -p /etc/sysctl.d/90-xrdp-pipe-budget.conf
+sysctl fs.pipe-user-pages-soft fs.pipe-user-pages-hard fs.pipe-max-size
+```
+
+Run this on the physical Incus host, not inside `/work` or a k3s pod. It sets
+a host-wide per-user threshold of 1 GiB at 4096 bytes/page, not a reservation
+of 1 GiB and not a container-specific privilege grant. Keep the existing
+hard=0 and max=1048576 settings unchanged. The initial commentary suggested a
+smaller 65536-page threshold; re-reading the fleet record corrected the
+instruction to restore the owner's previously approved 262144-page value.
+No reboot is needed. After the host correction, preserve the failed evidence,
+recreate only this arm's test pod from the identical image, and rerun its
+certificate and final smoke. Do not disturb the 40060/40061 controls. The
+Windows handoff remains pending until that precondition is green.
+
+The initial rendered smoke completed successfully at both 1920x1080 and
+1024x768: each produced eight expected key transitions, no lag, edge fidelity
+1.000, and no encoder restart/sequence errors. `initial-smoke.txt` and the
+two keytest outputs retain the results. The smoke script's generic "safe to
+hand over" line covers only those rendered checks; the failed pipe certificate
+still blocks this arm's overall handoff. No Windows odd-size test was run.

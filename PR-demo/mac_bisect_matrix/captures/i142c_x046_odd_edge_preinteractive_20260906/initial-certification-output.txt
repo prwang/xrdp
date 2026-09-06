@@ -1,0 +1,11 @@
+certifying x046 (xrdp-x046-88845dc4d-c6vz4) — 3s of payload at 1920x1080
+  image  localhost/xrdp-bisect:dev-odd-edge-40062
+  gfx    sha256:565ad975e8a0d5b2
+  session up after 4s; capturing 3s of payload
+PR-demo/mac_bisect_matrix/arm_certify.sh: line 206: 1133597 Killed                  setsid env DISPLAY=$CLI LD_LIBRARY_PATH=/opt/freerdp-vaapi/lib FREERDP_ORACLE_DUMP=1 RDPARGS="$RDPARGS" "$ORACLE_BIN" /args-from:env:RDPARGS < /dev/null > "$WORK/client.log" 2>&1
+NOT CERTIFIED: x046 — see /work/PR-demo/mac_bisect_matrix/certs/x046.cert.FAILED
+  the encoder input pipe is smaller than xrdp asked for, so no
+  timing number from this arm would mean anything. This one
+  needs the OWNER: raise fs/pipe-user-pages-soft on the host,
+  or grant CAP_SYS_RESOURCE in the initial user namespace.
+  xrdp does not change system settings (2026-08-09).
