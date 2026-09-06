@@ -122,6 +122,10 @@ xrdp_egfx_wire_inspect(const char *data, int bytes,
     info->lc = -1;
     info->version = -1;
     info->caps_flags = -1;
+    info->region_x1 = -1;
+    info->region_y1 = -1;
+    info->region_x2 = -1;
+    info->region_y2 = -1;
     info->descriptor = (unsigned char)data[0];
     if (info->descriptor == 0xE0)
     {
@@ -225,6 +229,15 @@ xrdp_egfx_wire_inspect(const char *data, int bytes,
             {
                 info->lc = (int)(info->payload_head >> 30);
                 info->region_count = info->payload_next;
+                /* The first rectangle is wholly inside the first payload
+                 * segment; no scan of the encoded bitstream is needed. */
+                if (info->region_count > 0 && info->bitmap_bytes >= 16)
+                {
+                    info->region_x1 = (int)wire_u16(data + 50);
+                    info->region_y1 = (int)wire_u16(data + 52);
+                    info->region_x2 = (int)wire_u16(data + 54);
+                    info->region_y2 = (int)wire_u16(data + 56);
+                }
             }
             break;
         case XR_RDPGFX_CMDID_CREATESURFACE:
@@ -305,11 +318,15 @@ wire_trace_tx(struct xrdp_egfx *egfx, const char *data, int bytes, int result)
     {
         PERF_TRACE("event=wire_tx seq=%u cmd=%d frame=%d surface=%d "
                    "codec=%d lc=%d x1=%d y1=%d x2=%d y2=%d "
-                   "regions=%u payload_bytes=%u pdu_bytes=%u "
+                   "regions=%u region_x1=%d region_y1=%d "
+                   "region_x2=%d region_y2=%d "
+                   "payload_bytes=%u pdu_bytes=%u "
                    "wire_bytes=%d segments=%d head=%u next=%u tail=%u "
                    "result=%d", sequence, info.command_id, frame_id,
                    info.surface_id, info.codec_id, info.lc, info.x1,
                    info.y1, info.x2, info.y2, info.region_count,
+                   info.region_x1, info.region_y1,
+                   info.region_x2, info.region_y2,
                    info.bitmap_bytes, info.pdu_bytes, bytes,
                    info.segment_count, info.payload_head,
                    info.payload_next, info.payload_tail, result);

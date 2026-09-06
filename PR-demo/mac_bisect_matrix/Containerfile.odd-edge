@@ -1,0 +1,5 @@
+# Preserve the exact software/environment used by the development control.
+FROM localhost/xrdp-bisect:dev-wire-655639d8-baf9658-u2404-xfce
+ARG XRDP_DEB
+COPY ${XRDP_DEB} /tmp/odd-edge-xrdp.deb
+RUN dpkg -i /tmp/odd-edge-xrdp.deb && rm /tmp/odd-edge-xrdp.deb

@@ -142,6 +142,10 @@ struct xrdp_egfx_wire_info
     int lc;
     int version;
     int caps_flags;
+    int region_x1;
+    int region_y1;
+    int region_x2;
+    int region_y2;
     unsigned int pdu_bytes;
     unsigned int bitmap_bytes;
     unsigned int region_count;

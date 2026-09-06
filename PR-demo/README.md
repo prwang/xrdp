@@ -57,6 +57,11 @@ driver uses a dummy payload only to exercise metadata serialization; it proves
 neither H.264 validity nor client behavior. `mac_bisect_matrix/i142_wire_transition.py`
 reports the corresponding captured client acknowledgements and capability
 advertisements by send sequence, including reused frame IDs.
+`mac_bisect_matrix/deploy_x046_odd_edge.sh` creates the explicitly faulty
+canonical-development comparison on port 40062. It layers only the new xrdp
+package onto the exact 40060 image and refuses to replace an existing arm.
+It preserves visible outer surfaces while allowing the AVC444 inner region
+to round one pixel beyond an odd edge. This arm is not an acceptance build.
 
 * **`smoke_gate/`** — the mandatory pre-handoff gate. `smoke.sh` runs the
   colour-key test at **two** session sizes (1920×1080 and 1024×768, both

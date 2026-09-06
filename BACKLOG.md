@@ -336,6 +336,13 @@ forward undo plus a normative visible-surface correction, prove green on
 development, and re-author the owning clean-room slice. Until that observation,
 do not advance the conditional undo or claim the hypothesis confirmed.
 
+The 40062 intervention and bounded first-region wire fields are implemented.
+Complete trace-enabled and disabled gates pass (daemon 223/223 and 219/219);
+the existing visible-bound tests are unchanged. The new arm inherits 40060's
+exact image and replaces only xrdp, retaining the current paired producer.
+Build/deploy and interactive evidence are tracked in
+[`i142c_x046_odd_edge_preinteractive_20260906`](PR-demo/mac_bisect_matrix/captures/i142c_x046_odd_edge_preinteractive_20260906/README.md).
+
 The replacement clean-room acceptance image on port `40058` retains XFCE,
 LXTerminal, default xterm and every indexed visual/benchmark helper. It also
 provides working Glamor acceleration, Thunar and a Chromium launcher whose

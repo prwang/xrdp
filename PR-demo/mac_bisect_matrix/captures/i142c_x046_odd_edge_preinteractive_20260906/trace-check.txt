@@ -1,0 +1,817 @@
+Making check in third_party
+make[1]: Entering directory '/work/third_party'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/third_party'
+Making check in third_party/tomlc99
+make[1]: Entering directory '/work/third_party/tomlc99'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/third_party/tomlc99'
+Making check in common
+make[1]: Entering directory '/work/common'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/common'
+Making check in vnc
+make[1]: Entering directory '/work/vnc'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/vnc'
+Making check in xup
+make[1]: Entering directory '/work/xup'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/xup'
+Making check in mc
+make[1]: Entering directory '/work/mc'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/mc'
+Making check in libipm
+make[1]: Entering directory '/work/libipm'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/libipm'
+Making check in libxrdp
+make[1]: Entering directory '/work/libxrdp'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/libxrdp'
+Making check in libpainter
+make[1]: Entering directory '/work/libpainter'
+Making check in src
+make[2]: Entering directory '/work/libpainter/src'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/libpainter/src'
+Making check in include
+make[2]: Entering directory '/work/libpainter/include'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/libpainter/include'
+Making check in pkgconfig
+make[2]: Entering directory '/work/libpainter/pkgconfig'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/libpainter/pkgconfig'
+Making check in tests
+make[2]: Entering directory '/work/libpainter/tests'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/libpainter/tests'
+make[2]: Entering directory '/work/libpainter'
+make[2]: Leaving directory '/work/libpainter'
+make[1]: Leaving directory '/work/libpainter'
+Making check in librfxcodec
+make[1]: Entering directory '/work/librfxcodec'
+Making check in include
+make[2]: Entering directory '/work/librfxcodec/include'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/librfxcodec/include'
+Making check in src
+make[2]: Entering directory '/work/librfxcodec/src'
+Making check in amd64
+make[3]: Entering directory '/work/librfxcodec/src/amd64'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '/work/librfxcodec/src/amd64'
+Making check in sse2
+make[3]: Entering directory '/work/librfxcodec/src/sse2'
+make[4]: Entering directory '/work/librfxcodec/src/sse2'
+make[4]: Nothing to be done for 'check-am'.
+make[4]: Leaving directory '/work/librfxcodec/src/sse2'
+make[3]: Leaving directory '/work/librfxcodec/src/sse2'
+make[3]: Entering directory '/work/librfxcodec/src'
+make[3]: Nothing to be done for 'check-am'.
+make[3]: Leaving directory '/work/librfxcodec/src'
+make[2]: Leaving directory '/work/librfxcodec/src'
+Making check in tests
+make[2]: Entering directory '/work/librfxcodec/tests'
+make  rfxcodectest rfxencode test_dwt_rem
+make[3]: Entering directory '/work/librfxcodec/tests'
+make[3]: 'rfxcodectest' is up to date.
+make[3]: 'rfxencode' is up to date.
+make[3]: 'test_dwt_rem' is up to date.
+make[3]: Leaving directory '/work/librfxcodec/tests'
+make[2]: Leaving directory '/work/librfxcodec/tests'
+make[2]: Entering directory '/work/librfxcodec'
+make[2]: Leaving directory '/work/librfxcodec'
+make[1]: Leaving directory '/work/librfxcodec'
+Making check in sesman
+make[1]: Entering directory '/work/sesman'
+Making check in libsesman
+make[2]: Entering directory '/work/sesman/libsesman'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/sesman/libsesman'
+Making check in sesexec
+make[2]: Entering directory '/work/sesman/sesexec'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/sesman/sesexec'
+Making check in tools
+make[2]: Entering directory '/work/sesman/tools'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/sesman/tools'
+Making check in chansrv
+make[2]: Entering directory '/work/sesman/chansrv'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/sesman/chansrv'
+make[2]: Entering directory '/work/sesman'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '/work/sesman'
+make[1]: Leaving directory '/work/sesman'
+Making check in xrdp
+make[1]: Entering directory '/work/xrdp'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/xrdp'
+Making check in fontutils
+make[1]: Entering directory '/work/fontutils'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/fontutils'
+Making check in keygen
+make[1]: Entering directory '/work/keygen'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/keygen'
+Making check in waitforx
+make[1]: Entering directory '/work/waitforx'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/waitforx'
+Making check in docs
+make[1]: Entering directory '/work/docs'
+Making check in man
+make[2]: Entering directory '/work/docs/man'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/docs/man'
+make[2]: Entering directory '/work/docs'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '/work/docs'
+make[1]: Leaving directory '/work/docs'
+Making check in instfiles
+make[1]: Entering directory '/work/instfiles'
+Making check in pam.d
+make[2]: Entering directory '/work/instfiles/pam.d'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/instfiles/pam.d'
+Making check in pulse
+make[2]: Entering directory '/work/instfiles/pulse'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/instfiles/pulse'
+Making check in default
+make[2]: Entering directory '/work/instfiles/default'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/instfiles/default'
+Making check in init.d
+make[2]: Entering directory '/work/instfiles/init.d'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/instfiles/init.d'
+make[2]: Entering directory '/work/instfiles'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '/work/instfiles'
+make[1]: Leaving directory '/work/instfiles'
+Making check in genkeymap
+make[1]: Entering directory '/work/genkeymap'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/genkeymap'
+Making check in xrdpapi
+make[1]: Entering directory '/work/xrdpapi'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/xrdpapi'
+Making check in pkgconfig
+make[1]: Entering directory '/work/pkgconfig'
+make[1]: Nothing to be done for 'check'.
+make[1]: Leaving directory '/work/pkgconfig'
+Making check in tests
+make[1]: Entering directory '/work/tests'
+Making check in common
+make[2]: Entering directory '/work/tests/common'
+make  test_common
+make[3]: Entering directory '/work/tests/common'
+  CC       test_common-test_common_main.o
+  CC       test_common-test_list_calls.o
+  CC       test_common-test_list16_calls.o
+  CC       test_common-test_dechunker.o
+  CC       test_common-test_fifo_calls.o
+  CC       test_common-test_parse.o
+  CC       test_common-test_set_int.o
+  CC       test_common-test_string_calls.o
+  CC       test_common-test_string_calls_unicode.o
+  CC       test_common-test_os_calls.o
+  CC       test_common-test_os_calls_signals.o
+  CC       test_common-test_ssl_calls.o
+  CC       test_common-test_base64.o
+  CC       test_common-test_guid.o
+  CC       test_common-test_scancode.o
+  CC       test_common-test_timers.o
+  CC       test_common-test_log.o
+  CC       test_common-test_perf_trace.o
+  CCLD     test_common
+make[3]: Leaving directory '/work/tests/common'
+make  check-TESTS
+make[3]: Entering directory '/work/tests/common'
+make[4]: Entering directory '/work/tests/common'
+SKIP: test_perf_trace_disabled.sh - performance trace is enabled
+PASS: test_common 1 - test_dechunker.c:dechunker_basic:test_dechunker_bad_params: Passed
+PASS: test_common 2 - test_dechunker.c:dechunker_basic:test_dechunker_passthrough: Passed
+PASS: test_common 3 - test_dechunker.c:dechunker_basic:test_dechunker_intermediate: Passed
+PASS: test_common 4 - test_dechunker.c:dechunker_basic:test_dechunker_last: Passed
+PASS: test_common 5 - test_dechunker.c:dechunker_basic:test_dechunker_first_first: Passed
+PASS: test_common 6 - test_dechunker.c:dechunker_basic:test_dechunker_chunk_overflow: Passed
+PASS: test_common 7 - test_dechunker.c:dechunker_basic:test_dechunker_big_test: Passed
+PASS: test_common 8 - test_dechunker.c:dechunker_basic:test_dechunker_big_test_oversize_fail: Passed
+PASS: test_common 9 - test_dechunker.c:dechunker_basic:test_dechunker_big_test_undersize_fail: Passed
+PASS: test_common 10 - test_fifo_calls.c:simple:test_fifo__null: Passed
+PASS: test_common 11 - test_fifo_calls.c:simple:test_fifo__simple: Passed
+PASS: test_common 12 - test_fifo_calls.c:simple:test_fifo__strdup: Passed
+PASS: test_common 13 - test_fifo_calls.c:simple:test_fifo__large_test_1: Passed
+PASS: test_common 14 - test_fifo_calls.c:simple:test_fifo__large_test_2: Passed
+PASS: test_common 15 - test_list_calls.c:simple:test_list__simple: Passed
+PASS: test_common 16 - test_list_calls.c:simple:test_list__simple_auto_free: Passed
+PASS: test_common 17 - test_list_calls.c:simple:test_list__simple_append_list: Passed
+PASS: test_common 18 - test_list_calls.c:simple:test_list__simple_strdup_multi: Passed
+PASS: test_common 19 - test_list_calls.c:simple:test_list__append_fragment: Passed
+PASS: test_common 20 - test_list_calls.c:simple:test_list__split_string_into_list: Passed
+PASS: test_common 21 - test_list16_calls.c:simple:test_list16__simple: Passed
+PASS: test_common 22 - test_list16_calls.c:simple:test_list16__stack: Passed
+PASS: test_common 23 - test_parse.c:Unicode:test_out_utf8_as_utf16_le: Passed
+PASS: test_common 24 - test_parse.c:Unicode:test_in_utf16_le_fixed_as_utf8: Passed
+PASS: test_common 25 - test_parse.c:Unicode:test_in_utf16_le_terminated_as_utf8: Passed
+PASS: test_common 26 - test_parse.c:Unicode:test_in_utf16_le_significant_chars: Passed
+PASS: test_common 27 - test_set_int.c:basic:test_basic__bad_args: Passed
+PASS: test_common 28 - test_set_int.c:basic:test_basic__one_to_ten: Passed
+PASS: test_common 29 - test_set_int.c:basic:test_basic__add_remove_all: Passed
+PASS: test_common 30 - test_set_int.c:basic:test_basic__single_element: Passed
+PASS: test_common 31 - test_set_int.c:basic:test_basic__get_next: Passed
+PASS: test_common 32 - test_string_calls.c:strnjoin:test_strnjoin__when_src_is_null__returns_empty_string: Passed
+PASS: test_common 33 - test_string_calls.c:strnjoin:test_strnjoin__when_src_has_null_item__returns_joined_string: Passed
+PASS: test_common 34 - test_string_calls.c:strnjoin:test_strnjoin__when_src_has_one_item__returns_copied_source_string: Passed
+PASS: test_common 35 - test_string_calls.c:strnjoin:test_strnjoin__when_src_has_two_items__returns_joined_string: Passed
+PASS: test_common 36 - test_string_calls.c:strnjoin:test_strnjoin__when_joiner_is_empty_string__returns_joined_string: Passed
+PASS: test_common 37 - test_string_calls.c:strnjoin:test_strnjoin__when_joiner_is_NULL__returns_joined_string: Passed
+PASS: test_common 38 - test_string_calls.c:strnjoin:test_strnjoin__when_destination_is_NULL__returns_NULL: Passed
+PASS: test_common 39 - test_string_calls.c:strnjoin:test_strnjoin__when_destination_is_shorter_than_src__returns_partial_src_string: Passed
+PASS: test_common 40 - test_string_calls.c:strnjoin:test_strnjoin__when_destination_is_shorter_than_src_plus_joiner__returns_partial_joined_string: Passed
+PASS: test_common 41 - test_string_calls.c:strnjoin:test_strnjoin__when_destination_has_contents__returns_joined_string_with_content_overwritten: Passed
+PASS: test_common 42 - test_string_calls.c:strnjoin:test_strnjoin__when_always__then_doesnt_write_beyond_end_of_destination: Passed
+PASS: test_common 43 - test_string_calls.c:bm2str:test_bm2str__no_bits_defined: Passed
+PASS: test_common 44 - test_string_calls.c:bm2str:test_bm2str__all_bits_defined: Passed
+PASS: test_common 45 - test_string_calls.c:bm2str:test_bm2str__some_bits_undefined: Passed
+PASS: test_common 46 - test_string_calls.c:bm2str:test_bm2str__overflow_all_bits_defined: Passed
+PASS: test_common 47 - test_string_calls.c:bm2str:test_bm2str__overflow_some_bits_undefined: Passed
+PASS: test_common 48 - test_string_calls.c:str2bm:test_str2bm__null_string: Passed
+PASS: test_common 49 - test_string_calls.c:str2bm:test_str2bm__empty_string: Passed
+PASS: test_common 50 - test_string_calls.c:str2bm:test_str2bm__null_bitdefs: Passed
+PASS: test_common 51 - test_string_calls.c:str2bm:test_str2bm__null_delim: Passed
+PASS: test_common 52 - test_string_calls.c:str2bm:test_str2bm__null_buffer: Passed
+PASS: test_common 53 - test_string_calls.c:str2bm:test_str2bm__zero_buffer: Passed
+PASS: test_common 54 - test_string_calls.c:str2bm:test_str2bm__zero_mask: Passed
+PASS: test_common 55 - test_string_calls.c:str2bm:test_str2bm__all_defined: Passed
+PASS: test_common 56 - test_string_calls.c:str2bm:test_str2bm__no_defined: Passed
+PASS: test_common 57 - test_string_calls.c:str2bm:test_str2bm__some_defined: Passed
+PASS: test_common 58 - test_string_calls.c:str2bm:test_str2bm__trim_space: Passed
+PASS: test_common 59 - test_string_calls.c:str2bm:test_str2bm__overflow_undefined: Passed
+PASS: test_common 60 - test_string_calls.c:str2bm:test_str2bm__no_delim: Passed
+PASS: test_common 61 - test_string_calls.c:str2bm:test_str2bm__delim_slash: Passed
+PASS: test_common 62 - test_string_calls.c:str2bm:test_str2bm__multiple_delim: Passed
+PASS: test_common 63 - test_string_calls.c:str2bm:test_str2bm__first_delim_is_semicolon: Passed
+PASS: test_common 64 - test_string_calls.c:str2bm:test_str2bm__empty_token: Passed
+PASS: test_common 65 - test_string_calls.c:bm2char:test_bm2char__no_bits_defined: Passed
+PASS: test_common 66 - test_string_calls.c:bm2char:test_bm2char__all_bits_defined: Passed
+PASS: test_common 67 - test_string_calls.c:bm2char:test_bm2char__some_bits_undefined: Passed
+PASS: test_common 68 - test_string_calls.c:bm2char:test_bm2char__overflow_all_bits_defined: Passed
+PASS: test_common 69 - test_string_calls.c:bm2char:test_bm2char__overflow_some_bits_undefined: Passed
+PASS: test_common 70 - test_string_calls.c:bm2char:test_bm2char__null_rest_param: Passed
+PASS: test_common 71 - test_string_calls.c:char2bm:test_char2bm__null_string: Passed
+PASS: test_common 72 - test_string_calls.c:char2bm:test_char2bm__empty_string: Passed
+PASS: test_common 73 - test_string_calls.c:char2bm:test_char2bm__null_bitdefs: Passed
+PASS: test_common 74 - test_string_calls.c:char2bm:test_char2bm__null_buffer: Passed
+PASS: test_common 75 - test_string_calls.c:char2bm:test_char2bm__zero_buffer: Passed
+PASS: test_common 76 - test_string_calls.c:char2bm:test_char2bm__zero_mask: Passed
+PASS: test_common 77 - test_string_calls.c:char2bm:test_char2bm__all_defined: Passed
+PASS: test_common 78 - test_string_calls.c:char2bm:test_char2bm__no_defined: Passed
+PASS: test_common 79 - test_string_calls.c:char2bm:test_char2bm__some_defined: Passed
+PASS: test_common 80 - test_string_calls.c:char2bm:test_char2bm__overflow_undefined: Passed
+PASS: test_common 81 - test_string_calls.c:strtrim:test_strtrim__trim_left: Passed
+PASS: test_common 82 - test_string_calls.c:strtrim:test_strtrim__trim_right: Passed
+PASS: test_common 83 - test_string_calls.c:strtrim:test_strtrim__trim_both: Passed
+PASS: test_common 84 - test_string_calls.c:strtrim:test_strtrim__trim_through: Passed
+PASS: test_common 85 - test_string_calls.c:strtrim:test_strtrim__chinese_chars: Passed
+PASS: test_common 86 - test_string_calls.c:signals:test_sigs__common: Passed
+PASS: test_common 87 - test_string_calls.c:signals:test_sigs__bigint: Passed
+PASS: test_common 88 - test_string_calls.c:g_htoi:test_htoi__all: Passed
+PASS: test_common 89 - test_string_calls_unicode.c:Unicode:test_get_next_char__section_1: Passed
+PASS: test_common 90 - test_string_calls_unicode.c:Unicode:test_get_next_char__section_2: Passed
+PASS: test_common 91 - test_string_calls_unicode.c:Unicode:test_get_next_char__section_3: Passed
+PASS: test_common 92 - test_string_calls_unicode.c:Unicode:test_get_next_char__section_4: Passed
+PASS: test_common 93 - test_string_calls_unicode.c:Unicode:test_get_next_char__section_5: Passed
+PASS: test_common 94 - test_string_calls_unicode.c:Unicode:test_utf_char32_to_utf8: Passed
+PASS: test_common 95 - test_string_calls_unicode.c:Unicode:test_utf8_char_count: Passed
+PASS: test_common 96 - test_string_calls_unicode.c:Unicode:test_utf8_as_utf16_word_count: Passed
+PASS: test_common 97 - test_string_calls_unicode.c:Unicode:test_utf8_add_char_at: Passed
+PASS: test_common 98 - test_string_calls_unicode.c:Unicode:test_utf8_remove_char_at: Passed
+PASS: test_common 99 - test_os_calls.c:oscalls-file:test_g_file_get_size__returns_file_size: Passed
+PASS: test_common 100 - test_os_calls.c:oscalls-file:test_g_file_get_size__1GiB: Passed
+PASS: test_common 101 - test_os_calls.c:oscalls-file:test_g_file_get_size__just_less_than_2GiB: Passed
+PASS: test_common 102 - test_os_calls.c:oscalls-file:test_g_file_rw: Passed
+PASS: test_common 103 - test_os_calls.c:oscalls-file:test_g_file_ro: Passed
+PASS: test_common 104 - test_os_calls.c:oscalls-file:test_g_file_cloexec: Passed
+PASS: test_common 105 - test_os_calls.c:oscalls-file:test_g_file_get_open_fds: Passed
+PASS: test_common 106 - test_os_calls.c:oscalls-file:test_g_file_is_open: Passed
+PASS: test_common 107 - test_os_calls.c:oscalls-file:test_g_sck_fd_passing: Passed
+PASS: test_common 108 - test_os_calls.c:oscalls-file:test_g_sck_fd_overflow: Passed
+PASS: test_common 109 - test_os_calls.c:oscalls-file:test_g_readdir: Passed
+PASS: test_common 110 - test_os_calls.c:oscalls-file:test_g_readdir_not_dir: Passed
+PASS: test_common 111 - test_os_calls_signals.c:oscalls-signals:test_g_set_alarm: Passed
+PASS: test_common 112 - test_os_calls_signals.c:oscalls-signals:test_g_signal_child_stop_1: Passed
+PASS: test_common 113 - test_os_calls_signals.c:oscalls-signals:test_g_signal_child_stop_2: Passed
+PASS: test_common 114 - test_os_calls_signals.c:oscalls-signals:test_g_signal_segfault: Passed
+PASS: test_common 115 - test_os_calls_signals.c:oscalls-signals:test_g_signal_hang_up: Passed
+PASS: test_common 116 - test_os_calls_signals.c:oscalls-signals:test_g_signal_user_interrupt: Passed
+PASS: test_common 117 - test_os_calls_signals.c:oscalls-signals:test_g_signal_terminate: Passed
+PASS: test_common 118 - test_os_calls_signals.c:oscalls-signals:test_g_signal_pipe: Passed
+PASS: test_common 119 - test_os_calls_signals.c:oscalls-signals:test_g_signal_usr1: Passed
+PASS: test_common 120 - test_os_calls_signals.c:oscalls-signals:test_waitpid_not_interrupted_by_sig: Passed
+PASS: test_common 121 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_ok: Passed
+PASS: test_common 122 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_tv0_ok: Passed
+PASS: test_common 123 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_tv1_ok: Passed
+PASS: test_common 124 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_tv2_ok: Passed
+PASS: test_common 125 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_tv3_ok: Passed
+PASS: test_common 126 - test_ssl_calls.c:ssl_calls_rc4:test_rc4_enc_tv4_ok: Passed
+PASS: test_common 127 - test_ssl_calls.c:ssl_calls_sha1:test_sha1_hash_ok: Passed
+PASS: test_common 128 - test_ssl_calls.c:ssl_calls_md5:test_md5_hash_ok: Passed
+PASS: test_common 129 - test_ssl_calls.c:ssl_calls_des3:test_des3_enc_ok: Passed
+PASS: test_common 130 - test_ssl_calls.c:ssl_calls_hmac_sha1:test_hmac_sha1_dgst_ok: Passed
+PASS: test_common 131 - test_ssl_calls.c:ssl_calls_rsa_key:test_gen_key_xrdp1: Passed
+PASS: test_common 132 - test_base64.c:base64:test_b64_rfc4648_ex1_to: Passed
+PASS: test_common 133 - test_base64.c:base64:test_b64_rfc4648_ex1_from: Passed
+PASS: test_common 134 - test_base64.c:base64:test_b64_rfc4648_ex2_to: Passed
+PASS: test_common 135 - test_base64.c:base64:test_b64_rfc4648_ex2_from: Passed
+PASS: test_common 136 - test_base64.c:base64:test_b64_rfc4648_ex3_to: Passed
+PASS: test_common 137 - test_base64.c:base64:test_b64_rfc4648_ex3_from: Passed
+PASS: test_common 138 - test_base64.c:base64:test_b64_rfc4648_ex4_to: Passed
+PASS: test_common 139 - test_base64.c:base64:test_b64_rfc4648_ex4_from: Passed
+PASS: test_common 140 - test_base64.c:base64:test_b64_rfc4648_ex5_to: Passed
+PASS: test_common 141 - test_base64.c:base64:test_b64_rfc4648_ex5_from: Passed
+PASS: test_common 142 - test_base64.c:base64:test_b64_rfc4648_ex6_to: Passed
+PASS: test_common 143 - test_base64.c:base64:test_b64_rfc4648_ex6_from: Passed
+PASS: test_common 144 - test_base64.c:base64:test_b64_rfc4648_ex7_to: Passed
+PASS: test_common 145 - test_base64.c:base64:test_b64_rfc4648_ex7_from: Passed
+PASS: test_common 146 - test_base64.c:base64:test_b64_all_valid_from: Passed
+PASS: test_common 147 - test_base64.c:base64:test_b64_all_valid_to: Passed
+PASS: test_common 148 - test_base64.c:base64:test_b64_all_invalid: Passed
+PASS: test_common 149 - test_base64.c:base64:test_b64_small_buffer_encode: Passed
+PASS: test_common 150 - test_base64.c:base64:test_b64_small_buffer_decode: Passed
+PASS: test_common 151 - test_base64.c:base64:test_b64_add_pad_one: Passed
+PASS: test_common 152 - test_base64.c:base64:test_b64_add_pad_two: Passed
+PASS: test_common 153 - test_base64.c:base64:test_b64_bad_pad: Passed
+PASS: test_common 154 - test_base64.c:base64:test_b64_concat_pad: Passed
+PASS: test_common 155 - test_guid.c:guid_to_str:test_guid_to_str_remotefx: Passed
+PASS: test_common 156 - test_guid.c:guid_to_str:test_guid_to_str_nscodec: Passed
+PASS: test_common 157 - test_guid.c:guid_to_str:test_guid_to_str_ignore: Passed
+PASS: test_common 158 - test_guid.c:guid_to_str:test_guid_to_str_random: Passed
+PASS: test_common 159 - test_scancode.c:scancode:test_scancode__scancode_to_index: Passed
+PASS: test_common 160 - test_scancode.c:scancode:test_scancode__keycode_sets: Passed
+PASS: test_common 161 - test_scancode.c:scancode:test_scancode__evdev_all_values_returned: Passed
+PASS: test_common 162 - test_scancode.c:scancode:test_scancode__evdev_bad_values_mapped_to_0: Passed
+PASS: test_common 163 - test_scancode.c:scancode:test_scancode__base_all_values_returned: Passed
+PASS: test_common 164 - test_scancode.c:scancode:test_scancode__base_bad_values_mapped_to_0: Passed
+PASS: test_common 165 - test_timers.c:timers:test_timers__null_timer: Passed
+PASS: test_common 166 - test_timers.c:timers:test_timers__two_secs: Passed
+PASS: test_common 167 - test_log.c:log_timestamp:test_log_usec_to_msec_zero: Passed
+PASS: test_common 168 - test_log.c:log_timestamp:test_log_usec_to_msec_rounds_up: Passed
+PASS: test_common 169 - test_log.c:log_timestamp:test_log_usec_to_msec_rounds_down: Passed
+PASS: test_common 170 - test_log.c:log_timestamp:test_log_usec_to_msec_small_fraction: Passed
+PASS: test_common 171 - test_log.c:log_timestamp:test_log_usec_to_msec_large_fraction: Passed
+PASS: test_common 172 - test_log.c:log_timestamp:test_log_usec_to_msec_never_carries: Passed
+PASS: test_common 173 - test_log.c:log_timestamp:test_log_usec_to_msec_is_three_digits: Passed
+PASS: test_common 174 - test_log.c:log_timestamp:test_log_formatted_datetime_shape: Passed
+PASS: test_common 175 - test_perf_trace.c:perf_trace:test_perf_trace_named_schema: Passed
+PASS: test_common 176 - test_perf_trace.c:perf_trace:test_perf_trace_64_bit_and_negative_values: Passed
+PASS: test_common 177 - test_perf_trace.c:perf_trace:test_perf_trace_rejects_truncated_record: Passed
+PASS: test_common 178 - test_perf_trace.c:perf_trace:test_perf_trace_rejects_unsafe_formats: Passed
+PASS: test_common 179 - test_perf_trace.c:perf_trace:test_perf_trace_disarmed_by_default: Passed
+PASS: test_common 180 - test_perf_trace.c:perf_trace:test_perf_trace_does_not_initialize_lazily: Passed
+PASS: test_common 181 - test_perf_trace.c:perf_trace:test_perf_trace_explicit_lifecycle_and_final_drain: Passed
+PASS: test_common 182 - test_perf_trace.c:perf_trace:test_perf_trace_refuses_existing_symlink: Passed
+PASS: test_common 183 - test_perf_trace.c:perf_trace:test_perf_trace_concurrent_thread_rings: Passed
+PASS: test_common 184 - test_perf_trace.c:perf_trace:test_perf_trace_post_fork_initialization: Passed
+PASS: test_common 185 - test_perf_trace.c:perf_trace:test_perf_trace_sink_write_failure_is_visible: Passed
+PASS: test_common 186 - test_perf_trace.c:perf_trace:test_perf_trace_ring_fifo_bytes: Passed
+PASS: test_common 187 - test_perf_trace.c:perf_trace:test_perf_trace_ring_wraps_without_copy: Passed
+PASS: test_common 188 - test_perf_trace.c:perf_trace:test_perf_trace_ring_counts_whole_record_drops: Passed
+PASS: test_common 189 - test_perf_trace.c:perf_trace:test_perf_trace_ring_rejects_null: Passed
+============================================================================
+Testsuite summary for "libcommon"
+============================================================================
+# TOTAL: 190
+# PASS:  189
+# SKIP:  1
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+============================================================================
+make[4]: Leaving directory '/work/tests/common'
+make[3]: Leaving directory '/work/tests/common'
+make[2]: Leaving directory '/work/tests/common'
+Making check in libipm
+make[2]: Entering directory '/work/tests/libipm'
+make  test_libipm
+make[3]: Entering directory '/work/tests/libipm'
+  CC       test_libipm-test_libipm_main.o
+  CC       test_libipm-test_libipm_send_calls.o
+  CC       test_libipm-test_libipm_recv_calls.o
+  CCLD     test_libipm
+make[3]: Leaving directory '/work/tests/libipm'
+make  check-TESTS
+make[3]: Entering directory '/work/tests/libipm'
+make[4]: Entering directory '/work/tests/libipm'
+PASS: test_libipm 1 - test_libipm_send_calls.c:libipm_send:test_libipm_append_all_test: Passed
+PASS: test_libipm 2 - test_libipm_send_calls.c:libipm_send:test_libipm_send_y_type: Passed
+PASS: test_libipm 3 - test_libipm_send_calls.c:libipm_send:test_libipm_send_b_type: Passed
+PASS: test_libipm 4 - test_libipm_send_calls.c:libipm_send:test_libipm_send_n_type: Passed
+PASS: test_libipm 5 - test_libipm_send_calls.c:libipm_send:test_libipm_send_q_type: Passed
+PASS: test_libipm 6 - test_libipm_send_calls.c:libipm_send:test_libipm_send_i_type: Passed
+PASS: test_libipm 7 - test_libipm_send_calls.c:libipm_send:test_libipm_send_u_type: Passed
+PASS: test_libipm 8 - test_libipm_send_calls.c:libipm_send:test_libipm_send_x_type: Passed
+PASS: test_libipm 9 - test_libipm_send_calls.c:libipm_send:test_libipm_send_t_type: Passed
+PASS: test_libipm 10 - test_libipm_send_calls.c:libipm_send:test_libipm_send_s_type: Passed
+PASS: test_libipm 11 - test_libipm_send_calls.c:libipm_send:test_libipm_send_h_type: Passed
+PASS: test_libipm 12 - test_libipm_send_calls.c:libipm_send:test_libipm_send_B_type: Passed
+PASS: test_libipm 13 - test_libipm_send_calls.c:libipm_send:test_libipm_send_y_type: Passed
+PASS: test_libipm 14 - test_libipm_send_calls.c:libipm_send:test_libipm_send_bad_types: Passed
+PASS: test_libipm 15 - test_libipm_send_calls.c:libipm_send:test_libipm_send_msg_erase: Passed
+PASS: test_libipm 16 - test_libipm_send_calls.c:libipm_send:test_libipm_send_programming_errors: Passed
+PASS: test_libipm 17 - test_libipm_recv_calls.c:libipm_recv:test_libipm_send_recv_all_test: Passed
+PASS: test_libipm 18 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_y_type: Passed
+PASS: test_libipm 19 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_b_type: Passed
+PASS: test_libipm 20 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_n_type: Passed
+PASS: test_libipm 21 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_q_type: Passed
+PASS: test_libipm 22 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_i_type: Passed
+PASS: test_libipm 23 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_u_type: Passed
+PASS: test_libipm 24 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_x_type: Passed
+PASS: test_libipm 25 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_t_type: Passed
+PASS: test_libipm 26 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_s_type: Passed
+PASS: test_libipm 27 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_h_type: Passed
+PASS: test_libipm 28 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_B_type: Passed
+PASS: test_libipm 29 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_no_type: Passed
+PASS: test_libipm 30 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_unexpected_type: Passed
+PASS: test_libipm 31 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_unsupported_type: Passed
+PASS: test_libipm 32 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_unimplemented_type: Passed
+PASS: test_libipm 33 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_bad_header: Passed
+PASS: test_libipm 34 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_msg_erase: Passed
+PASS: test_libipm 35 - test_libipm_recv_calls.c:libipm_recv:test_libipm_receive_programming_errors: Passed
+============================================================================
+Testsuite summary for "libipm"
+============================================================================
+# TOTAL: 35
+# PASS:  35
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+============================================================================
+make[4]: Leaving directory '/work/tests/libipm'
+make[3]: Leaving directory '/work/tests/libipm'
+make[2]: Leaving directory '/work/tests/libipm'
+Making check in libxrdp
+make[2]: Entering directory '/work/tests/libxrdp'
+make  test_libxrdp
+make[3]: Entering directory '/work/tests/libxrdp'
+  CC       test_libxrdp-test_xrdp_sec_process_mcs_data_monitors.o
+  CC       test_libxrdp-test_libxrdp_main.o
+  CC       test_libxrdp-test_libxrdp_process_monitor_stream.o
+  CCLD     test_libxrdp
+make[3]: Leaving directory '/work/tests/libxrdp'
+make  check-TESTS
+make[3]: Entering directory '/work/tests/libxrdp'
+make[4]: Entering directory '/work/tests/libxrdp'
+PASS: test_libxrdp 1 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_flags_is_not_zero__fail: Passed
+PASS: test_libxrdp 2 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_monitor_count_is_greater_than_sixteen__fail: Passed
+PASS: test_libxrdp 3 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__with_single_monitor_happy_path: Passed
+PASS: test_libxrdp 4 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_no_primary_monitor_is_specified_one_is_selected: Passed
+PASS: test_libxrdp 5 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_virtual_desktop_width_is_too_large: Passed
+PASS: test_libxrdp 6 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_virtual_desktop_width_is_too_small: Passed
+PASS: test_libxrdp 7 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_virtual_desktop_height_is_too_large: Passed
+PASS: test_libxrdp 8 - test_xrdp_sec_process_mcs_data_monitors.c:xrdp_sec_process_mcs_data_monitors:test_xrdp_sec_process_mcs_data_monitors__when_virtual_desktop_height_is_too_small: Passed
+PASS: test_libxrdp 9 - test_libxrdp_process_monitor_stream.c:libxrdp_process_monitor_stream:test_libxrdp_process_monitor_stream__when_description_is_null__fail: Passed
+PASS: test_libxrdp 10 - test_libxrdp_process_monitor_stream.c:libxrdp_process_monitor_stream:test_libxrdp_process_monitor_stream__when_stream_is_too_small__fail: Passed
+PASS: test_libxrdp 11 - test_libxrdp_process_monitor_stream.c:libxrdp_process_monitor_stream:test_libxrdp_process_monitor_stream__when_monitor_count_is_greater_than_sixteen__fail: Passed
+PASS: test_libxrdp 12 - test_libxrdp_process_monitor_stream.c:libxrdp_process_monitor_stream:test_libxrdp_process_monitor_stream__with_single_monitor_happy_path: Passed
+PASS: test_libxrdp 13 - test_libxrdp_process_monitor_stream.c:libxrdp_process_monitor_stream:test_libxrdp_process_monitor_stream__with_sextuple_monitor_happy_path: Passed
+============================================================================
+Testsuite summary for "libxrdp"
+============================================================================
+# TOTAL: 13
+# PASS:  13
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+============================================================================
+make[4]: Leaving directory '/work/tests/libxrdp'
+make[3]: Leaving directory '/work/tests/libxrdp'
+make[2]: Leaving directory '/work/tests/libxrdp'
+Making check in memtest
+make[2]: Entering directory '/work/tests/memtest'
+make  memtest
+make[3]: Entering directory '/work/tests/memtest'
+  CC       memtest.o
+  CC       libmem.o
+  CCLD     memtest
+make[3]: Leaving directory '/work/tests/memtest'
+make  check-TESTS
+make[3]: Entering directory '/work/tests/memtest'
+make[4]: Entering directory '/work/tests/memtest'
+PASS: memtest
+============================================================================
+Testsuite summary for "memtest"
+============================================================================
+# TOTAL: 1
+# PASS:  1
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+============================================================================
+make[4]: Leaving directory '/work/tests/memtest'
+make[3]: Leaving directory '/work/tests/memtest'
+make[2]: Leaving directory '/work/tests/memtest'
+Making check in xrdp
+make[2]: Entering directory '/work/tests/xrdp'
+make  test_xrdp
+make[3]: Entering directory '/work/tests/xrdp'
+  CC       test_xrdp-test_xrdp_main.o
+  CC       test_xrdp-test_xrdp_egfx.o
+  CC       test_xrdp-test_xrdp_keymap.o
+  CC       test_xrdp-test_avc444_convert.o
+  CC       test_xrdp-test_avc444_metablock.o
+  CC       test_xrdp-test_xrdp_region.o
+  CC       test_xrdp-test_avc444_caps.o
+  CC       test_xrdp-test_tconfig.o
+  CC       test_xrdp-test_avc444_h264.o
+  CC       test_xrdp-test_avc444_ltr.o
+  CC       test_xrdp-test_avc444_nut.o
+  CC       test_xrdp-test_avc444_ffmpeg.o
+  CC       test_xrdp-test_avc444_multimon.o
+  CC       test_xrdp-test_avc444_emit_split.o
+  CC       test_xrdp-test_avc444_credit_frontier.o
+  CC       test_xrdp-test_avc444_chroma_due.o
+  CC       test_xrdp-test_bitmap_load.o
+  CCLD     test_xrdp
+make[3]: Leaving directory '/work/tests/xrdp'
+make  check-TESTS
+make[3]: Entering directory '/work/tests/xrdp'
+make[4]: Entering directory '/work/tests/xrdp'
+PASS: check_operator_surface.sh 1 - operator surface contains no internal project labels
+PASS: test_xrdp 1 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__with_invalid_image__fail: Passed
+PASS: test_xrdp 2 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__4_bit__ok: Passed
+PASS: test_xrdp 3 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__8_bit__ok: Passed
+PASS: test_xrdp 4 - test_bitmap_load.c:xrdp_bitmap_load_basic:test_bitmap_load__24_bit__ok: Passed
+PASS: test_xrdp 5 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_width_zoom__ok: Passed
+PASS: test_xrdp 6 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__max_height_zoom__ok: Passed
+PASS: test_xrdp 7 - test_bitmap_load.c:xrdp_bitmap_load_zoom:test_bitmap_load__min_zoom__ok: Passed
+PASS: test_xrdp 8 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_width_scale__ok: Passed
+PASS: test_xrdp 9 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__max_height_scale__ok: Passed
+PASS: test_xrdp 10 - test_bitmap_load.c:xrdp_bitmap_load_scale:test_bitmap_load__min_scale__ok: Passed
+PASS: test_xrdp 11 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_4_bit__ok: Passed
+PASS: test_xrdp 12 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_8_bit__ok: Passed
+PASS: test_xrdp 13 - test_bitmap_load.c:xrdp_bitmap_load_not_mod_4:test_bitmap_load__not_4_pixels_wide_24_bit__ok: Passed
+PASS: test_xrdp 14 - test_xrdp_keymap.c:xrdp_keymap_load:test_keymap_load__basic_load: Passed
+PASS: test_xrdp 15 - test_xrdp_egfx.c:xrdp_egfx_base_functions:test_xrdp_egfx_send_create_surface__happy_path: Passed
+PASS: test_xrdp 16 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_accepts_the_exact_avc444_shape: Passed
+PASS: test_xrdp 17 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_round_trips_dedicated_message: Passed
+PASS: test_xrdp 18 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_build_capture_rejects_unrepresentable_input: Passed
+PASS: test_xrdp 19 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_bad_command_ids: Passed
+PASS: test_xrdp 20 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_other_egfx_commands: Passed
+PASS: test_xrdp 21 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_wrong_codec_ids: Passed
+PASS: test_xrdp 22 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_every_truncation: Passed
+PASS: test_xrdp 23 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_lying_lengths: Passed
+PASS: test_xrdp 24 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_over_the_emit_envelope: Passed
+PASS: test_xrdp 25 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_rejects_degenerate_input: Passed
+PASS: test_xrdp 26 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_single_item: Passed
+PASS: test_xrdp 27 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_two_monitors_batch_together: Passed
+PASS: test_xrdp 28 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_same_monitor_ends_the_batch: Passed
+PASS: test_xrdp 29 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_first_is_a_set_of_one: Passed
+PASS: test_xrdp 30 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_non_batchable_second_ends_the_batch: Passed
+PASS: test_xrdp 31 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_sixteen_monitors: Passed
+PASS: test_xrdp 32 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_group_degenerate_input: Passed
+PASS: test_xrdp 33 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_reads_the_startframe_id: Passed
+PASS: test_xrdp 34 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_peek_frame_id_rejects_what_it_cannot_read: Passed
+PASS: test_xrdp 35 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_batch_capture_info_reads_the_exact_avc444_envelope: Passed
+PASS: test_xrdp 36 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_wire_inspect_retains_inner_overflow_bounds: Passed
+PASS: test_xrdp 37 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_wire_inspect_reads_frame_and_avc444_metadata: Passed
+PASS: test_xrdp 38 - test_xrdp_egfx.c:xrdp_egfx_multimon_batch:test_wire_inspect_rejects_every_truncated_wire_message: Passed
+PASS: test_xrdp 39 - test_xrdp_region.c:test_xrdp_region:execute_suite: Passed
+PASS: test_xrdp 40 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_always_success: Passed
+PASS: test_xrdp 41 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_x264_load_basic: Passed
+PASS: test_xrdp 42 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_codec_order: Passed
+PASS: test_xrdp 43 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_file: Passed
+PASS: test_xrdp 44 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_missing_h264: Passed
+PASS: test_xrdp 45 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_oh264_load_basic: Passed
+PASS: test_xrdp 46 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_oh264: Passed
+PASS: test_xrdp 47 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_x264: Passed
+PASS: test_xrdp 48 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_undefined: Passed
+PASS: test_xrdp 49 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_h264_invalid: Passed
+PASS: test_xrdp 50 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_defaults: Passed
+PASS: test_xrdp 51 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_override: Passed
+PASS: test_xrdp 52 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_threshold: Passed
+PASS: test_xrdp 53 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_surface_reset: Passed
+PASS: test_xrdp 54 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_rekey_out_of_range_refused: Passed
+PASS: test_xrdp 55 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh: Passed
+PASS: test_xrdp 56 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_intra_refresh_out_of_range_refused: Passed
+PASS: test_xrdp 57 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux: Passed
+PASS: test_xrdp 58 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_sparse_aux_out_of_range_refused: Passed
+PASS: test_xrdp 59 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window: Passed
+PASS: test_xrdp 60 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_wire_window_out_of_range_refused: Passed
+PASS: test_xrdp 61 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_empty_args_fallback: Passed
+PASS: test_xrdp 62 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_removed_key_still_parses: Passed
+PASS: test_xrdp 63 - test_tconfig.c:xrdp_tconfig_load_gfx:test_tconfig_gfx_avc444_development_key_disables_h264: Passed
+PASS: test_xrdp 64 - test_avc444_convert.c:avc444_convert:test_avc444_color_primaries: Passed
+PASS: test_xrdp 65 - test_avc444_convert.c:avc444_convert:test_avc444_roundtrip_exact: Passed
+PASS: test_xrdp 66 - test_avc444_convert.c:avc444_convert:test_avc444_v2_packing: Passed
+PASS: test_xrdp 67 - test_avc444_convert.c:avc444_convert:test_avc444_v2_default_is_v1: Passed
+PASS: test_xrdp 68 - test_avc444_convert.c:avc444_convert:test_avc444_main_only_420: Passed
+PASS: test_xrdp 69 - test_avc444_convert.c:avc444_convert:test_avc420_isoluminant_chroma_loss: Passed
+PASS: test_xrdp 70 - test_avc444_convert.c:avc444_convert:test_sparse_main_only_stalls_at_420_until_restore: Passed
+PASS: test_xrdp 71 - test_avc444_convert.c:avc444_convert:test_avc444_dims_and_padding: Passed
+PASS: test_xrdp 72 - test_avc444_convert.c:avc444_convert:test_avc444_odd_dims_alignment: Passed
+PASS: test_xrdp 73 - test_avc444_convert.c:avc444_convert:test_avc444_odd_padding_edge_replicated: Passed
+PASS: test_xrdp 74 - test_avc444_convert.c:avc444_convert:test_avc444_width_align: Passed
+PASS: test_xrdp 75 - test_avc444_convert.c:avc444_convert:test_avc444_resize_nonaligned_stride_contract: Passed
+PASS: test_xrdp 76 - test_avc444_caps.c:avc444_caps:test_caps_v8_none: Passed
+PASS: test_xrdp 77 - test_avc444_caps.c:avc444_caps:test_caps_v81: Passed
+PASS: test_xrdp 78 - test_avc444_caps.c:avc444_caps:test_caps_v10_avc444: Passed
+PASS: test_xrdp 79 - test_avc444_caps.c:avc444_caps:test_caps_v101_excluded: Passed
+PASS: test_xrdp 80 - test_avc444_caps.c:avc444_caps:test_caps_v102_to_107: Passed
+PASS: test_xrdp 81 - test_avc444_caps.c:avc444_caps:test_caps_unknown_none: Passed
+PASS: test_xrdp 82 - test_avc444_caps.c:avc444_caps:test_caps_v2_support: Passed
+PASS: test_xrdp 83 - test_avc444_metablock.c:avc444_metablock:test_metablock_even_x1_origin_even: Passed
+PASS: test_xrdp 84 - test_avc444_metablock.c:avc444_metablock:test_metablock_odd_x1_origin_even: Passed
+PASS: test_xrdp 85 - test_avc444_metablock.c:avc444_metablock:test_metablock_mixed_and_edges_origin_even: Passed
+PASS: test_xrdp 86 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_luma_lc1: Passed
+PASS: test_xrdp 87 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_chroma_lc2: Passed
+PASS: test_xrdp 88 - test_avc444_metablock.c:avc444_wire:test_avc444_wire_single_rect: Passed
+PASS: test_xrdp 89 - test_avc444_metablock.c:avc444_wire:test_avc444_coded_edge_comparison: Passed
+PASS: test_xrdp 90 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_sps_pps_idr: Passed
+PASS: test_xrdp 91 - test_avc444_h264.c:avc444_h264:test_h264_duplicate_sps_counted: Passed
+PASS: test_xrdp 92 - test_avc444_h264.c:avc444_h264:test_h264_main_reset_missing_pps: Passed
+PASS: test_xrdp 93 - test_avc444_h264.c:avc444_h264:test_h264_aux_vcl: Passed
+PASS: test_xrdp 94 - test_avc444_h264.c:avc444_h264:test_h264_malformed: Passed
+PASS: test_xrdp 95 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_rewrites_to_golden: Passed
+PASS: test_xrdp 96 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_no_hrd_untouched: Passed
+PASS: test_xrdp 97 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_idempotent: Passed
+PASS: test_xrdp 98 - test_avc444_h264.c:avc444_h264:test_h264_sanitize_hrd_truncated_sps_fails: Passed
+PASS: test_xrdp 99 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_clears_flag: Passed
+PASS: test_xrdp 100 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_zero_flag_untouched: Passed
+PASS: test_xrdp 101 - test_avc444_h264.c:avc444_h264:test_h264_strip_pic_struct_truncated_sps_fails: Passed
+PASS: test_xrdp 102 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_golden: Passed
+PASS: test_xrdp 103 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_rejects_non_idr_aux: Passed
+PASS: test_xrdp 104 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_requires_main_ref_vcl: Passed
+PASS: test_xrdp 105 - test_avc444_h264.c:avc444_h264:test_h264_aux_to_leaf_truncated_aux_fails: Passed
+PASS: test_xrdp 106 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_resolution_identical_both_modes: Passed
+PASS: test_xrdp 107 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_pinning_512_frames_across_wrap: Passed
+PASS: test_xrdp 108 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_cadence: Passed
+PASS: test_xrdp 109 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_slot_reassignment_replaces: Passed
+PASS: test_xrdp 110 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_idr_restart_reseeds: Passed
+PASS: test_xrdp 111 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_unseeded_aux_p_is_missing_ref: Passed
+PASS: test_xrdp 112 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sliding_window_exempts_long_term: Passed
+PASS: test_xrdp 113 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_range_violation_recorded_not_silent: Passed
+PASS: test_xrdp 114 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_frame_num_slots_golden: Passed
+PASS: test_xrdp 115 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_golden_sequence: Passed
+PASS: test_xrdp 116 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_field_sequence_cross_check: Passed
+PASS: test_xrdp 117 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_existing_list_modification: Passed
+PASS: test_xrdp 118 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_unseeded_aux_p: Passed
+PASS: test_xrdp 119 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_main_start_without_idr: Passed
+PASS: test_xrdp 120 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_truncated_and_small_cap: Passed
+PASS: test_xrdp 121 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_high_counter_and_cadence: Passed
+PASS: test_xrdp 122 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_emitter_epoch_restart_byte_exact: Passed
+PASS: test_xrdp 123 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_seed_i_pins_leaf_diff: Passed
+PASS: test_xrdp 124 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_main_golden_recipe_fields: Passed
+PASS: test_xrdp 125 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_win2022_sps_fields: Passed
+PASS: test_xrdp 126 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_rejects_b_slice_and_unknown_level: Passed
+PASS: test_xrdp 127 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_sequence_byte_exact: Passed
+PASS: test_xrdp 128 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_nonidr_i_accepted_both_views: Passed
+PASS: test_xrdp 129 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_cut_midstream_idr_keeps_chain: Passed
+PASS: test_xrdp 130 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_observed_vs_requested: Passed
+PASS: test_xrdp 131 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_schedule_aux_has_its_own_period: Passed
+PASS: test_xrdp 132 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_scheduled_paired_cut_both_modes: Passed
+PASS: test_xrdp 133 - test_avc444_ltr.c:avc444_ltr_dpb:test_ltr_dpb_sparse_aux_independent_cut_schedules_both_modes: Passed
+PASS: test_xrdp 134 - test_avc444_nut.c:avc444_nut:test_nut_four_packets: Passed
+PASS: test_xrdp 135 - test_avc444_nut.c:avc444_nut:test_nut_byte_fragmentation: Passed
+PASS: test_xrdp 136 - test_avc444_nut.c:avc444_nut:test_nut_truncation: Passed
+PASS: test_xrdp 137 - test_avc444_nut.c:avc444_nut:test_nut_bad_crc: Passed
+PASS: test_xrdp 138 - test_avc444_nut.c:avc444_nut:test_nut_bad_file_id: Passed
+PASS: test_xrdp 139 - test_avc444_nut.c:avc444_nut:test_nut_total_ceiling: Passed
+PASS: test_xrdp 140 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe: Passed
+PASS: test_xrdp 141 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_production_leaf_topology: Passed
+PASS: test_xrdp 142 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_post_confirm_failure_is_terminal_once: Passed
+PASS: test_xrdp 143 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_global_header_encoder: Passed
+PASS: test_xrdp 144 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_duplicate_headers_rejected: Passed
+PASS: test_xrdp 145 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_probe_timeout_classified: Passed
+PASS: test_xrdp 146 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_single_sps_per_keyframe: Passed
+PASS: test_xrdp 147 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_pair: Passed
+PASS: test_xrdp 148 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_ltr_rekey_cycle: Passed
+PASS: test_xrdp 149 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_scheduled_paired_cut_live: Passed
+PASS: test_xrdp 150 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_sparse_aux_independent_schedules_live: Passed
+PASS: test_xrdp 151 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_pump_set_four_views_one_thread: Passed
+PASS: test_xrdp 152 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_avc444_cfg_from_encoder_carries_every_field: Passed
+PASS: test_xrdp 153 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_encode_single: Passed
+PASS: test_xrdp 154 - test_avc444_ffmpeg.c:avc444_ffmpeg:test_ffmpeg_resize_recycle: Passed
+PASS: test_xrdp 155 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_no_monitors_uses_screen: Passed
+PASS: test_xrdp 156 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_null_uses_screen: Passed
+PASS: test_xrdp 157 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_dual_equal_1024x768: Passed
+PASS: test_xrdp 158 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_takes_max_per_axis: Passed
+PASS: test_xrdp 159 - test_avc444_multimon.c:avc444_multimon:test_probe_dims_alignment_round_up: Passed
+PASS: test_xrdp 160 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_no_monitors_session_at_zero: Passed
+PASS: test_xrdp 161 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_single_monitor_matches_session_formula: Passed
+PASS: test_xrdp 162 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_owner_dual_disjoint: Passed
+PASS: test_xrdp 163 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_nv12_dual: Passed
+PASS: test_xrdp 164 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_unaligned_dims_stay_disjoint: Passed
+PASS: test_xrdp 165 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_degenerate_monitor_zero_bytes: Passed
+PASS: test_xrdp 166 - test_avc444_multimon.c:avc444_multimon:test_cap_layout_two_slot_strides: Passed
+PASS: test_xrdp 167 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_starts_empty: Passed
+PASS: test_xrdp 168 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap1_is_serial: Passed
+PASS: test_xrdp 169 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_cap2_reaches_depth_two: Passed
+PASS: test_xrdp 170 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_third_capture_is_signalled: Passed
+PASS: test_xrdp 171 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_monitors_never_reach_three: Passed
+PASS: test_xrdp 172 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_slot_alternates_per_monitor: Passed
+PASS: test_xrdp 173 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_ack_everything_retires_all: Passed
+PASS: test_xrdp 174 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_capture_and_encode_do_overlap: Passed
+PASS: test_xrdp 175 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_single_slot_is_serial: Passed
+PASS: test_xrdp 176 - test_avc444_multimon.c:avc444_multimon:test_overlap_m1_closed_ack_window_is_serial: Passed
+PASS: test_xrdp 177 - test_avc444_multimon.c:avc444_multimon:test_overlap_m2_global_window_pins_each_monitor_to_one: Passed
+PASS: test_xrdp 178 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_never_exceeds_its_own_bounds: Passed
+PASS: test_xrdp 179 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_zero_capacity_yields_no_captures: Passed
+PASS: test_xrdp 180 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_instant_ack_cannot_overlap: Passed
+PASS: test_xrdp 181 - test_avc444_multimon.c:avc444_multimon:test_overlap_model_widening_window_never_reduces_depth: Passed
+PASS: test_xrdp 182 - test_avc444_multimon.c:avc444_multimon:test_cap_budget_two_gates_agree: Passed
+PASS: test_xrdp 183 - test_avc444_multimon.c:avc444_multimon:test_overlap_lossy_encode_wedges_without_consume_ack: Passed
+PASS: test_xrdp 184 - test_avc444_multimon.c:avc444_multimon:test_overlap_consume_ack_restores_depth: Passed
+PASS: test_xrdp 185 - test_avc444_multimon.c:avc444_multimon:test_ack_value_is_echoed_identity: Passed
+PASS: test_xrdp 186 - test_avc444_multimon.c:avc444_multimon:test_dropped_frame_region_returns_to_dirty: Passed
+PASS: test_xrdp 187 - test_avc444_multimon.c:avc444_multimon:test_xup_ack_displayed_bit_serialization: Passed
+PASS: test_xrdp 188 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_slot_only_holds_the_region_frontier: Passed
+PASS: test_xrdp 189 - test_avc444_multimon.c:avc444_multimon:test_ack_frontier_is_cumulative_and_monotonic: Passed
+PASS: test_xrdp 190 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_buys_nothing_when_the_budget_already_admits_two: Passed
+PASS: test_xrdp 191 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_restores_the_floor_at_effective_depth_one: Passed
+PASS: test_xrdp 192 - test_avc444_multimon.c:avc444_multimon:test_eager_ack_never_drops_a_region_a_failing_tail_owes_back: Passed
+PASS: test_xrdp 193 - test_avc444_multimon.c:avc444_multimon:test_absorb_only_ack_bufferbloats_and_the_metric_shows_it: Passed
+PASS: test_xrdp 194 - test_avc444_multimon.c:avc444_multimon:test_capture_contract_rejects_a_previous_resize_layout: Passed
+PASS: test_xrdp 195 - test_avc444_emit_split.c:batch_publish:test_publish_arms_sequence_zero: Passed
+PASS: test_xrdp 196 - test_avc444_emit_split.c:batch_publish:test_publish_leaves_untouched_monitor_alone: Passed
+PASS: test_xrdp 197 - test_avc444_emit_split.c:batch_publish:test_publish_clears_stale_arm_state: Passed
+PASS: test_xrdp 198 - test_avc444_emit_split.c:batch_publish:test_publish_marks_submit_failure: Passed
+PASS: test_xrdp 199 - test_avc444_emit_split.c:batch_publish:test_publish_arms_surface_reset_after_teardown: Passed
+PASS: test_xrdp 200 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_each_term_binds: Passed
+PASS: test_xrdp 201 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_is_monotone: Passed
+PASS: test_xrdp 202 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_obeys_the_same_window: Passed
+PASS: test_xrdp 203 - test_avc444_credit_frontier.c:credit_frontier:test_region_ack_never_lags_the_credit_by_more_than_one: Passed
+PASS: test_xrdp 204 - test_avc444_credit_frontier.c:credit_frontier:test_the_shipped_gate_withholds_what_the_window_permits: Passed
+PASS: test_xrdp 205 - test_avc444_credit_frontier.c:credit_frontier:test_planner_never_withholds_an_earned_credit: Passed
+PASS: test_xrdp 206 - test_avc444_credit_frontier.c:credit_frontier:test_joint_machine_enumeration: Passed
+PASS: test_xrdp 207 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c2: Passed
+PASS: test_xrdp 208 - test_avc444_credit_frontier.c:credit_frontier:test_wedge_replay_d40_c1: Passed
+PASS: test_xrdp 209 - test_avc444_credit_frontier.c:credit_frontier:test_credit_frontier_frozen_client_halts_at_client_plus_c: Passed
+PASS: test_xrdp 210 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_from_the_producers_contract: Passed
+PASS: test_xrdp 211 - test_avc444_credit_frontier.c:credit_frontier:test_credit_permits_capture_agrees_with_the_producer_budget: Passed
+PASS: test_xrdp 212 - test_avc444_credit_frontier.c:credit_frontier:test_credit_mask_names_the_permitted_monitors: Passed
+PASS: test_xrdp 213 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_disabled_sends_aux_every_frame: Passed
+PASS: test_xrdp 214 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_guarantee_holds_under_unbroken_motion: Passed
+PASS: test_xrdp 215 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_gap_never_exceeds_the_bound: Passed
+PASS: test_xrdp 216 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bound_is_refresh_plus_one_frame: Passed
+PASS: test_xrdp 217 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_settle_clamps_aux_to_the_idle_interval: Passed
+PASS: test_xrdp 218 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_aux_rate_is_bounded_by_the_idle_interval: Passed
+PASS: test_xrdp 219 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_without_idle_only_the_guarantee_fires: Passed
+PASS: test_xrdp 220 - test_avc444_chroma_due.c:chroma_due:test_chroma_due_bootstrap_and_boundaries: Passed
+PASS: test_xrdp 221 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_trailing_deadline: Passed
+PASS: test_xrdp 222 - test_avc444_chroma_due.c:chroma_due:test_chroma_restore_deadline_is_overflow_safe: Passed
+============================================================================
+Testsuite summary for "XRDP daemon"
+============================================================================
+# TOTAL: 223
+# PASS:  223
+# SKIP:  0
+# XFAIL: 0
+# FAIL:  0
+# XPASS: 0
+# ERROR: 0
+============================================================================
+make[4]: Leaving directory '/work/tests/xrdp'
+make[3]: Leaving directory '/work/tests/xrdp'
+make[2]: Leaving directory '/work/tests/xrdp'
+make[2]: Entering directory '/work/tests'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '/work/tests'
+make[1]: Leaving directory '/work/tests'
+Making check in tools
+make[1]: Entering directory '/work/tools'
+Making check in chkpriv
+make[2]: Entering directory '/work/tools/chkpriv'
+make[2]: Nothing to be done for 'check'.
+make[2]: Leaving directory '/work/tools/chkpriv'
+Making check in devel
+make[2]: Entering directory '/work/tools/devel'
+Making check in tcp_proxy
+make[3]: Entering directory '/work/tools/devel/tcp_proxy'
+make[3]: Nothing to be done for 'check'.
+make[3]: Leaving directory '/work/tools/devel/tcp_proxy'
+make[3]: Entering directory '/work/tools/devel'
+make[3]: Nothing to be done for 'check-am'.
+make[3]: Leaving directory '/work/tools/devel'
+make[2]: Leaving directory '/work/tools/devel'
+make[2]: Entering directory '/work/tools'
+make[2]: Nothing to be done for 'check-am'.
+make[2]: Leaving directory '/work/tools'
+make[1]: Leaving directory '/work/tools'
+make[1]: Entering directory '/work'
+make[1]: Leaving directory '/work'

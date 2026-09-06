@@ -61,7 +61,8 @@ def tx_description(record):
     for key in ("frame", "surface", "codec", "lc", "x1", "y1", "x2",
                 "y2", "regions", "payload_bytes", "pdu_bytes",
                 "wire_bytes", "segments", "head", "next", "tail",
-                "width", "height", "monitors", "result"):
+                "width", "height", "monitors", "region_x1", "region_y1",
+                "region_x2", "region_y2", "result"):
         if key in record and record[key] != -1:
             fields.append("%s=%s" % (key, record[key]))
     return "  " + " ".join(fields)

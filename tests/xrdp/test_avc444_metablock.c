@@ -292,6 +292,60 @@ START_TEST(test_avc444_wire_single_rect)
 }
 END_TEST
 
+/* This checks the explicitly retained diagnostic intervention, not the
+ * shipping visible-surface contract checked above. */
+START_TEST(test_avc444_coded_edge_comparison)
+{
+    const unsigned char payload[] = {0xAA};
+    const int widths[] = {2360, 2361};
+    const int heights[] = {1032, 1033};
+    const int right_edges[] = {2360, 2362};
+    const int bottom_edges[] = {1032, 1034};
+    struct xrdp_egfx_rect destination;
+    struct stream *s;
+    unsigned int info;
+    int count;
+    int coordinate;
+    int x;
+    int y;
+    int lc;
+
+    make_stream(s);
+    init_stream(s, 128);
+    for (x = 0; x < 2; x++)
+    {
+        for (y = 0; y < 2; y++)
+        {
+            destination.x1 = 0;
+            destination.y1 = 0;
+            destination.x2 = widths[x];
+            destination.y2 = heights[y];
+            for (lc = 1; lc <= 2; lc++)
+            {
+                s->p = s->data;
+                ck_assert_int_eq(0, out_RFX_AVC444_BITMAP_STREAM_view(
+                                     &destination, s, &destination, 1,
+                                     payload, sizeof(payload), lc));
+                s->p = s->data;
+                in_uint32_le(s, info);
+                ck_assert_uint_eq((unsigned int)lc, info >> 30);
+                in_uint32_le(s, count);
+                ck_assert_int_eq(1, count);
+                in_uint16_le(s, coordinate);
+                ck_assert_int_eq(0, coordinate);
+                in_uint16_le(s, coordinate);
+                ck_assert_int_eq(0, coordinate);
+                in_uint16_le(s, coordinate);
+                ck_assert_int_eq(right_edges[x], coordinate);
+                in_uint16_le(s, coordinate);
+                ck_assert_int_eq(bottom_edges[y], coordinate);
+            }
+        }
+    }
+    free_stream(s);
+}
+END_TEST
+
 /******************************************************************************/
 Suite *
 make_suite_avc444_metablock(void)
@@ -309,6 +363,7 @@ make_suite_avc444_metablock(void)
     tcase_add_test(tc, test_avc444_wire_luma_lc1);
     tcase_add_test(tc, test_avc444_wire_chroma_lc2);
     tcase_add_test(tc, test_avc444_wire_single_rect);
+    tcase_add_test(tc, test_avc444_coded_edge_comparison);
     suite_add_tcase(s, tc);
     return s;
 }
