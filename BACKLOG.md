@@ -398,6 +398,64 @@ and complete acceptance:
 
 ## #142D — repeated interactive resize tears down the client transport
 
+**IN PROGRESS — controlled FreeRDP reset reproduced, 2026-09-06.** The
+rendering client now sends one deliberate repeat on the existing connection.
+The authorized fixed-geometry run on corrected development port 40062 reached
+the actual callback, retained the old worker/children beside a successor and
+received no repaint before the post-reset snapshot. FreeRDP retained stale
+pixels and stayed connected; this is not a Windows-EOF reproduction or a fix.
+Server retirement, queued-capture disposal, shutdown-failure handling and the
+matching corrected run remain open. Evidence and apparatus limits:
+[`the FreeRDP capture`](PR-demo/mac_bisect_matrix/captures/i142d_freerdp_reset_20260906T174945Z/README.md).
+
+**Authorized scope — controlled client reset apparatus, 2026-09-06.** Microsoft
+MS-RDPEGFX 3.3.5.19 permits a 10.3–10.7 client to resend capabilities during
+an existing connection; 3.2.5.18 requires the server reset. No documented stock
+MSTSC or Linux-session command forcing that choice was found. Before changing
+the lifecycle, build a rendering test-client control for one valid resend on
+the same live connection with valid geometry, obeying client state reset and
+ignore-until-confirm. Prove the actual inbound callback and capture the current
+bad ownership/repaint sequence with the existing sink. A session-terminal
+wrapper needs a cooperating client; a server-only function call is not real
+renegotiation. The owner accepts rendering FreeRDP and authorizes a forward
+development implementation/spec commit if it reproduces the defect. First run:
+one connection to corrected development port 40062, fixed even geometry, one
+explicit reset after rendering, at most 60 seconds, existing colour-key login
+payload and wire trace; retain before/after client screenshots and server
+process ownership. Repeat that same condition after the correction. Other
+lifetime failure/queued-work checks must pass before only clean-room port work
+can remain. The first apparatus run is now recorded above. Protocol sources,
+implementation seam and acceptance:
+[`docs/experiments/142d-controlled-capability-reset.md`](docs/experiments/142d-controlled-capability-reset.md).
+
+**OPEN — independent upstream blocker after the odd-edge correction,
+2026-09-06.** Fixing the serializer trigger in `1cd9b551` does not repair or
+close the repeated-capability transition. Current development still overwrites
+its live encoder without retirement and resets a direct-Xorg surface without
+requesting a complete producer repaint. The August 27 source finding and
+August 28 instrumented proof were committed in `83bcb274`; the history review
+and distinction from unproven stale-pipe writes are appended to the experiment
+record below. Do not treat a successful odd-height retest as acceptance of this
+lifecycle or as permission to upstream it.
+
+The correction must be exercised independently of malformed odd-edge metadata:
+drive the real repeated-capability callback with a live encoder, queued
+completions and borrowed capture ownership while all visible regions are valid.
+Prove old-worker termination before shared state is freed/replaced, exactly-once
+capture release/terminal acknowledgement, no old-generation completion entering
+the successor, and one complete producer repaint after the successor is ready.
+Cover failure during replacement and worker shutdown; current encoder deletion
+warns on a termination timeout and still frees worker-owned state, so merely
+adding a delete call does not establish safe retirement. This is a source risk
+to audit/test, not evidence of an observed stale write. Keep fresh-login,
+reconnect, mode and rendered-resize controls in the acceptance below.
+
+Clean-room remains paused. This lifecycle work is distinct from slice 135's
+metadata correction: the worker-lifetime seam is owned by slice 134 and its
+activation/capability wiring by slice 142, under the existing #142C lifecycle
+gate. Confirm the final slice boundary from the development correction before
+any re-authoring; do not bury a lifetime mechanism in the serializer slice.
+
 **Canonical precursor reproduced, 2026-09-06:** the deliberately overflowing
 port-40062 development arm now shows the same missing-ACK/repeated-capability
 transition at its first odd-height resize, followed by black screen and EOF.

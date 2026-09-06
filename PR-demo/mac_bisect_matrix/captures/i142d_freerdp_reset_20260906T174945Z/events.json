@@ -1,0 +1,46 @@
+[
+  {
+    "utc": "2026-09-06T17:49:45.670056+00:00",
+    "event": "connect",
+    "value": {
+      "image": "localhost/xrdp-bisect:dev-visible-clip-1cd9b5513637",
+      "geometry": "1024 768",
+      "rendering": true
+    }
+  },
+  {
+    "utc": "2026-09-06T17:49:51.568979+00:00",
+    "event": "before",
+    "value": {
+      "control": "status=0 requests=0 confirms=1 waiting=0 decoded=6 ignored=0 version=0x000a0701",
+      "rgb": [
+        203.0,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  {
+    "utc": "2026-09-06T17:49:51.705737+00:00",
+    "event": "reset",
+    "value": "status=0 requests=1 confirms=1 waiting=1 decoded=0 ignored=0 version=0x000a0701"
+  },
+  {
+    "utc": "2026-09-06T17:49:54.886715+00:00",
+    "event": "after",
+    "value": {
+      "control": "status=0 requests=1 confirms=2 waiting=0 decoded=0 ignored=0 version=0x000a0701",
+      "rgb": [
+        203.0,
+        0.0,
+        0.0
+      ],
+      "client_exit": null
+    }
+  },
+  {
+    "utc": "2026-09-06T17:49:55.753718+00:00",
+    "event": "capture",
+    "value": "/work/PR-demo/mac_bisect_matrix/captures/i142d_freerdp_reset_20260906T174945Z"
+  }
+]

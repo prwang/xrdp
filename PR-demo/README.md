@@ -50,6 +50,14 @@ realistic payload rather than a diagnostic pattern.
 
 ## Harnesses — they drive a client and assert something
 
+* **`gfx_reset_client/`** — a rendering FreeRDP channel plugin with a private
+  local reset control. It resends graphics capabilities on the existing
+  connection, discards client graphics state and ignores graphics messages
+  until confirmation. `run.py` drives one fixed-size reset against corrected
+  development port 40062 and retains screenshots, server ownership and wire
+  evidence. A completed run is an apparatus result, not lifecycle acceptance;
+  see its README for the reproduced missing repaint and outstanding fix.
+
 Offline resize diagnosis: `lib/i142_metablock_bounds_probe.sh` compiles the
 real development and clean-room serializers and prints their rectangle bounds
 for retained failing and preceding-good desktop geometries. Its companion C

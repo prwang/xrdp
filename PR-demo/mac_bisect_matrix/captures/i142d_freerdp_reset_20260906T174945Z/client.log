@@ -1,0 +1,21 @@
+[17:49:45:716] [1200105:00124feb] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x08 -> no RDP scancode found
+[17:49:45:716] [1200105:00124feb] [WARN][com.freerdp.client.x11] - [load_map_from_xkbfile]:     : keycode: 0x5d -> no RDP scancode found
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *************************************************
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: This build is using [experimental] build options:
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: * 'WITH_VAAPI=ON'
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: [experimental] build options might crash the application
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *************************************************
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *************************************************
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: This build is using [runtime-check] build options:
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: * 'WITH_VERBOSE_WINPR_ASSERT=ON'
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: [runtime-check] build options might slow down the application
+[17:49:45:772] [1200105:00124feb] [WARN][com.freerdp.core.rdp] - [log_build_warn][0x597a19fca150]: *************************************************
+[17:49:45:803] [1200105:00124feb] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[17:49:45:803] [1200105:00124feb] [WARN][com.freerdp.core.license] - [license_read_binary_blob_data]: license binary blob::type BB_ERROR_BLOB, length=0, skipping.
+[17:49:45:803] [1200105:00124feb] [WARN][com.freerdp.core.connection] - [rdp_client_connect_auto_detect]: expected messageChannelId=0, got 1003
+[17:49:46:056] [1200105:00125043] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x7d8acef1fff0
+[17:49:55:479] [1200105:00124fe9] [ERROR][com.freerdp.utils.signal] - [term_handler]: Caught signal 'Terminated' [15]
+[17:49:55:479] [1200105:00124fe9] [ERROR][com.freerdp.core] - [freerdp_abort_connect_context]: ERRCONNECT_CONNECT_CANCELLED [0x0002000B]
+[17:49:55:488] [1200105:00125043] [WARN][com.freerdp.channels.drdynvc.client] - [check_open_close_receive]: {Microsoft::Windows::RDS::DisplayControl:2} OnOpen=(nil), OnClose=0x7d8acef1fff0

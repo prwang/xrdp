@@ -148,6 +148,14 @@ captures and acknowledgement ownership. After the successor is ready, it
 shall request exactly one current full-screen update from the direct producer.
 The replacement must render a complete current desktop; connection liveness
 alone does not satisfy this gate.
+Removing a known advertisement trigger does not discharge the replacement
+lifecycle requirement. A deterministic test shall drive the real callback with
+a live encoder, pending work/completions and borrowed captures while serialized
+regions remain within visible bounds. It shall prove old-worker termination
+before freeing shared state, exactly-once capture/acknowledgement disposition,
+no old completion entering the successor, and failure-safe handling of a
+shutdown or replacement-creation failure. Repeat the existing rendered gate
+after the successor is ready.
 
 Do not correct only a source-reachable handler on a development build which
 does not exhibit the client-visible precursor. That would prove a unit branch,

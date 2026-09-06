@@ -382,3 +382,87 @@ replacement, one successor, and one current direct-producer repaint after the
 successor is ready. The same Windows sequence must establish whether the peer
 EOF disappears. If it does not, teardown remains a second defect; the
 already-proven black and ownership defects are not permission to hide it.
+
+
+## 2026-09-06 history review: the lifecycle remains an upstream blocker
+
+The owner recalled the earlier two-layer diagnosis after deployment of the
+visible-edge correction. The source analysis under the August 27 observation
+and the August 28 instrumented reproduction were first committed in
+83bcb274bd294f8479422e51e00867f953d46e3e (August 28). Git blame attributes the
+live-encoder overwrite, missing direct repaint, and subsequent stale-PDU/pipe
+qualification to that commit. Preserve those paragraphs verbatim.
+
+The remembered ownership finding is precise: a repeated capability callback
+assigns a new encoder to the sole manager owner pointer without retiring the
+old encoder. Its worker, children, queues, capture mappings and frame/ACK state
+then belong to an unreachable owner. The surface is also reset without a
+complete direct-producer repaint. Re-reading the archived August 28 connection
+and pairing each encoder installation with its subsequent complete deletion,
+including allocator address reuse, again yields ten installations and nine
+complete deletions; the lifetime installed at 00:26:33.371 remains unmatched.
+The observed orphan is not a claim that a stale object subsequently wrote into
+a successor's buffer or pipe. The original capture showed no stale PDU from
+it, and g_create_wait_obj() uses independent anonymous pipes on Linux, so
+repeated wait-object names do not cause cross-encoder wakeup aliasing.
+
+Current source at deployed 1cd9b551 still assigns the successor in
+xrdp_mm_egfx_caps_advertise() without deleting the live predecessor. Its
+xrdp_mm_egfx_invalidate_wm_screen() deliberately skips a loaded direct-GFX
+backend. The main thread watches/drains only self->encoder's completion event
+and queue, so replacing that pointer does not retire or service the orphan's
+completion queue. The odd-edge correction changed the serializer only.
+It removes the reproduced stimulus; it is not a correction of this callback.
+
+A related retirement risk needs explicit checking during the fix:
+xrdp_encoder_delete() waits for termination, logs a warning if termination
+was not signalled, and then proceeds to destroy children, events, queues,
+mutex and encoder storage. Reading that control flow does not prove a timeout
+occurred in any retained Windows run, but it means an extra delete call alone
+cannot prove worker-owned memory is no longer accessible before it is freed.
+The lifecycle test must cover shutdown failure as well as ordinary completion.
+
+The two-layer gate remains open even if the corrected odd-height Windows
+sequence stays green. Drive the actual callback deterministically with a live
+worker, pending work/completions and borrowed capture ownership, while keeping
+serialized visible bounds valid. Require retirement before publishing new
+state, exactly-once capture/ACK disposition, no successor consumption of old
+completions, failure-safe teardown and exactly one full current producer repaint
+after successor readiness. Keep the historical malformed-wire reproduction as
+evidence of reachability, not as the only means of exercising the callback.
+
+This is a development-first, independently required upstream gate. The future
+clean-room worker-lifetime implementation belongs at slice 134's ownership
+seam, with capability activation wiring at slice 142; the precise repair scope
+must be derived after validating development. Slice 135 owns only the visible
+metadata correction. No production code, test assertions, deployment or
+clean-room files were changed during this history review. The owner-requested
+clean-room pause for separate development clipboard file-transfer work remains.
+
+
+## 2026-09-06 Microsoft protocol review: deliberate client reset is allowed
+
+The canonical MS-RDPEGFX client/server rules explicitly permit repeated
+capability advertisement for the negotiated 10.7 version and require both
+endpoints to reset protocol state. This supersedes the August 28 uncertainty
+about whether a repeated advertisement itself was allowed; it does not explain
+Windows' internal decision to send it. No documented stock-client command to
+force it from the Linux session was found. The controlled rendering-client
+apparatus remains to be built and validated before retirement correction.
+Sources and the concrete client sender seam are in
+[the apparatus review](142d-controlled-capability-reset.md).
+
+
+## 2026-09-06 controlled FreeRDP reproduction
+
+The rendering client now drives one deliberate legal capability repeat on
+the corrected canonical-development server. With unchanged 1024×768 geometry
+and the preceding frame already acknowledged, the actual callback creates
+a successor while the old worker and production children survive, and no
+repaint arrives before the post-reset observation. The client retains stale
+pixels and remains connected. This isolates the lifecycle defect from the
+odd-edge precursor; it neither fixes the server nor reproduces Windows EOF.
+The complete capture, ownership identities and apparatus limits are in
+[the retained run](../../PR-demo/mac_bisect_matrix/captures/i142d_freerdp_reset_20260906T174945Z/README.md).
+Safe retirement, queued ownership/failure tests and the same-condition
+corrected run remain outstanding.

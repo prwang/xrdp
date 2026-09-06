@@ -1,0 +1,8 @@
+freerdp-reset: process 1577 sent 258 graphics commands, received 6 frame acknowledgements and 2 capability advertisements.
+  Replacement advertisement 2 followed tx 252 by 1304.481 ms; that transaction names frame 4.
+  Latest acknowledgement: frame 4, received after tx 252. Frame IDs may be reused; this is not an acknowledgement of a later transaction with the same ID.
+  tx 249 start frame frame=4 pdu_bytes=16 wire_bytes=18 result=0
+  tx 250 write pixels to surface frame=4 surface=0 codec=15 lc=1 x1=0 y1=0 x2=1024 y2=768 regions=2 payload_bytes=3505 pdu_bytes=3530 wire_bytes=3547 segments=2 head=1073745325 next=2 tail=789421828 region_x1=898 region_y1=0 region_x2=916 region_y2=28 result=0
+  tx 251 write pixels to surface frame=4 surface=0 codec=15 lc=2 x1=0 y1=0 x2=1024 y2=768 regions=2 payload_bytes=6416 pdu_bytes=6441 wire_bytes=6458 segments=2 head=2147483648 next=2 tail=2150429307 region_x1=898 region_y1=0 region_x2=916 region_y2=28 result=0
+  tx 252 end frame frame=4 pdu_bytes=12 wire_bytes=14 result=0
+  Client advertised 11 sets: version=524292 flags=2, version=524549 flags=2, version=655362 flags=2, version=655616 flags=-1, version=655872 flags=2, version=656129 flags=0, version=656384 flags=2, version=656642 flags=2, version=656896 flags=2, version=656897 flags=2, version=657153 flags=2
